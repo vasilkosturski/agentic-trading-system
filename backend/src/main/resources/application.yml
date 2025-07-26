@@ -32,10 +32,11 @@ openai:
 
 # Market Data Configuration
 market:
-  polygon:
-    api-key: ${POLYGON_API_KEY:}
-    base-url: https://api.polygon.io
-  mock-data: true # Use mock data when API keys not available
+  alpha-vantage:
+    api-key: ${ALPHA_VANTAGE_API_KEY:demo}
+  cache:
+    ttl-minutes: 5
+  fallback-to-mock: true
 
 # Trading Configuration
 trading:
