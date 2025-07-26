@@ -1,126 +1,117 @@
-# Agentic Trading System - Hybrid Java/Python MCP Architecture
+# Agentic Trading System
 
-## Architecture Overview
+A full-stack autonomous AI trading system with proper separation of concerns.
 
-This project implements a **hybrid architecture** that combines:
-- **Java Spring Boot** backend for business logic, database operations, and REST APIs
-- **Python MCP servers** that provide tools to AI agents via the Model Context Protocol
-
-## Architecture Components
-
-### Java Spring Boot Backend (`src/main/java/`)
-- **Controllers**: REST API endpoints that MCP servers call
-  - `AccountsController` - Account management operations
-  - `MarketController` - Market data operations
-- **Services**: Business logic layer
-  - `AccountService` - Account operations and trading logic
-  - `MarketService` - Market data and pricing
-- **Entities**: JPA entities for database persistence
-- **Repositories**: Data access layer with SQLite + JSON storage
-
-### Python MCP Servers (Root directory)
-- **`accounts_server.py`** - MCP tools for account operations (get_balance, buy_shares, sell_shares, etc.)
-- **`market_server.py`** - MCP tools for market data (lookup_share_price)
-- **`push_server.py`** - MCP tools for notifications
-- **`mcp_params.py`** - Configuration for MCP server parameters
-
-## How It Works
-
-1. **AI Agents** connect to Python MCP servers via stdio transport
-2. **Python MCP servers** expose tools using `@mcp.tool()` decorators
-3. **MCP tools** make HTTP calls to Java Spring Boot REST APIs
-4. **Java backend** handles business logic, database operations, and returns responses
-5. **MCP servers** return results to AI agents
+## 🏗️ Project Structure (Organized by Purpose)
 
 ```
-AI Agent <--stdio--> Python MCP Server <--HTTP--> Java Spring Boot <--JPA--> SQLite DB
+agentic-trading-system/
+├── backend/                    # Java Spring Boot REST API
+│   ├── src/main/java/         # Java source code
+│   ├── build.gradle.kts       # Backend build configuration
+│   └── gradlew               # Gradle wrapper
+├── frontend/                   # React/Vue/Angular UI (Future)
+│   └── (Coming soon)
+├── mcp-servers/               # Python MCP Protocol Servers
+│   ├── accounts_server.py     # Account operations MCP tools
+│   ├── market_server.py       # Market data MCP tools
+│   ├── push_server.py         # Notification MCP tools
+│   ├── mcp_params.py          # MCP server configuration
+│   └── requirements.txt       # Python dependencies
+├── agents/                    # AI Trading Agents (Future)
+│   └── (Warren, George, Ray, Cathie traders)
+└── docs/                      # Documentation
+    └── README.md              # Detailed technical documentation
 ```
 
-## Key Features
+## 🎯 Architecture Overview
 
-- **Proper MCP Protocol**: Uses official Python MCP SDK with FastMCP
-- **Scalable Backend**: Java Spring Boot with proper service/repository layers
-- **Database Persistence**: SQLite with JSON-based account storage
-- **Market Data**: Mock market data service (easily replaceable with real APIs)
-- **Push Notifications**: Pushover integration for trade notifications
-- **Error Handling**: Comprehensive error handling across both layers
+**Hybrid Full-Stack Architecture:**
+```
+Frontend UI <--REST--> Java Backend <--HTTP--> Python MCP Servers <--stdio--> AI Agents
+```
 
-## Getting Started
+### Components:
 
-### Prerequisites
-- Java 17+
-- Python 3.8+
-- Gradle
+1. **Backend** (`/backend/`) - Java Spring Boot
+   - REST APIs for frontend and MCP servers
+   - Business logic and database operations
+   - SQLite with JSON-based account storage
 
-### Setup
+2. **MCP Servers** (`/mcp-servers/`) - Python FastMCP
+   - Proper MCP protocol implementation
+   - Tools for AI agents (accounts, market, notifications)
+   - Calls backend REST APIs for data operations
 
-1. **Install Python dependencies**:
+3. **Frontend** (`/frontend/`) - Modern Web UI (Future)
+   - Trading dashboard and portfolio management
+   - Real-time market data visualization
+   - Account management interface
+
+4. **Agents** (`/agents/`) - AI Trading Agents (Future)
+   - Warren (Value investing)
+   - George (Momentum trading)  
+   - Ray (Systematic approach)
+   - Cathie (Innovation focus)
+
+## 🚀 Quick Start
+
+### Backend (Java Spring Boot)
 ```bash
-pip install -r requirements.txt
-```
-
-2. **Start Java Spring Boot backend**:
-```bash
+cd backend
 ./gradlew bootRun
+# Backend runs on http://localhost:8080
 ```
 
-3. **Test MCP servers** (in separate terminals):
+### MCP Servers (Python)
 ```bash
-python accounts_server.py
-python market_server.py  
-python push_server.py
+cd mcp-servers
+pip install -r requirements.txt
+python accounts_server.py    # Terminal 1
+python market_server.py      # Terminal 2  
+python push_server.py        # Terminal 3
 ```
 
-### Configuration
-
-Create a `.env` file for environment variables:
-```
-PUSHOVER_USER=your_pushover_user
-PUSHOVER_TOKEN=your_pushover_token
-BRAVE_API_KEY=your_brave_api_key
+### Frontend (Coming Soon)
+```bash
+cd frontend
+npm install && npm start
+# Frontend will run on http://localhost:3000
 ```
 
-## API Endpoints
+## 📋 Available APIs
 
-### Accounts API (`/api/accounts`)
-- `POST /tools/get_balance` - Get account balance
-- `POST /tools/get_holdings` - Get account holdings
-- `POST /tools/buy_shares` - Buy shares
-- `POST /tools/sell_shares` - Sell shares
-- `POST /tools/change_strategy` - Change investment strategy
-- `GET /resources/accounts/{name}` - Get account report
-- `GET /resources/strategy/{name}` - Get account strategy
+### Backend REST APIs
+- **Accounts**: `http://localhost:8080/api/accounts/*`
+- **Market**: `http://localhost:8080/api/market/*`
 
-### Market API (`/api/market`)
-- `GET /price/{symbol}` - Get current stock price
+### MCP Tools (for AI Agents)
+- **Accounts**: get_balance, get_holdings, buy_shares, sell_shares, change_strategy
+- **Market**: lookup_share_price
+- **Push**: push notifications
 
-## MCP Tools Available
+## 🔧 Development Status
 
-### Accounts Server
-- `get_balance(name)` - Get cash balance
-- `get_holdings(name)` - Get stock holdings
-- `buy_shares(name, symbol, quantity, rationale)` - Buy shares
-- `sell_shares(name, symbol, quantity, rationale)` - Sell shares
-- `change_strategy(name, strategy)` - Change investment strategy
+- ✅ **Backend**: Java Spring Boot with REST APIs
+- ✅ **MCP Servers**: Python FastMCP with proper protocol
+- ✅ **Database**: SQLite with JSON account storage
+- ✅ **Architecture**: Proper separation by purpose
+- 🚧 **Service Layer**: Account operations (in progress)
+- 📋 **Frontend**: React dashboard (planned)
+- 📋 **AI Agents**: Four autonomous traders (planned)
 
-### Market Server
-- `lookup_share_price(symbol)` - Get current stock price
+## 📚 Documentation
 
-### Push Server
-- `push(message)` - Send push notification
+See [`docs/README.md`](docs/README.md) for detailed technical documentation, API specifications, and development guides.
 
-## Next Steps
+## 🎯 Next Steps
 
 1. Complete AccountService implementation
-2. Add real market data integration (Polygon.io, Alpha Vantage, etc.)
-3. Implement OpenAI agent foundation
-4. Create the four autonomous traders (Warren, George, Ray, Cathie)
-5. Add comprehensive logging and monitoring
+2. Add real market data integration
+3. Build React frontend dashboard
+4. Implement AI trading agents
+5. Add comprehensive monitoring and logging
 
-## Benefits of This Architecture
+---
 
-- **Best of Both Worlds**: Java's enterprise capabilities + Python's MCP ecosystem
-- **Maintainable**: Clear separation between business logic and MCP protocol
-- **Scalable**: Java backend can handle high-throughput operations
-- **Standards Compliant**: Uses official MCP protocol and tools
-- **Flexible**: Easy to add new MCP tools or modify business logic independently
+**Architecture Philosophy**: Organized by purpose, not technology. Each component has a clear responsibility and communicates through well-defined interfaces.
