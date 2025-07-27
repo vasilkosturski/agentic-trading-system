@@ -17,6 +17,25 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+// Data tier enumeration for tracking data source quality
+enum DataTier {
+    REAL_TIME("Real-time", 0),
+    DELAYED("Delayed", 15),
+    CACHED("Cached", 300),
+    MOCK("Mock/Simulated", Integer.MAX_VALUE);
+    
+    private final String description;
+    private final int delayMinutes;
+    
+    DataTier(String description, int delayMinutes) {
+        this.description = description;
+        this.delayMinutes = delayMinutes;
+    }
+    
+    public String getDescription() { return description; }
+    public int getDelayMinutes() { return delayMinutes; }
+}
+
 @Service
 public class MarketService {
     
@@ -30,7 +49,7 @@ public class MarketService {
     @Value("${market.alpha-vantage.api-key:demo}")
     private String alphaVantageApiKey;
     
-    @Value("${market.cache.ttl-minutes:5}")
+    @Value("${market.cache.ttl-minutes:60}")
     private int cacheTtlMinutes;
     
     @Value("${market.fallback-to-mock:true}")
@@ -66,7 +85,7 @@ public class MarketService {
     /**
      * Get current stock price with caching and fallback mechanisms
      */
-    public Double getSharePrice(String symbol) {
+    public PriceData getSharePrice(String symbol) {
         if (symbol == null || symbol.trim().isEmpty()) {
             throw new IllegalArgumentException("Symbol cannot be null or empty");
         }
@@ -77,22 +96,27 @@ public class MarketService {
         CachedPrice cachedPrice = priceCache.get(upperSymbol);
         if (cachedPrice != null && !cachedPrice.isExpired(cacheTtlMinutes)) {
             logger.debug("Returning cached price for {}: ${}", upperSymbol, cachedPrice.price);
-            return cachedPrice.price;
+            return new PriceData(cachedPrice.price, DataTier.CACHED, cachedPrice.timestamp,
+                "Data retrieved from cache (age: " + java.time.Duration.between(cachedPrice.timestamp, LocalDateTime.now()).toMinutes() + " minutes)");
         }
         
         // Try to fetch real price
         Double realPrice = fetchRealPrice(upperSymbol);
         if (realPrice != null) {
-            priceCache.put(upperSymbol, new CachedPrice(realPrice, LocalDateTime.now()));
+            LocalDateTime fetchTime = LocalDateTime.now();
+            priceCache.put(upperSymbol, new CachedPrice(realPrice, fetchTime));
             logger.info("Fetched real price for {}: ${}", upperSymbol, realPrice);
-            return realPrice;
+            return new PriceData(realPrice, DataTier.DELAYED, fetchTime,
+                "Real market data with ~15 minute delay from external APIs");
         }
         
         // Fallback to mock price if enabled
         if (fallbackToMock) {
             Double mockPrice = getMockPrice(upperSymbol);
+            LocalDateTime mockTime = LocalDateTime.now();
             logger.warn("Using mock price for {} (real data unavailable): ${}", upperSymbol, mockPrice);
-            return mockPrice;
+            return new PriceData(mockPrice, DataTier.MOCK, mockTime,
+                "Simulated price data - not suitable for real trading decisions");
         }
         
         throw new RuntimeException("Unable to fetch price for symbol: " + upperSymbol);
@@ -203,9 +227,10 @@ public class MarketService {
     /**
      * Get historical prices for a symbol (mock implementation for now)
      */
-    public List<HistoricalPrice> getHistoricalPrices(String symbol, int days) {
+    public HistoricalPriceData getHistoricalPrices(String symbol, int days) {
         List<HistoricalPrice> prices = new ArrayList<>();
-        Double currentPrice = getSharePrice(symbol);
+        PriceData currentPriceData = getSharePrice(symbol);
+        Double currentPrice = currentPriceData.getPrice();
         
         for (int i = days; i >= 0; i--) {
             LocalDateTime date = LocalDateTime.now().minusDays(i);
@@ -218,14 +243,22 @@ public class MarketService {
             ));
         }
         
-        return prices;
+        // Add data consistency warning for mock data
+        String warning = null;
+        if (currentPriceData.getDataTier() == DataTier.MOCK) {
+            warning = "Historical data is simulated and may not reflect actual market conditions";
+        }
+        
+        return new HistoricalPriceData(prices, currentPriceData.getDataTier(),
+            LocalDateTime.now(), warning);
     }
     
     /**
      * Get market indicators for a symbol
      */
-    public MarketIndicators getMarketIndicators(String symbol) {
-        List<HistoricalPrice> prices = getHistoricalPrices(symbol, 20);
+    public MarketIndicatorsData getMarketIndicators(String symbol) {
+        HistoricalPriceData historicalData = getHistoricalPrices(symbol, 20);
+        List<HistoricalPrice> prices = historicalData.getPrices();
         
         // Calculate simple moving averages
         double sma5 = prices.stream()
@@ -247,11 +280,14 @@ public class MarketService {
             .orElse(0.0);
         double volatility = Math.sqrt(variance);
         
-        return new MarketIndicators(
+        MarketIndicators indicators = new MarketIndicators(
             Math.round(sma5 * 100.0) / 100.0,
             Math.round(sma20 * 100.0) / 100.0,
             Math.round(volatility * 100.0) / 100.0
         );
+        
+        return new MarketIndicatorsData(indicators, historicalData.getDataTier(),
+            LocalDateTime.now(), historicalData.getWarning());
     }
     
     /**
@@ -338,5 +374,69 @@ public class MarketService {
             this.nextEvent = nextEvent;
             this.currentTime = currentTime;
         }
+    }
+    
+    // Enhanced data structures with timing metadata
+    
+    public static class PriceData {
+        private final Double price;
+        private final DataTier dataTier;
+        private final LocalDateTime timestamp;
+        private final String dataSource;
+        
+        public PriceData(Double price, DataTier dataTier, LocalDateTime timestamp, String dataSource) {
+            this.price = price;
+            this.dataTier = dataTier;
+            this.timestamp = timestamp;
+            this.dataSource = dataSource;
+        }
+        
+        public Double getPrice() { return price; }
+        public DataTier getDataTier() { return dataTier; }
+        public LocalDateTime getTimestamp() { return timestamp; }
+        public String getDataSource() { return dataSource; }
+        public int getDataAgeMinutes() {
+            return (int) java.time.Duration.between(timestamp, LocalDateTime.now()).toMinutes();
+        }
+    }
+    
+    public static class HistoricalPriceData {
+        private final List<HistoricalPrice> prices;
+        private final DataTier dataTier;
+        private final LocalDateTime timestamp;
+        private final String warning;
+        
+        public HistoricalPriceData(List<HistoricalPrice> prices, DataTier dataTier,
+                                 LocalDateTime timestamp, String warning) {
+            this.prices = prices;
+            this.dataTier = dataTier;
+            this.timestamp = timestamp;
+            this.warning = warning;
+        }
+        
+        public List<HistoricalPrice> getPrices() { return prices; }
+        public DataTier getDataTier() { return dataTier; }
+        public LocalDateTime getTimestamp() { return timestamp; }
+        public String getWarning() { return warning; }
+    }
+    
+    public static class MarketIndicatorsData {
+        private final MarketIndicators indicators;
+        private final DataTier dataTier;
+        private final LocalDateTime timestamp;
+        private final String warning;
+        
+        public MarketIndicatorsData(MarketIndicators indicators, DataTier dataTier,
+                                  LocalDateTime timestamp, String warning) {
+            this.indicators = indicators;
+            this.dataTier = dataTier;
+            this.timestamp = timestamp;
+            this.warning = warning;
+        }
+        
+        public MarketIndicators getIndicators() { return indicators; }
+        public DataTier getDataTier() { return dataTier; }
+        public LocalDateTime getTimestamp() { return timestamp; }
+        public String getWarning() { return warning; }
     }
 }

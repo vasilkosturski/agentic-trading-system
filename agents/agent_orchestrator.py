@@ -19,7 +19,7 @@ class AgentOrchestrator:
         self.mcp_manager = MCPManager()
         self.trading_symbols = ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN"]
         self.running = False
-        self.cycle_interval = 300  # 5 minutes between trading cycles
+        self.cycle_interval = 3600  # 60 minutes between trading cycles
     
     def add_agent(self, agent: BaseAgent):
         """Add an agent to the orchestrator"""
