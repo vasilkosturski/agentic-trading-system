@@ -130,16 +130,66 @@ class BaseAgent(ABC):
             return False
     
     async def get_market_data(self, symbol: str) -> Dict[str, Any]:
-        """Get comprehensive market data for a symbol"""
-        current_price = await self.market_tools.lookup_share_price(symbol)
-        indicators = await self.market_tools.get_market_indicators(symbol)
-        trend_analysis = await self.market_tools.analyze_stock_trend(symbol)
+        """Get comprehensive market data for a symbol with data quality awareness"""
+        # Get enhanced data with metadata
+        try:
+            price_data = await self.market_tools.get_price_with_metadata(symbol)
+            indicators_data = await self.market_tools.get_market_indicators_with_metadata(symbol)
+            trend_analysis = await self.market_tools.analyze_stock_trend(symbol)
+            
+            return {
+                "current_price": price_data["price"],
+                "price_metadata": {
+                    "data_tier": price_data["data_tier"],
+                    "data_age_minutes": price_data["data_age_minutes"],
+                    "data_source": price_data["data_source"]
+                },
+                "indicators": indicators_data["indicators"],
+                "indicators_metadata": {
+                    "data_tier": indicators_data["data_tier"],
+                    "warning": indicators_data.get("warning")
+                },
+                "trend_analysis": trend_analysis,
+                "data_quality_summary": self._assess_data_quality(price_data, indicators_data, trend_analysis)
+            }
+        except Exception as e:
+            # Fallback to basic data if enhanced methods fail
+            logger.warning(f"Enhanced data retrieval failed for {symbol}, falling back to basic data: {e}")
+            current_price = await self.market_tools.lookup_share_price(symbol)
+            indicators = await self.market_tools.get_market_indicators(symbol)
+            trend_analysis = await self.market_tools.analyze_stock_trend(symbol)
+            
+            return {
+                "current_price": current_price,
+                "price_metadata": {"data_tier": "UNKNOWN", "warning": "Using fallback data"},
+                "indicators": indicators,
+                "indicators_metadata": {"data_tier": "UNKNOWN"},
+                "trend_analysis": trend_analysis,
+                "data_quality_summary": "Data quality information unavailable - using fallback methods"
+            }
+    
+    def _assess_data_quality(self, price_data: Dict, indicators_data: Dict, trend_analysis: Dict) -> str:
+        """Assess overall data quality and provide summary"""
+        issues = []
         
-        return {
-            "current_price": current_price,
-            "indicators": indicators,
-            "trend_analysis": trend_analysis
-        }
+        # Check price data quality
+        if price_data["data_tier"] == "MOCK":
+            issues.append("Price data is simulated")
+        elif price_data["data_age_minutes"] > 60:
+            issues.append(f"Price data is {price_data['data_age_minutes']} minutes old")
+        
+        # Check for warnings
+        if indicators_data.get("warning"):
+            issues.append("Indicators may be unreliable")
+        
+        # Check trend analysis warnings
+        if trend_analysis.get("data_quality", {}).get("warnings"):
+            issues.extend(trend_analysis["data_quality"]["warnings"])
+        
+        if not issues:
+            return "Data quality is good for trading decisions"
+        else:
+            return f"Data quality concerns: {'; '.join(issues)}"
     
     async def generate_trading_prompt(self, symbol: str, market_data: Dict[str, Any]) -> str:
         """Generate the prompt for OpenAI based on agent personality and market data"""
@@ -149,7 +199,12 @@ class BaseAgent(ABC):
         holdings = await self.get_holdings()
         portfolio_value = await self.get_portfolio_value()
         
-        # Base prompt with agent personality
+        # Extract data quality information
+        price_metadata = market_data.get('price_metadata', {})
+        indicators_metadata = market_data.get('indicators_metadata', {})
+        data_quality_summary = market_data.get('data_quality_summary', 'Data quality unknown')
+        
+        # Base prompt with agent personality and enhanced data awareness
         prompt = f"""
 You are {self.config.name}, a trading agent with a {self.config.personality} investment personality and {self.config.risk_tolerance} risk tolerance.
 
@@ -166,6 +221,19 @@ MARKET DATA FOR {symbol}:
 - Trend: {market_data['trend_analysis']['trend']}
 - Price Change: {market_data['trend_analysis']['price_change_percent']:.2f}%
 
+DATA QUALITY ASSESSMENT:
+- Price Data Tier: {price_metadata.get('data_tier', 'UNKNOWN')}
+- Data Age: {price_metadata.get('data_age_minutes', 'Unknown')} minutes
+- Data Source: {price_metadata.get('data_source', 'Unknown')}
+- Quality Summary: {data_quality_summary}
+- Indicators Warning: {indicators_metadata.get('warning', 'None')}
+
+IMPORTANT DATA QUALITY CONSIDERATIONS:
+- If data tier is "MOCK" or "Simulated", this is test data - be extremely cautious
+- If data age is >60 minutes, consider the staleness in your decision
+- If there are quality warnings, factor them into your confidence level
+- Real trading decisions should only be made with reliable, fresh data
+
 {self.get_personality_prompt()}
 
 Based on this information, make a trading decision for {symbol}. Consider:
@@ -173,16 +241,19 @@ Based on this information, make a trading decision for {symbol}. Consider:
 2. Current market conditions and technical indicators
 3. Your existing portfolio allocation
 4. Position sizing appropriate for your risk level
+5. **DATA QUALITY**: Factor data freshness and reliability into your decision
+6. **RISK ADJUSTMENT**: Lower confidence if data quality is poor
 
 Respond with a JSON object containing:
 {{
     "action": "buy" | "sell" | "hold",
     "quantity": <number of shares>,
-    "reasoning": "<detailed explanation of your decision>",
-    "confidence": <0.0 to 1.0>
+    "reasoning": "<detailed explanation including data quality considerations>",
+    "confidence": <0.0 to 1.0, adjusted for data quality>
 }}
 
 If buying, ensure you have sufficient cash. If selling, ensure you own the stock.
+CRITICAL: If data tier is MOCK or data is very stale, strongly consider "hold" action.
 """
         return prompt
     

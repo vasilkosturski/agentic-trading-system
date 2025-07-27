@@ -16,32 +16,67 @@ public class MarketController {
     private MarketService marketService;
     
     @GetMapping("/price/{symbol}")
-    public ResponseEntity<ToolResponse<Double>> getSharePrice(@PathVariable String symbol) {
+    public ResponseEntity<ToolResponse<MarketService.PriceData>> getSharePrice(@PathVariable String symbol) {
         try {
-            Double price = marketService.getSharePrice(symbol);
-            return ResponseEntity.ok(ToolResponse.success(price));
+            MarketService.PriceData priceData = marketService.getSharePrice(symbol);
+            return ResponseEntity.ok(ToolResponse.success(priceData));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
+        }
+    }
+    
+    // Backward compatibility endpoint - returns just the price value
+    @GetMapping("/price/{symbol}/value")
+    public ResponseEntity<ToolResponse<Double>> getSharePriceValue(@PathVariable String symbol) {
+        try {
+            MarketService.PriceData priceData = marketService.getSharePrice(symbol);
+            return ResponseEntity.ok(ToolResponse.success(priceData.getPrice()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
         }
     }
     
     @GetMapping("/historical/{symbol}")
-    public ResponseEntity<ToolResponse<List<MarketService.HistoricalPrice>>> getHistoricalPrices(
+    public ResponseEntity<ToolResponse<MarketService.HistoricalPriceData>> getHistoricalPrices(
             @PathVariable String symbol,
             @RequestParam(defaultValue = "30") int days) {
         try {
-            List<MarketService.HistoricalPrice> prices = marketService.getHistoricalPrices(symbol, days);
-            return ResponseEntity.ok(ToolResponse.success(prices));
+            MarketService.HistoricalPriceData historicalData = marketService.getHistoricalPrices(symbol, days);
+            return ResponseEntity.ok(ToolResponse.success(historicalData));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
+        }
+    }
+    
+    // Backward compatibility endpoint - returns just the price list
+    @GetMapping("/historical/{symbol}/prices")
+    public ResponseEntity<ToolResponse<List<MarketService.HistoricalPrice>>> getHistoricalPricesList(
+            @PathVariable String symbol,
+            @RequestParam(defaultValue = "30") int days) {
+        try {
+            MarketService.HistoricalPriceData historicalData = marketService.getHistoricalPrices(symbol, days);
+            return ResponseEntity.ok(ToolResponse.success(historicalData.getPrices()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
         }
     }
     
     @GetMapping("/indicators/{symbol}")
-    public ResponseEntity<ToolResponse<MarketService.MarketIndicators>> getMarketIndicators(@PathVariable String symbol) {
+    public ResponseEntity<ToolResponse<MarketService.MarketIndicatorsData>> getMarketIndicators(@PathVariable String symbol) {
         try {
-            MarketService.MarketIndicators indicators = marketService.getMarketIndicators(symbol);
-            return ResponseEntity.ok(ToolResponse.success(indicators));
+            MarketService.MarketIndicatorsData indicatorsData = marketService.getMarketIndicators(symbol);
+            return ResponseEntity.ok(ToolResponse.success(indicatorsData));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
+        }
+    }
+    
+    // Backward compatibility endpoint - returns just the indicators
+    @GetMapping("/indicators/{symbol}/values")
+    public ResponseEntity<ToolResponse<MarketService.MarketIndicators>> getMarketIndicatorsValues(@PathVariable String symbol) {
+        try {
+            MarketService.MarketIndicatorsData indicatorsData = marketService.getMarketIndicators(symbol);
+            return ResponseEntity.ok(ToolResponse.success(indicatorsData.getIndicators()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
         }
