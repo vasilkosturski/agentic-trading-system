@@ -34,8 +34,12 @@ openai:
 market:
   alpha-vantage:
     api-key: ${ALPHA_VANTAGE_API_KEY:demo}
+  polygon:
+    api-key: ${POLYGON_API_KEY:}
+    enabled: true
+    free-tier: true
   cache:
-    ttl-minutes: 5
+    ttl-minutes: 60
   fallback-to-mock: true
 
 # Trading Configuration
