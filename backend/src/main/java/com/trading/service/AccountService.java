@@ -78,7 +78,7 @@ public class AccountService {
     public String buyShares(String name, String symbol, Integer quantity, String rationale) {
         try {
             AccountData accountData = getAccount(name);
-            Double currentPrice = marketService.getSharePrice(symbol.toUpperCase());
+            Double currentPrice = marketService.getSharePrice(symbol.toUpperCase()).getPrice();
             Double totalCost = currentPrice * quantity;
             
             // Check if account has sufficient balance
@@ -132,7 +132,7 @@ public class AccountService {
                     quantity, currentHolding);
             }
             
-            Double currentPrice = marketService.getSharePrice(upperSymbol);
+            Double currentPrice = marketService.getSharePrice(upperSymbol).getPrice();
             Double totalRevenue = currentPrice * quantity;
             
             // Update balance
@@ -208,7 +208,7 @@ public class AccountService {
                 for (Map.Entry<String, Integer> holding : accountData.getHoldings().entrySet()) {
                     String symbol = holding.getKey();
                     Integer shares = holding.getValue();
-                    Double currentPrice = marketService.getSharePrice(symbol);
+                    Double currentPrice = marketService.getSharePrice(symbol).getPrice();
                     Double value = shares * currentPrice;
                     report.append(String.format("%s: %d shares @ $%.2f = $%.2f\n",
                         symbol, shares, currentPrice, value));
@@ -245,7 +245,7 @@ public class AccountService {
         for (Map.Entry<String, Integer> holding : accountData.getHoldings().entrySet()) {
             String symbol = holding.getKey();
             Integer shares = holding.getValue();
-            Double currentPrice = marketService.getSharePrice(symbol);
+            Double currentPrice = marketService.getSharePrice(symbol).getPrice();
             totalValue += shares * currentPrice;
         }
         return totalValue;

@@ -2,6 +2,10 @@ package com.trading.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+// Note: Using HTTP client approach for Polygon API since Kotlin SDK has Java interop issues
+// import io.polygon.kotlin.sdk.rest.PolygonRestClient;
+// import io.polygon.kotlin.sdk.rest.stocks.AggregatesParameters;
+// import io.polygon.kotlin.sdk.rest.stocks.AggregatesDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.RestClientException;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -20,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 // Data tier enumeration for tracking data source quality
 enum DataTier {
     REAL_TIME("Real-time", 0),
+    END_OF_DAY("End-of-day", 1440), // 24 hours delay for free tier
     DELAYED("Delayed", 15),
     CACHED("Cached", 300),
     MOCK("Mock/Simulated", Integer.MAX_VALUE);
@@ -49,11 +55,23 @@ public class MarketService {
     @Value("${market.alpha-vantage.api-key:demo}")
     private String alphaVantageApiKey;
     
+    @Value("${market.polygon.api-key:}")
+    private String polygonApiKey;
+    
+    @Value("${market.polygon.enabled:true}")
+    private boolean polygonEnabled;
+    
+    @Value("${market.polygon.free-tier:true}")
+    private boolean polygonFreeTier;
+    
     @Value("${market.cache.ttl-minutes:60}")
     private int cacheTtlMinutes;
     
     @Value("${market.fallback-to-mock:true}")
     private boolean fallbackToMock;
+    
+    // Polygon HTTP client approach (avoiding Kotlin interop issues)
+    private boolean polygonClientInitialized = false;
     
     // Cache for stock prices with timestamps
     private final Map<String, CachedPrice> priceCache = new ConcurrentHashMap<>();
@@ -83,6 +101,23 @@ public class MarketService {
     }
     
     /**
+     * Check if Polygon client is available
+     */
+    private boolean isPolygonAvailable() {
+        if (!polygonClientInitialized) {
+            if (polygonEnabled && polygonApiKey != null && !polygonApiKey.isEmpty()) {
+                logger.info("Polygon API key configured, using HTTP client approach");
+                polygonClientInitialized = true;
+                return true;
+            } else {
+                logger.debug("Polygon API not configured or disabled");
+                return false;
+            }
+        }
+        return polygonEnabled && polygonApiKey != null && !polygonApiKey.isEmpty();
+    }
+    
+    /**
      * Get current stock price with caching and fallback mechanisms
      */
     public PriceData getSharePrice(String symbol) {
@@ -101,13 +136,12 @@ public class MarketService {
         }
         
         // Try to fetch real price
-        Double realPrice = fetchRealPrice(upperSymbol);
-        if (realPrice != null) {
+        PriceData realPriceData = fetchRealPrice(upperSymbol);
+        if (realPriceData != null) {
             LocalDateTime fetchTime = LocalDateTime.now();
-            priceCache.put(upperSymbol, new CachedPrice(realPrice, fetchTime));
-            logger.info("Fetched real price for {}: ${}", upperSymbol, realPrice);
-            return new PriceData(realPrice, DataTier.DELAYED, fetchTime,
-                "Real market data with ~15 minute delay from external APIs");
+            priceCache.put(upperSymbol, new CachedPrice(realPriceData.getPrice(), fetchTime));
+            logger.info("Fetched real price for {}: ${} ({})", upperSymbol, realPriceData.getPrice(), realPriceData.getDataTier());
+            return realPriceData;
         }
         
         // Fallback to mock price if enabled
@@ -125,21 +159,112 @@ public class MarketService {
     /**
      * Fetch real stock price from external APIs
      */
-    private Double fetchRealPrice(String symbol) {
-        // Try Alpha Vantage first
+    private PriceData fetchRealPrice(String symbol) {
+        // Try Polygon first if enabled
+        if (polygonEnabled) {
+            PriceData polygonPrice = fetchFromPolygon(symbol);
+            if (polygonPrice != null) {
+                return polygonPrice;
+            }
+        }
+        
+        // Try Alpha Vantage
         Double price = fetchFromAlphaVantage(symbol);
         if (price != null) {
-            return price;
+            return new PriceData(price, DataTier.DELAYED, LocalDateTime.now(),
+                "Real market data with ~15 minute delay from Alpha Vantage API");
         }
         
         // Try Yahoo Finance as fallback
         price = fetchFromYahooFinance(symbol);
         if (price != null) {
-            return price;
+            return new PriceData(price, DataTier.DELAYED, LocalDateTime.now(),
+                "Real market data with ~15 minute delay from Yahoo Finance API");
         }
         
         logger.warn("Failed to fetch real price for {} from all sources", symbol);
         return null;
+    }
+    
+    /**
+     * Fetch price from Polygon API (free tier - end-of-day data) using HTTP client
+     */
+    private PriceData fetchFromPolygon(String symbol) {
+        try {
+            if (!isPolygonAvailable()) {
+                logger.debug("Polygon API not available for {}", symbol);
+                return null;
+            }
+            
+            // For free tier, get previous trading day's data
+            LocalDate targetDate = getPreviousTradingDay();
+            String dateStr = targetDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            
+            // Polygon aggregates endpoint for daily data
+            String url = String.format(
+                "https://api.polygon.io/v2/aggs/ticker/%s/range/1/day/%s/%s?adjusted=true&sort=asc&limit=1&apikey=%s",
+                symbol, dateStr, dateStr, polygonApiKey
+            );
+            
+            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+            
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                JsonNode jsonNode = objectMapper.readTree(response.getBody());
+                
+                // Check for successful response
+                if (jsonNode.has("status") && "OK".equals(jsonNode.get("status").asText())) {
+                    JsonNode results = jsonNode.get("results");
+                    
+                    if (results != null && results.isArray() && results.size() > 0) {
+                        JsonNode result = results.get(0);
+                        
+                        if (result.has("c")) { // 'c' is the closing price
+                            Double closePrice = result.get("c").asDouble();
+                            
+                            if (closePrice > 0) {
+                                logger.info("Fetched Polygon end-of-day price for {}: ${} (date: {})", symbol, closePrice, dateStr);
+                                return new PriceData(closePrice, DataTier.END_OF_DAY, LocalDateTime.now(),
+                                    "End-of-day closing price from Polygon (free tier) for " + dateStr);
+                            }
+                        }
+                    }
+                }
+                
+                // Check for API limit or error messages
+                if (jsonNode.has("error")) {
+                    logger.warn("Polygon API error for {}: {}", symbol, jsonNode.get("error").asText());
+                } else if (jsonNode.has("message")) {
+                    logger.warn("Polygon API message for {}: {}", symbol, jsonNode.get("message").asText());
+                }
+            }
+            
+            logger.debug("No Polygon data available for {} on {}", symbol, dateStr);
+            return null;
+            
+        } catch (RestClientException e) {
+            logger.error("HTTP error fetching from Polygon for {}: {}", symbol, e.getMessage());
+            return null;
+        } catch (Exception e) {
+            logger.error("Error fetching from Polygon for {}: {}", symbol, e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Get the previous trading day (skips weekends)
+     */
+    private LocalDate getPreviousTradingDay() {
+        LocalDate date = LocalDate.now(ZoneId.of("America/New_York"));
+        
+        // Go back one day
+        date = date.minusDays(1);
+        
+        // Skip weekends - if it's Sunday, go to Friday; if Saturday, go to Friday
+        while (date.getDayOfWeek().getValue() > 5) { // Saturday = 6, Sunday = 7
+            date = date.minusDays(1);
+        }
+        
+        return date;
     }
     
     /**
