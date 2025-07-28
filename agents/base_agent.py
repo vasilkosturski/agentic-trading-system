@@ -49,12 +49,14 @@ class BaseAgent(ABC):
         self.accounts_tools = None
         self.market_tools = None
         self.push_tools = None
+        self.memory_tools = None
     
-    def set_mcp_tools(self, accounts_tools, market_tools, push_tools):
+    def set_mcp_tools(self, accounts_tools, market_tools, push_tools, memory_tools=None):
         """Inject MCP tool connections"""
         self.accounts_tools = accounts_tools
         self.market_tools = market_tools
         self.push_tools = push_tools
+        self.memory_tools = memory_tools
     
     async def initialize_account(self) -> str:
         """Initialize trading account for this agent"""
@@ -115,6 +117,20 @@ class BaseAgent(ABC):
             
             # Log the trade
             self.trading_history.append(decision)
+            
+            # Store trading decision in memory
+            if self.memory_tools:
+                try:
+                    await self.memory_tools.store_trading_decision(
+                        symbol=decision.symbol,
+                        action=decision.action,
+                        reasoning=decision.reasoning,
+                        price=decision.current_price,
+                        quantity=decision.quantity
+                    )
+                    logger.info(f"Stored trading decision in memory for {decision.symbol}")
+                except Exception as e:
+                    logger.warning(f"Failed to store trading decision in memory: {e}")
             
             # Send notification
             if self.push_tools:
@@ -191,6 +207,66 @@ class BaseAgent(ABC):
         else:
             return f"Data quality concerns: {'; '.join(issues)}"
     
+    async def get_memory_context(self, symbol: str) -> str:
+        """Retrieve relevant memory context for trading decision"""
+        if not self.memory_tools:
+            return "No memory system available."
+        
+        try:
+            # Get past decisions for this symbol
+            past_decisions = await self.memory_tools.retrieve_past_decisions(symbol)
+            
+            # Get past market analysis for this symbol
+            past_analysis = await self.memory_tools.retrieve_market_insights(symbol)
+            
+            # Get general trading insights
+            general_insights = await self.memory_tools.retrieve_past_decisions()
+            
+            memory_context = f"""
+MEMORY CONTEXT FROM KNOWLEDGE GRAPH:
+
+Past Trading Decisions for {symbol}:
+{past_decisions if past_decisions else "No previous decisions found for this symbol."}
+
+Past Market Analysis for {symbol}:
+{past_analysis if past_analysis else "No previous analysis found for this symbol."}
+
+Recent General Trading Insights:
+{general_insights if general_insights else "No general insights available."}
+
+Use this historical context to inform your current decision. Learn from past successes and mistakes.
+"""
+            return memory_context
+            
+        except Exception as e:
+            logger.warning(f"Failed to retrieve memory context: {e}")
+            return "Memory context unavailable due to error."
+    
+    async def store_market_analysis_in_memory(self, symbol: str, market_data: Dict[str, Any], reasoning: str):
+        """Store market analysis in memory for future reference"""
+        if not self.memory_tools:
+            return
+        
+        try:
+            analysis_summary = f"""
+Market Analysis Summary:
+- Current Price: ${market_data['current_price']:.2f}
+- Trend: {market_data['trend_analysis']['trend']}
+- Price Change: {market_data['trend_analysis']['price_change_percent']:.2f}%
+- Data Quality: {market_data.get('data_quality_summary', 'Unknown')}
+- Agent Reasoning: {reasoning}
+"""
+            
+            await self.memory_tools.store_market_analysis(
+                symbol=symbol,
+                analysis=analysis_summary,
+                indicators=market_data['indicators']
+            )
+            logger.info(f"Stored market analysis in memory for {symbol}")
+            
+        except Exception as e:
+            logger.warning(f"Failed to store market analysis in memory: {e}")
+    
     async def generate_trading_prompt(self, symbol: str, market_data: Dict[str, Any]) -> str:
         """Generate the prompt for OpenAI based on agent personality and market data"""
         
@@ -236,6 +312,9 @@ IMPORTANT DATA QUALITY CONSIDERATIONS:
 
 {self.get_personality_prompt()}
 
+MEMORY AND LEARNING CONTEXT:
+{await self.get_memory_context(symbol)}
+
 Based on this information, make a trading decision for {symbol}. Consider:
 1. Your investment personality and risk tolerance
 2. Current market conditions and technical indicators
@@ -243,6 +322,8 @@ Based on this information, make a trading decision for {symbol}. Consider:
 4. Position sizing appropriate for your risk level
 5. **DATA QUALITY**: Factor data freshness and reliability into your decision
 6. **RISK ADJUSTMENT**: Lower confidence if data quality is poor
+7. **HISTORICAL LEARNING**: Use memory context to learn from past decisions and analysis
+8. **PATTERN RECOGNITION**: Identify patterns from your trading history
 
 Respond with a JSON object containing:
 {{
@@ -303,6 +384,9 @@ CRITICAL: If data tier is MOCK or data is very stale, strongly consider "hold" a
                 timestamp=datetime.now(),
                 current_price=market_data["current_price"]
             )
+            
+            # Store market analysis in memory for future learning
+            await self.store_market_analysis_in_memory(symbol, market_data, decision.reasoning)
             
             logger.info(f"Agent {self.config.name} decision for {symbol}: {decision.action} (confidence: {decision.confidence:.2f})")
             return decision
