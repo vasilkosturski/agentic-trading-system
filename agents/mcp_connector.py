@@ -6,6 +6,7 @@ import logging
 from typing import Dict, List, Any, Optional
 import subprocess
 import sys
+import os
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -200,14 +201,152 @@ class PushToolConnector(MCPToolConnector):
             "priority": priority
         })
 
+class MemoryToolConnector(MCPToolConnector):
+    """Connector for LibSQL Memory MCP server tools"""
+    
+    def __init__(self, agent_name: str):
+        self.agent_name = agent_name
+        memory_db_path = f"./memory/{agent_name.lower()}.db"
+        
+        # Ensure memory directory exists
+        os.makedirs("./memory", exist_ok=True)
+        
+        super().__init__(MCPServerConfig(
+            name=f"memory_server_{agent_name}",
+            script_path="npx",  # Will be handled differently for external commands
+            description=f"LibSQL Memory tools for {agent_name}"
+        ))
+        self.memory_db_path = memory_db_path
+    
+    async def start_server(self):
+        """Start the LibSQL Memory MCP server process"""
+        try:
+            env = os.environ.copy()
+            env["LIBSQL_URL"] = f"file:{self.memory_db_path}"
+            
+            self.process = await asyncio.create_subprocess_exec(
+                "npx", "-y", "mcp-memory-libsql",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env
+            )
+            logger.info(f"Started LibSQL Memory server for {self.agent_name}")
+        except Exception as e:
+            logger.error(f"Failed to start LibSQL Memory server for {self.agent_name}: {e}")
+            raise
+    
+    async def create_entities(self, entities: List[Dict[str, Any]]) -> str:
+        """Create entities in the knowledge graph"""
+        return await self.call_tool("create_entities", {"entities": entities})
+    
+    async def create_relations(self, relations: List[Dict[str, Any]]) -> str:
+        """Create relations between entities"""
+        # Ensure all relation fields are properly defined
+        validated_relations = []
+        for relation in relations:
+            validated_relation = {
+                "from": str(relation.get("from", "")),
+                "to": str(relation.get("to", "")),
+                "relationType": str(relation.get("relationType", "related_to"))
+            }
+            validated_relations.append(validated_relation)
+        return await self.call_tool("create_relations", {"relations": validated_relations})
+    
+    async def add_observations(self, observations: List[Dict[str, Any]]) -> str:
+        """Add observations to existing entities"""
+        return await self.call_tool("add_observations", {"observations": observations})
+    
+    async def search_nodes(self, query: str) -> str:
+        """Search for nodes in the knowledge graph"""
+        return await self.call_tool("search_nodes", {"query": query})
+    
+    async def open_nodes(self, names: List[str]) -> str:
+        """Open specific nodes by their names"""
+        return await self.call_tool("open_nodes", {"names": names})
+    
+    async def read_graph(self) -> str:
+        """Read the entire knowledge graph"""
+        return await self.call_tool("read_graph", {})
+    
+    async def store_trading_decision(self, symbol: str, action: str, reasoning: str, price: float, quantity: int) -> str:
+        """Store a trading decision in memory"""
+        import time
+        timestamp = int(time.time())
+        entities = [{
+            "name": f"trade_{symbol}_{action}_{timestamp}",
+            "entityType": "trading_decision",
+            "observations": [
+                f"Symbol: {symbol}",
+                f"Action: {action}",
+                f"Price: ${price}",
+                f"Quantity: {quantity}",
+                f"Reasoning: {reasoning}",
+                f"Agent: {self.agent_name}",
+                f"Timestamp: {timestamp}"
+            ]
+        }]
+        return await self.create_entities(entities)
+    
+    async def store_market_analysis(self, symbol: str, analysis: str, indicators: Dict[str, Any]) -> str:
+        """Store market analysis in memory"""
+        import time
+        timestamp = int(time.time())
+        entities = [{
+            "name": f"analysis_{symbol}_{timestamp}",
+            "entityType": "market_analysis",
+            "observations": [
+                f"Symbol: {symbol}",
+                f"Analysis: {analysis}",
+                f"Indicators: {json.dumps(indicators)}",
+                f"Agent: {self.agent_name}",
+                f"Timestamp: {timestamp}"
+            ]
+        }]
+        return await self.create_entities(entities)
+    
+    async def retrieve_past_decisions(self, symbol: str = None) -> str:
+        """Retrieve past trading decisions"""
+        if symbol:
+            query = f"trading_decision {symbol}"
+        else:
+            query = "trading_decision"
+        
+        # Try search first, if no results, try reading entire graph
+        result = await self.search_nodes(query)
+        if not result or result == '{"entities": [], "relations": []}':
+            # Fallback to reading entire graph and filtering
+            graph = await self.read_graph()
+            return graph
+        return result
+    
+    async def retrieve_market_insights(self, symbol: str = None) -> str:
+        """Retrieve past market analysis"""
+        if symbol:
+            query = f"market_analysis {symbol}"
+        else:
+            query = "market_analysis"
+        
+        # Try search first, if no results, try reading entire graph
+        result = await self.search_nodes(query)
+        if not result or result == '{"entities": [], "relations": []}':
+            # Fallback to reading entire graph and filtering
+            graph = await self.read_graph()
+            return graph
+        return result
+
 class MCPManager:
     """Manager for all MCP tool connections"""
     
-    def __init__(self):
+    def __init__(self, agent_name: str = None):
         self.accounts = AccountsToolConnector()
         self.market = MarketToolConnector()
         self.push = PushToolConnector()
+        self.memory = MemoryToolConnector(agent_name) if agent_name else None
+        
         self.servers = [self.accounts, self.market, self.push]
+        if self.memory:
+            self.servers.append(self.memory)
     
     async def start_all_servers(self):
         """Start all MCP servers"""

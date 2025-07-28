@@ -16,10 +16,11 @@ class AgentOrchestrator:
     
     def __init__(self):
         self.agents: List[BaseAgent] = []
-        self.mcp_manager = MCPManager()
+        self.mcp_manager = None  # Will be initialized per agent with memory
         self.trading_symbols = ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN"]
         self.running = False
         self.cycle_interval = 3600  # 60 minutes between trading cycles
+        self.agent_mcp_managers = {}  # Store MCP manager for each agent
     
     def add_agent(self, agent: BaseAgent):
         """Add an agent to the orchestrator"""
@@ -27,32 +28,45 @@ class AgentOrchestrator:
         logger.info(f"Added agent: {agent.config.name}")
     
     async def initialize_agents(self):
-        """Initialize all agents with MCP connections"""
-        logger.info("Initializing agents...")
+        """Initialize all agents with MCP connections including memory"""
+        logger.info("Initializing agents with memory systems...")
         
-        # Start MCP servers
-        await self.mcp_manager.start_all_servers()
-        
-        # Configure each agent with MCP tools
+        # Configure each agent with MCP tools including memory
         for agent in self.agents:
+            # Create individual MCP manager with memory for each agent
+            agent_mcp_manager = MCPManager(agent_name=agent.config.name)
+            self.agent_mcp_managers[agent.config.name] = agent_mcp_manager
+            
+            # Start MCP servers for this agent
+            await agent_mcp_manager.start_all_servers()
+            
+            # Configure agent with MCP tools including memory
             agent.set_mcp_tools(
-                self.mcp_manager.accounts,
-                self.mcp_manager.market,
-                self.mcp_manager.push
+                agent_mcp_manager.accounts,
+                agent_mcp_manager.market,
+                agent_mcp_manager.push,
+                agent_mcp_manager.memory  # Add memory tools
             )
             
             # Initialize agent account
             await agent.initialize_account()
+            
+            logger.info(f"Initialized agent {agent.config.name} with memory system")
         
-        logger.info(f"Initialized {len(self.agents)} agents")
+        logger.info(f"Initialized {len(self.agents)} agents with persistent memory")
     
     async def run_single_cycle(self) -> Dict[str, Any]:
         """Run a single trading cycle for all agents"""
         cycle_start = datetime.now()
         logger.info(f"Starting trading cycle at {cycle_start}")
         
-        # Check if market is open
-        market_open = await self.mcp_manager.market.is_market_open()
+        # Check if market is open (use first agent's market tools)
+        first_agent_manager = list(self.agent_mcp_managers.values())[0] if self.agent_mcp_managers else None
+        if not first_agent_manager:
+            logger.error("No MCP managers available")
+            return {"status": "error", "message": "No MCP managers available"}
+        
+        market_open = await first_agent_manager.market.is_market_open()
         if not market_open:
             logger.info("Market is closed, skipping trading cycle")
             return {"status": "market_closed", "timestamp": cycle_start.isoformat()}
@@ -128,7 +142,13 @@ class AgentOrchestrator:
                     await asyncio.sleep(60)  # Wait 1 minute before retrying
                     
         finally:
-            await self.mcp_manager.stop_all_servers()
+            # Stop all agent MCP managers
+            for agent_name, mcp_manager in self.agent_mcp_managers.items():
+                try:
+                    await mcp_manager.stop_all_servers()
+                    logger.info(f"Stopped MCP servers for agent {agent_name}")
+                except Exception as e:
+                    logger.error(f"Error stopping MCP servers for {agent_name}: {e}")
     
     def log_cycle_summary(self, cycle_results: Dict[str, Any]):
         """Log a summary of the trading cycle"""
@@ -207,7 +227,9 @@ async def main():
     except KeyboardInterrupt:
         logger.info("Interrupted by user")
     finally:
-        await orchestrator.mcp_manager.stop_all_servers()
+        # Stop all agent MCP managers
+        for mcp_manager in orchestrator.agent_mcp_managers.values():
+            await mcp_manager.stop_all_servers()
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
