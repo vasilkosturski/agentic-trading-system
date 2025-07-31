@@ -31,7 +31,7 @@ class MemoryManager:
     
     def get_memory_config(self, agent_name: str) -> MemoryServerConfig:
         """Get memory configuration for a specific agent"""
-        database_path = os.path.join(self.base_memory_dir, f"{agent_name.lower()}.db")
+        database_path = os.path.abspath(os.path.join(self.base_memory_dir, f"{agent_name.lower()}.db"))
         return MemoryServerConfig(
             agent_name=agent_name,
             database_path=database_path

@@ -206,10 +206,10 @@ class MemoryToolConnector(MCPToolConnector):
     
     def __init__(self, agent_name: str):
         self.agent_name = agent_name
-        memory_db_path = f"./memory/{agent_name.lower()}.db"
+        memory_db_path = f"./agents/memory/{agent_name.lower()}.db"
         
         # Ensure memory directory exists
-        os.makedirs("./memory", exist_ok=True)
+        os.makedirs("./agents/memory", exist_ok=True)
         
         super().__init__(MCPServerConfig(
             name=f"memory_server_{agent_name}",
