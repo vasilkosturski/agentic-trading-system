@@ -38,23 +38,25 @@ class MemoryManager:
         )
     
     def get_researcher_mcp_params(self, agent_name: str) -> List[Dict[str, Any]]:
-        """Get MCP server parameters for researcher with memory (similar to agents/6_mcp)"""
+        """Get MCP server parameters for researcher with memory - Brave Search only approach"""
         memory_config = self.get_memory_config(agent_name)
         
-        return [
-            # Fetch server for web content
-            {"command": "uvx", "args": ["mcp-server-fetch"]},
-            
-            # Brave search server (if API key available)
-            {
-                "command": "npx",
-                "args": ["-y", "@modelcontextprotocol/server-brave-search"],
-                "env": {"BRAVE_API_KEY": os.getenv("BRAVE_API_KEY", "")}
-            },
-            
-            # LibSQL Memory server
-            memory_config.get_mcp_params()
-        ]
+        # Simplified approach: Only Brave Search (no web fetching fallback)
+        # If Brave Search fails/rate limited, agents use technical analysis only
+        servers = []
+        
+        # Brave search server (primary research tool)
+        brave_api_key = os.getenv("BRAVE_API_KEY", "")
+        if brave_api_key:
+            servers.append({
+                "command": "mcp-server-brave-search",
+                "env": {"BRAVE_API_KEY": brave_api_key}
+            })
+        
+        # LibSQL Memory server (always included)
+        servers.append(memory_config.get_mcp_params())
+        
+        return servers
     
     def get_trader_mcp_params(self, agent_name: str) -> List[Dict[str, Any]]:
         """Get MCP server parameters for trader agents"""
