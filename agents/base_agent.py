@@ -50,13 +50,15 @@ class BaseAgent(ABC):
         self.market_tools = None
         self.push_tools = None
         self.memory_tools = None
+        self.researcher_tool = None
     
-    def set_mcp_tools(self, accounts_tools, market_tools, push_tools, memory_tools=None):
+    def set_mcp_tools(self, accounts_tools, market_tools, push_tools, memory_tools=None, researcher_tool=None):
         """Inject MCP tool connections"""
         self.accounts_tools = accounts_tools
         self.market_tools = market_tools
         self.push_tools = push_tools
         self.memory_tools = memory_tools
+        self.researcher_tool = researcher_tool
     
     async def initialize_account(self) -> str:
         """Initialize trading account for this agent"""
@@ -267,6 +269,25 @@ Market Analysis Summary:
         except Exception as e:
             logger.warning(f"Failed to store market analysis in memory: {e}")
     
+    async def get_research_insights(self, symbol: str) -> str:
+        """Get research insights for a symbol using the researcher tool"""
+        if not self.researcher_tool:
+            return "No researcher tool available."
+        
+        try:
+            # Create research request
+            research_request = f"Research financial news and market sentiment for {symbol}. Include recent developments, analyst opinions, and potential trading opportunities or risks."
+            
+            # Call researcher tool
+            research_result = await self.researcher_tool['function'](research_request)
+            
+            logger.info(f"Retrieved research insights for {symbol}")
+            return research_result
+            
+        except Exception as e:
+            logger.warning(f"Failed to get research insights for {symbol}: {e}")
+            return f"Research unavailable due to error: {str(e)}"
+    
     async def generate_trading_prompt(self, symbol: str, market_data: Dict[str, Any]) -> str:
         """Generate the prompt for OpenAI based on agent personality and market data"""
         
@@ -315,6 +336,9 @@ IMPORTANT DATA QUALITY CONSIDERATIONS:
 MEMORY AND LEARNING CONTEXT:
 {await self.get_memory_context(symbol)}
 
+RESEARCH INSIGHTS:
+{await self.get_research_insights(symbol)}
+
 Based on this information, make a trading decision for {symbol}. Consider:
 1. Your investment personality and risk tolerance
 2. Current market conditions and technical indicators
@@ -324,6 +348,7 @@ Based on this information, make a trading decision for {symbol}. Consider:
 6. **RISK ADJUSTMENT**: Lower confidence if data quality is poor
 7. **HISTORICAL LEARNING**: Use memory context to learn from past decisions and analysis
 8. **PATTERN RECOGNITION**: Identify patterns from your trading history
+9. **RESEARCH INSIGHTS**: Factor in recent news, market sentiment, and analyst opinions from research
 
 Respond with a JSON object containing:
 {{
