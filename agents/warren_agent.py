@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from base_agent import BaseAgent, AgentConfig
+<<<<<<< HEAD
 from mcp_params import trader_mcp_server_params, researcher_mcp_server_params
 from datetime import datetime
 from typing import List, Dict, Any
@@ -8,6 +9,12 @@ from typing import List, Dict, Any
 class WarrenAgent(BaseAgent):
     """
     Warren Buffett-inspired value investing agent using OpenAI Agents SDK
+=======
+
+class WarrenAgent(BaseAgent):
+    """
+    Warren Buffett-inspired value investing agent
+>>>>>>> b17143b68fb4c453eebe20a29c0549607f5d3eb2
     
     Investment Philosophy:
     - Long-term value investing
@@ -17,6 +24,7 @@ class WarrenAgent(BaseAgent):
     - Patient approach - willing to hold cash when no opportunities
     """
     
+<<<<<<< HEAD
     def get_personality_instructions(self) -> str:
         """Get Warren Buffett-inspired personality instructions"""
         return f"""
@@ -40,6 +48,13 @@ You invest patiently and hold positions through market fluctuations,
 relying on meticulous fundamental analysis, steady cash flows, strong management teams, 
 and competitive advantages. You rarely react to short-term market movements, 
 trusting your deep research and value-driven strategy.
+=======
+    def get_personality_prompt(self) -> str:
+        return """
+WARREN BUFFETT INVESTMENT PHILOSOPHY:
+
+You are Warren, a value-focused long-term investor inspired by Warren Buffett's principles:
+>>>>>>> b17143b68fb4c453eebe20a29c0549607f5d3eb2
 
 CORE PRINCIPLES:
 1. VALUE INVESTING: Look for stocks trading below intrinsic value
@@ -65,6 +80,7 @@ MARKET ANALYSIS APPROACH:
 - Look for consistent earnings growth
 - Value stability over growth at any price
 
+<<<<<<< HEAD
 Remember: "It's far better to buy a wonderful company at a fair price than a fair company at a wonderful price."
 Be patient, disciplined, and focus on long-term value creation.
 """
@@ -79,12 +95,32 @@ Be patient, disciplined, and focus on long-term value creation.
 
 def create_warren_agent() -> WarrenAgent:
     """Create Warren Buffett-style agent using OpenAI Agents SDK"""
+=======
+CURRENT MARKET CONDITIONS:
+- If SMA5 < SMA20 and volatility is low: Potential value opportunity
+- If SMA5 > SMA20 significantly: May be overvalued, be cautious
+- High volatility: Wait for stability before making moves
+- Consider price-to-historical-average ratios
+
+Remember: "It's far better to buy a wonderful company at a fair price than a fair company at a wonderful price."
+Be patient, disciplined, and focus on long-term value creation.
+"""
+
+def create_warren_agent() -> WarrenAgent:
+    """Create Warren Buffett-style agent"""
+>>>>>>> b17143b68fb4c453eebe20a29c0549607f5d3eb2
     config = AgentConfig(
         name="Warren",
         personality="value_investor",
         risk_tolerance="conservative",
         initial_balance=10000.0,
+<<<<<<< HEAD
         model_name="gpt-4o-mini"
+=======
+        openai_model="gpt-4",
+        max_tokens=2000,
+        temperature=0.3  # Lower temperature for more consistent, conservative decisions
+>>>>>>> b17143b68fb4c453eebe20a29c0549607f5d3eb2
     )
     
     return WarrenAgent(config)

@@ -1,0 +1,740 @@
+And welcome to day two of week six as we get more into MCP.
+
+And this is the time that we build our own MCP client and MCP server.
+
+Remember today we're making our own.
+
+We're not making a USBA of agent Guy.
+
+We're making USB-C of Agentic I.
+
+And another reminder of these core concepts that probably now you're getting this.
+
+The host is the overall application like cloud desktop or our agent architecture.
+
+The client lives inside the host and has a one on one connection, like over input output to an MCP
+
+server, which is a separate process running outside and providing the tools, the contexts, and the
+
+prompts to your MCP clients to your host.
+
+And most of the time we're talking about tools, although briefly we'll use contexts as well in our
+
+journey.
+
+And there's the example of fetch that we'd used before.
+
+And a reminder of the architecture again.
+
+On the bottom left is the idea that you could have an MCP server that connects to an MCP server running
+
+on your computer, and it does everything locally, like the file writer that we had in when we wrote
+
+Banoffee Pie.
+
+The second one along is an MCP client that connects to MCP server running on your box that then calls
+
+out to some sort of remote internet service.
+
+And I guess the playwright and fetch are both examples of that.
+
+And then less common, that third one, sometimes known as an A hosted MCP server or a managed MCP server,
+
+is when you have an MCP client that connects remotely to the MCP server running on another machine.
+
+And that would need to be using the SSE transport mechanism, whereas one's running locally could be
+
+either Stdio or SSE, and they're usually stdio.
+
+And maybe it's also worth mentioning on this diagram that these MCP servers can be written in Python
+
+or JavaScript, in which case they're typically the parameters that describe them.
+
+Have you've as the command to run or MPW.
+
+They can actually also just be creating a Docker container.
+
+There's various other ways, but UX and MPW are by far the most common.
+
+So with that we're going to go and create our own MCP server.
+
+But just before we do, I want to quickly take a moment to ask, why do we want to make an SMTP server?
+
+What's the advantage of doing it?
+
+Well, the number one advantage is you make an SMTP server if you want to share it.
+
+You've built something which you want other people to be able to use with their agents, because you're
+
+going to be describing it in a way.
+
+You're going to be working on the prompts and the information around your tool, and people will be
+
+able to integrate it with their agents.
+
+So simply, that's the number one reason.
+
+And also if it has resources which a bit like a rag context and then prompt templates too, although
+
+that's not not used so often.
+
+Also, I suppose there is a small benefit if we're building an agent system and we're using a bunch
+
+of MCP servers, it might be nice for us to treat our own tools consistently so that everything is packaged
+
+as MCP servers.
+
+This is a bit tenuous, but it's one reason we're going to do it this way, because we only want to
+
+use MCP servers, and it's also useful if you're doing it just so you can understand the plumbing,
+
+just so you can really build the nuts and bolts and do it yourself.
+
+Now, you probably realize the reason I'm belaboring this point is because I want to say, why don't
+
+you want to make an MCP SMTP server.
+
+What are the reasons against.
+
+And there's one really important one.
+
+And it's this if you're only building a tool for you to use yourself, if we're writing a function and
+
+we want to equip our LLM with that function, then there's no point in building an NCP server that's
+
+wasting time.
+
+You can simply decorate that tool with app function tool and then equip your LLM just by just by putting
+
+it in tools, you can just immediately provide it through the OpenAI agents SDK or using the JSON approach
+
+from week one.
+
+And then that function will be called in in your current Python process, it will just be called as
+
+a tool.
+
+And that's easy.
+
+Building an NCP server, which means that it gets spawned and runs as a separate process and communicates
+
+over standard input output, and is provided as an NCP server.
+
+That's a whole lot of extra plumbing and and scaffolding that's not needed if it's just to call your
+
+own tool.
+
+So it's important to have that that clarity that NCP doesn't help with building your own tools.
+
+That's already easy and you should just do it.
+
+MCP is about sharing tools.
+
+That's the benefit.
+
+And we're right back in cursor again, of course.
+
+And we're going into the week six folder and we're going to lab two to create our own MCP server and
+
+client, which as I put here, it's it's pretty simple, but it's not super simple.
+
+The reason people are excited about MCP is that it's so simple to use other tools, not necessarily
+
+to create MCP servers.
+
+The first thing we're going to do, though, is we're going to look at a Python module.
+
+And I know that that many people would much rather spend more time with Python modules than in labs.
+
+And this week we'll be doing both.
+
+We'll be starting in labs.
+
+We will be moving to just Python code in modules.
+
+And there is a Python module called accounts, and it contains a ton of code for managing your account,
+
+where you can buy and sell shares, and where you have a balance, and where you can do things like
+
+calculate profit and loss, list transactions, and where you can do things like buy shares and sell
+
+shares based on a market price.
+
+Looks like some interesting business logic and hopefully you remember it seems familiar to you because
+
+this is, of course, code generated by our agent team in week three, our engineering team in Crewe.
+
+I created this code right here, and you can tell because it's got sort of like comments and type hints.
+
+And you probably know that I'm a bit hacky with this stuff, and that I only write comments and type
+
+hints when I'm when I'm forced.
+
+But here the our agent crew did a wonderful job.
+
+Um, so it's cool that we are taking the code here that is being used by our agents.
+
+Now, I've made a slight change to it that I've updated it so that it does save accounts in a database,
+
+and I've separated that out into a separate module called database.
+
+And this is just simply using SQLite.
+
+So this is very vanilla.
+
+But it allows you to read and write accounts as JSON objects.
+
+And that I've hooked up to accounts.py.
+
+But apart from making tiny changes like that, it is basically untouched code written by our engineering
+
+team of agents in week three.
+
+All right, so back to our lab, uh, for, for, uh, today, uh, I see it says here week two, day
+
+two.
+
+I think we'll change that right away.
+
+That seems better.
+
+Okay, so let's get started.
+
+We'll do some imports.
+
+We are now going to import this Python module account okay.
+
+So now I can call account dot get.
+
+And if I pass in a name it gets the account with that id here I am.
+
+This is my account.
+
+Apparently I have a balance of $9,400.
+
+I have three Amazon shares and I have some transactions.
+
+This is the coming back from the code written by our agents and I can call buy shares.
+
+I can buy three more shares of Amazon.
+
+And I have to give a reason.
+
+And we'll just rewind the clocks a bit and imagine this is a few years back and I'll say, I'm going
+
+to buy three shares of Amazon because this bookstore website looks promising.
+
+So there we go.
+
+Uh, yeah.
+
+If only I'd had that foresight.
+
+Uh, okay.
+
+So I bought three, and now I have six shares of Amazon in there.
+
+And I can call account Report to get a report about it.
+
+Uh, and all sorts of information, um, about it.
+
+And I can also call account list transactions to see those transactions right there.
+
+So this is just showing that we've got some code.
+
+It was written by our agents.
+
+And we can operate it to do things like buying shares and listing transactions.
+
+Now it's MCP server time.
+
+So writing an MCP server is pretty easy.
+
+It's just boilerplate code that you use to wrap code you've already got into an MCP server and you use
+
+some libraries provided by anthropic.
+
+And let's have a look.
+
+I've created one, a Python module called Accountsservice.
+
+Let's see what happens.
+
+So it begins by importing an anthropic class called fast MCP.
+
+And we also import our business logic account.
+
+And we then create an MCP server by saying fast MCP account server that is creating a new fast MCP server
+
+with that name.
+
+What we then have is a number of functions listed here which are decorated with at MCP tool.
+
+And for each of them we have a function like Getbalance.
+
+We describe that function.
+
+We give information about it here using standard docstrings.
+
+And then we actually do that function.
+
+And in our case we're just delegating to our business logic.
+
+But the idea is that this server will be spawned when we launch the MCP server.
+
+This will be launched, and these tools will all be tools that will be available.
+
+And they will work simply by calling the business logic that we've imported right here.
+
+So we have Getbalance, get holdings, buy shares, sell shares, change strategy if we want to change
+
+the strategy associated with the portfolio.
+
+And then I've also got some resources here.
+
+As I say, resources are not as common as tools, but I do want to show you how they work.
+
+And here we have the ability to access a resource, the name of an account will just return its report,
+
+and the strategy of an account will return its strategy.
+
+And it gets like a sort of a fake URL, a URI like this, where you can describe what resource you want
+
+to provide.
+
+If something requests this resource, and then down at the very bottom, we have the final piece here,
+
+which is that when this script, this Python script is run, what it should actually do is call the
+
+run function on MCP and say that my transport mechanism is the usual stdio.
+
+And by because we've done that, when this Python script is run, it will launch that MCP server, it
+
+will import our business logic, and it will be ready to handle any of these tools.
+
+And as you can see, there's not much to this at all.
+
+It's not super simple, but it's not hard at all to write your own MCP server that wraps your business
+
+logic and launches a server like that, and now we just have to try and put it to use.
+
+So here we are back in the lab.
+
+And what we're looking at here are parameters being set for our very own MCP server that we just wrote.
+
+So the command is you've run because that's exactly what we would type at a command line to run this
+
+module.
+
+You've run account server dot Pi.
+
+Just run the account server.py that I just showed you.
+
+And we know that when that's called it's going to create an MCP server, a fast MCP.
+
+It's going to call run.
+
+And that we've got some functions decorated as MCP tools.
+
+All right.
+
+So then we use the open AI agents SDK context manager with MCP Server Studio.
+
+And we pass in those parameters.
+
+Remember this timeout.
+
+And we then are going to call server list tools.
+
+So just by running this what's going to happen.
+
+It's going to create an MCP client.
+
+It's then going to spawn our MCP server by carrying out this instruction right here.
+
+And it's then going to ask it, what tools do you offer us?
+
+And we'll print them out.
+
+And we're hoping to see the things that we decorated.
+
+Uh, let's see if this works.
+
+Can it be that simple?
+
+Off it goes.
+
+Took 1.4 seconds.
+
+Let's just print that.
+
+And there we go.
+
+These are the functions that we just decorated.
+
+Get balance, get holdings.
+
+Buy shares.
+
+Sell shares.
+
+Change strategy.
+
+It's available.
+
+Wow.
+
+Um, so as you can see, it's not super easy, but it's also it's pretty easy.
+
+Okay, let's try and put this to action.
+
+Let's have some instructions.
+
+You're able to manage an account for a client and answer questions about the account.
+
+My name is Ed.
+
+My account is under the name Ed.
+
+What is my balance and my holdings?
+
+So it's going to need to make use of these tools.
+
+And we'll give it the latest model.
+
+Why not.
+
+Uh, let's take that.
+
+And now this again is the same code as before.
+
+We use the context manager with MCP Server Studio.
+
+We pass in our parameters.
+
+Let's put in that timeout client session timeout is 30.
+
+Um, and uh, we will pass in our instructions, our model, and we will then run a run and display
+
+the output.
+
+We're hoping that it's going to spawn the server, call the tools and be able to tell me about my six
+
+Amazon shares, uh, and the balance and everything like that.
+
+So enter your current cash balance is 8000.
+
+Your holdings includes six shares of Amazon.
+
+If you need any further details then let me know.
+
+So that is us successfully calling our very own MCP server that then calls our business logic.
+
+And now it's time to show you what it's like to write an MCP client.
+
+But I should first explain that it's not a common task to write an MCP client.
+
+You don't really need to do it anymore.
+
+When I when I first started working on this lab, the way that you worked with OpenAI agents SDK, they
+
+didn't sort of natively support MCP.
+
+You had to write your own client and then provide the tools into OpenAI agents SDK.
+
+And it was the day that I finished this project and checked it into GitHub and did the push that same
+
+day, about about 2 or 3 hours later, they released an update to OpenAI SDK that simplified everything
+
+and meant that all my code was useless.
+
+And you can, you can, you can look at the git timestamps if you don't believe me.
+
+It was crazy.
+
+I was I was infuriated, but it is a great thing.
+
+And basically it means that just with this, this context manager construct, you automatically get,
+
+uh, OpenAI SDK creating the client for you.
+
+But anyway, it's a good exercise to show you what it's like to make a client.
+
+And also this this construct works for tools.
+
+But if you want to use resources, I think you still need to write a client.
+
+And it's not so common.
+
+But but but we'll do it anyway and you'll see how it works.
+
+Okay.
+
+So this is in a Python module called Accounts clients.
+
+And this this is where the magic happens.
+
+That is no longer needed really.
+
+Uh.
+
+So this is this is a this is a an MCB client for use with my accounts, MCP server.
+
+So at the top here I specify these are the parameters that will be used to launch the MCP server.
+
+Now this could be something configurable.
+
+You could make a sort of generic MCP client that takes this as configuration and then and then spawns
+
+it.
+
+But for now this is just a fixed client for our accounts MCP server.
+
+And so this is an accounts MCP client.
+
+And so there are a few things we need to be able to do.
+
+We need to be able to list the tools.
+
+And so this first function here is an example of the function that lists tools.
+
+And we're basically using a bunch of anthropic code here for our client.
+
+And you can see that there's some context managers that we manage a session.
+
+We initialize the session.
+
+And then we call list tools on the session and return the tools.
+
+And so it's just sort of plumbing stuff that that you need to know about.
+
+If you want to write something that will contact your server and list the tools.
+
+This second one is actually calling a tool.
+
+This is how you go about reading a one of the resources, and this is reading the other resources.
+
+You can see I specify the resource name right there.
+
+Um, and then finally the types.
+
+The way that MCP returns tools is very similar to the JSON, the standard JSON that you use when you
+
+call a tool, as we did in week one.
+
+But it's not identical.
+
+There is some couple of slight differences.
+
+So if you're writing your own MCP client, you also have to know how to map between the MCP description
+
+of a tool and the kind of JSON description of a tool that's used generally when you're calling LMS.
+
+And that is what this this function here does that I painstakingly wrote.
+
+But all of this comes for free packaged in OpenAI agents SDK.
+
+So you don't need to do all of this, but you could look through it should you be interested and should
+
+you want to understand what does it mean to have your own MCP client?
+
+Okay, so now it remains for us to actually run the MCP client that we just created.
+
+So I import from that module.
+
+We just looked at some of the functions we just saw.
+
+And the first function I call is the list account tools function, which is the one that's going to
+
+spawn an MCP server and ask it for its tools that will come back as MCP tools.
+
+I'm then going to call the other function I showed you, where I take the MCP tools, and I reconstitute
+
+them as open AI tools.
+
+I turn them into these function tools, just as if I'd had a function and decorated it with app function
+
+tools.
+
+Same thing.
+
+And then I'm going to print that.
+
+So I'll print these two separately so you can see the results side by side.
+
+So this first line here, this is the actual MCP tools themselves with their description, the arguments
+
+of all the tools.
+
+And you can take a look at them should you wish.
+
+And underneath it is the same thing but reconstituted as a function tool, which is the kind of object
+
+that needs to be passed in to OpenAI.
+
+And indeed, that's what I'm going to do right here.
+
+So this is the way you had to do it before OpenAI built this, so that you can now you can just pass
+
+in the MCP servers.
+
+You don't have to build a client and do all of this stuff.
+
+But before that, in fact, very recently this was the way to do it.
+
+You'd actually have to pass in the tools themselves.
+
+So we've used our MCP client to find the tools and then we're passing them in here.
+
+So as I say, you just follow along for interest to see what this is doing.
+
+But it's not like you'd need to do this yourself.
+
+So as always, I've got a trace, and then I'll pass in my instructions and I will pass in the tools
+
+that when these tools are called, it's actually going to call the MCP client.
+
+That's going to call the MCP server that's going to actually run our business logic.
+
+Okay.
+
+So now we're going to run our MCP client like this.
+
+So we're passing in the tools we are calling the model and it has now responded.
+
+I asked what's my balance?
+
+And it's responded with the balance.
+
+And so just as a recap, what's going on there, we provided it with some tools right here.
+
+Those tools are in fact wrappers around MCP tools, which actually created an MCP client which launched
+
+our MCP server and which ran our function through the business logic on the MCP server and got back
+
+the results to the LM.
+
+So quite a lot was going on there behind the scenes with this.
+
+And as I say, you really shouldn't need to do this yourself because open AI agents SDK does it all
+
+for you.
+
+But it's useful to see how the plumbing works behind the scenes.
+
+Now here's another example of using the MCP client.
+
+This time we're using this read accounts resource client function that I wrote.
+
+And I think that you do need to do it this way.
+
+If you want to use resources, then that doesn't come for free with the OpenAI agents SDK package.
+
+So this is an example of reading the resource called editor.
+
+So let's see what happens if we run that.
+
+Let's run it through our client, through our server.
+
+And that's what comes back.
+
+This is a description of my account.
+
+And just to show you, I could also, of course, just import the business logic directly.
+
+And this is ending up just calling this function report.
+
+So this should give exactly the same answer.
+
+You could see the same stuff.
+
+So essentially what we've done is we've taken this piece of business logic.
+
+We've wrapped it in an MCP server to be available at a certain resource.
+
+We've written an MCP client that allows you to expose that resource.
+
+And that is what this function is.
+
+And so you can call this MCP client to get this.
+
+You could also just call the business logic directly.
+
+Um, and so why would you want to do this.
+
+Again it's if you wanted to share this resource with other people, it gives everyone a simple, streamlined
+
+way to access your resources rather than having to understand how your business logic works.
+
+Okay, that wraps up creating MCP servers and MCP clients with most of the emphasis on the servers.
+
+And I would now like to give you an exercise to go and create your own.
+
+So one super simple one to do would be to write an MCP server that can tell you the current date, give
+
+the current date, and you can expose it as a tool that you can equip OpenAI agent with so that it can
+
+find out the current date.
+
+And it can make sure that what it's the the content and the questions it's answering, it's doing so
+
+mindful of what the current date is.
+
+Um, and uh, yeah.
+
+Then then as a harder exercise, you could not only build that MCP server, but also build an MCP client
+
+to accompany it.
+
+Taking a look at exactly how I just did that for the accounts client compared with the accounts server,
+
+same approach.
+
+And then you could actually write something that looks like a native call to OpenAI, as we did in week
+
+one, like a simple native call with a tool as a JSON.
+
+And then you're getting really bare metal and you're seeing how you can call an MLM and have an MCP
+
+client and an MCP server where you're writing all the nuts and bolts.
+
+The only real use of that is to give you some direct exposure to it.
+
+So only do that if you're if you're interested.
+
+You won't have to do that day to day.
+
+But but it's a it's an interesting exercise.
+
+It's also worth pointing out that actually answering the current date isn't a great tool isn't super
+
+useful in the real world, because if you need to tell your agent about the current date, it's better
+
+just to state it in the prompt so that it always has it available so that the model doesn't have to
+
+go through the extra work of knowing to call your tool to collect the date.
+
+So if you feel like it, try make some more interesting tools.
+
+Have a shot at making a calculator that can do some calculation operation on two inputs or something
+
+like that.
+
+So.
+
+So try and make some interesting tool that appeals to you, and then write an MCP server and perhaps
+
+also explore writing an MCP client should you wish and enjoy that.
+
+And we will then go over to wrap up for today.
+
+Well.
+
+I hope you enjoyed our adventure into the plumbing's and internals of MCP servers and clients.
+
+Next time we are going to now do what MCP is famous for, we are going to explore tons of MCP servers
+
+out there and just have fun equipping our agents with these new capabilities.
+
+I will see you then.
+
