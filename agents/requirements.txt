@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # OpenAI Agents SDK - Core dependency for agent framework
 openai-agents>=0.2.4
 
@@ -15,3 +16,16 @@ aiohttp>=3.8.0
 
 # MQTT for messaging (if needed)
 asyncio-mqtt>=0.11.0
+=======
+# OpenAI agent dependencies
+openai>=1.0.0
+aiohttp>=3.8.0
+asyncio-mqtt>=0.11.0
+
+# MCP dependencies
+mcp>=0.1.0
+
+# Utility dependencies
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+>>>>>>> b17143b68fb4c453eebe20a29c0549607f5d3eb2

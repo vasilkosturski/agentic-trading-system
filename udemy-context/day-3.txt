@@ -1,0 +1,880 @@
+And welcome to week six, day three, and I've been looking forward to today for a long time, because
+
+this is the day when we go crazy exploring what MCP has to offer first.
+
+As usual, a quick recap of the core concepts behind MCP.
+
+Looking at the architecture diagram that we've got here, we're going to be looking at the three different
+
+configurations of MCP servers.
+
+First of all, and the simplest of all is when you use an MCP server that's simply is created, runs
+
+on your local computer, only, uses stuff on your computer, and is something that you're using right
+
+there, just like the accounts MCP server that we just used, which was actually one that we hand wrote
+
+ourselves, and also one like the local file system.
+
+Okay.
+
+And then secondly, and this is perhaps the most common of all, we're going to look at MCP servers
+
+that are run locally on your computer, but make remote calls to APIs that take advantage of stuff that
+
+can be available online.
+
+And that's number two on this diagram.
+
+And that is of course super common.
+
+And then thirdly, and we're not going to do this too much.
+
+We're just going to have a look at what it means to have a managed MCP server or a hosted MCP server,
+
+which is running remotely, as I say, not a common architecture, but we'll just look at it and see
+
+some examples and understand it.
+
+And it's worth pointing out that even numbers one and two, while it's possible to write your own most
+
+of the time when we're talking about MCP, these are MCP servers that have been made available online,
+
+and that through commands like like you are downloading it from an online public place and you are then
+
+running it locally on your box.
+
+So it's running on your box, but it's still something that's been shared online, made available for
+
+everyone to use.
+
+All right, that's enough.
+
+Intro.
+
+Let's go to the lab.
+
+Here we are back in cursor and we're going into the week six.
+
+Of course.
+
+Which other week would we want to be in and into the third lab, and we're going to be experimenting
+
+with a bunch more MCP servers.
+
+And yes, it's warning me I can actually take this out because we're not going to be using an MCP server.
+
+SS uh, okay.
+
+So the first type of MCP server that I mentioned is one that you run locally and everything it does
+
+is local.
+
+Again, remembering we have downloaded it from, from a public repo from somewhere public.
+
+But we're going to run it.
+
+The server will be applied locally and we're going to pick another JavaScript one, a node one.
+
+And I want to pick this one, which is great.
+
+It is a way to give our agent memory and to give it knowledge.
+
+Graph based memory, a special kind of memory that understands about entities and observations about
+
+those entities and relationships between those entities.
+
+It's worth memory is a is a hot topic, and people often ask me questions about memory, and they think
+
+of memory like it's kind of one construct, perhaps because Lang Chain thinks of it that way, but like
+
+there is one memory.
+
+But in this MCP age, we think of memory just as being another set of tools that we can equip our LM
+
+with.
+
+And in fact, it could have many different types of tools relating to memory.
+
+This in particular is giving it the ability to store information about things, observations and relationships.
+
+We could give it this and we could give it other kinds of context.
+
+All of this ends up just being information that it can request by tools, or that becomes available
+
+in its prompts.
+
+And so they're just different techniques to give the LM more context.
+
+Anyway, so these are the parameters.
+
+Remember you always start by specifying the parameters of your MCP server.
+
+And in this case it's mpc's because we're running a node version.
+
+And it's uh, we're going to be running this version called lib SQL, which is a version, a memory
+
+that stores to a SQLite database.
+
+I've actually I've given a link here to to one that this is closely based off, which is one that,
+
+uh, gives you access to a JSON file.
+
+Um, but doesn't actually store it to SQL.
+
+And I found that this is a little bit less stable.
+
+This is a better version of it that that I prefer.
+
+It also allows you to specify a directory and a name for your memory.
+
+And this allows you to have different memory stores for different agents.
+
+So I find that quite handy.
+
+So I'm saying that looking looking somewhere called memory and look for database called Ed.
+
+And I believe it might already exist.
+
+It does.
+
+So why don't we just delete this so that it doesn't have any memory to start with?
+
+We'll move that to trash starting from nothing.
+
+So if you have Ed in in a folder there, then delete it.
+
+If you don't have a folder then then create one called memory.
+
+All right.
+
+So first of all let's just find out what tools do we have uh associated with this.
+
+We have tools create entities search nodes read graph create Relations, delete entity and delete relation.
+
+So we're allowing it to build this kind of connectivity between the things it wants to remember.
+
+All right let's see this in action.
+
+Okay.
+
+So now we have instructions.
+
+You use your entity tools as persistent memory to store and recall information about your conversations.
+
+My name is Edgar.
+
+I'm an LLM engineer.
+
+I'm teaching a course about agents, including the incredible MCP protocol.
+
+And I say something about MCP and I give it a model and let's see how this gets on.
+
+So as before, this is hopefully a pattern that you're quite familiar with.
+
+We use this context manager with MCP Server Studio, which we know is going to create the MCP client.
+
+We pass in the parameters.
+
+We give this timeout of 30s.
+
+And then as usual, we create our agent with instructions with the model and now with the MCP server.
+
+And now we call runner run with the agent and our request.
+
+And let's see what happens.
+
+Armed with these tools is it able to take this piece of information about me and do something with it?
+
+So it says, nice to meet you, editor.
+
+It's great to know you're teaching a course about AI agents and amqp protocol, blah blah blah, blah
+
+blah.
+
+And if you look over on the left, it has created a file editor.
+
+So now for the follow up question.
+
+We're coming back.
+
+We're creating an agent.
+
+We're giving it instructions.
+
+We're giving it the same asking for the same model, and we're giving it the same MCP server with access
+
+to the memory.
+
+And we're saying, my name is Ed.
+
+What do you know about me?
+
+And we'll see what this MCP server is able to do.
+
+I know that you're ed an LM engineer.
+
+You're teaching a course about AI agents, and in this course, you're teaching about the MCP protocol.
+
+So there you go.
+
+It's a quick, simple example, but it shows you how we were so easily able to equip our agent with
+
+a memory that's able to handle relationships between things.
+
+And so this is just a great starting example, and we'll be using this memory in the future as well.
+
+And it could be handy for any of your projects too.
+
+And of course, it's always a good idea to check the trace, which we should do.
+
+Come on in and conversation with our agent is right here and you will see that it it called the search
+
+nodes.
+
+It looked it did a query for Ed and it got back here JSON structure that reflects the entity type,
+
+the observations and and so on.
+
+And so you can look through this and get a sense for how the memory works.
+
+And you can use this to try and build up some more sophisticated memory about the different, uh, parts
+
+of your conversation that you want your agent to remember.
+
+Okay.
+
+Now we're going to go on to another MCP tool, and this time it's going to be the second type, which
+
+is the type that runs locally but uses the internet, which we've already done with, with, with fetch
+
+and with playwright.
+
+But but let's do another and and a handy one.
+
+So there's been many times in the last few weeks that we have used tools that do internet searches.
+
+You probably remember the hosted tool with OpenAI that we used right back in week two, which was quite
+
+expensive.
+
+Was it two and a half cents for every single web search?
+
+And we've used, I think, Tavileh and we've used, uh, Serpa.
+
+Well, we're going to do another one.
+
+So sorry to make you set up another key, but this one's a really great one.
+
+It's called Brave Search, and it's a company that specializes in an API driven search, including for
+
+use with AI.
+
+And it's free again, at least I think you get 2000 free searches a month.
+
+Uh, so it's very generous.
+
+And I have set it up.
+
+I've actually got a paid account because I've been using it a lot, but, uh, you very much can stay
+
+on the free version.
+
+I've got a link here for where you go to set up your account.
+
+If I go up here, uh, it brings up the brave search.
+
+You sign up, you go through and get an API key super easily without needing any credit card or anything
+
+like that.
+
+So once you've done that, you come back, you take your brave API key and you put it in your EMV file
+
+as usual, and then you'll have to rerun load MV up at the top.
+
+Okay.
+
+So then what we do is we collect our brave API key.
+
+And this time you'll notice that when we specify the params for our MCP server, we're passing in these
+
+environment variables, these settings as well.
+
+So that's a new twist for this one so that we can tell brave about our API key.
+
+And it's another node another JavaScript MCP server.
+
+So we run it this way.
+
+And in fact this is one of Anthropic's out of the box reference implementations.
+
+So this is part of Anthropic's offerings, the brave search.
+
+And so again even though we're running online searches, the MCP server is going to be running on my
+
+box.
+
+So the code for this is is remote is online.
+
+We are downloading that code and running it locally using npm.
+
+So it starts online, we bring it locally, we run it locally.
+
+And then of course, what that code actually does is it makes a call to a web service offered by the
+
+company brave, and it passes in our key to that service.
+
+So that's why this is architecture two MCP server running locally calling out to the cloud.
+
+And I'm probably belaboring this.
+
+You're probably like, yeah I get it I get it enough.
+
+Okay.
+
+So MCP server studio again is how we do this.
+
+We pass in the parameters.
+
+Let's just see what tools we get with this.
+
+Um, we get a brave web search tool which performs a web search with the API.
+
+Um, and then a local search searches for local businesses.
+
+I think I only get that because I'm paying the paid plan.
+
+I don't think that comes with the free plan, actually.
+
+Um, so again, the key difference with something like fetch is that with fetch, we're running a browser
+
+locally and we're just going to a web address.
+
+We're brave.
+
+We're making a web call to brave, to ask it to run like a Google search.
+
+But it's not using Google.
+
+It's using its own search engine and return the results of that query.
+
+Um, and so, uh, we're going to ask a question.
+
+You're able to search the web for information, research the latest news on the Amazon stock price and
+
+give it the current date.
+
+And then we run the server right here.
+
+Okay.
+
+Here we go.
+
+Running that you'll see.
+
+As usual we're passing in the MCP server.
+
+We've got the timeout set and we're calling run and run and back.
+
+We get of course, the results of running this web search with the current price of Amazon apparently
+
+217 and more information about it.
+
+And as always, we should go in and check out the trace.
+
+Let's have a look here and make sure that we're happy.
+
+Yep, it's calling a brave web search.
+
+The query was Amazon Stock Price News May 2025.
+
+And it got back these results.
+
+And so it seems to be working nicely end to end.
+
+That is another.
+
+That is an example of type two of the calling out to the web.
+
+And so now to talk about the type three of the MCP servers, the ones where the server itself, the
+
+MCP server, is running remotely.
+
+And you must connect to it using the SSC approach.
+
+And now here's the thing.
+
+As I say, it's not that common.
+
+And it's also quite flaky because there's no guarantees that the people that you're connecting with
+
+are going to keep their server running.
+
+I used to have an example in here of an MCP server that I found, a hosted MCP server that you could
+
+connect to remotely, but it went down and now you can't connect to it.
+
+And that's why I had to take out that code at the top.
+
+So it's no longer running.
+
+So that example didn't work.
+
+And so I tried to look for some other examples.
+
+And the other examples that I found are all for paid business services where you are already paying
+
+for something, and it tends to be from sort of professional business plans.
+
+So let me show you that, that the anthropic docs have a section on remote MCP servers.
+
+That's what we're talking about here.
+
+And it says several companies have deployed remote servers that developers can connect to.
+
+Um, and so here are some examples of them.
+
+And you'll see why I'm not able to demo one of these because I'd have to be a paying client.
+
+So asana, if you are a client of asana, asana like project management tool, then you could interact
+
+with asana workspace by by using this remote, uh, MCP server at MCP.
+
+Uh, and then similarly for these others like intercom, like, uh, PayPal, if you use not not just
+
+PayPal for your personal, uh, PayPal, I have one of them, but I don't have commerce capabilities.
+
+I don't I'm not I'm not a seller.
+
+Um, and and the others at Square and Waikato and Zapier.
+
+I was going to try and set something up to show it, but you have to have a paid account.
+
+So it's it's it's honestly not common to be seeing this.
+
+It's only in these cases of, like, paid, uh, enterprise accounts where you don't want to run the
+
+MCP server yourself.
+
+You want to connect to it running on the cloud.
+
+And as I say, I really I haven't seen much traction with this in the community.
+
+It's not like this is something that you come across often.
+
+Um, and for many of these, uh, for many of those commercial examples, you can run an MCP server
+
+locally as well, which is what people typically do.
+
+Cloudflare, which was actually on that list, has some tools for you to create and run your own remote
+
+servers.
+
+If you're a Cloudflare Cloudflare customer and you use Cloudflare for your own website, your own deployments,
+
+uh, they have some really interesting sheets here which allow you to deploy, uh, a remote server
+
+that other people could connect to, and they actually make it really quite easy.
+
+They walk you through the code here and how you can check in their, uh, screens that it's running.
+
+And then they give you, of course, the way that you would then connect to it from, say, your desktop
+
+or indeed from your OpenAI agents SDK.
+
+Um, and this is then where you can add authentication, which is one of the hot new areas of MCP.
+
+If you are going to provide a hosted tool, then you would want to have a way that people can authenticate
+
+with it so that they can demonstrate that they are who they say they are.
+
+Um, but as I say one more time, then I'll shut up because you're fed up of me saying this.
+
+But but it's not a common way of doing things.
+
+And indeed, uh, if you're if you're running something like the brave search that we just did, it
+
+would be more common for you to set up an API key with something like brave and then pass in that API
+
+key when you call your local MCP server.
+
+That's the more common configuration.
+
+And of course, this might change any day that maybe, maybe managed hosted MCP servers will take off
+
+big time.
+
+And and I'll be eating my words.
+
+But but as of right now, uh, it's not terribly common, but you certainly could follow the Cloudflare
+
+instructions and set up your own should you wish.
+
+So that wraps up the third type.
+
+And we're now going to go back to the second type for a really cool example.
+
+So the main project for this week is to set up a trading floor, have autonomous agents that can buy
+
+and sell equities, and they're not going to really buy and sell equities.
+
+They're going to be using the simulated account management that we already built, but they will be
+
+using real market data.
+
+And there's a bunch of different MCP servers that can help provide you with market data.
+
+And after playing with a bunch of them, my favorite one is the one provided by the company, polygon.
+
+That's a very well known professional provider of financial markets.
+
+Uh, and uh, yeah, I'll bring you to their website.
+
+Here they are.
+
+It's, uh, they're super well known and, uh, they one of the big benefits that they have is that
+
+they have both a free plan and a paid plan.
+
+So I recommend you stick with the free plan.
+
+But if you're a sucker for this stuff like I am, then for sure you can.
+
+You can spend a little.
+
+It's somewhere between 20 and 30 bucks a month, uh, to get more accurate market data.
+
+So with the free plan, you always get data as of the previous day's business, close stock prices as
+
+of yesterday's close with the paid plan that I'm on, you get them on a 15 minute delay, but unlimited
+
+API use.
+
+And if you want to pay a lot more, you can get real time market data, but there's no need for that
+
+unless you're already a trader.
+
+So this is polygon.
+
+Uh, please come in and sign up.
+
+And once you're signed, signed in, select the keys button.
+
+In the left hand navigation.
+
+You press a blue new key button.
+
+And then you take that key and you put it in your EMV file as polygon API key.
+
+And uh, the, uh, here we go.
+
+Just run this.
+
+And the fact that it didn't say polygon API key is not set means that it was set.
+
+Um, and then you can, for example, directly use the polygon client.
+
+And they've got great docs on their websites and it's very easy to use.
+
+So this previous close, uh, AG for Apple's stock price, for example, will tell me that the previous
+
+close for Apple was $195.27.
+
+And that is how you simply use polygon code directly.
+
+Okay, so I have written a little Python module called market.py that wraps some of these calls to polygon.
+
+And I've done something a little bit sneaky.
+
+So the polygon API if you're on the free plan is what they call rate limited, which means you're only
+
+allowed to make that API call.
+
+I think it's five times a minute.
+
+It's quite, quite mean.
+
+Uh, and uh, so you would only be able to call for a share price that five times, but it turns out
+
+that that it also only counts it as one call.
+
+If you make a call and ask for all the share prices in the market, a snapshot of every share price.
+
+And so I've done something that if you ask for a share price like Apple and you're on the free plan,
+
+it will call for all share prices.
+
+It will use that one call and then it will cache that in memory and the subsequent times you call this,
+
+it will just return from the cache.
+
+Let me show you that for a second.
+
+If we look in Market Pi, you'll see here that there's this get share price.
+
+Um, I checked you got a polygon key and then I call this get share price polygon.
+
+And I see if you're on the paid plan or not if you're on the free plan, I call this function.
+
+If you're following me and this function is basically going to end up getting the full market for the
+
+prior business day, and it will cache that.
+
+So if this has been called before with the same date, it will just return the same full market.
+
+So it's just a nice way of making sure that we can always get that share price, and we won't hit the
+
+rate limits.
+
+Let me show you that if we get the share price for Apple, it's 195.
+
+And now I can put that in a tight loop and get it 1000 times, and we simply get 195.
+
+And I assure you that if this weren't being plucked from the cache, then we would have problems with
+
+that.
+
+We would hit the rate limit immediately.
+
+So that's just something to to understand.
+
+Just something that I've put in there.
+
+Okay.
+
+And I've also made this into an MCP server as well.
+
+Another little local MCP server called market underscore server.
+
+So if you look at market server you will see that this is again a very simple MCP server.
+
+It just the same as before.
+
+You remember, you create the MCP and then you use the MCP tool decorator.
+
+And then here is the function lookup share price.
+
+And that just calls get share price.
+
+And this is the way that you actually launch the server.
+
+So it's really nice to see such an such a simple MCP server here that created that means that we can
+
+now call that as uh, we can first of all, look at the tools that it gives us.
+
+And this should exactly give us the lookup share price.
+
+And now we can ask an agent to tell us the share price of Apple.
+
+So we'll say you answer questions about the stock market.
+
+What's the share price of Apple.
+
+Let's upgrade this to be the latest model.
+
+And then just as before we use the context manager we pass in that MCP server.
+
+This stuff is is simple to you.
+
+Now you're an expert at this.
+
+We call our MCP server.
+
+And sure enough it all worked great.
+
+It called the MCP tool and it told us the share price of Apple.
+
+But that's not the interesting part of using polygon.
+
+The interesting part is if you have a paid plan and you want to use their MCP server with all of the
+
+capabilities.
+
+And so I'm going to show this to you just so you get a sense for it and totally optional.
+
+But if you wish, you could sign up even just for the first month, to experience this for yourself.
+
+So here are the parameters that we're providing for our MCP tool.
+
+It is UVC, so it's a Python based MCP server.
+
+And you can see interestingly that the way it works is that you can you can provide a link to the GitHub
+
+repo which contains this MCP server.
+
+And you can use that.
+
+So we're calling MCP polygon from this repo.
+
+So it doesn't have to be something that's like pip installable.
+
+It can be something that is just straight from a repo.
+
+And obviously if you do something like this then you need to do your research.
+
+You need to go and check that this genuinely is the official GitHub repo for polygon, the company behind
+
+polygon IO, and make sure you're comfortable with the community traction, the number of stars, the
+
+kind of support it has, and so on.
+
+Just as you would do if you were going to clone somebody else's repo.
+
+The same kind of due diligence.
+
+Exactly.
+
+And so I have done that, of course.
+
+And I'm satisfied with this myself.
+
+But but you should too.
+
+And then I'm passing in my polygon key.
+
+And then I'm going to ask, what tools do you provide me this MCC server.
+
+So we'll run this.
+
+And wowza there's a lot of them.
+
+So there's a bunch of different tools.
+
+There's a lot that the model is going to be allowed to do.
+
+It includes, uh, doing things like getting the last trade.
+
+It has crypto data in here, as well as ethics data, getting market status, tickers, dividends,
+
+conditions, financials.
+
+There's there's a there's a lot to get here.
+
+Uh, and so this this is something which which equips our agent with lots of capabilities to analyse
+
+financial markets directly.
+
+Now, you can give all of these tools to your agent, even if you're on the free plan.
+
+But if you do that, most of these will respond and say this tool isn't available for people on the
+
+free plan.
+
+So it's a bit of a bore.
+
+Uh, what you have to do is, uh, is is either just only provide the one tool, as I did for the free
+
+plan example, uh, or sign up for the paid plan.
+
+Okay.
+
+So let's try these out.
+
+So, um, as I say, because if you're on the free plan, we have to be specific that it should only
+
+use the get snapshot ticker tool.
+
+And so I will run this and have it hopefully use the right tool.
+
+So so we're now equipping the agent with all of those tools that we just saw.
+
+And uh oh.
+
+And it hasn't used the right tool.
+
+That's super interesting.
+
+Actually let me also I'm going to upgrade the model while I'm doing it, even though I said get snapshot
+
+ticker.
+
+Let's try it a second time.
+
+It's always good to see her agents being unpredictable.
+
+Um, let's see whether it gets it right the second time and uses the right ticker.
+
+It does.
+
+Uh, so I'm tempted to, to go and rerecord this, but I won't, because I think it's important to see
+
+that with a genetic AI.
+
+You do get this, this sometimes ill behavior when it doesn't correctly follow the prompts, and you
+
+need to be able to account for that in what you do.
+
+And also, I don't know if this is what fixed it, but upgrading to a more recent model, uh, did did
+
+appear in this case to make it perform better, but now it did use the right tool, and it got the latest
+
+share price at $195.
+
+Okay, so if you do have a paid plan then you can now add this to your M file.
+
+You just have to in your env file say polygon plan equals paid.
+
+That makes sure that I switch it to use the right tools.
+
+And if you do decide to go all the way and have the premium real time plan, you can set this to real
+
+time.
+
+And I'll be sure to use all of the real time APIs.
+
+But I have got just this paid plan, so I'm going to go and update my M file right now.
+
+Okay, so now if I now run this cell, it should confirm that I'm on the right plan.
+
+Let's see.
+
+Yep.
+
+You've chosen to subscribe to the paid polygon plan.
+
+And so we'll be looking at prices on a 15 minute delay.
+
+And that for the time being is uh, is the, the uh, our foray into MCP servers.
+
+Um, but there are so many more and that's where I will get to with the exercises.
+
+Um, so I would suggest that you go on to the marketplaces and look for tools which interest you and
+
+experiment with them right here, try and use.
+
+I say here all three approaches.
+
+You'll probably find, like me, that there actually aren't easily available approaches with remote
+
+MCP servers, so you might not want to go there unless you are already paying user of something like
+
+asana.
+
+Um, but assuming that you're not, then then go with those first two approaches.
+
+Find examples of MCP servers that will run locally and only stay locally.
+
+Do things on your local computer.
+
+Find examples that call the web and find examples of MCP servers that are Python based and those that
+
+are JavaScript based, and try them all out.
+
+Experiment with them and have fun giving capabilities to your agents and seeing them taking advantage
+
+of them.
+
+Well, hopefully you took me up on that.
+
+You did some exercises and you've added more MCP servers.
+
+And that's a wrap on day three of week six.
+
+And that means that we're about to head into the capstone project of building a trading floor.
+
+And I can't wait to show you this.
+
+It's such a cool project.
+
+I'll see you next time.
+
