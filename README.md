@@ -1,319 +1,119 @@
-# 🏛️ Agentic Trading System
+# Agentic Trading System - Quick Start Guide
 
-A sophisticated autonomous trading system featuring four AI agents inspired by legendary investors, built with MCP (Model Context Protocol) architecture and OpenAI GPT-4.
-
-## 🎯 Overview
-
-This system implements four distinct trading personalities as autonomous AI agents:
-
-- **Warren** 📊 - Value investing (Warren Buffett style)
-- **George** 🌍 - Contrarian macro trading (George Soros style)  
-- **Ray** ⚖️ - Risk parity diversification (Ray Dalio style)
-- **Cathie** 🚀 - Innovation growth investing (Cathie Wood style)
-
-## 🏗️ Architecture
-
-### Hybrid Java/Python MCP Architecture
-
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   AI Agents     │    │   MCP Servers    │    │  Java Backend   │
-│   (Python)      │◄──►│   (Python)       │◄──►│  (Spring Boot)  │
-│                 │    │                  │    │                 │
-│ • Warren        │    │ • accounts_server│    │ • AccountService│
-│ • George        │    │ • market_server  │    │ • MarketService │
-│ • Ray           │    │ • push_server    │    │ • Controllers   │
-│ • Cathie        │    │                  │    │ • SQLite DB     │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-```
-
-### Project Structure
-
-```
-agentic-trading-system/
-├── backend/                 # Java Spring Boot REST API
-│   ├── src/main/java/com/trading/
-│   │   ├── service/        # Business logic
-│   │   ├── controller/     # REST endpoints
-│   │   ├── entity/         # JPA entities
-│   │   └── repository/     # Data access
-│   └── build.gradle.kts    # Build configuration
-├── mcp-servers/            # Python MCP Protocol Servers
-│   ├── accounts_server.py  # Account management tools
-│   ├── market_server.py    # Market data tools
-│   └── push_server.py      # Notification tools
-├── agents/                 # AI Trading Agents
-│   ├── base_agent.py       # Abstract base agent
-│   ├── warren_agent.py     # Value investor
-│   ├── george_agent.py     # Contrarian trader
-│   ├── ray_agent.py        # Risk parity trader
-│   ├── cathie_agent.py     # Growth investor
-│   ├── mcp_connector.py    # MCP tool connections
-│   ├── agent_orchestrator.py # Multi-agent coordinator
-│   └── trading_system.py   # Main system entry point
-├── frontend/               # Future React/Vue UI
-└── docs/                   # Documentation
-```
-
-## 🤖 Trading Agents
-
-### Warren (Value Investor)
-- **Philosophy**: Long-term value investing with margin of safety
-- **Risk**: Conservative (2-5% position sizes)
-- **Focus**: Undervalued stocks, strong fundamentals, dividend-paying companies
-- **Approach**: Patient, disciplined, fundamentals over technicals
-
-### George (Contrarian Macro)
-- **Philosophy**: Contrarian thinking and reflexivity theory
-- **Risk**: Aggressive (up to 15% position sizes)
-- **Focus**: Market sentiment, macro trends, overreactions
-- **Approach**: Bold when conviction is high, quick to reverse
-
-### Ray (Risk Parity)
-- **Philosophy**: Diversified risk-adjusted returns
-- **Risk**: Moderate (3-5% risk-adjusted positions)
-- **Focus**: Portfolio balance, volatility-based sizing
-- **Approach**: Systematic, principle-based, risk-first
-
-### Cathie (Growth Innovation)
-- **Philosophy**: Disruptive innovation and exponential growth
-- **Risk**: Aggressive (5-10% concentrated positions)
-- **Focus**: Technology, innovation, transformative companies
-- **Approach**: Long-term vision, high conviction, embrace volatility
-
-## 🛠️ Technology Stack
-
-### Backend (Java)
-- **Spring Boot 3.2.0** - Web framework
-- **SQLite** - Database with JSON storage
-- **JPA/Hibernate** - ORM with custom SQLite dialect
-- **Jackson** - JSON serialization
-- **RestTemplate** - HTTP client for market data APIs
-
-### MCP Servers (Python)
-- **FastMCP** - MCP protocol implementation
-- **aiohttp** - Async HTTP client
-- **Alpha Vantage API** - Real market data
-- **Yahoo Finance API** - Fallback market data
-
-### AI Agents (Python)
-- **OpenAI GPT-4** - Decision making engine
-- **asyncio** - Async programming
-- **MCP Protocol** - Tool communication
-
-## 🚀 Getting Started
+## 🚀 Running the Full System (Backend + Frontend)
 
 ### Prerequisites
-- Java 17+
-- Python 3.8+
-- OpenAI API key
-- Alpha Vantage API key (optional)
+- Java 17+ (for Spring Boot backend)
+- Node.js 18+ (for React frontend)
+- Gradle (included via gradlew)
 
-### 1. Start the Java Backend
+### 1. Start the Java Spring Boot Backend
 
 ```bash
-cd backend
+# Navigate to the backend directory
+cd agentic-trading-system/backend
+
+# Start the backend (this will run on port 8080)
 ./gradlew bootRun
 ```
 
-The backend will start on `http://localhost:8080`
+The backend will be available at: `http://localhost:8080`
 
-### 2. Install Python Dependencies
-
-```bash
-cd agents
-pip install -r requirements.txt
-
-cd ../mcp-servers  
-pip install -r requirements.txt
-```
-
-### 3. Set Environment Variables
+### 2. Start the React Frontend
 
 ```bash
-export OPENAI_API_KEY="your-openai-api-key"
-export ALPHA_VANTAGE_API_KEY="your-alpha-vantage-key"  # Optional
+# Open a new terminal and navigate to frontend
+cd agentic-trading-system/frontend
+
+# Install dependencies (if not already done)
+npm install
+
+# Start the frontend development server
+npm run dev
 ```
 
-### 4. Run the Trading System
+The frontend will be available at: `http://localhost:3000`
 
-```bash
-cd agents
-python trading_system.py
+### 3. Access the Trading Dashboard
+
+Open your browser and go to: **http://localhost:3000**
+
+You should see:
+- ✅ **4 Trading Agents**: Warren, George, Ray, Cathie
+- ✅ **Real-time Data**: Portfolio values, P&L, trading stats
+- ✅ **Market Status**: Live market open/closed indicator
+- ✅ **Auto-refresh**: Data updates every 15 seconds
+
+## 🔧 Configuration
+
+### Backend Configuration
+The backend runs on port 8080 by default. Key endpoints:
+- `/api/trading/agents/status` - Get all agent statuses
+- `/api/accounts` - Account management
+- `/api/market/status` - Market status
+
+### Frontend Configuration
+Create a `.env` file in the `frontend/` directory:
+
+```env
+VITE_API_BASE_URL=http://localhost:8080/api
+VITE_APP_NAME=Agentic Trading System
+VITE_APP_VERSION=1.0.0
 ```
 
-## 📊 Market Data Integration
+## 🐛 Troubleshooting
 
-### Real-Time Data Sources
-- **Alpha Vantage** - Primary market data API
-- **Yahoo Finance** - Fallback market data API
-- **Mock Data** - Fallback when APIs unavailable
+### Backend Issues
+- **Port 8080 in use**: Change port in `application.properties`
+- **Java version**: Ensure Java 17+ is installed
+- **Database**: H2 database runs in-memory by default
 
-### Market Features
-- Current stock prices with caching
-- Historical price data (configurable periods)
-- Technical indicators (SMA5, SMA20, volatility)
-- Market status and trading hours
-- Trend analysis and sentiment
+### Frontend Issues
+- **Connection Error**: Ensure backend is running on port 8080
+- **Port 3000 in use**: Vite will automatically use next available port
+- **Dependencies**: Run `npm install` if packages are missing
 
-### Supported Symbols
-- **Tech**: AAPL, GOOGL, MSFT, NVDA, META
-- **Growth**: TSLA, NFLX, AMZN
-- **ETFs**: SPY, QQQ
+### Common Issues
+1. **CORS Errors**: Backend should have CORS configured for localhost:3000
+2. **API 404 Errors**: Check if backend endpoints match frontend service calls
+3. **Loading Forever**: Check browser console for network errors
 
-## 🔧 MCP Tools Available
+## 📊 What You'll See
 
-### Account Management
-- `get_balance` - Get account cash and portfolio value
-- `buy_shares` - Execute buy orders with validation
-- `sell_shares` - Execute sell orders with validation
-- `get_holdings` - Get current stock positions
-- `change_strategy` - Update trading strategy
+### With Backend Running
+- Real agent data from the Java APIs
+- Live portfolio values and P&L
+- Trading statistics and success rates
+- Market status indicator
 
-### Market Data
-- `lookup_share_price` - Get current stock price
-- `get_historical_prices` - Historical price data
-- `get_market_indicators` - Technical indicators
-- `get_market_status` - Market open/close status
-- `analyze_stock_trend` - Comprehensive trend analysis
-- `clear_price_cache` - Cache management
+### Without Backend (Frontend Only)
+- Professional error handling
+- "Connection Error" message
+- Graceful degradation of features
 
-### Notifications
-- `send_notification` - Push notifications for trades
+## 🔄 Development Workflow
 
-## 🎮 Usage Examples
+1. **Backend Changes**: Restart `mvn spring-boot:run`
+2. **Frontend Changes**: Hot reload automatically updates
+3. **API Changes**: Update both backend endpoints and frontend services
 
-### Run Single Trading Cycle
-```python
-from agents.trading_system import TradingSystem
+## 📁 Project Structure
 
-system = TradingSystem()
-await system.run_single_cycle()
+```
+agentic-trading-system/
+├── backend/                 # Java Spring Boot backend
+├── frontend/               # React TypeScript frontend
+├── agents/                 # Python trading agents
+├── mcp-servers/           # MCP server implementations
+└── docs/                  # Documentation
 ```
 
-### Continuous Trading
-```python
-system = TradingSystem()
-await system.run_continuous()  # Runs every 5 minutes
-```
+## 🎯 Next Steps
 
-### Get System Status
-```python
-status = await system.get_system_status()
-print(json.dumps(status, indent=2))
-```
+Once both services are running, you can:
+1. View the 4 autonomous trading agents
+2. Monitor real-time portfolio performance
+3. See live market data integration
+4. Test the API integration layer
 
-## 📈 Trading Logic
-
-Each agent analyzes:
-1. **Current portfolio** - Cash balance, holdings, total value
-2. **Market data** - Price, technical indicators, trend analysis
-3. **Risk factors** - Volatility, position sizing, diversification
-4. **Personality rules** - Investment philosophy and constraints
-
-Decision output:
-```json
-{
-  "action": "buy|sell|hold",
-  "quantity": 100,
-  "reasoning": "Detailed explanation...",
-  "confidence": 0.85
-}
-```
-
-## 🔒 Risk Management
-
-- **Position limits** - Max 15% per position (varies by agent)
-- **Cash management** - Maintain minimum cash reserves
-- **Volatility adjustment** - Size positions based on risk
-- **Stop losses** - Quick exits when thesis breaks
-- **Diversification** - Spread risk across symbols
-
-## 🧪 Testing
-
-### Test Agent Foundation
-```bash
-cd agents
-python test_agent_foundation.py
-```
-
-### Test Java Backend
-```bash
-cd backend
-./gradlew test
-```
-
-### Test MCP Servers
-```bash
-cd mcp-servers
-python -m pytest
-```
-
-## 📊 Performance Monitoring
-
-The system tracks:
-- **Trade execution** - Buy/sell orders with timestamps
-- **Portfolio performance** - P&L, returns, Sharpe ratio
-- **Agent behavior** - Decision patterns, confidence levels
-- **Risk metrics** - Volatility, drawdowns, correlation
-
-## 🔮 Future Enhancements
-
-- **Web UI** - React dashboard for monitoring
-- **Backtesting** - Historical performance analysis
-- **Paper trading** - Risk-free testing mode
-- **Advanced indicators** - RSI, MACD, Bollinger Bands
-- **Options trading** - Derivatives support
-- **Multi-asset** - Bonds, commodities, crypto
-
-## 📝 Configuration
-
-### Application Settings (`backend/src/main/resources/application.yml`)
-```yaml
-market:
-  alpha-vantage:
-    api-key: ${ALPHA_VANTAGE_API_KEY:demo}
-  cache:
-    ttl-minutes: 5
-  fallback-to-mock: true
-
-openai:
-  api-key: ${OPENAI_API_KEY:}
-  model: gpt-4
-  max-tokens: 2000
-```
-
-### Agent Configuration
-Each agent can be customized:
-- **Risk tolerance** - Conservative, moderate, aggressive
-- **Position sizing** - Max percentage per trade
-- **Temperature** - OpenAI creativity level
-- **Trading symbols** - Stocks to analyze
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## ⚠️ Disclaimer
-
-This is an educational project for learning AI and trading concepts. **NOT FINANCIAL ADVICE**. Do not use with real money without proper testing and risk management. Past performance does not guarantee future results.
-
-## 🙏 Acknowledgments
-
-- **MCP Protocol** - Model Context Protocol for tool integration
-- **OpenAI** - GPT-4 for intelligent decision making
-- **Spring Boot** - Robust Java backend framework
-- **FastMCP** - Python MCP server implementation
-- **Legendary Investors** - Warren Buffett, George Soros, Ray Dalio, Cathie Wood for inspiration
-
----
-
-Built with ❤️ using MCP architecture and OpenAI GPT-4
+The system is designed to work with or without the Python agents running - the Java backend provides the core trading infrastructure and APIs.
