@@ -126,14 +126,20 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
   - **React Hooks**: [`useAccounts.ts`](../frontend/src/hooks/useAccounts.ts), [`useMarketData.ts`](../frontend/src/hooks/useMarketData.ts), [`useTrading.ts`](../frontend/src/hooks/useTrading.ts)
   - **Features**: TypeScript support, professional error handling, React Query caching, real-time data updates (15-second intervals), environment configuration
 
-##### 3.1.3 Trader Dashboard Layout (1 day)
+##### ⏳ 3.1.3 Switch Java Backend to Read Real SQLite Data (1 day) - **IN PROGRESS**
+- **Task**: Connect Java backend to read from actual SQLite database instead of mock data
+- **Files**: `backend/src/main/java/com/trading/service/TradingService.java`, `backend/src/main/java/com/trading/controller/TradingController.java`
+- **Deliverables**: Java backend reading real agent data from SQLite database, proper integration with AgentMonitoringService
+- **Status**: ⏳ **IN PROGRESS** - AgentMonitoringService created, TradingController updated, compilation issues resolved
+
+##### 3.1.4 Trader Dashboard Layout (1 day)
 - **Task**: Enhance 4-trader grid layout with real data structure
 - **Files**: `frontend/src/components/TradingDashboard/`
 - **Deliverables**: Enhanced responsive 4-column layout, detailed trader cards, portfolio displays
 - **Reference**: Source project shows Warren, George, Ray, Cathie in columns
 - **Status**: ⏳ **PENDING**
 
-##### 3.1.4 Basic Data Integration and Testing (1 day)
+##### 3.1.5 Basic Data Integration and Testing (1 day)
 - **Task**: Connect dashboard to Java backend APIs and verify functionality
 - **Files**: `frontend/src/components/TradingDashboard/`, API integration
 - **Deliverables**: Live data from backend, error handling, loading states
@@ -163,53 +169,86 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 - **Task**: Notification management interface
 - **Enhancement**: Alert configuration, notification history, channel management
 
-### 🔬 **PHASE 4: ADVANCED TRADING PLATFORM FEATURES**
+### 🗄️ **PHASE 4: DATABASE MIGRATION TO POSTGRESQL**
+**Goal**: Migrate from SQLite to PostgreSQL for production scalability
+
+#### 4.1 PostgreSQL Setup and Configuration (1-2 days)
+- **Task**: Set up PostgreSQL database and configure connection
+- **Files**: `backend/src/main/resources/application.yml`, Docker configuration
+- **Deliverables**: PostgreSQL instance, connection configuration, environment setup
+- **Status**: ⏳ **PENDING**
+
+#### 4.2 Database Schema Migration (2-3 days)
+- **Task**: Create PostgreSQL schema matching SQLite structure
+- **Files**: Database migration scripts, JPA entity updates
+- **Deliverables**: PostgreSQL schema, data migration scripts, updated entity mappings
+- **Status**: ⏳ **PENDING**
+
+#### 4.3 Update Python MCP Servers for PostgreSQL (2-3 days)
+- **Task**: Modify Python MCP servers to use PostgreSQL instead of SQLite
+- **Files**: `mcp-servers/accounts_server.py`, `mcp-servers/market_server.py`, database connection utilities
+- **Deliverables**: PostgreSQL-compatible MCP servers, connection pooling, error handling
+- **Status**: ⏳ **PENDING**
+
+#### 4.4 Java Backend PostgreSQL Integration (1-2 days)
+- **Task**: Update Java services to use PostgreSQL
+- **Files**: `backend/src/main/java/com/trading/repository/`, `backend/src/main/java/com/trading/service/`
+- **Deliverables**: PostgreSQL repositories, updated services, connection management
+- **Status**: ⏳ **PENDING**
+
+#### 4.5 Data Migration and Testing (2-3 days)
+- **Task**: Migrate existing SQLite data to PostgreSQL and test functionality
+- **Files**: Migration scripts, test suites
+- **Deliverables**: Migrated data, comprehensive testing, performance validation
+- **Status**: ⏳ **PENDING**
+
+### 🔬 **PHASE 5: ADVANCED TRADING PLATFORM FEATURES**
 **Goal**: Professional trading platform capabilities
 
-#### 4.1 Multi-timeframe Analysis (4-5 days)
+#### 5.1 Multi-timeframe Analysis (4-5 days)
 - **Task**: Multiple timeframe analysis capabilities
 - **Enhancement**: 1m, 5m, 15m, 1h, 1d analysis across all agents
 
-#### 4.2 Advanced Backtesting (5-6 days)
+#### 5.2 Advanced Backtesting (5-6 days)
 - **Task**: Comprehensive backtesting with strategy optimization
 - **Enhancement**: Monte Carlo simulations, walk-forward analysis
 
-#### 4.3 Risk Management Dashboard (4-5 days)
+#### 5.3 Risk Management Dashboard (4-5 days)
 - **Task**: Risk management controls and monitoring
 - **Enhancement**: Real-time risk metrics, position limits, drawdown controls
 
-#### 4.4 Compliance Reporting Interface (3-4 days)
+#### 5.4 Compliance Reporting Interface (3-4 days)
 - **Task**: Regulatory compliance and audit trail interface
 - **Enhancement**: Automated compliance reports, audit trail visualization
 
-#### 4.5 Agent Behavior Customization (3-4 days)
+#### 5.5 Agent Behavior Customization (3-4 days)
 - **Task**: Advanced agent tuning and customization
 - **Enhancement**: Personality parameter tuning, behavior modification
 
-#### 4.6 Market Sentiment Analysis (4-5 days)
+#### 5.6 Market Sentiment Analysis (4-5 days)
 - **Task**: Advanced market sentiment and news aggregation
 - **Enhancement**: Sentiment scoring, news impact analysis, social media integration
 
-### ✅ **PHASE 5: INTEGRATION AND TESTING**
+### ✅ **PHASE 6: INTEGRATION AND TESTING**
 **Goal**: Production-ready system
 
-#### 5.1 Integration Testing (3-4 days)
+#### 6.1 Integration Testing (3-4 days)
 - **Task**: End-to-end testing of all enhanced components
 - **Validation**: All systems working together seamlessly
 
-#### 5.2 Performance Testing (2-3 days)
+#### 6.2 Performance Testing (2-3 days)
 - **Task**: Load testing and optimization
 - **Validation**: System performance under load
 
-#### 5.3 User Acceptance Testing (3-4 days)
+#### 6.3 User Acceptance Testing (3-4 days)
 - **Task**: React interface testing with users
 - **Validation**: User experience and functionality validation
 
-#### 5.4 Production Deployment (2-3 days)
+#### 6.4 Production Deployment (2-3 days)
 - **Task**: Production deployment preparation
 - **Deliverable**: Production-ready deployment
 
-#### 5.5 Documentation and User Guides (2-3 days)
+#### 6.5 Documentation and User Guides (2-3 days)
 - **Task**: Comprehensive documentation
 - **Deliverable**: User guides, technical documentation
 
@@ -305,19 +344,30 @@ Cathie Agent + Researcher Tool
 |-------|----------|------------------|
 | **Phase 1** | 1-2 weeks | Researcher integration with all 4 traders |
 | **Phase 2** | 3-4 weeks | Enhanced backend with memory, notifications, analytics |
-| **Phase 3** | 3-4 weeks | Modern React dashboard and trading interface |
-| **Phase 4** | 4-5 weeks | Advanced trading platform features |
-| **Phase 5** | 2-3 weeks | Integration testing and production deployment |
+| **Phase 3** | 3-4 weeks | Modern React dashboard and real SQLite data integration |
+| **Phase 4** | 1-2 weeks | Database migration from SQLite to PostgreSQL |
+| **Phase 5** | 4-5 weeks | Advanced trading platform features |
+| **Phase 6** | 2-3 weeks | Integration testing and production deployment |
 
-**Total Timeline**: 13-18 weeks (3-4 months)
+**Total Timeline**: 14-20 weeks (3.5-5 months)
 
 ## Immediate Next Steps
 
-### **Ready to Begin**: Phase 3.1.3 - Trader Dashboard Layout
+### **Currently In Progress**: Phase 3.1.3 - Switch Java Backend to Read Real SQLite Data
+- **Files**: `backend/src/main/java/com/trading/service/TradingService.java`, `backend/src/main/java/com/trading/controller/TradingController.java`
+- **Status**: ⏳ **IN PROGRESS** - AgentMonitoringService created, TradingController updated, compilation issues resolved
+- **Next**: Test real data integration and complete SQLite connection
+
+### **Ready to Begin**: Phase 3.1.4 - Trader Dashboard Layout
 - **File**: `frontend/src/components/TradingDashboard/`
 - **Task**: Enhance 4-trader grid layout with real data structure
 - **Duration**: 1 day
 - **Outcome**: Enhanced responsive 4-column layout with detailed trader cards and portfolio displays
+
+### **Future**: Phase 4 - Database Migration to PostgreSQL
+- **Goal**: Migrate from SQLite to PostgreSQL for production scalability
+- **Duration**: 1-2 weeks
+- **Key Benefits**: Better performance, concurrent access, production readiness
 
 ## Conclusion
 
