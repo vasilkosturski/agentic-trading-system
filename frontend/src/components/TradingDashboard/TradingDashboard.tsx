@@ -1,4 +1,3 @@
-import React from 'react';
 import { useTradingAgents, useMarketStatus } from '../../hooks';
 
 const TradingDashboard = () => {

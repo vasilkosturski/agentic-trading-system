@@ -75,17 +75,29 @@ export const tradingService = {
   // Order management
   createOrder: async (orderData: CreateOrderRequest): Promise<TradeOrder> => {
     const response = await apiClient.post('/trading/orders', orderData);
+    // Handle ToolResponse wrapper format
+    if (response.data && response.data.success && response.data.data) {
+      return response.data.data;
+    }
     return response.data;
   },
 
   getOrders: async (accountId?: string): Promise<TradeOrder[]> => {
     const params = accountId ? { accountId } : {};
     const response = await apiClient.get('/trading/orders', { params });
-    return response.data;
+    // Handle ToolResponse wrapper format
+    if (response.data && response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    return response.data || [];
   },
 
   getOrder: async (orderId: string): Promise<TradeOrder> => {
     const response = await apiClient.get(`/trading/orders/${orderId}`);
+    // Handle ToolResponse wrapper format
+    if (response.data && response.data.success && response.data.data) {
+      return response.data.data;
+    }
     return response.data;
   },
 
@@ -97,17 +109,31 @@ export const tradingService = {
   getAgentTrades: async (agentName?: string): Promise<AgentTrade[]> => {
     const params = agentName ? { agentName } : {};
     const response = await apiClient.get('/trading/agent-trades', { params });
-    return response.data;
+    // Handle ToolResponse wrapper format
+    if (response.data && response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    return response.data || [];
   },
 
   getAgentStatus: async (agentName: string): Promise<AgentStatus> => {
     const response = await apiClient.get(`/trading/agents/${agentName}/status`);
+    // Handle ToolResponse wrapper format
+    if (response.data && response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    // Fallback to direct data if not wrapped
     return response.data;
   },
 
   getAllAgentsStatus: async (): Promise<AgentStatus[]> => {
     const response = await apiClient.get('/trading/agents/status');
-    return response.data;
+    // Handle ToolResponse wrapper format
+    if (response.data && response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    // Fallback to direct data if not wrapped
+    return response.data || [];
   },
 
   // Start/stop agent trading
@@ -126,6 +152,10 @@ export const tradingService = {
     if (agentName) params.agentName = agentName;
     
     const response = await apiClient.get('/trading/stats', { params });
+    // Handle ToolResponse wrapper format
+    if (response.data && response.data.success && response.data.data) {
+      return response.data.data;
+    }
     return response.data;
   },
 
@@ -164,6 +194,10 @@ export const tradingService = {
     const response = await apiClient.get('/trading/activity', {
       params: { limit }
     });
-    return response.data;
+    // Handle ToolResponse wrapper format
+    if (response.data && response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    return response.data || [];
   },
 };
