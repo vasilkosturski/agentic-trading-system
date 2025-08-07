@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { accountService, Account, Position, Transaction } from '../services';
+import { accountService, Account } from '../services';
 
 // Query keys for caching
 export const accountKeys = {

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { marketService, MarketData, HistoricalData, MarketStatus, WatchlistItem } from '../services';
+import { marketService } from '../services';
 
 // Query keys for market data
 export const marketKeys = {

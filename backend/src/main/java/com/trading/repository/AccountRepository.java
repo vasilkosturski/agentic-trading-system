@@ -92,4 +92,20 @@ public class AccountRepository {
         
         return logs;
     }
+    
+    public void save(Account account) {
+        String sql = "INSERT INTO accounts (name, account) VALUES (?, ?) " +
+                    "ON CONFLICT(name) DO UPDATE SET account = excluded.account";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, account.getName().toLowerCase());
+            stmt.setString(2, objectMapper.writeValueAsString(account));
+            stmt.executeUpdate();
+        } catch (SQLException | JsonProcessingException e) {
+            System.err.println("Error saving account: " + e.getMessage());
+            throw new RuntimeException("Failed to save account: " + e.getMessage());
+        }
+    }
 }

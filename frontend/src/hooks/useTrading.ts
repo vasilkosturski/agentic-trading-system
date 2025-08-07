@@ -1,11 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  tradingService, 
-  TradeOrder, 
-  CreateOrderRequest, 
-  AgentTrade, 
-  AgentStatus, 
-  TradingStats 
+import {
+  tradingService
 } from '../services';
 
 // Query keys for trading data
