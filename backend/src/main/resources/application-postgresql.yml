@@ -1,0 +1,36 @@
+# PostgreSQL Configuration Profile
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:agentic_trading}
+    username: ${DB_USERNAME:trading_user}
+    password: ${DB_PASSWORD:trading_password}
+    driver-class-name: org.postgresql.Driver
+    
+    # Connection pool settings
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      leak-detection-threshold: 60000
+      
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false  # Disable in production
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        
+# Logging configuration for PostgreSQL
+logging:
+  level:
+    com.trading: INFO  # Less verbose in production
+    org.springframework.web: INFO
+    org.hibernate.SQL: WARN
+    org.postgresql: INFO

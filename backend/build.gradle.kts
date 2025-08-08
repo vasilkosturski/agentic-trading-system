@@ -25,6 +25,7 @@ dependencies {
     
     // Database
     implementation("org.xerial:sqlite-jdbc:3.44.1.0")
+    implementation("org.postgresql:postgresql:42.7.1")
     implementation("org.hibernate.orm:hibernate-community-dialects:6.3.1.Final")
     
     // JSON processing

@@ -2,6 +2,9 @@ spring:
   application:
     name: agentic-trading-system
   
+  profiles:
+    active: sqlite  # Default to SQLite for development
+  
   datasource:
     url: jdbc:sqlite:accounts.db
     driver-class-name: org.sqlite.JDBC
