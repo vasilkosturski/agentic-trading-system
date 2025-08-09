@@ -24,29 +24,8 @@ services:
       timeout: 5s
       retries: 5
 
-  # PostgreSQL Admin Interface (optional)
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: agentic-trading-pgadmin
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@trading.local
-      PGADMIN_DEFAULT_PASSWORD: admin123
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-    ports:
-      - "5050:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    networks:
-      - trading-network
-    depends_on:
-      postgres:
-        condition: service_healthy
-
 volumes:
   postgres_data:
-    driver: local
-  pgadmin_data:
     driver: local
 
 networks:
