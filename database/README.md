@@ -13,7 +13,6 @@ docker-compose -f docker-compose.postgresql.yml up -d
 
 This will start:
 - **PostgreSQL 15** on port `5432`
-- **pgAdmin 4** on port `5050` (optional admin interface)
 
 ### 2. Configure Application
 
@@ -32,10 +31,6 @@ cd backend
   - Database: `agentic_trading`
   - Username: `trading_user`
   - Password: `trading_password`
-
-- **pgAdmin**: Open http://localhost:5050
-  - Email: `admin@trading.local`
-  - Password: `admin123`
 
 ## Configuration Details
 
