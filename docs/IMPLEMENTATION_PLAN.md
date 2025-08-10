@@ -130,19 +130,20 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
   - **Database Features**: 3 schemas (trading, agents, analytics), JSONB support, indexes, triggers, views, sample data
   - **Architecture**: Proper normalization, relationships, constraints, and PostgreSQL-specific optimizations
 
-#### 3.3 Update Python MCP Servers for PostgreSQL (2-3 days)
-- **Task**: Modify Python MCP servers to use PostgreSQL instead of SQLite
-- **Files**: `mcp-servers/accounts_server.py`, `mcp-servers/market_server.py`, database connection utilities
-- **Deliverables**: PostgreSQL-compatible MCP servers, connection pooling, error handling
+#### 3.3 Java Backend PostgreSQL Integration (2-3 days)
+- **Task**: Update Java services to use PostgreSQL with new normalized entities
+- **Files**: `backend/src/main/java/com/trading/repository/`, `backend/src/main/java/com/trading/service/`, `backend/src/main/java/com/trading/controller/`
+- **Deliverables**: PostgreSQL repositories, updated services, API compatibility verification
+- **Sub-tasks**:
+  - **3.3.1 Update Repository Layer**: Migrate repositories from SQLite to PostgreSQL entities
+  - **3.3.2 Update Service Layer**: Adapt services to use normalized PostgreSQL schema
+  - **3.3.3 Update Controller Layer**: Ensure API endpoints work with PostgreSQL data structures
+  - **3.3.4 MCP Server Compatibility Check**: Verify Python MCP servers still work with updated Java API
+  - **3.3.5 API Response Format Validation**: Ensure ToolResponse wrapper format is maintained
+  - **3.3.6 Error Handling Enhancement**: Add PostgreSQL-specific error handling and logging
 - **Status**: ⏳ **PENDING**
 
-#### 3.4 Java Backend PostgreSQL Integration (1-2 days)
-- **Task**: Update Java services to use PostgreSQL
-- **Files**: `backend/src/main/java/com/trading/repository/`, `backend/src/main/java/com/trading/service/`
-- **Deliverables**: PostgreSQL repositories, updated services, connection management
-- **Status**: ⏳ **PENDING**
-
-#### 3.5 Data Migration and Testing (2-3 days)
+#### 3.4 Data Migration and Testing (2-3 days)
 - **Task**: Migrate existing SQLite data to PostgreSQL and test functionality
 - **Files**: Migration scripts, test suites
 - **Deliverables**: Migrated data, comprehensive testing, performance validation
