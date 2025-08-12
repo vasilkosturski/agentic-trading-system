@@ -18,22 +18,22 @@ public class AccountPortfolioSnapshot {
     @Column(nullable = false)
     private LocalDateTime timestamp;
     
-    @Column(name = "total_value", nullable = false, precision = 15, scale = 2)
+    @Column(name = "total_value", nullable = false)
     private Double totalValue;
-    
-    @Column(name = "cash_balance", nullable = false, precision = 15, scale = 2)
+
+    @Column(name = "cash_balance", nullable = false)
     private Double cashBalance;
-    
-    @Column(name = "holdings_value", nullable = false, precision = 15, scale = 2)
+
+    @Column(name = "holdings_value", nullable = false)
     private Double holdingsValue;
-    
-    @Column(name = "total_pnl", precision = 15, scale = 2)
+
+    @Column(name = "total_pnl")
     private Double totalPnl;
-    
-    @Column(name = "daily_pnl", precision = 15, scale = 2)
+
+    @Column(name = "daily_pnl")
     private Double dailyPnl;
-    
-    @Column(name = "total_return_percent", precision = 10, scale = 4)
+
+    @Column(name = "total_return_percent")
     private Double totalReturnPercent;
     
     @Column(name = "snapshot_type", nullable = false)
