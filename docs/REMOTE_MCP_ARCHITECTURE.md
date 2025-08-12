@@ -76,6 +76,183 @@ Python Trading Agents → Local MCP Servers (Stdio) → Java Spring Boot API (lo
 1. **Stdio Transport** (Current): Local process communication via stdin/stdout
 2. **SSE Transport** (Target): HTTP-based Server-Sent Events for remote servers
 
+#### **How Server-Sent Events (SSE) Work for MCP**
+
+**SSE Overview:**
+Server-Sent Events provide a way for a server to push real-time data to a client over a single HTTP connection. Unlike WebSockets, SSE is unidirectional (server-to-client) but perfect for MCP's request-response pattern with server-initiated notifications.
+
+**MCP SSE Communication Flow:**
+```
+1. Client establishes SSE connection: GET /sse
+2. Server keeps connection open, sends events as needed
+3. Client sends requests via separate HTTP calls
+4. Server responds via the SSE stream
+5. Server can push notifications proactively
+```
+
+**Technical Implementation:**
+```http
+GET /accounts/sse HTTP/1.1
+Host: mcp-api.trading-system.com
+Accept: text/event-stream
+Authorization: Bearer <token>
+Cache-Control: no-cache
+
+HTTP/1.1 200 OK
+Content-Type: text/event-stream
+Connection: keep-alive
+Access-Control-Allow-Origin: *
+
+data: {"jsonrpc":"2.0","method":"notifications/initialized"}
+
+data: {"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"get_balance"}]}}
+
+data: {"jsonrpc":"2.0","method":"notifications/tools/list_changed"}
+```
+
+**Key Benefits for Remote MCP:**
+- **Persistent Connection**: Maintains long-lived connection for real-time communication
+- **Automatic Reconnection**: Browsers automatically reconnect if connection drops
+- **Firewall Friendly**: Uses standard HTTP, works through corporate firewalls
+- **Scalable**: Can handle thousands of concurrent connections per server
+- **Bi-directional**: Client requests via HTTP POST, server responses via SSE stream
+
+#### **How Tool Notifications Work - The Connection Requirement**
+
+**Yes, you're absolutely correct!** The server MUST have a persistent connection with the client to send notifications about new tools. Here's exactly how it works:
+
+**1. Connection Establishment:**
+```python
+# Client establishes persistent SSE connection
+async def connect_to_mcp_server():
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            'https://mcp-api.trading-system.com/accounts/sse',
+            headers={'Authorization': 'Bearer <token>'}
+        ) as response:
+            async for line in response.content:
+                # Server can now push notifications anytime
+                handle_server_message(line)
+```
+
+**2. Server-Side Connection Management:**
+```python
+# Server maintains active connections to all clients
+class MCPServerSSE:
+    def __init__(self):
+        self.active_connections = {}  # client_id -> connection
+        self.available_tools = set()
+    
+    async def handle_sse_connection(self, request):
+        client_id = request.headers.get('X-Client-ID')
+        
+        async def event_stream():
+            # Store connection for notifications
+            self.active_connections[client_id] = request
+            
+            try:
+                # Send initial tool list
+                yield f"data: {json.dumps({
+                    'jsonrpc': '2.0',
+                    'method': 'notifications/tools/list_changed'
+                })}\n\n"
+                
+                # Keep connection alive and wait for tool changes
+                while True:
+                    await asyncio.sleep(30)  # Heartbeat
+                    yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+                    
+            except asyncio.CancelledError:
+                # Clean up when client disconnects
+                del self.active_connections[client_id]
+        
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
+    
+    async def notify_tool_change(self, new_tools):
+        """Called when tools are added/removed/modified"""
+        if new_tools != self.available_tools:
+            self.available_tools = new_tools
+            
+            # Notify ALL connected clients
+            notification = {
+                'jsonrpc': '2.0',
+                'method': 'notifications/tools/list_changed'
+            }
+            
+            for client_id, connection in self.active_connections.items():
+                try:
+                    # Push notification to each connected client
+                    await connection.send(f"data: {json.dumps(notification)}\n\n")
+                except Exception as e:
+                    # Remove dead connections
+                    del self.active_connections[client_id]
+```
+
+**3. Real-World Scenario - Trading System Example:**
+```python
+# When market conditions change, new trading tools become available
+class TradingMCPServer:
+    async def on_market_volatility_spike(self):
+        # Market volatility increased - enable high-frequency trading tools
+        new_tools = self.available_tools.copy()
+        new_tools.add("execute_high_frequency_trade")
+        new_tools.add("set_volatility_stop_loss")
+        
+        # This triggers notifications to ALL connected trading agents
+        await self.notify_tool_change(new_tools)
+        
+        # Warren, George, Ray, and Cathie agents all get notified simultaneously:
+        # data: {"jsonrpc":"2.0","method":"notifications/tools/list_changed"}
+```
+
+**4. Connection Lifecycle Management:**
+```mermaid
+sequenceDiagram
+    participant C as Trading Agent (Client)
+    participant S as MCP Server
+    participant B as Java Backend
+    
+    Note over C,S: Initial Connection
+    C->>S: GET /sse (establish SSE connection)
+    S->>C: Connection established
+    S->>C: Initial tool list notification
+    
+    Note over C,S: Normal Operation
+    C->>S: POST /tools/get_balance (via separate HTTP)
+    S->>B: Forward to Java API
+    B->>S: Return balance data
+    S->>C: Response via SSE stream
+    
+    Note over S,B: Tool Change Event
+    B->>S: Market conditions changed
+    S->>S: Update available tools
+    S->>C: Push notification via SSE
+    Note over C: Client updates tool list
+    
+    Note over C,S: Connection Management
+    C->>S: Heartbeat (keep-alive)
+    S->>C: Heartbeat response
+    
+    Note over C,S: Reconnection on Failure
+    C-xS: Connection lost
+    C->>S: Automatic reconnection
+    S->>C: Re-establish + send current tool list
+```
+
+**5. Why This Connection is Critical:**
+- **Real-time Updates**: Without persistent connection, clients would need to poll for changes
+- **Immediate Notifications**: Trading agents get tool updates instantly when market conditions change
+- **State Synchronization**: All connected agents stay in sync with available capabilities
+- **Efficient**: One connection handles all server-to-client communication
+
+**Connection Requirements:**
+- **Always-On**: SSE connection must remain open for notifications to work
+- **Heartbeat**: Regular keep-alive messages prevent connection timeouts
+- **Reconnection Logic**: Clients must handle connection drops and reconnect automatically
+- **Connection Pooling**: Servers must efficiently manage hundreds of concurrent connections
+
+This is why the AWS architecture includes persistent ECS Fargate containers rather than serverless Lambda functions - we need long-running processes to maintain these SSE connections with all trading agents.
+
 #### **Key Protocol Features**
 - **Tools**: Functions that servers expose to clients
 - **Resources**: Data sources that servers can provide
@@ -119,72 +296,53 @@ Python Trading Agents → Local MCP Servers (Stdio) → Java Spring Boot API (lo
 ### High-Level Architecture Overview
 
 ```mermaid
-graph TB
-    subgraph "Client Environment"
-        TA[Trading Agents]
-        TA --> MC[MCP Clients]
-    end
+flowchart TD
+    %% Client Layer
+    TA[Trading Agents<br/>Warren, George, Ray, Cathie] --> MC[MCP Clients]
     
-    subgraph "AWS Cloud Infrastructure"
-        subgraph "Edge Layer"
-            CF[CloudFront CDN]
-            WAF[AWS WAF]
-        end
-        
-        subgraph "API Gateway Layer"
-            AG[API Gateway]
-            AUTH[Cognito/Lambda Authorizer]
-        end
-        
-        subgraph "Application Layer - ECS Fargate"
-            ALB[Application Load Balancer]
-            
-            subgraph "MCP Server Services"
-                MS1[Accounts MCP Server]
-                MS2[Market MCP Server]
-                MS3[Push MCP Server]
-                MS4[Research MCP Server]
-            end
-            
-            subgraph "Backend Services"
-                JB[Java Spring Boot API]
-            end
-        end
-        
-        subgraph "Data Layer"
-            RDS[(PostgreSQL RDS)]
-            REDIS[(ElastiCache Redis)]
-            S3[(S3 Storage)]
-        end
-        
-        subgraph "Observability"
-            CW[CloudWatch]
-            XR[X-Ray Tracing]
-            ES[OpenSearch]
-        end
-    end
+    %% AWS Infrastructure
+    MC --> CF[CloudFront CDN]
+    CF --> WAF[AWS WAF]
+    WAF --> AG[API Gateway + Auth]
+    AG --> ALB[Application Load Balancer]
     
-    MC --> CF
-    CF --> WAF
-    WAF --> AG
-    AG --> AUTH
-    AG --> ALB
-    ALB --> MS1
-    ALB --> MS2
-    ALB --> MS3
-    ALB --> MS4
-    MS1 --> JB
+    %% MCP Server Layer
+    ALB --> MS1[Accounts<br/>MCP Server]
+    ALB --> MS2[Market<br/>MCP Server]
+    ALB --> MS3[Push<br/>MCP Server]
+    ALB --> MS4[Research<br/>MCP Server]
+    
+    %% Backend Integration
+    MS1 --> JB[Java Spring Boot<br/>Backend API]
     MS2 --> JB
     MS3 --> JB
-    JB --> RDS
-    JB --> REDIS
-    MS4 --> S3
     
-    MS1 --> CW
+    %% Data Layer
+    JB --> RDS[(PostgreSQL<br/>RDS)]
+    JB --> REDIS[(ElastiCache<br/>Redis)]
+    MS4 --> S3[(S3 Storage<br/>Research Data)]
+    
+    %% Monitoring
+    MS1 --> CW[CloudWatch<br/>Monitoring]
     MS2 --> CW
     MS3 --> CW
     MS4 --> CW
-    JB --> XR
+    JB --> XR[X-Ray<br/>Tracing]
+    
+    %% Styling
+    classDef client fill:#e1f5fe
+    classDef aws fill:#fff3e0
+    classDef mcp fill:#f3e5f5
+    classDef backend fill:#e8f5e8
+    classDef data fill:#fce4ec
+    classDef monitor fill:#f1f8e9
+    
+    class TA,MC client
+    class CF,WAF,AG,ALB aws
+    class MS1,MS2,MS3,MS4 mcp
+    class JB backend
+    class RDS,REDIS,S3 data
+    class CW,XR monitor
 ```
 
 ### Core Design Principles
@@ -1120,23 +1278,36 @@ class MCPConnectionManager:
 
 #### **1. Gradual Migration Approach**
 ```mermaid
-graph LR
-    subgraph "Phase 1: Hybrid Mode"
-        LA[Local Agents] --> LM[Local MCP Servers]
-        LA --> RM[Remote MCP Servers]
-        LM --> JB[Java Backend]
-        RM --> JB
+flowchart LR
+    subgraph P1 ["🔄 Phase 1: Hybrid Mode"]
+        LA[Local Agents] --> LM[Local MCP<br/>Servers]
+        LA --> RM[Remote MCP<br/>Servers]
+        LM --> JB1[Java Backend]
+        RM --> JB1
     end
     
-    subgraph "Phase 2: Full Remote"
-        RA[Remote Agents] --> RM2[Remote MCP Servers]
+    subgraph P2 ["☁️ Phase 2: Full Remote"]
+        RA[Remote Agents] --> RM2[Remote MCP<br/>Servers]
         RM2 --> JB2[Java Backend]
     end
     
-    subgraph "Phase 3: Cloud Native"
-        CA[Cloud Agents] --> CM[Cloud MCP Servers]
+    subgraph P3 ["🚀 Phase 3: Cloud Native"]
+        CA[Cloud Agents] --> CM[Cloud MCP<br/>Servers]
         CM --> CB[Cloud Backend]
     end
+    
+    P1 --> P2
+    P2 --> P3
+    
+    classDef phase fill:#f9f9f9,stroke:#333,stroke-width:2px
+    classDef agents fill:#e1f5fe
+    classDef servers fill:#f3e5f5
+    classDef backend fill:#e8f5e8
+    
+    class P1,P2,P3 phase
+    class LA,RA,CA agents
+    class LM,RM,RM2,CM servers
+    class JB1,JB2,CB backend
 ```
 
 #### **2. Feature Flag System**
