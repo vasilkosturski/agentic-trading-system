@@ -21,7 +21,7 @@ public class AccountTransaction {
     @Column(nullable = false)
     private Integer quantity;
     
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(nullable = false)
     private Double price;
     
     @Column(nullable = false)
@@ -33,7 +33,7 @@ public class AccountTransaction {
     @Column(name = "transaction_type", nullable = false)
     private String transactionType; // BUY, SELL
     
-    @Column(name = "total_amount", nullable = false, precision = 15, scale = 2)
+    @Column(name = "total_amount", nullable = false)
     private Double totalAmount;
     
     @Column(name = "created_at", nullable = false)

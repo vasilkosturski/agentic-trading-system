@@ -23,10 +23,10 @@ public class TradingAgent {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
     
-    @Column(name = "risk_tolerance", precision = 5, scale = 2)
+    @Column(name = "risk_tolerance")
     private Double riskTolerance;
-    
-    @Column(name = "max_position_size", precision = 15, scale = 2)
+
+    @Column(name = "max_position_size")
     private Double maxPositionSize;
     
     @Column(name = "trading_frequency")
@@ -44,10 +44,10 @@ public class TradingAgent {
     @Column(name = "successful_trades")
     private Integer successfulTrades = 0;
     
-    @Column(name = "total_pnl", precision = 15, scale = 2)
+    @Column(name = "total_pnl")
     private Double totalPnl = 0.0;
-    
-    @Column(name = "win_rate", precision = 5, scale = 2)
+
+    @Column(name = "win_rate")
     private Double winRate = 0.0;
     
     @Column(name = "created_at", nullable = false)

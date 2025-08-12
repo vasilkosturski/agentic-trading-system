@@ -1,7 +1,7 @@
 package com.trading.controller;
 
 import com.trading.dto.ToolResponse;
-import com.trading.service.AccountService;
+import com.trading.service.PostgreSQLAccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,7 +14,7 @@ import java.util.Map;
 public class AccountController {
 
     @Autowired
-    private AccountService accountService;
+    private PostgreSQLAccountService accountService;
 
     // MCP Tool endpoints
     @PostMapping("/tools/get_balance")

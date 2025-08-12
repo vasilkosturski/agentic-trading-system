@@ -12,6 +12,8 @@ services:
       POSTGRES_USER: trading_user
       POSTGRES_PASSWORD: trading_password
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init:/docker-entrypoint-initdb.d

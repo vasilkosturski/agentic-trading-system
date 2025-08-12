@@ -22,16 +22,16 @@ public class AccountHolding {
     @Column(nullable = false)
     private Integer quantity;
     
-    @Column(name = "average_price", precision = 15, scale = 2)
+    @Column(name = "average_price")
     private Double averagePrice;
-    
-    @Column(name = "current_price", precision = 15, scale = 2)
+
+    @Column(name = "current_price")
     private Double currentPrice;
-    
-    @Column(name = "market_value", precision = 15, scale = 2)
+
+    @Column(name = "market_value")
     private Double marketValue;
-    
-    @Column(name = "unrealized_pnl", precision = 15, scale = 2)
+
+    @Column(name = "unrealized_pnl")
     private Double unrealizedPnl;
     
     @Column(name = "last_updated", nullable = false)
@@ -74,6 +74,13 @@ public class AccountHolding {
                 this.unrealizedPnl = this.quantity * (this.currentPrice - this.averagePrice);
             }
         }
+    }
+    
+    /**
+     * Calculate market metrics (market value and unrealized P&L)
+     */
+    public void calculateMarketMetrics() {
+        updateCalculatedFields();
     }
     
     public boolean isEmpty() {

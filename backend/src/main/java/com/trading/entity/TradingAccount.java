@@ -16,7 +16,7 @@ public class TradingAccount {
     @Column(unique = true, nullable = false)
     private String name;
     
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(nullable = false)
     private Double balance;
     
     @Column(nullable = false)

@@ -3,7 +3,8 @@ package com.trading.controller;
 import com.trading.dto.ToolResponse;
 import com.trading.service.TradingService;
 import com.trading.service.TradingService.*;
-import com.trading.service.AgentMonitoringService;
+import com.trading.service.PostgreSQLAgentMonitoringService;
+import com.trading.service.PostgreSQLAccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,13 +22,15 @@ public class TradingController {
     private TradingService tradingService;
     
     @Autowired
-    private AgentMonitoringService agentMonitoringService;
+    private PostgreSQLAgentMonitoringService agentMonitoringService;
     
-    // Agent Status Endpoints (Real Data from SQLite)
+    @Autowired
+    private PostgreSQLAccountService accountService;
+    
+    // Agent Status Endpoints (Real Data from PostgreSQL)
     @GetMapping("/agents/status")
     public ResponseEntity<ToolResponse<List<AgentStatusResponse>>> getAllAgentsStatus() {
         try {
-            // Use real data from SQLite database
             List<AgentStatusResponse> statuses = agentMonitoringService.getRealAgentStatuses();
             return ResponseEntity.ok(ToolResponse.success(statuses));
         } catch (Exception e) {
@@ -49,7 +52,6 @@ public class TradingController {
     @GetMapping("/agents/{agentName}/status")
     public ResponseEntity<ToolResponse<AgentStatusResponse>> getAgentStatus(@PathVariable String agentName) {
         try {
-            // Use real data from SQLite database
             AgentStatusResponse status = agentMonitoringService.getRealAgentStatus(agentName);
             return ResponseEntity.ok(ToolResponse.success(status));
         } catch (Exception e) {
