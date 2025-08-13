@@ -5,8 +5,8 @@ import aiohttp
 import json
 from mcp.server.fastmcp import FastMCP
 
-# Configuration
-JAVA_API_BASE_URL = "http://localhost:8080/api/accounts"
+# Configuration - Use Docker service name for container networking
+JAVA_API_BASE_URL = "http://backend:8080/api/accounts"
 
 mcp = FastMCP("accounts_server")
 

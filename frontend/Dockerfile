@@ -1,4 +1,4 @@
-# Simple development setup with Vite dev server
+# React frontend Dockerfile - Development friendly
 FROM node:18-alpine
 
 # Set working directory
