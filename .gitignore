@@ -128,3 +128,10 @@ test_*.py
 build/
 dist/
 target/
+# Docker environment variables (keep .env.example)
+!.env.example
+
+# Docker volumes
+postgres_data/
+agent_memory/
+agent_logs/

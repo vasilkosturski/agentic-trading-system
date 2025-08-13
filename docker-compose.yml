@@ -52,6 +52,35 @@ services:
       timeout: 10s
       retries: 3
 
+  # Python Agents (includes MCP servers)
+  agents:
+    build:
+      context: ./agents
+      dockerfile: Dockerfile
+    container_name: agentic-trading-agents
+    restart: unless-stopped
+    environment:
+      # MCP servers will connect to backend via Docker networking
+      JAVA_API_BASE_URL: http://backend:8080/api/accounts
+      # Environment variables for external APIs (add your keys here)
+      POLYGON_API_KEY: ${POLYGON_API_KEY:-}
+      BRAVE_API_KEY: ${BRAVE_API_KEY:-}
+      PUSHOVER_TOKEN: ${PUSHOVER_TOKEN:-}
+      PUSHOVER_USER: ${PUSHOVER_USER:-}
+    volumes:
+      # Mount source code for development
+      - ./agents:/app
+      - ./mcp-servers:/app/mcp-servers
+      # Persistent storage for agent memory/databases
+      - agent_memory:/app/memory
+      - agent_logs:/app/logs
+    networks:
+      - trading-network
+    depends_on:
+      backend:
+        condition: service_healthy
+    # No ports exposed - agents are autonomous scripts
+
   # React Frontend
   frontend:
     build:
@@ -62,8 +91,9 @@ services:
     environment:
       VITE_API_BASE_URL: http://localhost:8080
     ports:
-      - "3000:3000"
+      - "5173:5173"  # Fixed: Use correct Vite port
     volumes:
+      # Mount source code for development hot-reload
       - ./frontend:/app
       - /app/node_modules
     networks:
@@ -73,6 +103,10 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  agent_memory:
+    driver: local
+  agent_logs:
     driver: local
 
 networks:
