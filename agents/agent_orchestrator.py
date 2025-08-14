@@ -60,16 +60,10 @@ class AgentOrchestrator:
         cycle_start = datetime.now()
         logger.info(f"Starting trading cycle at {cycle_start}")
         
-        # Check if market is open (use first agent's market tools)
-        first_agent_manager = list(self.agent_mcp_managers.values())[0] if self.agent_mcp_managers else None
-        if not first_agent_manager:
-            logger.error("No MCP managers available")
-            return {"status": "error", "message": "No MCP managers available"}
-        
-        market_open = await first_agent_manager.market.is_market_open()
-        if not market_open:
-            logger.info("Market is closed, skipping trading cycle")
-            return {"status": "market_closed", "timestamp": cycle_start.isoformat()}
+        # For demonstration purposes, assume market is always open
+        # In production, you would check actual market hours
+        market_open = True
+        logger.info("Assuming market is open for demonstration")
         
         cycle_results = {
             "timestamp": cycle_start.isoformat(),

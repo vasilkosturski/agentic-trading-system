@@ -63,6 +63,7 @@ services:
       # MCP servers will connect to backend via Docker networking
       JAVA_API_BASE_URL: http://backend:8080/api/accounts
       # Environment variables for external APIs (add your keys here)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
       BRAVE_API_KEY: ${BRAVE_API_KEY:-}
       PUSHOVER_TOKEN: ${PUSHOVER_TOKEN:-}
@@ -70,7 +71,6 @@ services:
     volumes:
       # Mount source code for development
       - ./agents:/app
-      - ./mcp-servers:/app/mcp-servers
       # Persistent storage for agent memory/databases
       - agent_memory:/app/memory
       - agent_logs:/app/logs
