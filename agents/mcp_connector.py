@@ -54,6 +54,10 @@ class MCPToolConnector:
         
         self.request_id += 1
         
+        # Handle None arguments for parameterless functions
+        if arguments is None:
+            arguments = {}
+        
         # Prepare the JSON-RPC request
         request = {
             "jsonrpc": "2.0",
@@ -173,7 +177,7 @@ class MarketToolConnector(MCPToolConnector):
     
     async def is_market_open(self) -> bool:
         """Check if market is open"""
-        result = await self.call_tool("is_market_open", {})
+        result = await self.call_tool("is_market_open", None)
         return json.loads(result)
     
     async def analyze_stock_trend(self, symbol: str, days: int = 20) -> Dict[str, Any]:

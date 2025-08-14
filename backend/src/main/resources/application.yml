@@ -3,20 +3,7 @@ spring:
     name: agentic-trading-system
   
   profiles:
-    active: sqlite  # Default to SQLite for development
-  
-  datasource:
-    url: jdbc:sqlite:accounts.db
-    driver-class-name: org.sqlite.JDBC
-    
-  jpa:
-    database-platform: org.hibernate.community.dialect.SQLiteDialect
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
+    active: postgresql  # Default to PostgreSQL
 
 server:
   port: 8080

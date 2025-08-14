@@ -7,7 +7,7 @@ from typing import List, Dict, Any
 from mcp.server.fastmcp import FastMCP
 
 # Configuration
-JAVA_API_BASE_URL = "http://localhost:8080/api/market"
+JAVA_API_BASE_URL = "http://backend:8080/api/market"
 
 mcp = FastMCP("market_server")
 

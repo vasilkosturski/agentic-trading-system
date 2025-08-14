@@ -21,9 +21,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy agents source code
 COPY . .
 
-# Copy MCP servers code into the container
-COPY ../mcp-servers/ ./mcp-servers/
-
 # Install MCP server dependencies
 WORKDIR /app/mcp-servers
 RUN pip install --no-cache-dir -r requirements.txt
