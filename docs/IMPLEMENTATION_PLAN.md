@@ -208,6 +208,81 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 - **Deliverables**: One-command deployment (`docker-compose up`), verification tests
 - **Status**: ⏳ **PENDING**
 
+### 🌐 **PHASE 4.5: MCP REMOTE SERVERS CONVERSION** (NEW)
+**Goal**: Convert stdio-based MCP servers to remote streamable HTTP microservices for better scalability and production readiness
+**Duration**: 1.5-2.5 weeks
+**Reference**: [`MCP_REMOTE_SERVERS_SPECIFICATION.md`](MCP_REMOTE_SERVERS_SPECIFICATION.md)
+
+#### 4.5.1 MCP Server Conversion to Streamable HTTP (3-4 days)
+- **Task**: Convert existing stdio MCP servers to remote streamable HTTP-based services
+- **Files**: `mcp-servers/accounts_server.py`, `mcp-servers/market_server.py`, `mcp-servers/push_server.py`
+- **Current State**: Each of 4 agents spawns 3 MCP servers (accounts, market, push) = 12 total processes
+- **Target State**: 3 shared remote HTTP servers = 3 total containers (75% reduction)
+- **Deliverables**:
+  - Streamable HTTP transport with chunked transfer encoding
+  - Health check endpoints (`/health`, `/health/detailed`)
+  - Metrics endpoints for monitoring (`/metrics`)
+  - Enhanced error handling and logging
+  - CORS configuration for cross-origin requests
+- **Benefits**:
+  - Resource efficiency: 3 server containers vs 12 processes
+  - Better monitoring and observability per service
+  - Production-ready architecture with proper health checks
+- **Status**: ⏳ **PENDING**
+
+#### 4.5.2 Remote MCP Client Implementation (2-3 days)
+- **Task**: Update agent connection logic to use remote streamable HTTP MCP servers
+- **Files**: `agents/remote_mcp_connector.py`, `agents/mcp_params.py`, `agents/base_agent.py`
+- **Deliverables**:
+  - New `RemoteMCPConnector` class for streamable HTTP communication
+  - Updated MCP parameters configuration for remote servers
+  - Connection pooling and retry logic
+  - Graceful failover and reconnection handling
+  - Performance monitoring and metrics collection
+  - Support for both regular and streaming HTTP responses
+- **Integration**: Replace stdio-based `MCPToolConnector` with remote HTTP client
+- **Status**: ⏳ **PENDING**
+
+#### 4.5.3 Docker Integration for MCP Services (1-2 days)
+- **Task**: Create separate Docker containers for each MCP server
+- **Files**: `mcp-servers/accounts/Dockerfile`, `mcp-servers/market/Dockerfile`, `mcp-servers/push/Dockerfile`
+- **Deliverables**:
+  - Individual Dockerfiles for each MCP server
+  - Updated `docker-compose.yml` with MCP server services
+  - Service discovery and networking configuration
+  - Environment variable management for remote URLs
+  - Health checks and dependency management
+- **Architecture**:
+  ```
+  agents → http://accounts-mcp:8001 (Accounts Server)
+  agents → http://market-mcp:8002   (Market Server)
+  agents → http://push-mcp:8003     (Push Server)
+  ```
+- **Status**: ⏳ **PENDING**
+
+#### 4.5.4 Testing and Performance Validation (1-2 days)
+- **Task**: Comprehensive testing of remote MCP architecture
+- **Files**: `tests/test_remote_mcp_connector.py`, `tests/test_agent_remote_integration.py`, `tests/test_performance_comparison.py`
+- **Deliverables**:
+  - Unit tests for remote MCP connector
+  - Integration tests with all 4 trading agents
+  - Performance comparison: remote vs stdio (target: <2x latency)
+  - Load testing and stress testing
+  - Error handling and failover testing
+- **Validation Criteria**:
+  - All agents successfully connect to remote MCP servers
+  - Performance within acceptable limits (<2x stdio latency)
+  - Proper error handling and recovery
+  - Health checks passing for all services
+- **Status**: ⏳ **PENDING**
+
+**Phase 4.5 Benefits**:
+- **Scalability**: Shared MCP servers instead of per-agent processes
+- **Resource Efficiency**: 75% reduction in MCP server processes (3 vs 12)
+- **Production Readiness**: Proper health checks, monitoring, and service discovery
+- **Maintainability**: Independent deployment and scaling of MCP services
+- **Observability**: Better logging, metrics, and debugging capabilities
+
 ### 🎨 **PHASE 5: CORE API INTEGRATION** - **COMPLETED**
 **Goal**: Establish complete frontend-backend API integration with SQLite foundation
 
@@ -343,6 +418,7 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 ### **ENHANCED** (New Capabilities)
 - 🚀 **Java Spring Boot Backend** - Enterprise-grade APIs and services
 - 🚀 **React Frontend** - Modern professional trading interface
+- 🚀 **Remote MCP Architecture** - Streamable HTTP microservices instead of stdio processes
 - 🚀 **Real-time Data** - Live market data feeds and updates
 - 🚀 **Advanced Analytics** - Portfolio performance and risk analysis
 - 🚀 **Compliance Features** - Regulatory reporting and audit trails
@@ -359,13 +435,13 @@ Ray Agent + Researcher Tool
 Cathie Agent + Researcher Tool
 ```
 
-### **MCP Server Layer** (Hybrid)
+### **MCP Server Layer** (Remote Streamable HTTP Microservices)
 ```python
-# Core MCP servers (REPLICATED)
-- accounts_server.py (→ Java API)
-- market_server.py (→ Java API)
-- push_server.py (Pushover)
-- memory_server.py (LibSQL)
+# Core MCP servers (REPLICATED + ENHANCED)
+- accounts-mcp:8001 (accounts_server.py → Java API)
+- market-mcp:8002 (market_server.py → Java API)
+- push-mcp:8003 (push_server.py → Pushover)
+- memory_server.py (LibSQL - per agent)
 
 # Research MCP servers (REPLICATED)
 - brave_search_server (News research)
@@ -425,12 +501,13 @@ Cathie Agent + Researcher Tool
 | **Phase 2** | 3-4 weeks | Enhanced backend with memory, notifications, analytics |
 | **Phase 3** | 1-2 weeks | Database migration from SQLite to PostgreSQL |
 | **Phase 4** | 1-2 weeks | Docker containerization and one-command deployment |
+| **Phase 4.5** | 1.5-2.5 weeks | **MCP Remote Servers conversion (NEW)** |
 | **Phase 5** | 1-2 weeks | Core API integration (COMPLETED) |
 | **Phase 6** | 3-4 weeks | Enhanced React frontend with solid infrastructure |
 | **Phase 7** | 4-5 weeks | Advanced trading platform features |
 | **Phase 8** | 2-3 weeks | Integration testing and production deployment |
 
-**Total Timeline**: 16-22 weeks (4-5.5 months)
+**Total Timeline**: 17.5-24.5 weeks (4.5-6 months)
 
 ## Immediate Next Steps
 
@@ -449,6 +526,13 @@ Cathie Agent + Researcher Tool
 - **Goal**: Complete containerization for one-command deployment
 - **Duration**: 1-2 weeks
 - **Benefits**: `docker-compose up` → complete system running at localhost:3000
+
+### **New Priority**: Phase 4.5 - MCP Remote Servers Conversion
+- **Goal**: Convert stdio MCP servers to remote HTTP/SSE microservices
+- **Duration**: 1.5-2.5 weeks
+- **Status**: 📋 **PLANNED** - Technical specification complete, ready for implementation
+- **Benefits**: 75% reduction in processes, better scalability, production-ready architecture
+- **Reference**: [`MCP_REMOTE_SERVERS_SPECIFICATION.md`](MCP_REMOTE_SERVERS_SPECIFICATION.md)
 
 ## Conclusion
 
