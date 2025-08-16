@@ -231,12 +231,12 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 - **Deliverables**: One-command deployment (`docker-compose up`), verification tests
 - **Status**: ⏭️ **DEFERRED** - Core infrastructure working, comprehensive testing deferred to Phase 8
 
-### 🌐 **PHASE 4.5: MCP REMOTE SERVERS CONVERSION** (NEW)
+### 🌐 **PHASE 4.6: MCP REMOTE SERVERS CONVERSION** (NEW)
 **Goal**: Convert stdio-based MCP servers to remote streamable HTTP microservices for better scalability and production readiness
 **Duration**: 1.5-2.5 weeks
 **Reference**: [`MCP_REMOTE_SERVERS_SPECIFICATION.md`](MCP_REMOTE_SERVERS_SPECIFICATION.md)
 
-#### 4.5.1 MCP Server Conversion to Streamable HTTP (3-4 days)
+#### 4.6.1 MCP Server Conversion to Streamable HTTP (3-4 days)
 - **Task**: Convert existing stdio MCP servers to remote streamable HTTP-based services
 - **Files**: `mcp-servers/accounts_server.py`, `mcp-servers/market_server.py`, `mcp-servers/push_server.py`
 - **Current State**: Each of 4 agents spawns 3 MCP servers (accounts, market, push) = 12 total processes
@@ -253,7 +253,7 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
   - Production-ready architecture with proper health checks
 - **Status**: ⏳ **PENDING**
 
-#### 4.5.2 Remote MCP Client Implementation (2-3 days)
+#### 4.6.2 Remote MCP Client Implementation (2-3 days)
 - **Task**: Update agent connection logic to use remote streamable HTTP MCP servers
 - **Files**: `agents/remote_mcp_connector.py`, `agents/mcp_params.py`, `agents/base_agent.py`
 - **Deliverables**:
@@ -266,7 +266,7 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 - **Integration**: Replace stdio-based `MCPToolConnector` with remote HTTP client
 - **Status**: ⏳ **PENDING**
 
-#### 4.5.3 Docker Integration for MCP Services (1-2 days)
+#### 4.6.3 Docker Integration for MCP Services (1-2 days)
 - **Task**: Create separate Docker containers for each MCP server
 - **Files**: `mcp-servers/accounts/Dockerfile`, `mcp-servers/market/Dockerfile`, `mcp-servers/push/Dockerfile`
 - **Deliverables**:
@@ -283,7 +283,7 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
   ```
 - **Status**: ⏳ **PENDING**
 
-#### 4.5.4 Testing and Performance Validation (1-2 days)
+#### 4.6.4 Testing and Performance Validation (1-2 days)
 - **Task**: Comprehensive testing of remote MCP architecture
 - **Files**: `tests/test_remote_mcp_connector.py`, `tests/test_agent_remote_integration.py`, `tests/test_performance_comparison.py`
 - **Deliverables**:
@@ -299,7 +299,7 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
   - Health checks passing for all services
 - **Status**: ⏳ **PENDING**
 
-**Phase 4.5 Benefits**:
+**Phase 4.6 Benefits**:
 - **Scalability**: Shared MCP servers instead of per-agent processes
 - **Resource Efficiency**: 75% reduction in MCP server processes (3 vs 12)
 - **Production Readiness**: Proper health checks, monitoring, and service discovery
@@ -339,7 +339,62 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
   - **REST Controllers**: [`TradingController.java`](../backend/src/main/java/com/trading/controller/TradingController.java), [`AccountController.java`](../backend/src/main/java/com/trading/controller/AccountController.java), [`MarketController.java`](../backend/src/main/java/com/trading/controller/MarketController.java)
   - **Features**: Real SQLite data reading, ToolResponse wrapper format, CORS configuration, comprehensive error handling
 
-### 🎨 **PHASE 6: ENHANCED FRONTEND WITH REACT** (Moved after infrastructure)
+### 🔥 **PHASE 5.5: AGENT ACTIVATION AND REAL DATA VERIFICATION** (NEW - HIGH PRIORITY)
+**Goal**: Activate autonomous trading agents and generate real trading activity to verify system functionality
+**Duration**: 2-3 days
+**Status**: ⏳ **NEXT PRIORITY** - Critical for validating the entire system works end-to-end
+
+#### 5.5.1 Agent Activation and Trading Triggers (1 day) - **NEW**
+- **Task**: Activate the 4 autonomous trading agents to start making real trading decisions
+- **Files**: `agents/agent_orchestrator.py`, `agents/trading_system.py`, agent configuration files
+- **Current Issue**: Agents are initialized but inactive - no trading activity visible
+- **Deliverables**:
+  - Configure agents to run in active trading mode (not just initialization)
+  - Set up proper market hours detection and trading triggers
+  - Enable autonomous decision-making loops for all 4 agents
+  - Configure realistic trading parameters (position sizes, risk limits)
+- **Validation**: Agents should start making trading decisions and executing trades
+- **Status**: ⏳ **CRITICAL** - Without this, we can't verify the system actually works
+
+#### 5.5.2 Real Trading Data Generation (1 day) - **NEW**
+- **Task**: Generate actual trading activity and portfolio changes
+- **Files**: MCP servers, trading logic, market data integration
+- **Current Issue**: All agents show $100,000 static portfolios with 0 trades
+- **Deliverables**:
+  - Enable real market data fetching and analysis
+  - Configure agents to execute actual trades (paper trading mode)
+  - Generate portfolio changes, P&L updates, position tracking
+  - Create trading history and transaction records
+- **Validation**: Frontend should show changing portfolio values, trade counts, P&L changes
+- **Status**: ⏳ **CRITICAL** - Need to see actual trading activity
+
+#### 5.5.3 System Monitoring and Verification (1 day) - **NEW**
+- **Task**: Add comprehensive monitoring to verify all components are working
+- **Files**: Backend logging, agent monitoring, database verification
+- **Current Issue**: No way to verify if agents are actually functioning beyond static display
+- **Deliverables**:
+  - Enhanced logging for agent decision-making processes
+  - Real-time monitoring of agent activities and trades
+  - Database verification of trading records and portfolio updates
+  - Frontend indicators showing agent activity status (active/thinking/trading)
+  - Error detection and alerting for agent failures
+- **Validation**: Clear visibility into agent operations and system health
+- **Status**: ⏳ **CRITICAL** - Essential for system validation
+
+#### 5.5.4 Trading Activity Dashboard Enhancement (1 day) - **NEW**
+- **Task**: Enhance frontend to show real-time trading activity and agent status
+- **Files**: `frontend/src/components/TradingDashboard/`, React components
+- **Current Issue**: Dashboard only shows static initial state
+- **Deliverables**:
+  - Real-time activity feed showing agent decisions and trades
+  - Live portfolio value updates and P&L changes
+  - Agent status indicators (researching, analyzing, trading, idle)
+  - Recent trades list and trading history
+  - Market data integration showing current prices
+- **Validation**: Dynamic dashboard showing live trading activity
+- **Status**: ⏳ **HIGH PRIORITY** - Make the system come alive
+
+### 🎨 **PHASE 6: ENHANCED FRONTEND WITH REACT** (Moved after agent activation)
 **Goal**: Modern professional trading interface with solid infrastructure foundation
 
 #### 6.1 Trader Dashboard Layout (1 day) - **MOVED FROM 3.1.4**
@@ -490,81 +545,3 @@ Cathie Agent + Researcher Tool
 - MarketAnalysis
 - RiskManagement
 ```
-
-## Success Metrics
-
-### **Phase 1 Success** (Researcher Integration)
-- ✅ All 4 traders successfully using researcher for market analysis
-- ✅ Improved trading decision quality with news research
-- ✅ Seamless integration with existing Java backend
-
-### **Phase 2 Success** (Backend Enhancement)
-- ✅ Memory system storing and retrieving agent learning
-- ✅ Push notifications for all significant trades
-- 📈 Real-time market data with quality indicators
-- 📋 Comprehensive audit trail for all activities
-
-### **Phase 3 Success** (React Frontend)
-- 🖥️ Professional trading interface replacing basic UI
-- ⚡ Real-time updates and live data visualization
-- 🎛️ Interactive portfolio management capabilities
-- 📊 Advanced analytics and performance tracking
-
-### **Phase 4 Success** (Advanced Features)
-- 🔍 Multi-timeframe analysis across all agents
-- 🧪 Comprehensive backtesting and optimization
-- ⚠️ Advanced risk management and controls
-- 📋 Full compliance and regulatory reporting
-
-## Timeline Summary
-
-| Phase | Duration | Key Deliverables |
-|-------|----------|------------------|
-| **Phase 1** | 1-2 weeks | Researcher integration with all 4 traders |
-| **Phase 2** | 3-4 weeks | Enhanced backend with memory, notifications, analytics |
-| **Phase 3** | 1-2 weeks | Database migration from SQLite to PostgreSQL |
-| **Phase 4** | 1-2 weeks | Docker containerization and one-command deployment |
-| **Phase 4.5** | 1.5-2.5 weeks | **MCP Remote Servers conversion (NEW)** |
-| **Phase 5** | 1-2 weeks | Core API integration (COMPLETED) |
-| **Phase 6** | 3-4 weeks | Enhanced React frontend with solid infrastructure |
-| **Phase 7** | 4-5 weeks | Advanced trading platform features |
-| **Phase 8** | 2-3 weeks | Integration testing and production deployment |
-
-**Total Timeline**: 17.5-24.5 weeks (4.5-6 months)
-
-## Immediate Next Steps
-
-### **Currently Completed**: Phase 5 - Core API Integration
-- **Files**: Complete frontend-backend API integration with SQLite database
-- **Status**: ✅ **COMPLETED** - Full-stack integration with ToolResponse format, real-time data flow ready
-- **Achievement**: React frontend ↔ Java backend ↔ SQLite database working perfectly
-
-### **Ready to Begin**: Phase 3 - Database Migration to PostgreSQL
-- **Goal**: Migrate from SQLite to PostgreSQL for production scalability
-- **Duration**: 1-2 weeks
-- **Status**: ⏳ **READY** - API integration complete, ready for database upgrade
-- **Benefits**: Multi-container architecture, concurrent access, production readiness
-
-### **Next After PostgreSQL**: Phase 4 - Docker Containerization
-- **Goal**: Complete containerization for one-command deployment
-- **Duration**: 1-2 weeks
-- **Benefits**: `docker-compose up` → complete system running at localhost:3000
-
-### **New Priority**: Phase 4.5 - MCP Remote Servers Conversion
-- **Goal**: Convert stdio MCP servers to remote HTTP/SSE microservices
-- **Duration**: 1.5-2.5 weeks
-- **Status**: 📋 **PLANNED** - Technical specification complete, ready for implementation
-- **Benefits**: 75% reduction in processes, better scalability, production-ready architecture
-- **Reference**: [`MCP_REMOTE_SERVERS_SPECIFICATION.md`](MCP_REMOTE_SERVERS_SPECIFICATION.md)
-
-## Conclusion
-
-This implementation plan provides a clear roadmap for enhancing our existing agentic trading system with the proven components from the source project, while adding enterprise-grade capabilities through our Java backend and React frontend.
-
-**Key Success Factors**:
-1. **Maintain Core Behavior** - Keep autonomous trading behavior identical to source
-2. **Enhance Systematically** - Add enterprise features without disrupting core functionality  
-3. **Test Incrementally** - Validate each phase before proceeding
-4. **Focus on Integration** - Ensure seamless operation between all components
-
-The result will be a **best-of-both-worlds system**: proven autonomous trading agents enhanced with enterprise-grade infrastructure and modern user interfaces.
