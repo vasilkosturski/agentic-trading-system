@@ -79,6 +79,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    # Run the production autonomous trading system
+    command: python trading_system.py
     # No ports exposed - agents are autonomous scripts
 
   # React Frontend
