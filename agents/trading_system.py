@@ -2,15 +2,13 @@
 
 import asyncio
 import logging
-import json
+from contextlib import AsyncExitStack
 from datetime import datetime
 from typing import List, Dict, Any
 
-from agent_orchestrator import AgentOrchestrator
-from warren_agent import create_warren_agent
-from george_agent import create_george_agent
-from ray_agent import create_ray_agent
-from cathie_agent import create_cathie_agent
+from agents import Agent, Tool, Runner, trace
+from agents.mcp import MCPServerStdio
+from mcp_params import trader_mcp_server_params, researcher_mcp_server_params
 
 # Configure logging
 logging.basicConfig(
@@ -19,56 +17,195 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+class SimpleTrader:
+    """Simple trader using OpenAI Agents SDK with MCP - exactly like source project"""
+    
+    def __init__(self, name: str, strategy: str, model_name: str = "gpt-4o-mini"):
+        self.name = name
+        self.strategy = strategy
+        self.model_name = model_name
+        self.do_trade = True
+    
+    async def get_researcher_tool(self, researcher_mcp_servers) -> Tool:
+        """Create researcher tool from MCP servers"""
+        researcher_instructions = f"""You are a financial researcher. You are able to search the web for interesting financial news,
+look for possible trading opportunities, and help with research.
+Based on the request, you carry out necessary research and respond with your findings.
+Take time to make multiple searches to get a comprehensive overview, and then summarize your findings.
+If the web search tool raises an error due to rate limits, then use your other tool that fetches web pages instead.
+
+Important: making use of your knowledge graph to retrieve and store information on companies, websites and market conditions:
+
+Make use of your knowledge graph tools to store and recall entity information; use it to retrieve information that
+you have worked on previously, and store new information about companies, stocks and market conditions.
+Also use it to store web addresses that you find interesting so you can check them later.
+Draw on your knowledge graph to build your expertise over time.
+
+If there isn't a specific request, then just respond with investment opportunities based on searching latest news.
+The current datetime is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+"""
+        
+        researcher = Agent(
+            name="Researcher",
+            instructions=researcher_instructions,
+            model=self.model_name,
+            mcp_servers=researcher_mcp_servers,
+        )
+        
+        return researcher.as_tool(
+            tool_name="Researcher",
+            tool_description="This tool researches online for news and opportunities, either based on your specific request to look into a certain stock, or generally for notable financial news and opportunities. Describe what kind of research you're looking for."
+        )
+    
+    def get_trader_instructions(self) -> str:
+        """Get trader instructions"""
+        return f"""
+You are {self.name}, a trader on the stock market. Your account is under your name, {self.name}.
+You actively manage your portfolio according to your strategy.
+You have access to tools including a researcher to research online for news and opportunities, based on your request.
+You also have tools to access to financial data for stocks. You have access to end of day market data; use you lookup_share_price tool to get the share price as of the prior close.
+And you have tools to buy and sell stocks using your account name {self.name}.
+You can use your entity tools as a persistent memory to store and recall information; you share
+this memory with other traders and can benefit from the group's knowledge.
+Use these tools to carry out research, make decisions, and execute trades.
+After you've completed trading, send a push notification with a brief summary of activity, then reply with a 2-3 sentence appraisal.
+Your goal is to maximize your profits according to your strategy.
+
+Your investment strategy:
+{self.strategy}
+"""
+    
+    def get_trade_message(self) -> str:
+        """Get trading message"""
+        return f"""Based on your investment strategy, you should now look for new opportunities.
+Use the research tool to find news and opportunities consistent with your strategy.
+Do not use the 'get company news' tool; use the research tool instead.
+Use the tools to research stock price and other company information. You have access to end of day market data; use you lookup_share_price tool to get the share price as of the prior close.
+Finally, make you decision, then execute trades using the tools.
+Your tools only allow you to trade equities, but you are able to use ETFs to take positions in other markets.
+You do not need to rebalance your portfolio; you will be asked to do so later.
+Just make trades based on your strategy as needed.
+Your investment strategy:
+{self.strategy}
+Here is the current datetime:
+{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+Now, carry out analysis, make your decision and execute trades. Your account name is {self.name}.
+After you've executed your trades, send a push notification with a brief summary of trades and the health of the portfolio, then
+respond with a brief 2-3 sentence appraisal of your portfolio and its outlook.
+"""
+    
+    async def create_agent(self, trader_mcp_servers, researcher_mcp_servers) -> Agent:
+        """Create the agent with MCP servers"""
+        researcher_tool = await self.get_researcher_tool(researcher_mcp_servers)
+        
+        agent = Agent(
+            name=self.name,
+            instructions=self.get_trader_instructions(),
+            model=self.model_name,
+            tools=[researcher_tool],
+            mcp_servers=trader_mcp_servers,
+        )
+        
+        return agent
+    
+    async def run_agent(self, trader_mcp_servers, researcher_mcp_servers):
+        """Run the agent with MCP servers"""
+        agent = await self.create_agent(trader_mcp_servers, researcher_mcp_servers)
+        message = self.get_trade_message()
+        
+        await Runner.run(agent, message, max_turns=30)
+    
+    async def run_with_mcp_servers(self):
+        """Run agent with MCP server context managers"""
+        async with AsyncExitStack() as stack:
+            trader_mcp_servers = [
+                await stack.enter_async_context(
+                    MCPServerStdio(params, client_session_timeout_seconds=120)
+                )
+                for params in trader_mcp_server_params
+            ]
+            
+            async with AsyncExitStack() as stack2:
+                researcher_mcp_servers = [
+                    await stack2.enter_async_context(
+                        MCPServerStdio(params, client_session_timeout_seconds=120)
+                    )
+                    for params in researcher_mcp_server_params(self.name.lower())
+                ]
+                
+                await self.run_agent(trader_mcp_servers, researcher_mcp_servers)
+    
+    async def run_with_trace(self):
+        """Run agent with tracing"""
+        trace_name = f"{self.name}-trading"
+        trace_id = f"trace_{self.name.lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        with trace(trace_name, trace_id=trace_id):
+            await self.run_with_mcp_servers()
+    
+    async def run(self):
+        """Main run method"""
+        try:
+            logger.info(f"Starting {self.name} agent...")
+            await self.run_with_trace()
+            logger.info(f"{self.name} agent completed successfully")
+        except Exception as e:
+            logger.error(f"Error running {self.name} agent: {e}")
+            raise
+
 class TradingSystem:
-    """
-    Main trading system that orchestrates all four autonomous agents
-    """
+    """Main trading system that orchestrates all four autonomous agents"""
     
     def __init__(self):
-        self.orchestrator = AgentOrchestrator()
-        self.agents_initialized = False
-        
-        # Trading configuration
-        self.trading_symbols = [
-            "AAPL",   # Apple - Technology
-            "GOOGL",  # Google - Technology/Innovation
-            "MSFT",   # Microsoft - Technology/Cloud
-            "TSLA",   # Tesla - Innovation/EV
-            "AMZN",   # Amazon - E-commerce/Cloud
-            "NVDA",   # NVIDIA - AI/Semiconductors
-            "META",   # Meta - Social Media/VR
-            "NFLX",   # Netflix - Streaming/Content
-            "SPY",    # S&P 500 ETF - Market Index
-            "QQQ"     # NASDAQ ETF - Tech Index
+        # Create the four legendary traders with their strategies
+        self.agents = [
+            SimpleTrader("Warren", """
+You are Warren, and you are named in homage to your role model, Warren Buffett.
+You are a value-oriented investor who prioritizes long-term wealth creation.
+You identify high-quality companies trading below their intrinsic value.
+You invest patiently and hold positions through market fluctuations, 
+relying on meticulous fundamental analysis, steady cash flows, strong management teams, 
+and competitive advantages. You rarely react to short-term market movements, 
+trusting your deep research and value-driven strategy.
+"""),
+            SimpleTrader("George", """
+You are George, and you are named in homage to your role model, George Soros.
+You are a contrarian macro investor who focuses on large-scale economic and political trends.
+You use reflexivity theory to identify market inefficiencies and bubbles.
+You're willing to take large, concentrated positions when you have high conviction,
+and you're not afraid to go against conventional wisdom. You focus on currencies,
+commodities, and broad market movements, looking for paradigm shifts and market dislocations.
+"""),
+            SimpleTrader("Ray", """
+You are Ray, and you are named in homage to your role model, Ray Dalio.
+You are a systematic investor who focuses on risk parity and diversification.
+You believe in building all-weather portfolios that can perform across different economic environments.
+You use systematic approaches, focus on uncorrelated returns, and emphasize risk management.
+You look for balance across asset classes and economic regimes, preferring steady,
+risk-adjusted returns over high-risk, high-reward strategies.
+"""),
+            SimpleTrader("Cathie", """
+You are Cathie, and you are named in homage to your role model, Cathie Wood.
+You are a growth investor focused on disruptive innovation and exponential technologies.
+You invest in companies that are transforming industries through artificial intelligence,
+robotics, autonomous vehicles, blockchain, and other breakthrough technologies.
+You have a long-term investment horizon and are willing to accept high volatility
+in exchange for the potential of exponential returns from revolutionary companies.
+""")
         ]
     
-    async def initialize_system(self):
-        """Initialize the trading system with all four agents"""
-        logger.info("🚀 Initializing Agentic Trading System...")
-        
-        # Create the four legendary traders
-        warren = create_warren_agent()
-        george = create_george_agent()
-        ray = create_ray_agent()
-        cathie = create_cathie_agent()
-        
-        # Add agents to orchestrator
-        self.orchestrator.add_agent(warren)
-        self.orchestrator.add_agent(george)
-        self.orchestrator.add_agent(ray)
-        self.orchestrator.add_agent(cathie)
-        
-        # Set trading symbols
-        self.orchestrator.trading_symbols = self.trading_symbols
-        
-        # Initialize all agents
-        await self.orchestrator.initialize_agents()
-        
-        self.agents_initialized = True
-        logger.info("✅ Trading system initialized with 4 autonomous agents")
+    async def run_all_agents(self):
+        """Run all four agents concurrently"""
+        logger.info("🚀 Starting all four autonomous trading agents...")
         
         # Print agent summary
         self.print_agent_summary()
+        
+        # Run all agents concurrently
+        tasks = [agent.run() for agent in self.agents]
+        await asyncio.gather(*tasks, return_exceptions=True)
+        
+        logger.info("✅ All agents completed their trading cycle")
     
     def print_agent_summary(self):
         """Print a summary of all agents"""
@@ -114,111 +251,19 @@ class TradingSystem:
             print(f"   ⚡ Risk Level: {agent['risk']}")
             print()
         
-        print(f"📈 Trading Universe: {', '.join(self.trading_symbols)}")
         print("="*80 + "\n")
-    
-    async def run_single_cycle(self) -> Dict[str, Any]:
-        """Run a single trading cycle"""
-        if not self.agents_initialized:
-            await self.initialize_system()
-        
-        logger.info("🔄 Running trading cycle...")
-        results = await self.orchestrator.run_single_cycle()
-        
-        # Print cycle summary
-        self.print_cycle_summary(results)
-        
-        return results
-    
-    def print_cycle_summary(self, results: Dict[str, Any]):
-        """Print a summary of the trading cycle"""
-        print(f"\n📊 TRADING CYCLE SUMMARY - {results.get('timestamp', 'Unknown')}")
-        print("-" * 60)
-        
-        if not results.get('market_open', False):
-            print("🏪 Market is CLOSED - No trading activity")
-            return
-        
-        total_trades = 0
-        for agent_name, agent_results in results.get('agents', {}).items():
-            if 'decisions' in agent_results:
-                decisions = agent_results['decisions']
-                trades = [d for d in decisions if d['action'] != 'hold']
-                total_trades += len(trades)
-                
-                print(f"👤 {agent_name}:")
-                if trades:
-                    for trade in trades:
-                        action_emoji = "🟢" if trade['action'] == 'buy' else "🔴"
-                        print(f"   {action_emoji} {trade['action'].upper()} {trade['quantity']} {trade['symbol']} @ ${trade['price']:.2f}")
-                        print(f"      💭 {trade['reasoning'][:100]}...")
-                        print(f"      🎯 Confidence: {trade['confidence']:.1%}")
-                else:
-                    print("   ⏸️  HOLD - No trades executed")
-                print()
-        
-        print(f"📈 Total trades executed: {total_trades}")
-        print(f"⏱️  Cycle duration: {results.get('duration_seconds', 0):.1f} seconds")
-        print("-" * 60)
-    
-    async def run_continuous(self):
-        """Run the trading system continuously"""
-        if not self.agents_initialized:
-            await self.initialize_system()
-        
-        logger.info("🔄 Starting continuous trading...")
-        await self.orchestrator.run_continuous()
-    
-    async def get_system_status(self) -> Dict[str, Any]:
-        """Get comprehensive system status"""
-        if not self.agents_initialized:
-            return {"status": "not_initialized"}
-        
-        status = await self.orchestrator.get_all_agent_status()
-        
-        # Add system-level information
-        status['system'] = {
-            'trading_symbols': self.trading_symbols,
-            'total_agents': len(self.orchestrator.agents),
-            'cycle_interval_seconds': self.orchestrator.cycle_interval
-        }
-        
-        return status
-    
-    def stop(self):
-        """Stop the trading system"""
-        self.orchestrator.stop()
-        logger.info("🛑 Trading system stopped")
 
 async def main():
-    """Main function for running the trading system"""
-    system = TradingSystem()
+    """Main function"""
+    logger.info("🚀 Starting Agentic Trading System...")
     
     try:
-        print("🚀 Starting Agentic Trading System...")
-        print("Press Ctrl+C to stop\n")
-        
-        # Initialize system
-        await system.initialize_system()
-        
-        # Run a single cycle for demonstration
-        print("Running single trading cycle for demonstration...")
-        await system.run_single_cycle()
-        
-        # Get system status
-        print("\n📊 Getting system status...")
-        status = await system.get_system_status()
-        print(json.dumps(status, indent=2, default=str))
-        
-        # Uncomment the line below to run continuously
-        # await system.run_continuous()
-        
-    except KeyboardInterrupt:
-        logger.info("Interrupted by user")
+        system = TradingSystem()
+        await system.run_all_agents()
+        logger.info("✅ Trading system completed successfully")
     except Exception as e:
-        logger.error(f"System error: {e}")
-    finally:
-        system.stop()
+        logger.error(f"❌ Trading system failed: {e}")
+        raise
 
 if __name__ == "__main__":
     asyncio.run(main())
