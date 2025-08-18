@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 # Environment variables
-brave_env = {"BRAVE_API_KEY": os.getenv("BRAVE_API_KEY")}
+brave_api_key = os.getenv("BRAVE_API_KEY")
+brave_env = {"BRAVE_API_KEY": brave_api_key} if brave_api_key else {}
 polygon_api_key = os.getenv("POLYGON_API_KEY")
 polygon_plan = os.getenv("POLYGON_PLAN")
 
@@ -26,9 +27,9 @@ else:
 
 # The full set of MCP servers for the trader: Accounts, Push Notification and the Market
 trader_mcp_server_params = [
-    {"command": "python", "args": ["mcp-servers/accounts_server.py"]},
-    {"command": "python", "args": ["mcp-servers/push_server.py"]},
-    {"command": "python", "args": ["mcp-servers/market_server.py"]},
+    {"command": "python", "args": ["./mcp-servers/accounts_server.py"]},
+    {"command": "python", "args": ["./mcp-servers/push_server.py"]},
+    {"command": "python", "args": ["./mcp-servers/market_server.py"]},
 ]
 
 # The full set of MCP servers for the researcher: Fetch, Brave Search and Memory
