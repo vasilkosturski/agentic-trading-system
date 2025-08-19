@@ -126,45 +126,5 @@ Do not use direct market data tools for company news; use the research tool inst
 The research tool provides comprehensive financial news analysis and market sentiment.
 """.format(memory_instructions=MEMORY_INSTRUCTIONS)
 
-# Researcher tool factory function following agents/6_mcp pattern
-async def get_researcher_tool(agent_name: str, model_name: str = "gpt-4o-mini"):
-    """
-    Create researcher tool for trading agents
-    Following the exact pattern from agents/6_mcp/traders.py:62-64
-    """
-    from researcher_agent import get_researcher_tool as create_researcher_tool
-    from mcp_connector import MCPManager
-    
-    try:
-        # Get researcher MCP server parameters
-        researcher_mcp_params = memory_manager.get_researcher_mcp_params(agent_name)
-        
-        # Create MCP manager for researcher (this would need to be implemented)
-        # For now, we'll create a placeholder that returns the researcher tool
-        
-        # Import and create researcher tool
-        researcher_tool = await create_researcher_tool(researcher_mcp_params, model_name)
-        
-        return researcher_tool
-        
-    except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Failed to create researcher tool for {agent_name}: {e}")
-        
-        # Return a fallback tool that indicates research is unavailable
-        return {
-            "name": "Researcher",
-            "description": "Research tool unavailable due to configuration error",
-            "function": lambda request: f"Research unavailable: {str(e)}",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "request": {
-                        "type": "string",
-                        "description": "The research request or query"
-                    }
-                },
-                "required": ["request"]
-            }
-        }
+# Note: Researcher tool creation is handled directly in trading_system.py
+# This file provides memory configuration utilities for the trading system
