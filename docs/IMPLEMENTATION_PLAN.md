@@ -236,13 +236,26 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 **Duration**: 2-3 days
 **Status**: ⏳ **NEXT PRIORITY** - Critical for validating the entire system works end-to-end
 
-#### 5.1 Agent Activation and Trading Triggers (1 day) - **NEW**
+#### 5.1 Implement Continuous Trading Loop (1 day) - **NEW**
+- **Task**: Add infinite trading loop to make agents truly autonomous
+- **Files**: `agents/trading_system.py`
+- **Source Reference**: [`agents/6_mcp/trading_floor.py:41-49`](../../../agents/6_mcp/trading_floor.py)
+- **Current Issue**: Agents run once and exit - no continuous operation
+- **Deliverables**:
+  - Add infinite loop with configurable interval (default: 60 minutes)
+  - Add market hours detection and conditional execution
+  - Add environment variable configuration (RUN_EVERY_N_MINUTES, RUN_EVEN_WHEN_MARKET_IS_CLOSED)
+  - Add graceful shutdown handling (Ctrl+C)
+  - Add proper logging for each trading cycle
+- **Validation**: System runs continuously, agents trade every hour, respects market hours
+- **Status**: ⏳ **CRITICAL** - Core requirement for autonomous system
+
+#### 5.1.1 Agent Activation and Trading Triggers (1 day) - **NEW**
 - **Task**: Activate the 4 autonomous trading agents to start making real trading decisions
-- **Files**: `agents/agent_orchestrator.py`, `agents/trading_system.py`, agent configuration files
+- **Files**: `agents/trading_system.py`, agent configuration files
 - **Current Issue**: Agents are initialized but inactive - no trading activity visible
 - **Deliverables**:
   - Configure agents to run in active trading mode (not just initialization)
-  - Set up proper market hours detection and trading triggers
   - Enable autonomous decision-making loops for all 4 agents
   - Configure realistic trading parameters (position sizes, risk limits)
 - **Validation**: Agents should start making trading decisions and executing trades
