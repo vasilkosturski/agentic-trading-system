@@ -250,17 +250,27 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 - **Validation**: ✅ System runs continuously, agents alternate between trading/rebalancing every hour
 - **Status**: ✅ **COMPLETED** - Core autonomous system requirement fulfilled
 
-#### 5.2 Real Trading Data Generation (1 day) - **NEW**
-- **Task**: Generate actual trading activity and portfolio changes
-- **Files**: MCP servers, trading logic, market data integration
-- **Current Issue**: All agents show $100,000 static portfolios with 0 trades
+#### 5.2 Fix Account Report MCP Resource Integration (1 day) - **UPDATED**
+- **Task**: Fix `get_account_report()` to use real MCP resources instead of hardcoded data
+- **Files**: `agents/simple_trader.py` (lines 117-121)
+- **Current Issue**: `get_account_report()` returns hardcoded `$100,000` balance instead of real portfolio data
+- **Root Cause**: Function returns mock data instead of calling MCP resource `accounts://accounts_server/{name}`
 - **Deliverables**:
-  - Enable real market data fetching and analysis
-  - Configure agents to execute actual trades (paper trading mode)
-  - Generate portfolio changes, P&L updates, position tracking
-  - Create trading history and transaction records
-- **Validation**: Frontend should show changing portfolio values, trade counts, P&L changes
-- **Status**: ⏳ **CRITICAL** - Need to see actual trading activity
+  - Replace hardcoded mock data with real MCP resource call
+  - Implement proper JSON parsing and time series removal (matching source project)
+  - Enable agents to see their actual portfolio state (balance, holdings, P&L)
+  - Agents will make informed trading decisions based on real portfolio context
+- **Implementation**:
+  ```python
+  # CURRENT (WRONG):
+  return f'{{"name": "{self.name}", "balance": 100000, "holdings": {{}}, "strategy": "{self.strategy}"}}'
+  
+  # SHOULD BE (CORRECT):
+  # Use MCP resource like source project traders.py:86-90
+  ```
+- **Validation**: Agents should see dynamic portfolio data instead of static $100,000 balance
+- **Status**: ⏳ **CRITICAL** - Key missing piece for real trading activity
+- **Note**: `get_strategy()` is working correctly for static strategies, will enhance for dynamic strategies later
 
 #### 5.3 System Monitoring and Verification (1 day) - **NEW**
 - **Task**: Add comprehensive monitoring to verify all components are working
