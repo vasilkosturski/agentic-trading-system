@@ -2,9 +2,17 @@
 
 import asyncio
 import logging
+import os
 from typing import List, Dict, Any
+from dotenv import load_dotenv
 
 from simple_trader import SimpleTrader
+
+# Load environment variables
+load_dotenv(override=True)
+
+# Configuration
+RUN_EVERY_N_MINUTES = int(os.getenv("RUN_EVERY_N_MINUTES", "60"))
 
 # Configure logging
 logging.basicConfig(
@@ -113,9 +121,29 @@ in exchange for the potential of exponential returns from revolutionary companie
         
         print("="*80 + "\n")
 
+async def run_continuous_trading():
+    """Run continuous trading cycles - matches source project pattern"""
+    system = TradingSystem()
+    
+    print(f"🔄 Starting scheduler to run every {RUN_EVERY_N_MINUTES} minutes")
+    logger.info(f"Continuous trading loop started with {RUN_EVERY_N_MINUTES} minute intervals")
+    
+    try:
+        while True:
+            logger.info("🚀 Starting new trading cycle...")
+            await system.run_all_agents()
+            logger.info(f"✅ Trading cycle completed. Waiting {RUN_EVERY_N_MINUTES} minutes until next cycle...")
+            await asyncio.sleep(RUN_EVERY_N_MINUTES * 60)
+    except KeyboardInterrupt:
+        logger.info("🛑 Graceful shutdown requested (Ctrl+C)")
+        print("\n🛑 Shutting down trading system gracefully...")
+    except Exception as e:
+        logger.error(f"❌ Trading system error: {e}")
+        raise
+
 async def main():
-    """Main function"""
-    logger.info("🚀 Starting Agentic Trading System...")
+    """Main function - single run for testing"""
+    logger.info("🚀 Starting Agentic Trading System (single run)...")
     
     try:
         system = TradingSystem()
@@ -126,4 +154,12 @@ async def main():
         raise
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Check if we should run continuously or just once
+    continuous_mode = os.getenv("CONTINUOUS_MODE", "true").lower() == "true"
+    
+    if continuous_mode:
+        print("🔄 Running in CONTINUOUS mode")
+        asyncio.run(run_continuous_trading())
+    else:
+        print("🎯 Running in SINGLE mode")
+        asyncio.run(main())
