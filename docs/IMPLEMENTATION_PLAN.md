@@ -250,17 +250,6 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 - **Validation**: ✅ System runs continuously, agents alternate between trading/rebalancing every hour
 - **Status**: ✅ **COMPLETED** - Core autonomous system requirement fulfilled
 
-#### 5.1.1 Agent Activation and Trading Triggers (1 day) - **NEW**
-- **Task**: Activate the 4 autonomous trading agents to start making real trading decisions
-- **Files**: `agents/trading_system.py`, agent configuration files
-- **Current Issue**: Agents are initialized but inactive - no trading activity visible
-- **Deliverables**:
-  - Configure agents to run in active trading mode (not just initialization)
-  - Enable autonomous decision-making loops for all 4 agents
-  - Configure realistic trading parameters (position sizes, risk limits)
-- **Validation**: Agents should start making trading decisions and executing trades
-- **Status**: ⏳ **CRITICAL** - Without this, we can't verify the system actually works
-
 #### 5.2 Real Trading Data Generation (1 day) - **NEW**
 - **Task**: Generate actual trading activity and portfolio changes
 - **Files**: MCP servers, trading logic, market data integration
