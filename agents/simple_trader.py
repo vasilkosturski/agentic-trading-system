@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import asyncio
+import json
 import logging
 from contextlib import AsyncExitStack
 from datetime import datetime
@@ -115,10 +116,21 @@ respond with a brief 2-3 sentence appraisal of your portfolio and its outlook.
 """
 
     async def get_account_report(self) -> str:
-        """Get account report via MCP resource - matches source project"""
-        # This would use MCP resource to get account data
-        # For now, return a placeholder that matches the expected format
-        return f'{{"name": "{self.name}", "balance": 100000, "holdings": {{}}, "strategy": "{self.strategy}"}}'
+        """Get account report via MCP resource - matches source project exactly"""
+        try:
+            # Get account data from MCP resource (matches source project traders.py:86-90)
+            # This will call the accounts_server.py MCP resource endpoint
+            account_data = await self.agent.read_resource(f"accounts://accounts_server/{self.name}")
+            
+            # Parse JSON and remove time series data to keep prompt clean (like source project)
+            account_json = json.loads(account_data)
+            account_json.pop("portfolio_value_time_series", None)
+            
+            return json.dumps(account_json)
+        except Exception as e:
+            logger.error(f"Failed to get account report for {self.name}: {e}")
+            # Fallback to basic structure if MCP resource fails
+            return f'{{"name": "{self.name}", "balance": 100000, "holdings": {{}}, "error": "MCP resource unavailable"}}'
 
     async def get_strategy(self) -> str:
         """Get current strategy via MCP resource - matches source project"""
