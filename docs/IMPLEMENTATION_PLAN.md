@@ -243,11 +243,11 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 - **Current Issue**: Agents run once and exit - no continuous operation
 - **Deliverables**:
   - Add infinite loop with configurable interval (default: 60 minutes)
-  - Add market hours detection and conditional execution
-  - Add environment variable configuration (RUN_EVERY_N_MINUTES, RUN_EVEN_WHEN_MARKET_IS_CLOSED)
+  - Add environment variable configuration (RUN_EVERY_N_MINUTES)
   - Add graceful shutdown handling (Ctrl+C)
   - Add proper logging for each trading cycle
-- **Validation**: System runs continuously, agents trade every hour, respects market hours
+  - Remove market hours complexity - let agents work continuously
+- **Validation**: System runs continuously, agents work every hour regardless of market status
 - **Status**: ⏳ **CRITICAL** - Core requirement for autonomous system
 
 #### 5.1.1 Agent Activation and Trading Triggers (1 day) - **NEW**
