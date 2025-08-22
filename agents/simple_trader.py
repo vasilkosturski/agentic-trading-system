@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import asyncio
+import aiohttp
 import json
 import logging
 from contextlib import AsyncExitStack
@@ -116,27 +117,42 @@ respond with a brief 2-3 sentence appraisal of your portfolio and its outlook.
 """
 
     async def get_account_report(self) -> str:
-        """Get account report via MCP resource - matches source project exactly"""
+        """Get account report via direct API call - cleaner architecture than MCP resource"""
         try:
-            # Get account data from MCP resource (matches source project traders.py:86-90)
-            # This will call the accounts_server.py MCP resource endpoint
-            account_data = await self.agent.read_resource(f"accounts://accounts_server/{self.name}")
-            
-            # Parse JSON and remove time series data to keep prompt clean (like source project)
-            account_json = json.loads(account_data)
-            account_json.pop("portfolio_value_time_series", None)
-            
-            return json.dumps(account_json)
+            # Direct API call to Java backend (better than MCP resource for system data)
+            url = f"http://backend:8080/api/accounts/resources/accounts/{self.name.lower()}"
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        account_data = await response.text()
+                        
+                        # Parse JSON and remove time series data to keep prompt clean (like source project)
+                        account_json = json.loads(account_data)
+                        account_json.pop("portfolio_value_time_series", None)
+                        
+                        return json.dumps(account_json)
+                    else:
+                        raise Exception(f"API call failed: {response.status}")
         except Exception as e:
             logger.error(f"Failed to get account report for {self.name}: {e}")
-            # Fallback to basic structure if MCP resource fails
-            return f'{{"name": "{self.name}", "balance": 100000, "holdings": {{}}, "error": "MCP resource unavailable"}}'
+            # Fallback to basic structure if API fails
+            return f'{{"name": "{self.name}", "balance": 100000, "holdings": {{}}, "error": "API unavailable"}}'
 
     async def get_strategy(self) -> str:
-        """Get current strategy via MCP resource - matches source project"""
-        # This would use MCP resource to get strategy data
-        # For now, return the current strategy
-        return self.strategy
+        """Get current strategy via direct API call - cleaner architecture than MCP resource"""
+        try:
+            # Direct API call to Java backend (better than MCP resource for system data)
+            url = f"http://backend:8080/api/accounts/resources/strategy/{self.name.lower()}"
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        return await response.text()
+                    else:
+                        raise Exception(f"API call failed: {response.status}")
+        except Exception as e:
+            logger.error(f"Failed to get strategy for {self.name}: {e}")
+            # Fallback to constructor strategy if API fails
+            return self.strategy
     
     async def create_agent(self, trader_mcp_servers, researcher_mcp_servers) -> Agent:
         """Create the agent with MCP servers"""
