@@ -175,16 +175,7 @@ public class PostgreSQLAccountService {
         return "Successfully sold " + quantity + " shares of " + symbol + " at $" + String.format("%.2f", price) + " each";
     }
 
-    /**
-     * Change strategy for an agent
-     */
-    public String changeStrategy(String agentName, String strategy) {
-        TradingAccount account = getOrCreateAccount(agentName);
-        account.setStrategy(strategy);
-        tradingAccountRepository.save(account);
-        
-        return "Successfully changed strategy for " + agentName + " to: " + strategy;
-    }
+    // changeStrategy method removed - using hardcoded strategies only
 
     /**
      * Get account report for an agent
@@ -215,7 +206,6 @@ public class PostgreSQLAccountService {
             report.put("balance", account.getBalance());
             report.put("holdingsValue", holdingsValue);
             report.put("totalPortfolioValue", totalValue);
-            report.put("strategy", account.getStrategy());
             report.put("initialBalance", 100000.0); // Default initial balance
             report.put("totalProfitLoss", totalValue - 100000.0);
             report.put("profitLossPercent", ((totalValue - 100000.0) / 100000.0) * 100);
@@ -231,13 +221,7 @@ public class PostgreSQLAccountService {
         }
     }
 
-    /**
-     * Get strategy for an agent
-     */
-    public String getStrategy(String agentName) {
-        TradingAccount account = getOrCreateAccount(agentName);
-        return account.getStrategy() != null ? account.getStrategy() : "No strategy set";
-    }
+    // getStrategy method removed - using hardcoded strategies only
 
     /**
      * Get total portfolio value for an agent
@@ -288,7 +272,7 @@ public class PostgreSQLAccountService {
         account = new TradingAccount();
         account.setName(agentName);
         account.setBalance(100000.0); // Default initial balance
-        account.setStrategy("Default strategy for " + agentName);
+        // Strategy removed - using hardcoded strategies from trading system
         account.setAgent(agent);
         
         return tradingAccountRepository.save(account);
