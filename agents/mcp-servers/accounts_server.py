@@ -118,23 +118,8 @@ async def change_strategy(name: str, strategy: str) -> str:
     except Exception as e:
         raise Exception(f"Failed to change strategy for {name}: {str(e)}")
 
-@mcp.resource("accounts://accounts_server/{name}")
-async def read_account_resource(name: str) -> str:
-    """Get account report resource"""
-    try:
-        result = await call_java_api(f"/resources/accounts/{name.lower()}", "GET")
-        return result
-    except Exception as e:
-        raise Exception(f"Failed to get account resource for {name}: {str(e)}")
-
-@mcp.resource("accounts://strategy/{name}")
-async def read_strategy_resource(name: str) -> str:
-    """Get strategy resource"""
-    try:
-        result = await call_java_api(f"/resources/strategy/{name.lower()}", "GET")
-        return result
-    except Exception as e:
-        raise Exception(f"Failed to get strategy resource for {name}: {str(e)}")
+# MCP resources removed - using direct API calls in SimpleTrader instead
+# This provides cleaner architecture: MCP tools for agents, direct API for system data
 
 if __name__ == "__main__":
     mcp.run(transport='stdio')
