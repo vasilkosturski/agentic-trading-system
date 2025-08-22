@@ -97,7 +97,7 @@ respond with a brief 2-3 sentence appraisal of your portfolio and its outlook.
 """
 
     def get_rebalance_message(self, strategy: str, account: str) -> str:
-        """Get rebalancing message - matches source project exactly"""
+        """Get rebalancing message - simplified without strategy changes"""
         return f"""Based on your investment strategy, you should now examine your portfolio and decide if you need to rebalance.
 Use the research tool to find news and opportunities affecting your existing portfolio.
 Use the tools to research stock price and other company information affecting your existing portfolio. You have access to end of day market data; use you get_share_price tool to get the share price as of the prior close.
@@ -106,7 +106,6 @@ You do not need to identify new investment opportunities at this time; you will 
 Just rebalance your portfolio based on your strategy as needed.
 Your investment strategy:
 {strategy}
-You also have a tool to change your strategy if you wish; you can decide at any time that you would like to evolve or even switch your strategy.
 Here is your current account:
 {account}
 Here is the current datetime:
@@ -139,20 +138,9 @@ respond with a brief 2-3 sentence appraisal of your portfolio and its outlook.
             return f'{{"name": "{self.name}", "balance": 100000, "holdings": {{}}, "error": "API unavailable"}}'
 
     async def get_strategy(self) -> str:
-        """Get current strategy via direct API call - cleaner architecture than MCP resource"""
-        try:
-            # Direct API call to Java backend (better than MCP resource for system data)
-            url = f"http://backend:8080/api/accounts/resources/strategy/{self.name.lower()}"
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    if response.status == 200:
-                        return await response.text()
-                    else:
-                        raise Exception(f"API call failed: {response.status}")
-        except Exception as e:
-            logger.error(f"Failed to get strategy for {self.name}: {e}")
-            # Fallback to constructor strategy if API fails
-            return self.strategy
+        """Get strategy - simplified to use hardcoded constructor strategy only"""
+        # Return the hardcoded strategy from constructor - no persistence needed
+        return self.strategy
     
     async def create_agent(self, trader_mcp_servers, researcher_mcp_servers) -> Agent:
         """Create the agent with MCP servers"""

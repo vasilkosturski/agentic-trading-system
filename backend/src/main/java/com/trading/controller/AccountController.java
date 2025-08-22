@@ -69,18 +69,7 @@ public class AccountController {
         }
     }
 
-    @PostMapping("/tools/change_strategy")
-    public ResponseEntity<ToolResponse<String>> changeStrategy(@RequestBody Map<String, String> request) {
-        try {
-            String name = request.get("name");
-            String strategy = request.get("strategy");
-            
-            String result = accountService.changeStrategy(name, strategy);
-            return ResponseEntity.ok(new ToolResponse<>(true, result, null));
-        } catch (Exception e) {
-            return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
-        }
-    }
+    // change_strategy endpoint removed - using hardcoded strategies only
 
     // MCP Resource endpoints
     @GetMapping("/resources/accounts/{name}")
@@ -93,13 +82,5 @@ public class AccountController {
         }
     }
 
-    @GetMapping("/resources/strategy/{name}")
-    public ResponseEntity<String> getStrategyResource(@PathVariable String name) {
-        try {
-            String strategy = accountService.getStrategy(name);
-            return ResponseEntity.ok(strategy);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
-        }
-    }
+    // strategy resource endpoint removed - using hardcoded strategies only
 }

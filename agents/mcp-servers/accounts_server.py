@@ -101,22 +101,8 @@ async def sell_shares(name: str, symbol: str, quantity: int, rationale: str) -> 
     except Exception as e:
         raise Exception(f"Failed to sell shares for {name}: {str(e)}")
 
-@mcp.tool()
-async def change_strategy(name: str, strategy: str) -> str:
-    """At your discretion, if you choose to, call this to change your investment strategy for the future.
-
-    Args:
-        name: The name of the account holder
-        strategy: The new strategy for the account
-    """
-    try:
-        result = await call_java_api("/tools/change_strategy", "POST", {
-            "name": name,
-            "strategy": strategy
-        })
-        return str(result)
-    except Exception as e:
-        raise Exception(f"Failed to change strategy for {name}: {str(e)}")
+# change_strategy tool removed - using hardcoded strategies from constructor only
+# This simplifies the design and keeps strategies consistent with trading system configuration
 
 # MCP resources removed - using direct API calls in SimpleTrader instead
 # This provides cleaner architecture: MCP tools for agents, direct API for system data

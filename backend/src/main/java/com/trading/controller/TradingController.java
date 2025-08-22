@@ -3,7 +3,7 @@ package com.trading.controller;
 import com.trading.dto.ToolResponse;
 import com.trading.service.TradingService;
 import com.trading.service.TradingService.*;
-import com.trading.service.PostgreSQLAgentMonitoringService;
+// import com.trading.service.PostgreSQLAgentMonitoringService; // Commented out - class missing
 import com.trading.service.PostgreSQLAccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -22,17 +22,19 @@ public class TradingController {
     @Autowired
     private TradingService tradingService;
     
-    @Autowired
-    private PostgreSQLAgentMonitoringService agentMonitoringService;
+    // @Autowired
+    // private PostgreSQLAgentMonitoringService agentMonitoringService; // Commented out - class missing
     
     @Autowired
     private PostgreSQLAccountService accountService;
     
-    // Agent Status Endpoints (Real Data from PostgreSQL)
+    // Agent Status Endpoints (Real Data from PostgreSQL) - Temporarily disabled due to missing service
     @GetMapping("/agents/status")
     public ResponseEntity<ToolResponse<List<AgentStatusResponse>>> getAllAgentsStatus() {
         try {
-            List<AgentStatusResponse> statuses = agentMonitoringService.getRealAgentStatuses();
+            // List<AgentStatusResponse> statuses = agentMonitoringService.getRealAgentStatuses();
+            // Fallback to mock data until PostgreSQLAgentMonitoringService is implemented
+            List<AgentStatusResponse> statuses = tradingService.getAllAgentsStatus();
             return ResponseEntity.ok(ToolResponse.success(statuses));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
@@ -53,7 +55,9 @@ public class TradingController {
     @GetMapping("/agents/{agentName}/status")
     public ResponseEntity<ToolResponse<AgentStatusResponse>> getAgentStatus(@PathVariable String agentName) {
         try {
-            AgentStatusResponse status = agentMonitoringService.getRealAgentStatus(agentName);
+            // AgentStatusResponse status = agentMonitoringService.getRealAgentStatus(agentName);
+            // Fallback to mock data until PostgreSQLAgentMonitoringService is implemented
+            AgentStatusResponse status = tradingService.getAgentStatus(agentName);
             return ResponseEntity.ok(ToolResponse.success(status));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
@@ -190,13 +194,15 @@ public class TradingController {
         }
     }
     
-    // Real Data Monitoring Endpoints
+    // Real Data Monitoring Endpoints - Temporarily disabled due to missing service
     @GetMapping("/agents/{agentName}/logs")
     public ResponseEntity<ToolResponse<List<String>>> getAgentLogs(
             @PathVariable String agentName,
             @RequestParam(defaultValue = "10") int limit) {
         try {
-            List<String> logs = agentMonitoringService.getAgentLogs(agentName, limit);
+            // List<String> logs = agentMonitoringService.getAgentLogs(agentName, limit);
+            // Fallback until PostgreSQLAgentMonitoringService is implemented
+            List<String> logs = List.of("Log functionality temporarily unavailable");
             return ResponseEntity.ok(ToolResponse.success(logs));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
@@ -207,7 +213,7 @@ public class TradingController {
     public ResponseEntity<ToolResponse<Map<String, Object>>> getSystemStatus() {
         try {
             Map<String, Object> status = Map.of(
-                "pythonTradingSystemActive", agentMonitoringService.isPythonTradingSystemActive(),
+                "pythonTradingSystemActive", false, // agentMonitoringService.isPythonTradingSystemActive(),
                 "timestamp", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
                 "databaseConnected", true // Could add actual database health check
             );
