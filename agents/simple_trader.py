@@ -158,6 +158,10 @@ respond with a brief 2-3 sentence appraisal of your portfolio and its outlook.
     
     async def run_agent(self, trader_mcp_servers, researcher_mcp_servers):
         """Run the agent with MCP servers - matches source project exactly"""
+        # Phase 5.3: Basic agent activity logging
+        cycle_type = "trading" if self.do_trade else "rebalancing"
+        print(f"🤖 {self.name} starting {cycle_type} cycle at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
         self.agent = await self.create_agent(trader_mcp_servers, researcher_mcp_servers)
         account = await self.get_account_report()
         strategy = await self.get_strategy()
@@ -169,6 +173,9 @@ respond with a brief 2-3 sentence appraisal of your portfolio and its outlook.
         )
         
         await Runner.run(self.agent, message, max_turns=30)
+        
+        # Phase 5.3: Log completion
+        print(f"✅ {self.name} completed {cycle_type} cycle at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     async def run_with_mcp_servers(self):
         """Run agent with MCP server context managers"""
