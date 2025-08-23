@@ -288,18 +288,6 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 - **Status**: ✅ **COMPLETED** - Minimal logging for demo visibility implemented
 - **Note**: Trading transactions already logged comprehensively in database via AccountTransaction records
 
-#### 5.4 Trading Activity Dashboard Enhancement (1 day) - **NEW**
-- **Task**: Enhance frontend to show real-time trading activity and agent status
-- **Files**: `frontend/src/components/TradingDashboard/`, React components
-- **Current Issue**: Dashboard only shows static initial state
-- **Deliverables**:
-  - Real-time activity feed showing agent decisions and trades
-  - Live portfolio value updates and P&L changes
-  - Agent status indicators (researching, analyzing, trading, idle)
-  - Recent trades list and trading history
-  - Market data integration showing current prices
-- **Validation**: Dynamic dashboard showing live trading activity
-- **Status**: ⏳ **HIGH PRIORITY** - Make the system come alive
 
 ### 🎨 **PHASE 6: CORE API INTEGRATION** - **COMPLETED**
 **Goal**: Establish complete frontend-backend API integration with SQLite foundation
@@ -337,40 +325,53 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 ### 🎨 **PHASE 7: ENHANCED FRONTEND WITH REACT** (Moved after agent activation)
 **Goal**: Modern professional trading interface with solid infrastructure foundation
 
-#### 7.1 Trader Dashboard Layout (1 day) - **MOVED FROM 3.1.4**
+#### 7.1 Trading Activity Dashboard Enhancement (1 day) - **MOVED FROM 5.4**
+- **Task**: Enhance frontend to show real-time trading activity and agent status
+- **Files**: `frontend/src/components/TradingDashboard/`, React components
+- **Current Issue**: Dashboard only shows static initial state
+- **Deliverables**:
+  - Real-time activity feed showing agent decisions and trades
+  - Live portfolio value updates and P&L changes
+  - Agent status indicators (researching, analyzing, trading, idle)
+  - Recent trades list and trading history
+  - Market data integration showing current prices
+- **Validation**: Dynamic dashboard showing live trading activity
+- **Status**: ⏳ **HIGH PRIORITY** - Make the system come alive
+
+#### 7.2 Trader Dashboard Layout (1 day) - **MOVED FROM 3.1.4**
 - **Task**: Enhance 4-trader grid layout with real data structure
 - **Files**: `frontend/src/components/TradingDashboard/`
 - **Deliverables**: Enhanced responsive 4-column layout, detailed trader cards, portfolio displays
 - **Reference**: Source project shows Warren, George, Ray, Cathie in columns
 - **Status**: ⏳ **READY** - API integration complete, PostgreSQL and Docker ready
 
-#### 7.2 Basic Data Integration and Testing (1 day) - **MOVED FROM 3.1.5**
+#### 7.3 Basic Data Integration and Testing (1 day) - **MOVED FROM 3.1.5**
 - **Task**: Connect dashboard to backend APIs and verify functionality
 - **Files**: `frontend/src/components/TradingDashboard/`, API integration
 - **Deliverables**: Live data from PostgreSQL backend, error handling, loading states
 - **Status**: ⏳ **PENDING**
 
-#### 7.3 Real-time Trading Activity Visualization (3-4 days) - **MOVED FROM 3.2**
+#### 7.4 Real-time Trading Activity Visualization (3-4 days) - **MOVED FROM 3.2**
 - **Task**: Live trading activity monitoring
 - **Enhancement**: Real-time trade execution visualization, market data feeds
 
-#### 7.4 Interactive Portfolio Management (3-4 days) - **MOVED FROM 3.3**
+#### 7.5 Interactive Portfolio Management (3-4 days) - **MOVED FROM 3.3**
 - **Task**: Portfolio management interface
 - **Enhancement**: Interactive portfolio controls, allocation management
 
-#### 7.5 Agent Performance Analytics (3-4 days) - **MOVED FROM 3.4**
+#### 7.6 Agent Performance Analytics (3-4 days) - **MOVED FROM 3.4**
 - **Task**: Agent performance tracking and charts
 - **Enhancement**: Performance metrics, comparison charts, analytics
 
-#### 7.6 Market Data Visualization (4-5 days) - **MOVED FROM 3.5**
+#### 7.7 Market Data Visualization (4-5 days) - **MOVED FROM 3.5**
 - **Task**: Technical analysis tools and market data visualization
 - **Enhancement**: Advanced charting, technical indicators, market analysis
 
-#### 7.7 Trading Strategy Configuration (3-4 days) - **MOVED FROM 3.6**
+#### 7.8 Trading Strategy Configuration (3-4 days) - **MOVED FROM 3.6**
 - **Task**: Interface for configuring agent strategies
 - **Enhancement**: Strategy parameter tuning, behavior customization
 
-#### 7.8 Alert and Notification Management (2-3 days) - **MOVED FROM 3.7**
+#### 7.9 Alert and Notification Management (2-3 days) - **MOVED FROM 3.7**
 - **Task**: Notification management interface
 - **Enhancement**: Alert configuration, notification history, channel management
 
