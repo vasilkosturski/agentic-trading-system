@@ -277,19 +277,12 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 #### 5.3 Minimal System Monitoring (1.5 hours) - **SIMPLIFIED FOR DEMO**
 - **Task**: Add minimal, high-value monitoring to verify agents are working
 - **Files**: `agents/simple_trader.py`, `backend/src/main/java/com/trading/controller/TradingController.java`
-- **Current Issue**: No way to verify if agents are actually functioning beyond static display
-- **Deliverables** (Minimal Implementation):
+- **Deliverables**:
   - **Basic Agent Activity Logging (30 min)**: Console logs when agents start trading/rebalancing cycles
   - **Trading Decision Logging (30 min)**: Log successful buy/sell transactions to console
   - **Simple Agent Status Endpoint (30 min)**: `/api/agents/status/simple` showing last activity timestamps
-- **SKIP for Demo** (Too Complex/Low Value):
-  - ❌ Complex error detection and alerting
-  - ❌ Detailed decision reasoning tracking
-  - ❌ Advanced frontend indicators
-  - ❌ Database verification systems
-  - ❌ Strategy verification logic
 - **Validation**: Basic proof that agents are running and making trades
-- **Status**: ⏳ **SIMPLIFIED** - Minimal implementation for maximum demo value
+- **Status**: ⏳ **READY** - Minimal implementation for maximum demo value
 
 #### 5.4 Trading Activity Dashboard Enhancement (1 day) - **NEW**
 - **Task**: Enhance frontend to show real-time trading activity and agent status
