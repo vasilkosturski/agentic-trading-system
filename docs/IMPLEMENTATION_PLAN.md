@@ -274,18 +274,22 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 - **Status**: ✅ **COMPLETED** - Key missing piece for real trading activity implemented
 - **Impact**: Agents can now make trading decisions based on actual portfolio context instead of static data
 
-#### 5.3 System Monitoring and Verification (1 day) - **NEW**
-- **Task**: Add comprehensive monitoring to verify all components are working
-- **Files**: Backend logging, agent monitoring, database verification
+#### 5.3 Minimal System Monitoring (1.5 hours) - **SIMPLIFIED FOR DEMO**
+- **Task**: Add minimal, high-value monitoring to verify agents are working
+- **Files**: `agents/simple_trader.py`, `backend/src/main/java/com/trading/controller/TradingController.java`
 - **Current Issue**: No way to verify if agents are actually functioning beyond static display
-- **Deliverables**:
-  - Enhanced logging for agent decision-making processes
-  - Real-time monitoring of agent activities and trades
-  - Database verification of trading records and portfolio updates
-  - Frontend indicators showing agent activity status (active/thinking/trading)
-  - Error detection and alerting for agent failures
-- **Validation**: Clear visibility into agent operations and system health
-- **Status**: ⏳ **CRITICAL** - Essential for system validation
+- **Deliverables** (Minimal Implementation):
+  - **Basic Agent Activity Logging (30 min)**: Console logs when agents start trading/rebalancing cycles
+  - **Trading Decision Logging (30 min)**: Log successful buy/sell transactions to console
+  - **Simple Agent Status Endpoint (30 min)**: `/api/agents/status/simple` showing last activity timestamps
+- **SKIP for Demo** (Too Complex/Low Value):
+  - ❌ Complex error detection and alerting
+  - ❌ Detailed decision reasoning tracking
+  - ❌ Advanced frontend indicators
+  - ❌ Database verification systems
+  - ❌ Strategy verification logic
+- **Validation**: Basic proof that agents are running and making trades
+- **Status**: ⏳ **SIMPLIFIED** - Minimal implementation for maximum demo value
 
 #### 5.4 Trading Activity Dashboard Enhancement (1 day) - **NEW**
 - **Task**: Enhance frontend to show real-time trading activity and agent status
