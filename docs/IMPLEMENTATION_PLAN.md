@@ -307,21 +307,20 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 **Duration**: 1-2 weeks
 **Status**: ⏳ **PLANNED** - Ready for implementation after Phase 6.1 completion
 
-## Core Dashboard Improvements
+#### 7.1 Portfolio Performance Charts (5-7 days)
+- **Description**: Add historical performance graphs with time-series data visualization. Include profit/loss trends and portfolio value over time.
+- **Technical Specifications**: See [`PHASE_7_TECHNICAL_SPECIFICATIONS.md`](PHASE_7_TECHNICAL_SPECIFICATIONS.md) for detailed implementation guide.
 
-#### 7.1 Portfolio Performance Charts
-- Add historical performance graphs with time-series data visualization. Include profit/loss trends and portfolio value over time.
-
-#### 7.2 Recent Trades Display
+#### 7.2 Recent Trades Display (2-3 days)
 - Show latest trades with agent rationale and decision reasoning. Display entry/exit points and trade outcomes.
 
-#### 7.3 Individual Agent Detail Pages
+#### 7.3 Individual Agent Detail Pages (3-4 days)
 - Create dedicated pages for each agent (Warren, George, Ray, Cathie) with their specific strategies and performance metrics.
 
-#### 7.4 Real-time Activity Feed
+#### 7.4 Real-time Activity Feed (3-4 days)
 - Implement live updates showing current agent activities, market analysis, and trading decisions as they happen.
 
-#### 7.5 Transaction Reasoning Capture
+#### 7.5 Transaction Reasoning Capture (2-3 days)
 - Log and display the complete decision-making process for each trade. Show market conditions and agent logic.
 
 ### 🌐 **PHASE 8: MCP REMOTE SERVERS CONVERSION** (OPTIONAL ENHANCEMENT)
