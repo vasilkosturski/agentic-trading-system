@@ -302,12 +302,34 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
   - **Enterprise Features**: Error handling, loading states, responsive design
 - **Result**: Production-ready dashboard significantly superior to source project's Gradio interface
 
-### 🌐 **PHASE 7: MCP REMOTE SERVERS CONVERSION** (OPTIONAL ENHANCEMENT)
+### 📊 **PHASE 7: CORE DASHBOARD IMPROVEMENTS** (ENHANCEMENT PHASE)
+**Goal**: Enhance React dashboard with advanced features and detailed analytics
+**Duration**: 1-2 weeks
+**Status**: ⏳ **PLANNED** - Ready for implementation after Phase 6.1 completion
+
+## Core Dashboard Improvements
+
+#### 7.1 Portfolio Performance Charts
+- Add historical performance graphs with time-series data visualization. Include profit/loss trends and portfolio value over time.
+
+#### 7.2 Recent Trades Display
+- Show latest trades with agent rationale and decision reasoning. Display entry/exit points and trade outcomes.
+
+#### 7.3 Individual Agent Detail Pages
+- Create dedicated pages for each agent (Warren, George, Ray, Cathie) with their specific strategies and performance metrics.
+
+#### 7.4 Real-time Activity Feed
+- Implement live updates showing current agent activities, market analysis, and trading decisions as they happen.
+
+#### 7.5 Transaction Reasoning Capture
+- Log and display the complete decision-making process for each trade. Show market conditions and agent logic.
+
+### 🌐 **PHASE 8: MCP REMOTE SERVERS CONVERSION** (OPTIONAL ENHANCEMENT)
 **Goal**: Convert stdio-based MCP servers to remote streamable HTTP microservices for better scalability and production readiness
 **Duration**: 1.5-2.5 weeks
 **Reference**: [`MCP_REMOTE_SERVERS_SPECIFICATION.md`](MCP_REMOTE_SERVERS_SPECIFICATION.md)
 
-#### 7.1 MCP Server Conversion to Streamable HTTP (3-4 days)
+#### 8.1 MCP Server Conversion to Streamable HTTP (3-4 days)
 - **Task**: Convert existing stdio MCP servers to remote streamable HTTP-based services
 - **Files**: `mcp-servers/accounts_server.py`, `mcp-servers/market_server.py`, `mcp-servers/push_server.py`
 - **Current State**: Each of 4 agents spawns 3 MCP servers (accounts, market, push) = 12 total processes
@@ -324,7 +346,7 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
   - Production-ready architecture with proper health checks
 - **Status**: ⏳ **OPTIONAL**
 
-#### 7.2 Remote MCP Client Implementation (2-3 days)
+#### 8.2 Remote MCP Client Implementation (2-3 days)
 - **Task**: Update agent connection logic to use remote streamable HTTP MCP servers
 - **Files**: `agents/remote_mcp_connector.py`, `agents/mcp_params.py`, `agents/base_agent.py`
 - **Deliverables**:
@@ -337,7 +359,7 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 - **Integration**: Replace stdio-based `MCPToolConnector` with remote HTTP client
 - **Status**: ⏳ **OPTIONAL**
 
-#### 7.3 Docker Integration for MCP Services (1-2 days)
+#### 8.3 Docker Integration for MCP Services (1-2 days)
 - **Task**: Create separate Docker containers for each MCP server
 - **Files**: `mcp-servers/accounts/Dockerfile`, `mcp-servers/market/Dockerfile`, `mcp-servers/push/Dockerfile`
 - **Deliverables**:
@@ -354,7 +376,7 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
   ```
 - **Status**: ⏳ **OPTIONAL**
 
-#### 7.4 Testing and Performance Validation (1-2 days)
+#### 8.4 Testing and Performance Validation (1-2 days)
 - **Task**: Comprehensive testing of remote MCP architecture
 - **Files**: `tests/test_remote_mcp_connector.py`, `tests/test_agent_remote_integration.py`, `tests/test_performance_comparison.py`
 - **Deliverables**:
@@ -370,7 +392,7 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
   - Health checks passing for all services
 - **Status**: ⏳ **OPTIONAL**
 
-**Phase 7 Benefits**:
+**Phase 8 Benefits**:
 - **Scalability**: Shared MCP servers instead of per-agent processes
 - **Resource Efficiency**: 75% reduction in MCP server processes (3 vs 12)
 - **Production Readiness**: Proper health checks, monitoring, and service discovery
