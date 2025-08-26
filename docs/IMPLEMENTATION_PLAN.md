@@ -307,9 +307,15 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 **Duration**: 1-2 weeks
 **Status**: ⏳ **PLANNED** - Ready for implementation after Phase 6.1 completion
 
-#### 7.1 Portfolio Performance Charts (5-7 days)
-- **Description**: Add historical performance graphs with time-series data visualization. Include profit/loss trends and portfolio value over time.
-- **Technical Specifications**: See [`PHASE_7_TECHNICAL_SPECIFICATIONS.md`](PHASE_7_TECHNICAL_SPECIFICATIONS.md) for detailed implementation guide.
+#### 7.1 Simple Portfolio Value Graphs (2-3 days)
+- **Description**: Add basic portfolio value graphs below each agent card on the main dashboard. Simple line charts showing portfolio value over time.
+- **Location**: Below each agent card in the 4-trader grid on [`TradingDashboard.tsx`](../frontend/src/components/TradingDashboard/TradingDashboard.tsx)
+- **Scope**:
+  - Simple line chart component using existing portfolio snapshot data
+  - Basic time-series visualization (last 7-30 days)
+  - Minimal backend API endpoint for portfolio history
+  - No complex analytics or comparative charts
+- **Technical Specifications**: See [`PHASE_7_TECHNICAL_SPECIFICATIONS.md`](PHASE_7_TECHNICAL_SPECIFICATIONS.md) for simplified implementation guide.
 
 #### 7.2 Recent Trades Display (2-3 days)
 - Show latest trades with agent rationale and decision reasoning. Display entry/exit points and trade outcomes.
