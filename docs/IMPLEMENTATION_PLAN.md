@@ -307,8 +307,8 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 **Duration**: 1-2 weeks
 **Status**: ⏳ **PLANNED** - Ready for implementation after Phase 6.1 completion
 
-#### 7.1 Simple Portfolio Value Graphs (2-3 days)
-- **Description**: Add basic portfolio value graphs below each agent card on the main dashboard. Simple line charts showing portfolio value over time.
+#### ✅ 7.1 Simple Portfolio Value Graphs (2-3 days) - **COMPLETED**
+- **Description**: Basic portfolio value graphs below each agent card on the main dashboard. Simple line charts showing portfolio value over time.
 - **Location**: Below each agent card in the 4-trader grid on [`TradingDashboard.tsx`](../frontend/src/components/TradingDashboard/TradingDashboard.tsx)
 - **Scope**:
   - Simple line chart component using existing portfolio snapshot data
@@ -316,6 +316,13 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
   - Minimal backend API endpoint for portfolio history
   - No complex analytics or comparative charts
 - **Technical Specifications**: See [`PHASE_7_TECHNICAL_SPECIFICATIONS.md`](PHASE_7_TECHNICAL_SPECIFICATIONS.md) for simplified implementation guide.
+- **Technical Details**:
+  - **Backend Components**: [`PortfolioHistoryPoint`](../backend/src/main/java/com/trading/dto/PortfolioHistoryPoint.java) DTO and [`AccountController.java`](../backend/src/main/java/com/trading/controller/AccountController.java) endpoint
+  - **Frontend Components**: [`portfolioService.ts`](../frontend/src/services/portfolioService.ts), [`usePortfolioHistory.ts`](../frontend/src/hooks/usePortfolioHistory.ts) hook, [`SimplePortfolioChart.tsx`](../frontend/src/components/TradingDashboard/SimplePortfolioChart.tsx) component
+  - **Dashboard Integration**: Successfully integrated into [`TradingDashboard.tsx`](../frontend/src/components/TradingDashboard/TradingDashboard.tsx) below each agent card
+  - **User Experience**: 120px height charts with graceful no-data handling, Recharts LineChart implementation
+  - **Performance**: Real-time updates every minute, responsive design, proper error handling
+  - **Testing**: Backend API endpoints working, frontend displays properly with all 4 agents (Warren, George, Ray, Cathie)
 
 #### 7.2 Recent Trades Display (2-3 days)
 - Show latest trades with agent rationale and decision reasoning. Display entry/exit points and trade outcomes.
