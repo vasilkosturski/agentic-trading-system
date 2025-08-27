@@ -272,7 +272,10 @@ public class PostgreSQLAccountService {
         account = new TradingAccount();
         account.setName(agentName);
         account.setBalance(100000.0); // Default initial balance
-        // Strategy removed - using hardcoded strategies from trading system
+        
+        // Set default strategy based on agent name
+        String strategy = getDefaultStrategyForAgent(agentName);
+        account.setStrategy(strategy);
         account.setAgent(agent);
         
         return tradingAccountRepository.save(account);
@@ -382,5 +385,23 @@ public class PostgreSQLAccountService {
         }
         sb.append("\n}");
         return sb.toString();
+    }
+
+    /**
+     * Get default strategy for an agent based on their name
+     */
+    private String getDefaultStrategyForAgent(String agentName) {
+        switch (agentName.toLowerCase()) {
+            case "warren":
+                return "VALUE_INVESTING";
+            case "george":
+                return "CONTRARIAN";
+            case "ray":
+                return "DIVERSIFIED_PORTFOLIO";
+            case "cathie":
+                return "INNOVATION_GROWTH";
+            default:
+                return "BALANCED";
+        }
     }
 }

@@ -1,12 +1,18 @@
 package com.trading.controller;
 
+import com.trading.dto.PortfolioHistoryPoint;
 import com.trading.dto.ToolResponse;
+import com.trading.entity.AccountPortfolioSnapshot;
+import com.trading.repository.AccountPortfolioSnapshotRepository;
 import com.trading.service.PostgreSQLAccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/accounts")
@@ -15,6 +21,9 @@ public class AccountController {
 
     @Autowired
     private PostgreSQLAccountService accountService;
+    
+    @Autowired
+    private AccountPortfolioSnapshotRepository snapshotRepository;
 
     // MCP Tool endpoints
     @PostMapping("/tools/get_balance")
@@ -83,4 +92,25 @@ public class AccountController {
     }
 
     // strategy resource endpoint removed - using hardcoded strategies only
+    
+    // Portfolio history endpoint for charts
+    @GetMapping("/portfolio/{agentName}/history")
+    public ResponseEntity<List<PortfolioHistoryPoint>> getPortfolioHistory(
+            @PathVariable String agentName,
+            @RequestParam(defaultValue = "7") int days) {
+        try {
+            LocalDateTime fromDate = LocalDateTime.now().minusDays(days);
+            List<AccountPortfolioSnapshot> snapshots = snapshotRepository
+                    .getPortfolioPerformance(agentName, fromDate);
+            
+            // Convert to simple DTO
+            List<PortfolioHistoryPoint> history = snapshots.stream()
+                    .map(s -> new PortfolioHistoryPoint(s.getTimestamp(), s.getTotalValue()))
+                    .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(history);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
 }
