@@ -162,6 +162,9 @@ respond with a brief 2-3 sentence appraisal of your portfolio and its outlook.
         cycle_type = "trading" if self.do_trade else "rebalancing"
         print(f"🤖 {self.name} starting {cycle_type} cycle at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
+        # Initialize agent account if this is the first run
+        await self.ensure_agent_initialized()
+        
         self.agent = await self.create_agent(trader_mcp_servers, researcher_mcp_servers)
         account = await self.get_account_report()
         strategy = await self.get_strategy()
@@ -215,3 +218,28 @@ respond with a brief 2-3 sentence appraisal of your portfolio and its outlook.
             logger.error(f"Error running {self.name} agent: {e}")
         # Toggle between trading and rebalancing - matches source project exactly
         self.do_trade = not self.do_trade
+    
+    async def ensure_agent_initialized(self):
+        """Ensure agent account is initialized before trading operations"""
+        try:
+            # Call the Java backend to initialize the agent
+            url = "http://backend:8080/api/accounts/tools/initialize_agent"
+            data = {
+                "name": self.name,
+                "initialBalance": 100000.0
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=data, headers={"Content-Type": "application/json"}) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        if result.get("success"):
+                            logger.info(f"✅ {self.name} agent initialized successfully")
+                        else:
+                            # Agent might already be initialized, which is fine
+                            logger.debug(f"Agent {self.name} initialization response: {result.get('error', 'Unknown')}")
+                    else:
+                        logger.warning(f"Failed to initialize {self.name} agent: HTTP {response.status}")
+        except Exception as e:
+            logger.error(f"Error initializing {self.name} agent: {e}")
+            # Don't fail the entire agent run if initialization fails

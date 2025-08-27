@@ -30,10 +30,44 @@ public class PostgreSQLAccountService {
     private TradingAgentRepository agentRepository;
 
     /**
+     * Initialize agent and create trading account - should be called when agent starts
+     */
+    public TradingAccount initializeAgent(String agentName, Double initialBalance) {
+        // Check if agent already exists
+        TradingAccount existingAccount = tradingAccountRepository.findByName(agentName);
+        if (existingAccount != null) {
+            return existingAccount;
+        }
+        
+        // Create or get the trading agent
+        Optional<TradingAgent> agentOpt = agentRepository.findByName(agentName);
+        TradingAgent agent;
+        if (agentOpt.isPresent()) {
+            agent = agentOpt.get();
+        } else {
+            agent = new TradingAgent(agentName, "Autonomous trading agent");
+            agent = agentRepository.save(agent);
+        }
+        
+        // Create trading account
+        TradingAccount account = new TradingAccount();
+        account.setName(agentName);
+        account.setBalance(initialBalance != null ? initialBalance : 100000.0);
+        account.setAgent(agent);
+        
+        account = tradingAccountRepository.save(account);
+        
+        // Create initial portfolio snapshot
+        createPortfolioSnapshot(account, "INITIALIZATION");
+        
+        return account;
+    }
+
+    /**
      * Get account balance for an agent
      */
     public Double getBalance(String agentName) {
-        TradingAccount account = getOrCreateAccount(agentName);
+        TradingAccount account = getAccount(agentName);
         return account.getBalance();
     }
 
@@ -62,7 +96,7 @@ public class PostgreSQLAccountService {
      * Buy shares for an agent
      */
     public String buyShares(String agentName, String symbol, Integer quantity, String rationale) {
-        TradingAccount account = getOrCreateAccount(agentName);
+        TradingAccount account = getAccount(agentName);
         
         // Get current market price (mock for now)
         Double price = getMockPrice(symbol);
@@ -127,7 +161,7 @@ public class PostgreSQLAccountService {
      * Sell shares for an agent
      */
     public String sellShares(String agentName, String symbol, Integer quantity, String rationale) {
-        TradingAccount account = getOrCreateAccount(agentName);
+        TradingAccount account = getAccount(agentName);
         
         // Check if we have enough shares
         AccountHolding holding = holdingRepository.findByAccountAndSymbol(account, symbol);
@@ -182,7 +216,7 @@ public class PostgreSQLAccountService {
      */
     public String getAccountReport(String agentName) {
         try {
-            TradingAccount account = getOrCreateAccount(agentName);
+            TradingAccount account = getAccount(agentName);
             
             // Get current holdings
             List<AccountHolding> holdings = holdingRepository.findByAccount(account);
@@ -244,41 +278,20 @@ public class PostgreSQLAccountService {
      * Create portfolio snapshot for an agent
      */
     public void createPortfolioSnapshot(String agentName) {
-        TradingAccount account = getOrCreateAccount(agentName);
+        TradingAccount account = getAccount(agentName);
         createPortfolioSnapshot(account, "MANUAL");
     }
 
     /**
-     * Get or create trading account for an agent
+     * Get trading account for an agent - expects account to already exist
      */
-    private TradingAccount getOrCreateAccount(String agentName) {
+    private TradingAccount getAccount(String agentName) {
         TradingAccount account = tradingAccountRepository.findByName(agentName);
-        
-        if (account != null) {
-            return account;
+        if (account == null) {
+            throw new RuntimeException("Trading account not found for agent: " + agentName +
+                ". Agent must be initialized before trading operations.");
         }
-        
-        // First create or get the agent
-        Optional<TradingAgent> agentOpt = agentRepository.findByName(agentName);
-        TradingAgent agent;
-        if (agentOpt.isPresent()) {
-            agent = agentOpt.get();
-        } else {
-            agent = new TradingAgent(agentName, "Unknown", "Auto-created agent");
-            agent = agentRepository.save(agent);
-        }
-        
-        // Create new account linked to agent
-        account = new TradingAccount();
-        account.setName(agentName);
-        account.setBalance(100000.0); // Default initial balance
-        
-        // Set default strategy based on agent name
-        String strategy = getDefaultStrategyForAgent(agentName);
-        account.setStrategy(strategy);
-        account.setAgent(agent);
-        
-        return tradingAccountRepository.save(account);
+        return account;
     }
 
     /**
@@ -385,23 +398,5 @@ public class PostgreSQLAccountService {
         }
         sb.append("\n}");
         return sb.toString();
-    }
-
-    /**
-     * Get default strategy for an agent based on their name
-     */
-    private String getDefaultStrategyForAgent(String agentName) {
-        switch (agentName.toLowerCase()) {
-            case "warren":
-                return "VALUE_INVESTING";
-            case "george":
-                return "CONTRARIAN";
-            case "ray":
-                return "DIVERSIFIED_PORTFOLIO";
-            case "cathie":
-                return "INNOVATION_GROWTH";
-            default:
-                return "BALANCED";
-        }
     }
 }

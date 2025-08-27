@@ -25,6 +25,22 @@ public class AccountController {
     @Autowired
     private AccountPortfolioSnapshotRepository snapshotRepository;
 
+    // Agent initialization endpoint
+    @PostMapping("/tools/initialize_agent")
+    public ResponseEntity<ToolResponse<String>> initializeAgent(@RequestBody Map<String, Object> request) {
+        try {
+            String name = (String) request.get("name");
+            Double initialBalance = request.get("initialBalance") != null ?
+                ((Number) request.get("initialBalance")).doubleValue() : 100000.0;
+            
+            accountService.initializeAgent(name, initialBalance);
+            return ResponseEntity.ok(new ToolResponse<>(true,
+                "Successfully initialized agent " + name, null));
+        } catch (Exception e) {
+            return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
+        }
+    }
+
     // MCP Tool endpoints
     @PostMapping("/tools/get_balance")
     public ResponseEntity<ToolResponse<Double>> getBalance(@RequestBody Map<String, String> request) {
