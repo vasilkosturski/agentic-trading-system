@@ -1,4 +1,5 @@
 import { useTradingAgents, useMarketStatus } from '../../hooks';
+import SimplePortfolioChart from './SimplePortfolioChart';
 
 const TradingDashboard = () => {
   const { data: agents, isLoading, error, isError } = useTradingAgents();
@@ -144,6 +145,12 @@ const TradingDashboard = () => {
                     {agent.currentPositions}
                   </div>
                   <div className="text-xs text-gray-500">Current Positions</div>
+                </div>
+                
+                {/* Portfolio Value Chart */}
+                <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <div className="text-xs text-gray-500 mb-2 text-center">7-Day Portfolio Value</div>
+                  <SimplePortfolioChart agentName={agent.agentName} />
                 </div>
                 
                 <div className="text-xs text-gray-400 text-center">
