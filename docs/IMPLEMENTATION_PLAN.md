@@ -318,7 +318,16 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 - **Technical Specifications**: See [`PHASE_7_TECHNICAL_SPECIFICATIONS.md`](PHASE_7_TECHNICAL_SPECIFICATIONS.md) for simplified implementation guide.
 
 #### 7.2 Recent Trades Display (2-3 days)
-- Show latest trades with agent rationale and decision reasoning. Display entry/exit points and trade outcomes.
+- **Description**: Simple trade log showing recent buy/sell transactions for all agents
+- **Scope**:
+  - Display latest trades (last 10-20 transactions)
+  - Show: Agent name, BUY/SELL, stock symbol, quantity, price, timestamp
+  - Include agent's reasoning/rationale for the trade
+  - Simple table format, no complex analytics
+  - No entry/exit point tracking (trades are independent events)
+- **Data Source**: Use existing `account_transactions` table from PostgreSQL
+- **Location**: Below the 4-agent grid on main dashboard or separate "Recent Activity" section
+- **Technical**: Simple API endpoint + React table component, minimal styling
 
 #### 7.3 Individual Agent Detail Pages (3-4 days)
 - Create dedicated pages for each agent (Warren, George, Ray, Cathie) with their specific strategies and performance metrics.
