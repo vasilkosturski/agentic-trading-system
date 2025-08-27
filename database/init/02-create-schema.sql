@@ -18,7 +18,6 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 CREATE TABLE agents.trading_agents (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) UNIQUE NOT NULL,
-    strategy VARCHAR(100) NOT NULL,
     description TEXT,
     is_active BOOLEAN NOT NULL DEFAULT true,
     risk_tolerance DECIMAL(5,2),
@@ -55,7 +54,6 @@ CREATE TABLE trading.trading_accounts (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) UNIQUE NOT NULL,
     balance DECIMAL(15,2) NOT NULL,
-    strategy VARCHAR(100) NOT NULL,
     agent_id BIGINT REFERENCES agents.trading_agents(id),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -157,7 +155,6 @@ CREATE TABLE analytics.risk_metrics (
 
 -- Agents schema indexes
 CREATE INDEX idx_trading_agents_name ON agents.trading_agents(name);
-CREATE INDEX idx_trading_agents_strategy ON agents.trading_agents(strategy);
 CREATE INDEX idx_trading_agents_active ON agents.trading_agents(is_active);
 CREATE INDEX idx_agent_logs_agent_name ON agents.agent_logs(agent_name);
 CREATE INDEX idx_agent_logs_datetime ON agents.agent_logs(log_datetime);
@@ -220,11 +217,10 @@ CREATE TRIGGER update_market_data_updated_at
 
 -- Active trading accounts with agent information
 CREATE VIEW trading.active_accounts_with_agents AS
-SELECT 
+SELECT
     ta.id,
     ta.name,
     ta.balance,
-    ta.strategy,
     ta.created_at,
     ta.updated_at,
     ag.name as agent_name,
@@ -294,24 +290,24 @@ GRANT SELECT ON ALL TABLES IN SCHEMA trading TO trading_user;
 -- =============================================================================
 
 -- Insert sample trading agents
-INSERT INTO agents.trading_agents (name, strategy, description, risk_tolerance, trading_frequency) VALUES
-('warren', 'Value Investing', 'Long-term value investor focused on undervalued companies', 0.3, 'WEEKLY'),
-('george', 'Momentum Trading', 'Short-term momentum trader focusing on technical analysis', 0.7, 'DAILY'),
-('ray', 'Diversified Portfolio', 'Balanced approach with risk management focus', 0.5, 'MONTHLY'),
-('cathie', 'Growth Investing', 'Innovation-focused growth investor', 0.8, 'WEEKLY');
+INSERT INTO agents.trading_agents (name, description, risk_tolerance, trading_frequency) VALUES
+('Warren', 'Long-term value investor focused on undervalued companies', 0.3, 'WEEKLY'),
+('George', 'Short-term momentum trader focusing on technical analysis', 0.7, 'DAILY'),
+('Ray', 'Balanced approach with risk management focus', 0.5, 'MONTHLY'),
+('Cathie', 'Innovation-focused growth investor', 0.8, 'WEEKLY');
 
 -- Insert sample trading accounts
-INSERT INTO trading.trading_accounts (name, balance, strategy, agent_id) VALUES
-('warren', 100000.00, 'Value Investing', 1),
-('george', 50000.00, 'Momentum Trading', 2),
-('ray', 75000.00, 'Diversified Portfolio', 3),
-('cathie', 60000.00, 'Growth Investing', 4);
+INSERT INTO trading.trading_accounts (name, balance, agent_id) VALUES
+('Warren', 100000.00, 1),
+('George', 50000.00, 2),
+('Ray', 75000.00, 3),
+('Cathie', 60000.00, 4);
 
 -- Insert sample log entries
 INSERT INTO agents.agent_logs (agent_name, log_type, log_message, log_level) VALUES
-('warren', 'STARTUP', 'Agent initialized successfully', 'INFO'),
-('george', 'STARTUP', 'Agent initialized successfully', 'INFO'),
-('ray', 'STARTUP', 'Agent initialized successfully', 'INFO'),
-('cathie', 'STARTUP', 'Agent initialized successfully', 'INFO');
+('Warren', 'STARTUP', 'Agent initialized successfully', 'INFO'),
+('George', 'STARTUP', 'Agent initialized successfully', 'INFO'),
+('Ray', 'STARTUP', 'Agent initialized successfully', 'INFO'),
+('Cathie', 'STARTUP', 'Agent initialized successfully', 'INFO');
 
 COMMIT;

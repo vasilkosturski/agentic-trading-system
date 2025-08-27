@@ -19,9 +19,6 @@ public class TradingAccount {
     @Column(nullable = false)
     private Double balance;
     
-    @Column(nullable = false)
-    private String strategy;
-    
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
     
@@ -49,10 +46,9 @@ public class TradingAccount {
     // Constructors
     public TradingAccount() {}
     
-    public TradingAccount(String name, Double balance, String strategy) {
+    public TradingAccount(String name, Double balance) {
         this.name = name;
         this.balance = balance;
-        this.strategy = strategy;
     }
     
     // JPA lifecycle callbacks
@@ -70,9 +66,6 @@ public class TradingAccount {
     
     public Double getBalance() { return balance; }
     public void setBalance(Double balance) { this.balance = balance; }
-    
-    public String getStrategy() { return strategy; }
-    public void setStrategy(String strategy) { this.strategy = strategy; }
     
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

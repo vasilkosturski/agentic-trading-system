@@ -14,9 +14,6 @@ public class TradingAgent {
     @Column(unique = true, nullable = false)
     private String name;
     
-    @Column(nullable = false)
-    private String strategy;
-    
     @Column(columnDefinition = "TEXT")
     private String description;
     
@@ -63,9 +60,8 @@ public class TradingAgent {
     // Constructors
     public TradingAgent() {}
     
-    public TradingAgent(String name, String strategy, String description) {
+    public TradingAgent(String name, String description) {
         this.name = name;
-        this.strategy = strategy;
         this.description = description;
     }
     
@@ -114,9 +110,6 @@ public class TradingAgent {
     
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
-    
-    public String getStrategy() { return strategy; }
-    public void setStrategy(String strategy) { this.strategy = strategy; }
     
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
