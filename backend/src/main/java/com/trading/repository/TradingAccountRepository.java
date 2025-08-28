@@ -51,8 +51,4 @@ public interface TradingAccountRepository extends JpaRepository<TradingAccount, 
            "GROUP BY ta.id, ta.balance")
     Optional<Double> getTotalPortfolioValue(@Param("agentName") String agentName);
     
-    /**
-     * Find accounts by strategy type
-     */
-    List<TradingAccount> findByStrategyContainingIgnoreCase(String strategy);
 }
