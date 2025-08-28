@@ -1,5 +1,6 @@
 import { useTradingAgents, useMarketStatus } from '../../hooks';
 import SimplePortfolioChart from './SimplePortfolioChart';
+import RecentTrades from './RecentTrades';
 
 const TradingDashboard = () => {
   const { data: agents, isLoading, error, isError } = useTradingAgents();
@@ -159,6 +160,11 @@ const TradingDashboard = () => {
               </div>
             </div>
           ))}
+        </div>
+        
+        {/* Recent Trades Section */}
+        <div className="mt-12 max-w-7xl mx-auto">
+          <RecentTrades />
         </div>
         
         <div className="mt-8 text-sm text-gray-500">

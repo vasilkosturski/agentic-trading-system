@@ -39,10 +39,6 @@ public interface TradingAgentRepository extends JpaRepository<TradingAgent, Long
     @Query("SELECT ta FROM TradingAgent ta WHERE ta.isActive = true")
     List<TradingAgent> findActiveAgents();
     
-    /**
-     * Find agents by strategy type
-     */
-    List<TradingAgent> findByStrategyContainingIgnoreCase(String strategy);
     
     /**
      * Find agents with P&L above threshold

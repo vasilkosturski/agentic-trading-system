@@ -1,9 +1,12 @@
 package com.trading.controller;
 
 import com.trading.dto.PortfolioHistoryPoint;
+import com.trading.dto.RecentTradeDto;
 import com.trading.dto.ToolResponse;
 import com.trading.entity.AccountPortfolioSnapshot;
+import com.trading.entity.AccountTransaction;
 import com.trading.repository.AccountPortfolioSnapshotRepository;
+import com.trading.repository.AccountTransactionRepository;
 import com.trading.service.PostgreSQLAccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +27,9 @@ public class AccountController {
     
     @Autowired
     private AccountPortfolioSnapshotRepository snapshotRepository;
+    
+    @Autowired
+    private AccountTransactionRepository transactionRepository;
 
     // Agent initialization endpoint
     @PostMapping("/tools/initialize_agent")
@@ -125,6 +131,39 @@ public class AccountController {
                     .collect(Collectors.toList());
             
             return ResponseEntity.ok(history);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+    
+    // Recent trades endpoint for trade log
+    @GetMapping("/trades/recent")
+    public ResponseEntity<List<RecentTradeDto>> getRecentTrades(
+            @RequestParam(defaultValue = "20") int limit) {
+        try {
+            // Get recent transactions from all agents
+            List<AccountTransaction> transactions = transactionRepository
+                    .findAll()
+                    .stream()
+                    .sorted((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()))
+                    .limit(limit)
+                    .collect(Collectors.toList());
+            
+            // Convert to DTOs
+            List<RecentTradeDto> recentTrades = transactions.stream()
+                    .map(t -> new RecentTradeDto(
+                            t.getAccount().getName(),
+                            t.getTransactionType(),
+                            t.getSymbol(),
+                            Math.abs(t.getQuantity()), // Always show positive quantity
+                            t.getPrice(),
+                            t.getTotalAmount(),
+                            t.getTimestamp(),
+                            t.getRationale()
+                    ))
+                    .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(recentTrades);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
         }
