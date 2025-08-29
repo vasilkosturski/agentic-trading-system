@@ -135,3 +135,6 @@ target/
 postgres_data/
 agent_memory/
 agent_logs/
+
+# ConPort database and vector data
+context_portal/
