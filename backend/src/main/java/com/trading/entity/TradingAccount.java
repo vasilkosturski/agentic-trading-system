@@ -1,12 +1,18 @@
 package com.trading.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "trading_accounts", schema = "trading")
+@Getter
+@Setter
+@NoArgsConstructor
 public class TradingAccount {
     
     @Id
@@ -43,9 +49,7 @@ public class TradingAccount {
     @JoinColumn(name = "agent_id")
     private TradingAgent agent;
     
-    // Constructors
-    public TradingAccount() {}
-    
+    // Constructor with parameters
     public TradingAccount(String name, Double balance) {
         this.name = name;
         this.balance = balance;
@@ -56,37 +60,4 @@ public class TradingAccount {
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
-    
-    // Getters and Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    
-    public Double getBalance() { return balance; }
-    public void setBalance(Double balance) { this.balance = balance; }
-    
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-    
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
-    
-    public Boolean getIsActive() { return isActive; }
-    public void setIsActive(Boolean isActive) { this.isActive = isActive; }
-    
-    public List<AccountTransaction> getTransactions() { return transactions; }
-    public void setTransactions(List<AccountTransaction> transactions) { this.transactions = transactions; }
-    
-    public List<AccountHolding> getHoldings() { return holdings; }
-    public void setHoldings(List<AccountHolding> holdings) { this.holdings = holdings; }
-    
-    public List<AccountPortfolioSnapshot> getPortfolioSnapshots() { return portfolioSnapshots; }
-    public void setPortfolioSnapshots(List<AccountPortfolioSnapshot> portfolioSnapshots) {
-        this.portfolioSnapshots = portfolioSnapshots;
-    }
-    
-    public TradingAgent getAgent() { return agent; }
-    public void setAgent(TradingAgent agent) { this.agent = agent; }
 }

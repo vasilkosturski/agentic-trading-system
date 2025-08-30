@@ -1,10 +1,16 @@
 package com.trading.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "account_portfolio_snapshots", schema = "trading")
+@Getter
+@Setter
+@NoArgsConstructor
 public class AccountPortfolioSnapshot {
     
     @Id
@@ -42,9 +48,7 @@ public class AccountPortfolioSnapshot {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
     
-    // Constructors
-    public AccountPortfolioSnapshot() {}
-    
+    // Constructor with parameters
     public AccountPortfolioSnapshot(TradingAccount account, LocalDateTime timestamp, 
                                   Double totalValue, Double cashBalance, Double holdingsValue) {
         this.account = account;
@@ -84,38 +88,4 @@ public class AccountPortfolioSnapshot {
     public boolean isNegativeReturn() {
         return totalPnl != null && totalPnl < 0;
     }
-    
-    // Getters and Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    
-    public TradingAccount getAccount() { return account; }
-    public void setAccount(TradingAccount account) { this.account = account; }
-    
-    public LocalDateTime getTimestamp() { return timestamp; }
-    public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
-    
-    public Double getTotalValue() { return totalValue; }
-    public void setTotalValue(Double totalValue) { this.totalValue = totalValue; }
-    
-    public Double getCashBalance() { return cashBalance; }
-    public void setCashBalance(Double cashBalance) { this.cashBalance = cashBalance; }
-    
-    public Double getHoldingsValue() { return holdingsValue; }
-    public void setHoldingsValue(Double holdingsValue) { this.holdingsValue = holdingsValue; }
-    
-    public Double getTotalPnl() { return totalPnl; }
-    public void setTotalPnl(Double totalPnl) { this.totalPnl = totalPnl; }
-    
-    public Double getDailyPnl() { return dailyPnl; }
-    public void setDailyPnl(Double dailyPnl) { this.dailyPnl = dailyPnl; }
-    
-    public Double getTotalReturnPercent() { return totalReturnPercent; }
-    public void setTotalReturnPercent(Double totalReturnPercent) { this.totalReturnPercent = totalReturnPercent; }
-    
-    public String getSnapshotType() { return snapshotType; }
-    public void setSnapshotType(String snapshotType) { this.snapshotType = snapshotType; }
-    
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
