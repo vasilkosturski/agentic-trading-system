@@ -1,38 +1,19 @@
 package com.trading.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
  * Simple DTO for portfolio history data points used in charts
  */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class PortfolioHistoryPoint {
     private LocalDateTime timestamp;
     private Double portfolioValue;
-    
-    // Constructors
-    public PortfolioHistoryPoint() {}
-    
-    public PortfolioHistoryPoint(LocalDateTime timestamp, Double portfolioValue) {
-        this.timestamp = timestamp;
-        this.portfolioValue = portfolioValue;
-    }
-    
-    // Getters and Setters
-    public LocalDateTime getTimestamp() {
-        return timestamp;
-    }
-    
-    public void setTimestamp(LocalDateTime timestamp) {
-        this.timestamp = timestamp;
-    }
-    
-    public Double getPortfolioValue() {
-        return portfolioValue;
-    }
-    
-    public void setPortfolioValue(Double portfolioValue) {
-        this.portfolioValue = portfolioValue;
-    }
     
     @Override
     public String toString() {

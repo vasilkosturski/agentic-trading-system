@@ -1,3 +1,44 @@
 {
-    "java.compile.nullAnalysis.mode": "automatic"
+    "java.jdt.ls.lombokSupport.enabled": true,
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.eclipse.downloadSources": true,
+    "java.maven.downloadSources": true,
+    "java.gradle.downloadSources": true,
+    "java.sources.organizeImports.starThreshold": 99,
+    "java.sources.organizeImports.staticStarThreshold": 99,
+    "java.completion.enabled": true,
+    "java.completion.overwrite": true,
+    "java.completion.guessMethodArguments": true,
+    "java.signatureHelp.enabled": true,
+    "java.contentProvider.preferred": "fernflower",
+    "java.import.gradle.enabled": true,
+    "java.import.gradle.wrapper.enabled": true,
+    "java.import.gradle.java.home": null,
+    "java.import.gradle.offline.enabled": false,
+    "java.import.gradle.arguments": "",
+    "java.import.gradle.jvmArguments": "",
+    "java.import.gradle.user.home": null,
+    "java.project.sourcePaths": [
+        "backend/src/main/java"
+    ],
+    "java.project.outputPath": "backend/build/classes",
+    "java.project.referencedLibraries": [
+        "backend/build/libs/**/*.jar"
+    ],
+    "java.codeGeneration.insertionLocation": "afterCursor",
+    "java.codeGeneration.generateComments": true,
+    "java.codeGeneration.useBlocks": true,
+    "java.saveActions.organizeImports": true,
+    "java.format.enabled": true,
+    "java.format.onType.enabled": true,
+    "java.format.settings.url": null,
+    "java.format.settings.profile": null,
+    "files.exclude": {
+        "**/build": true,
+        "**/.gradle": true,
+        "**/node_modules": true,
+        "**/.git": true,
+        "**/.DS_Store": true
+    }
 }

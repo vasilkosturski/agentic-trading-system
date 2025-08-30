@@ -1,10 +1,16 @@
 package com.trading.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "trading_agents", schema = "agents")
+@Getter
+@Setter
+@NoArgsConstructor
 public class TradingAgent {
     
     @Id
@@ -57,9 +63,7 @@ public class TradingAgent {
     @OneToOne(mappedBy = "agent", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private TradingAccount tradingAccount;
     
-    // Constructors
-    public TradingAgent() {}
-    
+    // Constructor with parameters
     public TradingAgent(String name, String description) {
         this.name = name;
         this.description = description;
@@ -103,53 +107,4 @@ public class TradingAgent {
         return winRate != null && winRate < 40.0 || 
                (lastActivity != null && lastActivity.isBefore(LocalDateTime.now().minusDays(7)));
     }
-    
-    // Getters and Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-    
-    public Boolean getIsActive() { return isActive; }
-    public void setIsActive(Boolean isActive) { this.isActive = isActive; }
-    
-    public Double getRiskTolerance() { return riskTolerance; }
-    public void setRiskTolerance(Double riskTolerance) { this.riskTolerance = riskTolerance; }
-    
-    public Double getMaxPositionSize() { return maxPositionSize; }
-    public void setMaxPositionSize(Double maxPositionSize) { this.maxPositionSize = maxPositionSize; }
-    
-    public String getTradingFrequency() { return tradingFrequency; }
-    public void setTradingFrequency(String tradingFrequency) { this.tradingFrequency = tradingFrequency; }
-    
-    public String getPreferredSectors() { return preferredSectors; }
-    public void setPreferredSectors(String preferredSectors) { this.preferredSectors = preferredSectors; }
-    
-    public LocalDateTime getLastActivity() { return lastActivity; }
-    public void setLastActivity(LocalDateTime lastActivity) { this.lastActivity = lastActivity; }
-    
-    public Integer getTotalTrades() { return totalTrades; }
-    public void setTotalTrades(Integer totalTrades) { this.totalTrades = totalTrades; }
-    
-    public Integer getSuccessfulTrades() { return successfulTrades; }
-    public void setSuccessfulTrades(Integer successfulTrades) { this.successfulTrades = successfulTrades; }
-    
-    public Double getTotalPnl() { return totalPnl; }
-    public void setTotalPnl(Double totalPnl) { this.totalPnl = totalPnl; }
-    
-    public Double getWinRate() { return winRate; }
-    public void setWinRate(Double winRate) { this.winRate = winRate; }
-    
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-    
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
-    
-    public TradingAccount getTradingAccount() { return tradingAccount; }
-    public void setTradingAccount(TradingAccount tradingAccount) { this.tradingAccount = tradingAccount; }
 }

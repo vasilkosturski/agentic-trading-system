@@ -1,10 +1,16 @@
 package com.trading.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "account_transactions", schema = "trading")
+@Getter
+@Setter
+@NoArgsConstructor
 public class AccountTransaction {
     
     @Id
@@ -39,9 +45,7 @@ public class AccountTransaction {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
     
-    // Constructors
-    public AccountTransaction() {}
-    
+    // Constructor with parameters
     public AccountTransaction(TradingAccount account, String symbol, Integer quantity, 
                             Double price, LocalDateTime timestamp, String rationale) {
         this.account = account;
@@ -67,17 +71,7 @@ public class AccountTransaction {
         return quantity < 0;
     }
     
-    // Getters and Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    
-    public TradingAccount getAccount() { return account; }
-    public void setAccount(TradingAccount account) { this.account = account; }
-    
-    public String getSymbol() { return symbol; }
-    public void setSymbol(String symbol) { this.symbol = symbol; }
-    
-    public Integer getQuantity() { return quantity; }
+    // Custom setters that need business logic
     public void setQuantity(Integer quantity) { 
         this.quantity = quantity;
         this.transactionType = quantity > 0 ? "BUY" : "SELL";
@@ -86,26 +80,10 @@ public class AccountTransaction {
         }
     }
     
-    public Double getPrice() { return price; }
     public void setPrice(Double price) { 
         this.price = price;
         if (this.quantity != null) {
             this.totalAmount = Math.abs(this.quantity) * price;
         }
     }
-    
-    public LocalDateTime getTimestamp() { return timestamp; }
-    public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
-    
-    public String getRationale() { return rationale; }
-    public void setRationale(String rationale) { this.rationale = rationale; }
-    
-    public String getTransactionType() { return transactionType; }
-    public void setTransactionType(String transactionType) { this.transactionType = transactionType; }
-    
-    public Double getTotalAmount() { return totalAmount; }
-    public void setTotalAmount(Double totalAmount) { this.totalAmount = totalAmount; }
-    
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

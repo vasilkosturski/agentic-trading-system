@@ -76,14 +76,14 @@ const TradingDashboard = () => {
           </p>
           {!marketStatusLoading && marketStatus && (
             <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${
-              marketStatus.isOpen 
+              marketStatus.status === 'OPEN'
                 ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
                 : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
             }`}>
               <div className={`w-2 h-2 rounded-full ${
-                marketStatus.isOpen ? 'bg-green-500' : 'bg-red-500'
+                marketStatus.status === 'OPEN' ? 'bg-green-500' : 'bg-red-500'
               }`}></div>
-              <span>Market {marketStatus.isOpen ? 'Open' : 'Closed'}</span>
+              <span>Market {marketStatus.status === 'OPEN' ? 'Open' : 'Closed'}</span>
             </div>
           )}
         </div>

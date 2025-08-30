@@ -1,11 +1,17 @@
 package com.trading.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "account_holdings", schema = "trading",
        uniqueConstraints = @UniqueConstraint(columnNames = {"account_id", "symbol"}))
+@Getter
+@Setter
+@NoArgsConstructor
 public class AccountHolding {
     
     @Id
@@ -40,9 +46,7 @@ public class AccountHolding {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
     
-    // Constructors
-    public AccountHolding() {}
-    
+    // Constructor with parameters
     public AccountHolding(TradingAccount account, String symbol, Integer quantity, Double averagePrice) {
         this.account = account;
         this.symbol = symbol;
@@ -94,43 +98,19 @@ public class AccountHolding {
         updateCalculatedFields();
     }
     
-    // Getters and Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    
-    public TradingAccount getAccount() { return account; }
-    public void setAccount(TradingAccount account) { this.account = account; }
-    
-    public String getSymbol() { return symbol; }
-    public void setSymbol(String symbol) { this.symbol = symbol; }
-    
-    public Integer getQuantity() { return quantity; }
+    // Custom setters that need business logic
     public void setQuantity(Integer quantity) { 
         this.quantity = quantity;
         updateCalculatedFields();
     }
     
-    public Double getAveragePrice() { return averagePrice; }
     public void setAveragePrice(Double averagePrice) { 
         this.averagePrice = averagePrice;
         updateCalculatedFields();
     }
     
-    public Double getCurrentPrice() { return currentPrice; }
     public void setCurrentPrice(Double currentPrice) { 
         this.currentPrice = currentPrice;
         updateCalculatedFields();
     }
-    
-    public Double getMarketValue() { return marketValue; }
-    public void setMarketValue(Double marketValue) { this.marketValue = marketValue; }
-    
-    public Double getUnrealizedPnl() { return unrealizedPnl; }
-    public void setUnrealizedPnl(Double unrealizedPnl) { this.unrealizedPnl = unrealizedPnl; }
-    
-    public LocalDateTime getLastUpdated() { return lastUpdated; }
-    public void setLastUpdated(LocalDateTime lastUpdated) { this.lastUpdated = lastUpdated; }
-    
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

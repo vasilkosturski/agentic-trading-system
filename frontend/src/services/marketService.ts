@@ -1,11 +1,10 @@
 import { apiClient } from './api';
 
-// Types for market data - only what's actually used
+// Types for market data - matching backend API response
 export interface MarketStatus {
-  isOpen: boolean;
-  nextOpen: string;
-  nextClose: string;
-  timezone: string;
+  status: string; // "OPEN" or "CLOSED"
+  nextEvent: string; // e.g., "Market opens at 9:30 AM ET"
+  currentTime: string; // ISO timestamp
 }
 
 // Market data API functions - only what's actually used
