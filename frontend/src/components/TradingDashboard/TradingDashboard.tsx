@@ -75,15 +75,20 @@ const TradingDashboard = () => {
             4 Autonomous Traders: Warren, George, Ray, and Cathie
           </p>
           {!marketStatusLoading && marketStatus && (
-            <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${
-              marketStatus.status === 'OPEN'
-                ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-            }`}>
-              <div className={`w-2 h-2 rounded-full ${
-                marketStatus.status === 'OPEN' ? 'bg-green-500' : 'bg-red-500'
-              }`}></div>
-              <span>Market {marketStatus.status === 'OPEN' ? 'Open' : 'Closed'}</span>
+            <div className="flex flex-col items-start">
+              <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${
+                marketStatus.status === 'OPEN'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                  : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${
+                  marketStatus.status === 'OPEN' ? 'bg-green-500' : 'bg-red-500'
+                }`}></div>
+                <span>Market {marketStatus.status === 'OPEN' ? 'Open' : 'Closed'}</span>
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Next: {marketStatus.nextEvent} • As of {new Date(marketStatus.currentTime).toLocaleTimeString()}
+              </div>
             </div>
           )}
         </div>
