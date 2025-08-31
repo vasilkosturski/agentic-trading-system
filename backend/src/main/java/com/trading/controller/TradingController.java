@@ -3,7 +3,7 @@ package com.trading.controller;
 import com.trading.dto.ToolResponse;
 import com.trading.service.TradingService;
 import com.trading.service.TradingService.*;
-// import com.trading.service.PostgreSQLAgentMonitoringService; // Commented out - class missing
+import com.trading.service.PostgreSQLAgentMonitoringService;
 import com.trading.service.PostgreSQLAccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -22,19 +22,17 @@ public class TradingController {
     @Autowired
     private TradingService tradingService;
     
-    // @Autowired
-    // private PostgreSQLAgentMonitoringService agentMonitoringService; // Commented out - class missing
+    @Autowired
+    private PostgreSQLAgentMonitoringService agentMonitoringService;
     
     @Autowired
     private PostgreSQLAccountService accountService;
     
-    // Agent Status Endpoints (Real Data from PostgreSQL) - Temporarily disabled due to missing service
+    // Agent Status Endpoints (Real Data from PostgreSQL)
     @GetMapping("/agents/status")
     public ResponseEntity<ToolResponse<List<AgentStatusResponse>>> getAllAgentsStatus() {
         try {
-            // List<AgentStatusResponse> statuses = agentMonitoringService.getRealAgentStatuses();
-            // Fallback to mock data until PostgreSQLAgentMonitoringService is implemented
-            List<AgentStatusResponse> statuses = tradingService.getAllAgentsStatus();
+            List<AgentStatusResponse> statuses = agentMonitoringService.getRealAgentStatuses();
             return ResponseEntity.ok(ToolResponse.success(statuses));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
@@ -55,9 +53,7 @@ public class TradingController {
     @GetMapping("/agents/{agentName}/status")
     public ResponseEntity<ToolResponse<AgentStatusResponse>> getAgentStatus(@PathVariable String agentName) {
         try {
-            // AgentStatusResponse status = agentMonitoringService.getRealAgentStatus(agentName);
-            // Fallback to mock data until PostgreSQLAgentMonitoringService is implemented
-            AgentStatusResponse status = tradingService.getAgentStatus(agentName);
+            AgentStatusResponse status = agentMonitoringService.getRealAgentStatus(agentName);
             return ResponseEntity.ok(ToolResponse.success(status));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
