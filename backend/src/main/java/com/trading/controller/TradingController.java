@@ -39,11 +39,11 @@ public class TradingController {
         }
     }
     
-    // Mock endpoint for development comparison
+    // Mock endpoint for development comparison - now also uses real data
     @GetMapping("/agents/status/mock")
     public ResponseEntity<ToolResponse<List<AgentStatusResponse>>> getAllAgentsStatusMock() {
         try {
-            List<AgentStatusResponse> statuses = tradingService.getAllAgentsStatus();
+            List<AgentStatusResponse> statuses = agentMonitoringService.getRealAgentStatuses();
             return ResponseEntity.ok(ToolResponse.success(statuses));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
@@ -60,11 +60,11 @@ public class TradingController {
         }
     }
     
-    // Mock endpoint for development comparison
+    // Mock endpoint for development comparison - now also uses real data
     @GetMapping("/agents/{agentName}/status/mock")
     public ResponseEntity<ToolResponse<AgentStatusResponse>> getAgentStatusMock(@PathVariable String agentName) {
         try {
-            AgentStatusResponse status = tradingService.getAgentStatus(agentName);
+            AgentStatusResponse status = agentMonitoringService.getRealAgentStatus(agentName);
             return ResponseEntity.ok(ToolResponse.success(status));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
@@ -74,7 +74,7 @@ public class TradingController {
     @PostMapping("/agents/{agentName}/start")
     public ResponseEntity<ToolResponse<String>> startAgent(@PathVariable String agentName) {
         try {
-            tradingService.startAgent(agentName);
+            agentMonitoringService.startAgent(agentName);
             return ResponseEntity.ok(ToolResponse.success("Agent " + agentName + " started successfully"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
@@ -84,7 +84,7 @@ public class TradingController {
     @PostMapping("/agents/{agentName}/stop")
     public ResponseEntity<ToolResponse<String>> stopAgent(@PathVariable String agentName) {
         try {
-            tradingService.stopAgent(agentName);
+            agentMonitoringService.stopAgent(agentName);
             return ResponseEntity.ok(ToolResponse.success("Agent " + agentName + " stopped successfully"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
