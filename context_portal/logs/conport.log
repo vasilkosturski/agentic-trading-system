@@ -567,3 +567,15 @@
 2025-07-30 08:51:19,752 - INFO - context_portal_mcp.main - Pre-warming database connection for workspace: /Users/vasilkosturski/Projects/src/blog/ai-course-mcp
 2025-07-30 08:51:19,752 - INFO - context_portal_mcp.db.database - Alembic: Script directory /Users/vasilkosturski/Projects/src/blog/ai-course-mcp/context_portal/alembic confirmed to exist by Python.
 2025-07-30 08:51:19,752 - INFO - context_portal_mcp.db.database - Running Alembic migrations for database: /Users/vasilkosturski/Projects/src/blog/ai-course-mcp/context_portal/context.db
+2025-09-08 18:21:09,710 - INFO - context_portal_mcp.main - File logging configured to: /Users/vasilkosturski/Projects/agentic-trading-system/context_portal/./logs/conport.log
+2025-09-08 18:21:09,710 - INFO - context_portal_mcp.main - Parsed CLI args: Namespace(host='127.0.0.1', port=8000, workspace_id='/Users/vasilkosturski/Projects/agentic-trading-system', mode='stdio', log_file='./logs/conport.log', log_level='INFO')
+2025-09-08 18:21:09,710 - INFO - context_portal_mcp.main - Starting ConPort in STDIO mode using FastMCP for initial CLI arg workspace_id: /Users/vasilkosturski/Projects/agentic-trading-system
+2025-09-08 18:21:09,710 - INFO - context_portal_mcp.main - Pre-warming database connection for workspace: /Users/vasilkosturski/Projects/agentic-trading-system
+2025-09-08 18:21:09,711 - INFO - context_portal_mcp.db.database - Alembic: Script directory /Users/vasilkosturski/Projects/agentic-trading-system/context_portal/alembic confirmed to exist by Python.
+2025-09-08 18:21:09,711 - INFO - context_portal_mcp.db.database - Running Alembic migrations for database: /Users/vasilkosturski/Projects/agentic-trading-system/context_portal/context.db
+2025-09-08 18:21:13,327 - INFO - context_portal_mcp.main - File logging configured to: /Users/vasilkosturski/Projects/agentic-trading-system/context_portal/./logs/conport.log
+2025-09-08 18:21:13,327 - INFO - context_portal_mcp.main - Parsed CLI args: Namespace(host='127.0.0.1', port=8000, workspace_id='/Users/vasilkosturski/Projects/agentic-trading-system', mode='stdio', log_file='./logs/conport.log', log_level='INFO')
+2025-09-08 18:21:13,327 - INFO - context_portal_mcp.main - Starting ConPort in STDIO mode using FastMCP for initial CLI arg workspace_id: /Users/vasilkosturski/Projects/agentic-trading-system
+2025-09-08 18:21:13,327 - INFO - context_portal_mcp.main - Pre-warming database connection for workspace: /Users/vasilkosturski/Projects/agentic-trading-system
+2025-09-08 18:21:13,327 - INFO - context_portal_mcp.db.database - Alembic: Script directory /Users/vasilkosturski/Projects/agentic-trading-system/context_portal/alembic confirmed to exist by Python.
+2025-09-08 18:21:13,327 - INFO - context_portal_mcp.db.database - Running Alembic migrations for database: /Users/vasilkosturski/Projects/agentic-trading-system/context_portal/context.db
