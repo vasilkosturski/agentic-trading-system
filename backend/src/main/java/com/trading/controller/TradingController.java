@@ -3,8 +3,8 @@ package com.trading.controller;
 import com.trading.dto.ToolResponse;
 import com.trading.service.TradingService;
 import com.trading.service.TradingService.*;
-import com.trading.service.PostgreSQLAgentMonitoringService;
-import com.trading.service.PostgreSQLAccountService;
+import com.trading.service.AgentMonitoringService;
+import com.trading.service.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,10 +23,10 @@ public class TradingController {
     private TradingService tradingService;
     
     @Autowired
-    private PostgreSQLAgentMonitoringService agentMonitoringService;
+    private AgentMonitoringService agentMonitoringService;
     
     @Autowired
-    private PostgreSQLAccountService accountService;
+    private AccountService accountService;
     
     // Agent Status Endpoints (Real Data from PostgreSQL)
     @GetMapping("/agents/status")
