@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.Optional;
 
 @Service
-public class PostgreSQLAgentMonitoringService {
+public class AgentMonitoringService {
     
     @Autowired
     private TradingAgentRepository agentRepository;
@@ -27,7 +27,7 @@ public class PostgreSQLAgentMonitoringService {
     private AccountHoldingRepository holdingRepository;
     
     @Autowired
-    private PostgreSQLAccountService accountService;
+    private AccountService accountService;
     
     /**
      * Get real agent statuses from PostgreSQL database
