@@ -4,7 +4,6 @@ import com.trading.entity.TradingAgent;
 import com.trading.entity.AccountPortfolioSnapshot;
 import com.trading.repository.TradingAgentRepository;
 import com.trading.repository.AccountPortfolioSnapshotRepository;
-import com.trading.repository.AccountHoldingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -22,9 +21,6 @@ public class AgentMonitoringService {
     
     @Autowired
     private AccountPortfolioSnapshotRepository snapshotRepository;
-    
-    @Autowired
-    private AccountHoldingRepository holdingRepository;
     
     @Autowired
     private AccountService accountService;

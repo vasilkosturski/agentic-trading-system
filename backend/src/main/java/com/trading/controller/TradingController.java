@@ -4,7 +4,6 @@ import com.trading.dto.ToolResponse;
 import com.trading.service.TradingService;
 import com.trading.service.TradingService.*;
 import com.trading.service.AgentMonitoringService;
-import com.trading.service.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,8 +24,6 @@ public class TradingController {
     @Autowired
     private AgentMonitoringService agentMonitoringService;
     
-    @Autowired
-    private AccountService accountService;
     
     // Agent Status Endpoints (Real Data from PostgreSQL)
     @GetMapping("/agents/status")
@@ -39,16 +36,6 @@ public class TradingController {
         }
     }
     
-    // Mock endpoint for development comparison - now also uses real data
-    @GetMapping("/agents/status/mock")
-    public ResponseEntity<ToolResponse<List<AgentStatusResponse>>> getAllAgentsStatusMock() {
-        try {
-            List<AgentStatusResponse> statuses = agentMonitoringService.getRealAgentStatuses();
-            return ResponseEntity.ok(ToolResponse.success(statuses));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
-    }
     
     @GetMapping("/agents/{agentName}/status")
     public ResponseEntity<ToolResponse<AgentStatusResponse>> getAgentStatus(@PathVariable String agentName) {
@@ -60,16 +47,6 @@ public class TradingController {
         }
     }
     
-    // Mock endpoint for development comparison - now also uses real data
-    @GetMapping("/agents/{agentName}/status/mock")
-    public ResponseEntity<ToolResponse<AgentStatusResponse>> getAgentStatusMock(@PathVariable String agentName) {
-        try {
-            AgentStatusResponse status = agentMonitoringService.getRealAgentStatus(agentName);
-            return ResponseEntity.ok(ToolResponse.success(status));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
-    }
     
     @PostMapping("/agents/{agentName}/start")
     public ResponseEntity<ToolResponse<String>> startAgent(@PathVariable String agentName) {
