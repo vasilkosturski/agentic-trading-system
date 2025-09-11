@@ -8,9 +8,8 @@ import java.util.*;
 @Service
 public class TradingService {
     
-    // Mock data for the 4 autonomous trading agents
+    // Mock data for trades and orders (agent status now comes from PostgreSQL)
     private static final String[] AGENT_NAMES = {"Warren", "George", "Ray", "Cathie"};
-    private final Map<String, AgentData> agentDataMap = new HashMap<>();
     private final List<AgentTradeData> agentTrades = new ArrayList<>();
     private final List<TradeOrderData> orders = new ArrayList<>();
     
@@ -19,16 +18,6 @@ public class TradingService {
     }
     
     private void initializeMockData() {
-        // Initialize agent data
-        agentDataMap.put("Warren", new AgentData("Warren", true, LocalDateTime.now().minusMinutes(5), 
-            127, 0.84, 125000.0, 2500.0, 2.04, 8));
-        agentDataMap.put("George", new AgentData("George", true, LocalDateTime.now().minusMinutes(2), 
-            89, 0.78, 98000.0, -1200.0, -1.21, 5));
-        agentDataMap.put("Ray", new AgentData("Ray", false, LocalDateTime.now().minusMinutes(15), 
-            156, 0.91, 187000.0, 4200.0, 2.30, 12));
-        agentDataMap.put("Cathie", new AgentData("Cathie", true, LocalDateTime.now().minusMinutes(1), 
-            203, 0.73, 156000.0, -800.0, -0.51, 15));
-        
         // Initialize some mock trades
         agentTrades.add(new AgentTradeData("1", "Warren", "acc_warren", "AAPL", "BUY", 100, 185.50, 
             "Strong fundamentals and undervalued", 0.85, LocalDateTime.now().minusMinutes(10), "EXECUTED", "order_1"));
@@ -46,39 +35,11 @@ public class TradingService {
             "GTC", "FILLED", 25, 248.90, LocalDateTime.now().minusMinutes(5), LocalDateTime.now().minusMinutes(5), "Cathie"));
     }
     
-    // Agent Status Operations
-    public List<AgentStatusResponse> getAllAgentsStatus() {
-        List<AgentStatusResponse> statuses = new ArrayList<>();
-        for (AgentData agent : agentDataMap.values()) {
-            statuses.add(convertToAgentStatus(agent));
-        }
-        return statuses;
-    }
+    // Agent Status Operations - REMOVED: Now handled by PostgreSQLAgentMonitoringService
+    // These methods have been moved to use real database data instead of mock data
     
-    public AgentStatusResponse getAgentStatus(String agentName) {
-        AgentData agent = agentDataMap.get(agentName);
-        if (agent == null) {
-            throw new RuntimeException("Agent not found: " + agentName);
-        }
-        return convertToAgentStatus(agent);
-    }
-    
-    public void startAgent(String agentName) {
-        AgentData agent = agentDataMap.get(agentName);
-        if (agent == null) {
-            throw new RuntimeException("Agent not found: " + agentName);
-        }
-        agent.setActive(true);
-        agent.setLastActivity(LocalDateTime.now());
-    }
-    
-    public void stopAgent(String agentName) {
-        AgentData agent = agentDataMap.get(agentName);
-        if (agent == null) {
-            throw new RuntimeException("Agent not found: " + agentName);
-        }
-        agent.setActive(false);
-    }
+    // Agent control operations - REMOVED: These should be handled by PostgreSQLAgentMonitoringService
+    // or moved to a dedicated agent management service that updates the database directly
     
     // Order Operations
     public List<TradeOrderResponse> getOrders(String accountId) {
