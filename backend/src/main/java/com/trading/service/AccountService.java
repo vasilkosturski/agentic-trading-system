@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 
 @Service
 @Transactional
-public class PostgreSQLAccountService {
+public class AccountService {
 
     @Autowired
     private TradingAccountRepository tradingAccountRepository;

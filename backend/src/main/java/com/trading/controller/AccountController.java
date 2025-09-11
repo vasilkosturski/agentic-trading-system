@@ -7,7 +7,7 @@ import com.trading.entity.AccountPortfolioSnapshot;
 import com.trading.entity.AccountTransaction;
 import com.trading.repository.AccountPortfolioSnapshotRepository;
 import com.trading.repository.AccountTransactionRepository;
-import com.trading.service.PostgreSQLAccountService;
+import com.trading.service.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 public class AccountController {
 
     @Autowired
-    private PostgreSQLAccountService accountService;
+    private AccountService accountService;
     
     @Autowired
     private AccountPortfolioSnapshotRepository snapshotRepository;
