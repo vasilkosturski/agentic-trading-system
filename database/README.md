@@ -1,161 +1,188 @@
-# PostgreSQL Database Setup
+# PostgreSQL Database - Agentic Trading System
 
-This directory contains the PostgreSQL configuration and setup files for the Agentic Trading System.
+This directory contains PostgreSQL initialization scripts for the Agentic Trading System deployed on Kubernetes.
 
-## Quick Start
+## 📁 Files
 
-### 1. Start PostgreSQL with Docker Compose
+| File | Purpose | Description |
+|------|---------|-------------|
+| [`init/01-init-database.sql`](init/01-init-database.sql) | Schema Setup | Creates schemas, extensions, and permissions |
+| [`init/02-create-schema.sql`](init/02-create-schema.sql) | Tables & Data | Complete table definitions with sample data |
+
+## 🗄️ Database Schema
+
+### Schemas
+- **`trading`** - Core trading data (accounts, transactions, holdings)
+- **`agents`** - Agent management and logging
+- **`analytics`** - Performance metrics and analytics
+
+### Key Tables
+
+#### Agents Schema
+- **`trading_agents`** - Agent definitions, status, and performance metrics
+- **`agent_logs`** - Agent activity and decision logging
+
+#### Trading Schema
+- **`trading_accounts`** - Account balances and agent associations
+- **`account_transactions`** - Complete trade history
+- **`account_holdings`** - Current stock positions
+- **`account_portfolio_snapshots`** - Historical portfolio values
+- **`market_data`** - Market data cache
+
+#### Analytics Schema
+- **`performance_metrics`** - Agent performance calculations
+- **`risk_metrics`** - Risk analysis and VaR calculations
+
+## 🚀 Deployment
+
+### Kubernetes Deployment
+The database is automatically initialized when deployed via:
 
 ```bash
-# From the project root directory
-docker-compose -f docker-compose.postgresql.yml up -d
+# Single command deployment
+./deploy-to-k3s.sh
 ```
 
-This will start:
-- **PostgreSQL 15** on port `5432`
-
-### 2. Configure Application
+### Manual Initialization
+If you need to run the scripts manually:
 
 ```bash
-# Copy PostgreSQL environment configuration
-cp .env.postgresql .env
+# Get PostgreSQL pod name
+POSTGRES_POD=$(kubectl get pods -n agentic-trading -l app=postgres -o jsonpath='{.items[0].metadata.name}')
 
-# Start the Spring Boot application with PostgreSQL profile
-cd backend
-./gradlew bootRun --args='--spring.profiles.active=postgresql'
+# Run initialization scripts
+kubectl exec -n agentic-trading $POSTGRES_POD -- psql -U trading_user -d agentic_trading -f /tmp/01-init-database.sql
+kubectl exec -n agentic-trading $POSTGRES_POD -- psql -U trading_user -d agentic_trading -f /tmp/02-create-schema.sql
 ```
 
-### 3. Verify Setup
+## 📊 Sample Data
 
-- **Database**: Connect to `localhost:5432` with credentials:
-  - Database: `agentic_trading`
-  - Username: `trading_user`
-  - Password: `trading_password`
+The system includes realistic sample data:
 
-## Configuration Details
+### Trading Agents
+- **Warren** - Value investor (30% risk tolerance, weekly trading)
+- **George** - Momentum trader (70% risk tolerance, daily trading)
+- **Ray** - Risk parity trader (50% risk tolerance, monthly trading)
+- **Cathie** - Growth investor (80% risk tolerance, weekly trading)
 
-### Database Credentials
+### Trading Accounts
+- **Warren**: $100,000 initial balance
+- **George**: $50,000 initial balance
+- **Ray**: $75,000 initial balance
+- **Cathie**: $60,000 initial balance
 
-| Component | Value |
-|-----------|-------|
-| Host | `localhost` |
-| Port | `5432` |
-| Database | `agentic_trading` |
-| Username | `trading_user` |
-| Password | `trading_password` |
+### Sample Transactions
+- **5 Recent trades** across all agents
+- **Realistic symbols**: AAPL, MSFT, TSLA, GOOGL, NVDA
+- **Trade rationales**: AI-generated reasoning for each trade
 
-### Environment Variables
+### Portfolio History
+- **7 days** of portfolio snapshots for each agent
+- **Performance tracking** with daily values
+- **Chart data** for frontend visualization
 
-The application supports these environment variables for PostgreSQL:
+## 🔍 Database Access
 
+### From Kubernetes Cluster
 ```bash
-DB_HOST=localhost          # PostgreSQL host
-DB_PORT=5432              # PostgreSQL port
-DB_NAME=agentic_trading   # Database name
-DB_USERNAME=trading_user  # Database username
-DB_PASSWORD=trading_password # Database password
-SPRING_PROFILES_ACTIVE=postgresql # Spring profile
+# Connect to database
+kubectl exec -it statefulset/postgres -n agentic-trading -- psql -U trading_user -d agentic_trading
+
+# Check tables
+\dt agents.*
+\dt trading.*
+\dt analytics.*
+
+# View sample data
+SELECT * FROM agents.trading_agents;
+SELECT * FROM trading.trading_accounts;
 ```
 
-### Connection Pool Settings
+### Query Examples
+```sql
+-- Get all agents with their account balances
+SELECT 
+    a.name,
+    a.is_active,
+    a.risk_tolerance,
+    ta.balance
+FROM agents.trading_agents a
+JOIN trading.trading_accounts ta ON a.id = ta.agent_id;
 
-The application uses HikariCP with these optimized settings:
-- **Maximum Pool Size**: 20 connections
-- **Minimum Idle**: 5 connections
-- **Connection Timeout**: 20 seconds
-- **Idle Timeout**: 5 minutes
-- **Leak Detection**: 60 seconds
+-- Get recent transactions
+SELECT 
+    ta.name as agent,
+    t.symbol,
+    t.transaction_type,
+    t.quantity,
+    t.price,
+    t.timestamp
+FROM trading.account_transactions t
+JOIN trading.trading_accounts ta ON t.account_id = ta.id
+ORDER BY t.timestamp DESC
+LIMIT 10;
 
-## Database Schema
-
-The application uses **Hibernate JPA** with `ddl-auto: update` to automatically create and update the database schema. The following schemas are created:
-
-- `trading` - Core trading data (accounts, transactions, positions)
-- `agents` - Agent-specific data (configurations, memory, performance)
-- `analytics` - Analytics and reporting data
-
-## Initialization Scripts
-
-The `init/` directory contains SQL scripts that run when the PostgreSQL container starts:
-
-- `01-init-database.sql` - Creates schemas, extensions, and permissions
-
-## Development vs Production
-
-### Development (Default)
-- Uses SQLite for simplicity
-- Profile: `sqlite` (default)
-- File: `application.yml`
-
-### Production/Testing
-- Uses PostgreSQL for scalability
-- Profile: `postgresql`
-- File: `application-postgresql.yml`
-
-## Migration from SQLite
-
-To migrate existing SQLite data to PostgreSQL:
-
-1. **Export SQLite data** (Phase 3.5 - Data Migration)
-2. **Start PostgreSQL** with Docker Compose
-3. **Switch application profile** to `postgresql`
-4. **Import data** using migration scripts
-
-## Troubleshooting
-
-### Connection Issues
-
-```bash
-# Check if PostgreSQL is running
-docker-compose -f docker-compose.postgresql.yml ps
-
-# Check PostgreSQL logs
-docker-compose -f docker-compose.postgresql.yml logs postgres
-
-# Test connection
-psql -h localhost -p 5432 -U trading_user -d agentic_trading
+-- Get portfolio performance
+SELECT 
+    ta.name as agent,
+    s.timestamp,
+    s.total_value,
+    s.daily_pnl
+FROM trading.account_portfolio_snapshots s
+JOIN trading.trading_accounts ta ON s.account_id = ta.id
+ORDER BY s.timestamp DESC;
 ```
 
-### Reset Database
+## 🔧 Maintenance
 
+### Backup Database
 ```bash
-# Stop and remove containers with data
-docker-compose -f docker-compose.postgresql.yml down -v
+# Create backup
+kubectl exec statefulset/postgres -n agentic-trading -- pg_dump -U trading_user agentic_trading > backup.sql
 
-# Start fresh
-docker-compose -f docker-compose.postgresql.yml up -d
+# Restore backup
+kubectl exec -i statefulset/postgres -n agentic-trading -- psql -U trading_user -d agentic_trading < backup.sql
 ```
 
-### Performance Monitoring
-
+### Monitor Performance
 ```bash
-# Connect to PostgreSQL
-psql -h localhost -p 5432 -U trading_user -d agentic_trading
+# Check database size
+kubectl exec statefulset/postgres -n agentic-trading -- psql -U trading_user -d agentic_trading -c "SELECT pg_size_pretty(pg_database_size('agentic_trading'));"
 
 # Check active connections
-SELECT * FROM pg_stat_activity;
-
-# Check database size
-SELECT pg_size_pretty(pg_database_size('agentic_trading'));
-
-# Health check
-SELECT health_check();
+kubectl exec statefulset/postgres -n agentic-trading -- psql -U trading_user -d agentic_trading -c "SELECT count(*) FROM pg_stat_activity;"
 ```
 
-## Security Notes
+## 🔐 Security
 
-⚠️ **Important**: The default credentials are for development only. In production:
+### Production Considerations
+- **Credentials**: Change default passwords in production
+- **SSL/TLS**: Enable encrypted connections
+- **Network**: Restrict access to cluster internal traffic
+- **Backups**: Implement regular backup strategy
 
-1. Change all default passwords
-2. Use environment variables for credentials
-3. Enable SSL/TLS connections
-4. Configure proper firewall rules
-5. Regular security updates
+### Current Security
+- **Kubernetes Secrets**: Credentials stored securely
+- **Network Isolation**: Database only accessible within cluster
+- **User Permissions**: Limited to required schemas only
 
-## Next Steps
+## 📋 Schema Evolution
 
-After completing Phase 3.1 (PostgreSQL Setup), proceed to:
-- **Phase 3.2**: Database Schema Migration
-- **Phase 3.3**: Update Python MCP Servers
-- **Phase 3.4**: Java Backend Integration
-- **Phase 3.5**: Data Migration and Testing
+### Adding New Tables
+1. Create migration SQL file
+2. Apply via kubectl exec
+3. Update JPA entities in backend
+4. Test with sample data
+
+### Performance Optimization
+- **Indexes**: Optimized for common queries
+- **Partitioning**: Consider for large transaction tables
+- **Connection Pooling**: Configured in Spring Boot
+- **Query Optimization**: Monitor slow queries
+
+---
+
+**Database Version**: PostgreSQL 15  
+**Deployment**: Kubernetes StatefulSet  
+**Storage**: Persistent Volume (5Gi)  
+**Last Updated**: September 15, 2025

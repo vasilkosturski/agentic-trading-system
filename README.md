@@ -1,56 +1,75 @@
-# Agentic Trading System - Quick Start Guide
+# Agentic Trading System - Local Development Guide
 
-## 🚀 Running the Full System (Backend + Frontend)
+## 🚀 Local Development Setup
+
+This guide covers running the system locally for development purposes. For production deployment, see the main [`DEPLOYMENT.md`](../DEPLOYMENT.md).
 
 ### Prerequisites
 - Java 17+ (for Spring Boot backend)
 - Node.js 18+ (for React frontend)
-- Gradle (included via gradlew)
+- PostgreSQL 15+ (or use Docker)
 
-### 1. Start the Java Spring Boot Backend
+### 1. Database Setup
+
+#### Option A: Local PostgreSQL
+```bash
+# Install PostgreSQL and create database
+createdb agentic_trading
+psql -d agentic_trading -f database/init/01-init-database.sql
+psql -d agentic_trading -f database/init/02-create-schema.sql
+```
+
+#### Option B: Docker PostgreSQL
+```bash
+docker run --name postgres-dev -e POSTGRES_DB=agentic_trading -e POSTGRES_USER=trading_user -e POSTGRES_PASSWORD=trading_password -p 5432:5432 -d postgres:15
+```
+
+### 2. Start the Backend
 
 ```bash
-# Navigate to the backend directory
-cd agentic-trading-system/backend
-
-# Start the backend (this will run on port 8080)
+cd backend
 ./gradlew bootRun
 ```
 
-The backend will be available at: `http://localhost:8080`
+The backend will start on `http://localhost:8080`
 
-### 2. Start the React Frontend
+### 3. Start the Frontend
 
 ```bash
-# Open a new terminal and navigate to frontend
-cd agentic-trading-system/frontend
+cd frontend
 
-# Install dependencies (if not already done)
+# Install dependencies (first time only)
 npm install
 
-# Start the frontend development server
+# Start development server
 npm run dev
 ```
 
-The frontend will be available at: `http://localhost:3000`
+The frontend will start on `http://localhost:5173`
 
-### 3. Access the Trading Dashboard
+### 4. Access the Application
 
-Open your browser and go to: **http://localhost:3000**
+Open your browser to: **http://localhost:5173**
 
 You should see:
 - ✅ **4 Trading Agents**: Warren, George, Ray, Cathie
 - ✅ **Real-time Data**: Portfolio values, P&L, trading stats
 - ✅ **Market Status**: Live market open/closed indicator
-- ✅ **Auto-refresh**: Data updates every 15 seconds
+- ✅ **Recent Trades**: Sample trading activity
+- ✅ **Portfolio Charts**: 7-day performance visualization
 
 ## 🔧 Configuration
 
 ### Backend Configuration
-The backend runs on port 8080 by default. Key endpoints:
-- `/api/trading/agents/status` - Get all agent statuses
-- `/api/accounts` - Account management
-- `/api/market/status` - Market status
+The backend uses PostgreSQL profile by default. Key configuration in [`src/main/resources/application-postgresql.yml`](backend/src/main/resources/application-postgresql.yml):
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/agentic_trading
+    username: trading_user
+    password: trading_password
+```
 
 ### Frontend Configuration
 Create a `.env` file in the `frontend/` directory:
@@ -64,56 +83,89 @@ VITE_APP_VERSION=1.0.0
 ## 🐛 Troubleshooting
 
 ### Backend Issues
-- **Port 8080 in use**: Change port in `application.properties`
-- **Java version**: Ensure Java 17+ is installed
-- **Database**: H2 database runs in-memory by default
+- **Port 8080 in use**: Change port in `application.yml`
+- **Database connection**: Ensure PostgreSQL is running and accessible
+- **Java version**: Verify Java 17+ is installed
 
 ### Frontend Issues
-- **Connection Error**: Ensure backend is running on port 8080
-- **Port 3000 in use**: Vite will automatically use next available port
+- **API connection**: Ensure backend is running on port 8080
 - **Dependencies**: Run `npm install` if packages are missing
+- **Port conflicts**: Vite will use next available port automatically
 
-### Common Issues
-1. **CORS Errors**: Backend should have CORS configured for localhost:3000
-2. **API 404 Errors**: Check if backend endpoints match frontend service calls
-3. **Loading Forever**: Check browser console for network errors
+### Database Issues
+- **Connection refused**: Check PostgreSQL service status
+- **Tables missing**: Run the initialization scripts
+- **Permission denied**: Verify database user permissions
 
-## 📊 What You'll See
+## 📊 API Endpoints
 
-### With Backend Running
-- Real agent data from the Java APIs
-- Live portfolio values and P&L
-- Trading statistics and success rates
-- Market status indicator
+### Market Data
+- `GET /api/market/status` - Current market status and hours
 
-### Without Backend (Frontend Only)
-- Professional error handling
-- "Connection Error" message
-- Graceful degradation of features
+### Trading Agents
+- `GET /api/trading/agents/status` - All agents with portfolio data
+
+### Account Management
+- `GET /api/accounts/portfolio/{agent}/history?days=7` - Portfolio history
+- `GET /api/accounts/trades/recent?limit=50` - Recent trading activity
 
 ## 🔄 Development Workflow
 
-1. **Backend Changes**: Restart `mvn spring-boot:run`
+1. **Backend Changes**: Restart with `./gradlew bootRun`
 2. **Frontend Changes**: Hot reload automatically updates
-3. **API Changes**: Update both backend endpoints and frontend services
+3. **Database Changes**: Apply SQL scripts manually
+4. **API Changes**: Update both backend endpoints and frontend services
 
-## 📁 Project Structure
+## 📁 Component Structure
 
 ```
 agentic-trading-system/
-├── backend/                 # Java Spring Boot backend
-├── frontend/               # React TypeScript frontend
-├── agents/                 # Python trading agents
-├── mcp-servers/           # MCP server implementations
-└── docs/                  # Documentation
+├── backend/                    # Java Spring Boot backend
+│   ├── src/main/java/com/trading/
+│   │   ├── controller/        # REST API endpoints
+│   │   ├── service/          # Business logic
+│   │   ├── entity/           # JPA entities
+│   │   └── repository/       # Data access layer
+│   └── build.gradle.kts      # Build configuration
+├── frontend/                  # React TypeScript frontend
+│   ├── src/
+│   │   ├── components/       # React components
+│   │   ├── hooks/           # Custom React hooks
+│   │   ├── services/        # API service layer
+│   │   └── App.tsx          # Main application
+│   └── package.json         # Dependencies
+├── database/init/            # PostgreSQL initialization
+│   ├── 01-init-database.sql # Schema and permissions
+│   └── 02-create-schema.sql # Tables and sample data
+└── docs/                    # Technical documentation
+```
+
+## 🧪 Testing
+
+### Backend Tests
+```bash
+cd backend
+./gradlew test
+```
+
+### Frontend Tests
+```bash
+cd frontend
+npm test
+```
+
+### API Testing
+```bash
+# Test endpoints manually
+curl http://localhost:8080/api/market/status
+curl http://localhost:8080/api/trading/agents/status
 ```
 
 ## 🎯 Next Steps
 
-Once both services are running, you can:
-1. View the 4 autonomous trading agents
-2. Monitor real-time portfolio performance
-3. See live market data integration
-4. Test the API integration layer
+1. **View Dashboard**: Access http://localhost:5173
+2. **Monitor Agents**: Check trading agent status and activity
+3. **Explore APIs**: Test different endpoints
+4. **Customize**: Modify agent parameters or add features
 
-The system is designed to work with or without the Python agents running - the Java backend provides the core trading infrastructure and APIs.
+For production deployment, use the main deployment script: [`../deploy-to-k3s.sh`](../deploy-to-k3s.sh)
