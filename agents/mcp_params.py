@@ -27,9 +27,9 @@ else:
 
 # The full set of MCP servers for the trader: Accounts, Push Notification and the Market
 trader_mcp_server_params = [
-    {"command": "python", "args": ["./mcp-servers/accounts_server.py"]},
-    {"command": "python", "args": ["./mcp-servers/push_server.py"]},
-    {"command": "python", "args": ["./mcp-servers/market_server.py"]},
+    {"command": "uv", "args": ["run", "./mcp-servers/accounts_server.py"]},
+    {"command": "uv", "args": ["run", "./mcp-servers/push_server.py"]},
+    {"command": "uv", "args": ["run", "./mcp-servers/market_server.py"]},
 ]
 
 # The full set of MCP servers for the researcher: Fetch, Brave Search and Memory
@@ -43,7 +43,7 @@ def researcher_mcp_server_params(name: str):
         },
         {
             "command": "npx",
-            "args": ["-y", "mcp-memory-libsql"],
+            "args": ["-y", "@modelcontextprotocol/server-memory"],
             "env": {"LIBSQL_URL": f"file:./memory/{name}.db"},
         },
     ]

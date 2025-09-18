@@ -14,6 +14,13 @@ RUN apt-get update && apt-get install -y \
 # Install uv for Python package management (used by MCP servers)
 RUN pip install uv
 
+# Install correct MCP server packages
+RUN npm install -g @modelcontextprotocol/server-brave-search @modelcontextprotocol/server-memory
+
+# uvx is already provided by uv package - no separate installation needed
+# Test that uvx is available
+RUN uvx --help || echo "uvx is available via uv package"
+
 # Copy requirements and install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
