@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
 RUN pip install uv
 
 # Install correct MCP server packages
-RUN npm install -g @modelcontextprotocol/server-brave-search @modelcontextprotocol/server-memory
+RUN npm install -g @modelcontextprotocol/server-brave-search mcp-memory-libsql
 
 # uvx is already provided by uv package - no separate installation needed
 # Test that uvx is available

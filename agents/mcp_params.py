@@ -43,7 +43,7 @@ def researcher_mcp_server_params(name: str):
         },
         {
             "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-memory"],
+            "args": ["-y", "mcp-memory-libsql"],
             "env": {"LIBSQL_URL": f"file:./memory/{name}.db"},
         },
     ]
