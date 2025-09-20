@@ -60,14 +60,18 @@ services:
     container_name: agentic-trading-agents
     restart: unless-stopped
     environment:
-      # MCP servers will connect to backend via Docker networking
-      JAVA_API_BASE_URL: http://backend:8080/api/accounts
-      # Environment variables for external APIs (add your keys here)
+      # Match K3s environment variables exactly
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      POLYGON_API_KEY: ${POLYGON_API_KEY:-}
+      PUSHOVER_USER_KEY: ${PUSHOVER_USER_KEY:-}
+      PUSHOVER_API_TOKEN: ${PUSHOVER_API_TOKEN:-}
       BRAVE_API_KEY: ${BRAVE_API_KEY:-}
-      PUSHOVER_TOKEN: ${PUSHOVER_TOKEN:-}
-      PUSHOVER_USER: ${PUSHOVER_USER:-}
+      BACKEND_URL: "http://backend:8080"
+      DATABASE_URL: "postgresql://trading_user:trading_password@postgres:5432/agentic_trading"
+      ENVIRONMENT: "development"
+      LOG_LEVEL: "DEBUG"
+      CONTINUOUS_MODE: "false"
+      RUN_EVERY_N_MINUTES: "60"
+      RUN_EVEN_WHEN_MARKET_IS_CLOSED: "true"
     volumes:
       # Mount source code for development
       - ./agents:/app
