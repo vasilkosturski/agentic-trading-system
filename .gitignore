@@ -119,10 +119,6 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
-# Test files (temporary)
-test_memory_*.py
-*_test.py
-test_*.py
 
 # Build artifacts
 build/
