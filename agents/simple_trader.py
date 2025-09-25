@@ -119,7 +119,7 @@ respond with a brief 2-3 sentence appraisal of your portfolio and its outlook.
         """Get account report via direct API call - cleaner architecture than MCP resource"""
         try:
             # Direct API call to Java backend (better than MCP resource for system data)
-            url = f"http://backend:8080/api/accounts/resources/accounts/{self.name}"
+            url = f"http://backend-service:8080/api/accounts/resources/accounts/{self.name}"
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if response.status == 200:
@@ -223,7 +223,7 @@ respond with a brief 2-3 sentence appraisal of your portfolio and its outlook.
         """Ensure agent account is initialized before trading operations"""
         try:
             # Call the Java backend to initialize the agent
-            url = "http://backend:8080/api/accounts/tools/initialize_agent"
+            url = "http://backend-service:8080/api/accounts/tools/initialize_agent"
             data = {
                 "name": self.name,
                 "initialBalance": 100000.0
