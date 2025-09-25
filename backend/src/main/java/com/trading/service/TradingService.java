@@ -1,39 +1,104 @@
 package com.trading.service;
 
+import com.trading.entity.AccountTransaction;
+import com.trading.entity.TradingAccount;
+import com.trading.entity.TradingAgent;
+import com.trading.repository.AccountTransactionRepository;
+import com.trading.repository.TradingAccountRepository;
+import com.trading.repository.TradingAgentRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class TradingService {
     
-    // Mock data for trades and orders (agent status now comes from PostgreSQL)
-    private static final String[] AGENT_NAMES = {"Warren", "George", "Ray", "Cathie"};
-    private final List<AgentTradeData> agentTrades = new ArrayList<>();
+    @Autowired
+    private AccountTransactionRepository transactionRepository;
+    
+    @Autowired
+    private TradingAccountRepository accountRepository;
+    
+    @Autowired
+    private TradingAgentRepository agentRepository;
+    
+    // Mock data for orders only (trades now come from database)
     private final List<TradeOrderData> orders = new ArrayList<>();
     
     public TradingService() {
-        initializeMockData();
+        initializeMockOrders();
     }
     
-    private void initializeMockData() {
-        // Initialize some mock trades
-        agentTrades.add(new AgentTradeData("1", "Warren", "acc_warren", "AAPL", "BUY", 100, 185.50, 
-            "Strong fundamentals and undervalued", 0.85, LocalDateTime.now().minusMinutes(10), "EXECUTED", "order_1"));
-        agentTrades.add(new AgentTradeData("2", "George", "acc_george", "SPY", "SELL", 50, 445.20, 
-            "Market overheated, taking profits", 0.78, LocalDateTime.now().minusMinutes(8), "EXECUTED", "order_2"));
-        agentTrades.add(new AgentTradeData("3", "Cathie", "acc_cathie", "TSLA", "BUY", 25, 248.90, 
-            "Innovation cycle acceleration", 0.92, LocalDateTime.now().minusMinutes(5), "EXECUTED", "order_3"));
-        
-        // Initialize some mock orders
-        orders.add(new TradeOrderData("order_1", "acc_warren", "AAPL", "BUY", "MARKET", 100, null, null, 
+    private void initializeMockOrders() {
+        // Initialize some mock orders (these will be replaced with real order system later)
+        orders.add(new TradeOrderData("order_1", "Warren", "AAPL", "BUY", "MARKET", 100, null, null,
             "GTC", "FILLED", 100, 185.50, LocalDateTime.now().minusMinutes(10), LocalDateTime.now().minusMinutes(10), "Warren"));
-        orders.add(new TradeOrderData("order_2", "acc_george", "SPY", "SELL", "LIMIT", 50, 445.20, null, 
+        orders.add(new TradeOrderData("order_2", "George", "SPY", "SELL", "LIMIT", 50, 445.20, null,
             "DAY", "FILLED", 50, 445.20, LocalDateTime.now().minusMinutes(8), LocalDateTime.now().minusMinutes(8), "George"));
-        orders.add(new TradeOrderData("order_3", "acc_cathie", "TSLA", "BUY", "MARKET", 25, null, null, 
+        orders.add(new TradeOrderData("order_3", "Cathie", "TSLA", "BUY", "MARKET", 25, null, null,
             "GTC", "FILLED", 25, 248.90, LocalDateTime.now().minusMinutes(5), LocalDateTime.now().minusMinutes(5), "Cathie"));
     }
+    
+    /**
+     * Record a new trade in the database and update agent statistics
+     */
+    @Transactional
+    public AccountTransaction recordTrade(String agentName, String symbol, Integer quantity,
+                                        Double price, String rationale) {
+        // Find the trading account for this agent
+        TradingAccount account = accountRepository.findByName(agentName)
+            .orElseThrow(() -> new RuntimeException("Trading account not found for agent: " + agentName));
+        
+        // Create and save the transaction
+        AccountTransaction transaction = new AccountTransaction(
+            account, symbol, quantity, price, LocalDateTime.now(), rationale
+        );
+        transaction = transactionRepository.save(transaction);
+        
+        // Update agent statistics
+        updateAgentTradeStatistics(agentName);
+        
+        return transaction;
+    }
+    
+    /**
+     * Update agent trade statistics based on actual database transactions
+     */
+    @Transactional
+    public void updateAgentTradeStatistics(String agentName) {
+        TradingAgent agent = agentRepository.findByName(agentName)
+            .orElseThrow(() -> new RuntimeException("Agent not found: " + agentName));
+        
+        // Get all transactions for this agent
+        List<AccountTransaction> transactions = transactionRepository.findByAgentNameOrderByTransactionDateDesc(agentName);
+        
+        // Calculate statistics
+        int totalTrades = transactions.size();
+        int successfulTrades = totalTrades; // For now, assume all recorded trades are successful
+        
+        // Update agent entity
+        agent.setTotalTrades(totalTrades);
+        agent.setSuccessfulTrades(successfulTrades);
+        agent.updateActivity();
+        
+        agentRepository.save(agent);
+    }
+    
+    /**
+     * Update all agent statistics (useful for initialization or batch updates)
+     */
+    @Transactional
+    public void updateAllAgentStatistics() {
+        List<TradingAgent> agents = agentRepository.findAll();
+        for (TradingAgent agent : agents) {
+            updateAgentTradeStatistics(agent.getName());
+        }
+    }
+    
     
     // Agent Status Operations - REMOVED: Now handled by PostgreSQLAgentMonitoringService
     // These methods have been moved to use real database data instead of mock data
@@ -79,37 +144,61 @@ public class TradingService {
             );
     }
     
-    // Agent Trades Operations
+    // Agent Trades Operations - Now using real database data
     public List<AgentTradeResponse> getAgentTrades(String agentName) {
-        return agentTrades.stream()
-            .filter(trade -> agentName == null || trade.getAgentName().equals(agentName))
-            .map(this::convertToTradeResponse)
-            .toList();
+        List<AccountTransaction> transactions;
+        if (agentName != null) {
+            transactions = transactionRepository.findByAgentNameOrderByTransactionDateDesc(agentName);
+        } else {
+            transactions = transactionRepository.findAll();
+            transactions.sort((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()));
+        }
+        
+        return transactions.stream()
+            .map(this::convertTransactionToTradeResponse)
+            .collect(Collectors.toList());
     }
     
     public List<AgentTradeResponse> getRecentActivity(int limit) {
-        return agentTrades.stream()
+        List<AccountTransaction> transactions = transactionRepository.findAll();
+        return transactions.stream()
             .sorted((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()))
             .limit(limit)
-            .map(this::convertToTradeResponse)
-            .toList();
+            .map(this::convertTransactionToTradeResponse)
+            .collect(Collectors.toList());
     }
     
-    // Trading Statistics
+    // Trading Statistics - Now using real database data
     public TradingStatsResponse getTradingStats(String accountId, String agentName) {
-        List<AgentTradeData> filteredTrades = agentTrades.stream()
-            .filter(trade -> (accountId == null || trade.getAccountId().equals(accountId)) &&
-                           (agentName == null || trade.getAgentName().equals(agentName)))
-            .toList();
+        List<AccountTransaction> transactions;
         
-        int totalTrades = filteredTrades.size();
-        int successfulTrades = (int) filteredTrades.stream().filter(t -> "EXECUTED".equals(t.getStatus())).count();
-        int failedTrades = totalTrades - successfulTrades;
-        double totalVolume = filteredTrades.stream().mapToDouble(t -> t.getQuantity() * t.getPrice()).sum();
+        if (agentName != null) {
+            transactions = transactionRepository.findByAgentNameOrderByTransactionDateDesc(agentName);
+        } else if (accountId != null) {
+            TradingAccount account = accountRepository.findByName(accountId)
+                .orElseThrow(() -> new RuntimeException("Account not found: " + accountId));
+            transactions = transactionRepository.findByAccountOrderByTimestampDesc(account);
+        } else {
+            transactions = transactionRepository.findAll();
+        }
         
-        return new TradingStatsResponse(totalTrades, successfulTrades, failedTrades, totalVolume, 
-            2500.0, successfulTrades > 0 ? (double) successfulTrades / totalTrades : 0.0, 
-            totalTrades > 0 ? totalVolume / totalTrades : 0.0, 5000.0, -1500.0);
+        int totalTrades = transactions.size();
+        int successfulTrades = totalTrades; // All recorded transactions are considered successful
+        int failedTrades = 0;
+        double totalVolume = transactions.stream()
+            .mapToDouble(t -> Math.abs(t.getQuantity()) * t.getPrice())
+            .sum();
+        
+        double winRate = totalTrades > 0 ? 1.0 : 0.0; // 100% for now since all recorded trades are successful
+        double averageTradeSize = totalTrades > 0 ? totalVolume / totalTrades : 0.0;
+        
+        // Calculate P&L (simplified - would need more complex logic for real P&L calculation)
+        double totalPnL = 0.0; // This would require market data and position tracking
+        double largestWin = 0.0;
+        double largestLoss = 0.0;
+        
+        return new TradingStatsResponse(totalTrades, successfulTrades, failedTrades, totalVolume,
+            totalPnL, winRate, averageTradeSize, largestWin, largestLoss);
     }
     
     // Portfolio Performance
@@ -150,12 +239,23 @@ public class TradingService {
         );
     }
     
-    private AgentTradeResponse convertToTradeResponse(AgentTradeData trade) {
+    /**
+     * Convert AccountTransaction to AgentTradeResponse for API responses
+     */
+    private AgentTradeResponse convertTransactionToTradeResponse(AccountTransaction transaction) {
         return new AgentTradeResponse(
-            trade.getId(), trade.getAgentName(), trade.getAccountId(), trade.getSymbol(),
-            trade.getType(), trade.getQuantity(), trade.getPrice(), trade.getReasoning(),
-            trade.getConfidence(), trade.getTimestamp().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-            trade.getStatus(), trade.getOrderId()
+            transaction.getId().toString(),
+            transaction.getAccount().getAgent().getName(),
+            transaction.getAccount().getName(),
+            transaction.getSymbol(),
+            transaction.getTransactionType(),
+            Math.abs(transaction.getQuantity()),
+            transaction.getPrice(),
+            transaction.getRationale() != null ? transaction.getRationale() : "No rationale provided",
+            1.0, // Default confidence for database transactions
+            transaction.getTimestamp().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+            "EXECUTED", // All database transactions are considered executed
+            "N/A" // Order ID not tracked in current schema
         );
     }
     
@@ -198,34 +298,7 @@ public class TradingService {
         public int getCurrentPositions() { return currentPositions; }
     }
     
-    private static class AgentTradeData {
-        private String id, agentName, accountId, symbol, type, reasoning, status, orderId;
-        private int quantity;
-        private double price, confidence;
-        private LocalDateTime timestamp;
-        
-        public AgentTradeData(String id, String agentName, String accountId, String symbol, String type,
-                             int quantity, double price, String reasoning, double confidence, 
-                             LocalDateTime timestamp, String status, String orderId) {
-            this.id = id; this.agentName = agentName; this.accountId = accountId; this.symbol = symbol;
-            this.type = type; this.quantity = quantity; this.price = price; this.reasoning = reasoning;
-            this.confidence = confidence; this.timestamp = timestamp; this.status = status; this.orderId = orderId;
-        }
-        
-        // Getters
-        public String getId() { return id; }
-        public String getAgentName() { return agentName; }
-        public String getAccountId() { return accountId; }
-        public String getSymbol() { return symbol; }
-        public String getType() { return type; }
-        public int getQuantity() { return quantity; }
-        public double getPrice() { return price; }
-        public String getReasoning() { return reasoning; }
-        public double getConfidence() { return confidence; }
-        public LocalDateTime getTimestamp() { return timestamp; }
-        public String getStatus() { return status; }
-        public String getOrderId() { return orderId; }
-    }
+    // AgentTradeData class removed - now using real AccountTransaction entities from database
     
     private static class TradeOrderData {
         private String id, accountId, symbol, type, orderType, timeInForce, status, agentId;
