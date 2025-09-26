@@ -30,7 +30,6 @@ market:
     free-tier: true
   cache:
     ttl-minutes: 60
-  fallback-to-mock: true
 
 # Trading Configuration
 trading:

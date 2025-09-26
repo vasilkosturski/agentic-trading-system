@@ -67,33 +67,12 @@ public class MarketService {
     @Value("${market.cache.ttl-minutes:60}")
     private int cacheTtlMinutes;
     
-    @Value("${market.fallback-to-mock:true}")
-    private boolean fallbackToMock;
-    
     // Polygon HTTP client approach (avoiding Kotlin interop issues)
     private boolean polygonClientInitialized = false;
     
     // Cache for stock prices with timestamps
     private final Map<String, CachedPrice> priceCache = new ConcurrentHashMap<>();
     
-    // Mock stock prices for fallback
-    private final Map<String, Double> basePrices = new HashMap<String, Double>() {{
-        put("AAPL", 150.0);
-        put("GOOGL", 2800.0);
-        put("MSFT", 300.0);
-        put("TSLA", 200.0);
-        put("AMZN", 3200.0);
-        put("NVDA", 800.0);
-        put("META", 350.0);
-        put("NFLX", 400.0);
-        put("SPY", 450.0);
-        put("QQQ", 380.0);
-        put("BRK.B", 350.0);
-        put("JNJ", 160.0);
-        put("V", 250.0);
-        put("WMT", 145.0);
-        put("PG", 155.0);
-    }};
     
     public MarketService(ObjectMapper objectMapper) {
         this.restTemplate = new RestTemplate();
@@ -144,16 +123,10 @@ public class MarketService {
             return realPriceData;
         }
         
-        // Fallback to mock price if enabled
-        if (fallbackToMock) {
-            Double mockPrice = getMockPrice(upperSymbol);
-            LocalDateTime mockTime = LocalDateTime.now();
-            logger.warn("Using mock price for {} (real data unavailable): ${}", upperSymbol, mockPrice);
-            return new PriceData(mockPrice, DataTier.MOCK, mockTime,
-                "Simulated price data - not suitable for real trading decisions");
-        }
-        
-        throw new RuntimeException("Unable to fetch price for symbol: " + upperSymbol);
+        // Zero tolerance for mock data - fail if real data unavailable
+        logger.error("CRITICAL: Unable to fetch real market data for {} - no fallback allowed", upperSymbol);
+        throw new RuntimeException("Unable to fetch real market data for symbol: " + upperSymbol +
+            ". All external APIs failed. Check API keys and network connectivity.");
     }
     
     /**
@@ -335,19 +308,6 @@ public class MarketService {
         return null;
     }
     
-    /**
-     * Generate mock price with realistic variation
-     */
-    private Double getMockPrice(String symbol) {
-        Double basePrice = basePrices.getOrDefault(symbol, 100.0);
-        
-        // Add some random variation (+/- 5%)
-        double variation = (random.nextDouble() - 0.5) * 0.1; // -5% to +5%
-        double currentPrice = basePrice * (1 + variation);
-        
-        // Round to 2 decimal places
-        return Math.round(currentPrice * 100.0) / 100.0;
-    }
     
     /**
      * Get historical prices for a symbol (mock implementation for now)

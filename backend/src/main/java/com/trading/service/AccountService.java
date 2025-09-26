@@ -28,6 +28,9 @@ public class AccountService {
     
     @Autowired
     private TradingAgentRepository agentRepository;
+    
+    @Autowired
+    private MarketService marketService;
 
     /**
      * Initialize agent and create trading account - should be called when agent starts
@@ -98,8 +101,9 @@ public class AccountService {
     public String buyShares(String agentName, String symbol, Integer quantity, String rationale) {
         TradingAccount account = getAccount(agentName);
         
-        // Get current market price (mock for now)
-        Double price = getMockPrice(symbol);
+        // Get current market price from MarketService
+        MarketService.PriceData priceData = marketService.getSharePrice(symbol);
+        Double price = priceData.getPrice();
         Double totalCost = price * quantity;
         
         // Check if sufficient funds
@@ -171,7 +175,9 @@ public class AccountService {
                 ". Only have " + available + " shares available");
         }
         
-        Double price = getMockPrice(symbol);
+        // Get current market price from MarketService
+        MarketService.PriceData priceData = marketService.getSharePrice(symbol);
+        Double price = priceData.getPrice();
         Double totalProceeds = price * quantity;
         
         // Update account balance
@@ -294,31 +300,6 @@ public class AccountService {
         return account;
     }
 
-    /**
-     * Mock prices for testing
-     */
-    private Double getMockPrice(String symbol) {
-        Map<String, Double> mockPrices = new HashMap<>();
-        mockPrices.put("AAPL", 155.0);
-        mockPrices.put("GOOGL", 2800.0);
-        mockPrices.put("MSFT", 380.0);
-        mockPrices.put("TSLA", 210.0);
-        mockPrices.put("AMZN", 3200.0);
-        mockPrices.put("NVDA", 450.0);
-        mockPrices.put("META", 320.0);
-        mockPrices.put("NFLX", 400.0);
-        mockPrices.put("SPY", 425.0);
-        mockPrices.put("QQQ", 350.0);
-        mockPrices.put("BRK.B", 410.0);
-        mockPrices.put("GLD", 185.0);
-        mockPrices.put("VTI", 225.0);
-        mockPrices.put("BND", 87.0);
-        mockPrices.put("VEA", 52.0);
-        mockPrices.put("ARKK", 65.0);
-        mockPrices.put("COIN", 125.0);
-        
-        return mockPrices.getOrDefault(symbol, 100.0);
-    }
 
     /**
      * Update agent statistics
