@@ -6,7 +6,7 @@ import json
 from mcp.server.fastmcp import FastMCP
 
 # Configuration - Use Docker service name for container networking
-JAVA_API_BASE_URL = "http://backend:8080/api/accounts"
+JAVA_API_BASE_URL = "http://backend-service:8080/api/accounts"
 
 mcp = FastMCP("accounts_server")
 

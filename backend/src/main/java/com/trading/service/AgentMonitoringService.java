@@ -25,6 +25,9 @@ public class AgentMonitoringService {
     @Autowired
     private AccountService accountService;
     
+    @Autowired
+    private TradingService tradingService;
+    
     /**
      * Get real agent statuses from PostgreSQL database
      */
@@ -64,8 +67,8 @@ public class AgentMonitoringService {
             ? agent.getLastActivity().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
             : LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
         
-        // Get real trade data
-        int totalTrades = agent.getTotalTrades() != null ? agent.getTotalTrades() : 0;
+        // Get real trade data using existing TradingService method
+        int totalTrades = tradingService.getAgentTrades(agentName).size();
         double successRate = agent.getWinRate() != null ? agent.getWinRate() : 0.0;
         
         // Get real portfolio value using existing service method
@@ -172,4 +175,5 @@ public class AgentMonitoringService {
         agent.updateActivity();
         agentRepository.save(agent);
     }
+    
 }

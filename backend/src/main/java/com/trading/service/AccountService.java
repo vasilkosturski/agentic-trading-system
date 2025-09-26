@@ -329,19 +329,7 @@ public class AccountService {
             TradingAgent agent = agentOpt.get();
             TradingAccount account = tradingAccountRepository.findByName(agentName);
             if (account != null) {
-                Long totalTrades = transactionRepository.countByAccount(account);
-                agent.setTotalTrades(totalTrades.intValue());
-                
-                // Calculate basic performance metrics
-                Double totalValue = getTotalPortfolioValue(agentName);
-                Double totalPnl = totalValue - 100000.0; // Assume 100k initial
-                agent.setTotalPnl(totalPnl);
-                
-                // Simple win rate calculation (could be improved)
-                if (totalTrades > 0) {
-                    agent.setWinRate(totalPnl > 0 ? 60.0 : 40.0); // Simplified
-                }
-                
+                // Only update activity timestamp - trade counts calculated at query time
                 agent.updateActivity();
                 agentRepository.save(agent);
             }
