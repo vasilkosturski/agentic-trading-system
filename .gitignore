@@ -124,6 +124,7 @@ yarn-error.log*
 build/
 dist/
 target/
+bin/
 # Docker environment variables (keep .env.example)
 !.env.example
 
