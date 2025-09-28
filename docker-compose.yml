@@ -38,6 +38,9 @@ services:
       DB_NAME: agentic_trading
       DB_USERNAME: trading_user
       DB_PASSWORD: trading_password
+      # Market data API keys
+      POLYGON_API_KEY: ${POLYGON_API_KEY:-}
+      POLYGON_PLAN: ${POLYGON_PLAN:-free}
     ports:
       - "8080:8080"
     networks:

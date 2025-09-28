@@ -2,6 +2,8 @@ package com.trading.service;
 
 import com.trading.entity.*;
 import com.trading.repository.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +15,8 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class AccountService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(AccountService.class);
 
     @Autowired
     private TradingAccountRepository tradingAccountRepository;
@@ -102,8 +106,11 @@ public class AccountService {
         TradingAccount account = getAccount(agentName);
         
         // Get current market price from MarketService
+        logger.info("🔍 DEBUGGING: Requesting real market price for {} from MarketService", symbol);
         MarketService.PriceData priceData = marketService.getSharePrice(symbol);
         Double price = priceData.getPrice();
+        logger.info("💰 DEBUGGING: Received price for {}: ${} from {} ({})",
+            symbol, price, priceData.getDataSource(), priceData.getDataTier());
         Double totalCost = price * quantity;
         
         // Check if sufficient funds
@@ -176,8 +183,11 @@ public class AccountService {
         }
         
         // Get current market price from MarketService
+        logger.info("🔍 DEBUGGING: Requesting real market price for {} from MarketService", symbol);
         MarketService.PriceData priceData = marketService.getSharePrice(symbol);
         Double price = priceData.getPrice();
+        logger.info("💰 DEBUGGING: Received price for {}: ${} from {} ({})",
+            symbol, price, priceData.getDataSource(), priceData.getDataTier());
         Double totalProceeds = price * quantity;
         
         // Update account balance

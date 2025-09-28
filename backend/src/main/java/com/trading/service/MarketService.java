@@ -51,10 +51,7 @@ public class MarketService {
     private final ObjectMapper objectMapper;
     private final Random random = new Random();
     
-    // Configuration
-    @Value("${market.alpha-vantage.api-key:demo}")
-    private String alphaVantageApiKey;
-    
+    // Configuration - Polygon API only (simplified for demo)
     @Value("${market.polygon.api-key:}")
     private String polygonApiKey;
     
@@ -105,6 +102,7 @@ public class MarketService {
         }
         
         String upperSymbol = symbol.toUpperCase();
+        logger.info("🚀 DEBUGGING: MarketService.getSharePrice() called for symbol: {}", upperSymbol);
         
         // Check cache first
         CachedPrice cachedPrice = priceCache.get(upperSymbol);
@@ -115,11 +113,13 @@ public class MarketService {
         }
         
         // Try to fetch real price
+        logger.info("📡 DEBUGGING: Attempting to fetch real price for {} from external APIs", upperSymbol);
         PriceData realPriceData = fetchRealPrice(upperSymbol);
         if (realPriceData != null) {
             LocalDateTime fetchTime = LocalDateTime.now();
             priceCache.put(upperSymbol, new CachedPrice(realPriceData.getPrice(), fetchTime));
-            logger.info("Fetched real price for {}: ${} ({})", upperSymbol, realPriceData.getPrice(), realPriceData.getDataTier());
+            logger.info("✅ DEBUGGING: Successfully fetched real price for {}: ${} from {} ({})",
+                upperSymbol, realPriceData.getPrice(), realPriceData.getDataSource(), realPriceData.getDataTier());
             return realPriceData;
         }
         
@@ -130,10 +130,10 @@ public class MarketService {
     }
     
     /**
-     * Fetch real stock price from external APIs
+     * Fetch real stock price from Polygon API only (simplified for demo)
      */
     private PriceData fetchRealPrice(String symbol) {
-        // Try Polygon first if enabled
+        // Only use Polygon API - simplified approach matching source project
         if (polygonEnabled) {
             PriceData polygonPrice = fetchFromPolygon(symbol);
             if (polygonPrice != null) {
@@ -141,21 +141,7 @@ public class MarketService {
             }
         }
         
-        // Try Alpha Vantage
-        Double price = fetchFromAlphaVantage(symbol);
-        if (price != null) {
-            return new PriceData(price, DataTier.DELAYED, LocalDateTime.now(),
-                "Real market data with ~15 minute delay from Alpha Vantage API");
-        }
-        
-        // Try Yahoo Finance as fallback
-        price = fetchFromYahooFinance(symbol);
-        if (price != null) {
-            return new PriceData(price, DataTier.DELAYED, LocalDateTime.now(),
-                "Real market data with ~15 minute delay from Yahoo Finance API");
-        }
-        
-        logger.warn("Failed to fetch real price for {} from all sources", symbol);
+        logger.warn("❌ DEBUGGING: Failed to fetch real price for {} from Polygon API", symbol);
         return null;
     }
     
@@ -164,43 +150,53 @@ public class MarketService {
      */
     private PriceData fetchFromPolygon(String symbol) {
         try {
+            logger.info("🔍 DEBUGGING: Attempting Polygon API for symbol: {}", symbol);
             if (!isPolygonAvailable()) {
-                logger.debug("Polygon API not available for {}", symbol);
+                logger.warn("❌ DEBUGGING: Polygon API not available for {} (enabled: {}, apiKey present: {})",
+                    symbol, polygonEnabled, polygonApiKey != null && !polygonApiKey.isEmpty());
                 return null;
             }
             
             // For free tier, get previous trading day's data
             LocalDate targetDate = getPreviousTradingDay();
             String dateStr = targetDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            logger.info("📅 DEBUGGING: Using previous trading day: {} for symbol: {}", dateStr, symbol);
             
             // Polygon aggregates endpoint for daily data
             String url = String.format(
                 "https://api.polygon.io/v2/aggs/ticker/%s/range/1/day/%s/%s?adjusted=true&sort=asc&limit=1&apikey=%s",
                 symbol, dateStr, dateStr, polygonApiKey
             );
+            logger.info("🌐 DEBUGGING: Making Polygon API request to: {}", url.replace(polygonApiKey, "***API_KEY***"));
             
             ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+            logger.info("📊 DEBUGGING: Polygon API response status: {} for symbol: {}", response.getStatusCode(), symbol);
             
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                logger.info("📄 DEBUGGING: Polygon API response body: {}", response.getBody());
                 JsonNode jsonNode = objectMapper.readTree(response.getBody());
                 
                 // Check for successful response
                 if (jsonNode.has("status") && "OK".equals(jsonNode.get("status").asText())) {
                     JsonNode results = jsonNode.get("results");
+                    logger.info("🔍 DEBUGGING: Polygon results array size: {}", results != null && results.isArray() ? results.size() : "null");
                     
                     if (results != null && results.isArray() && results.size() > 0) {
                         JsonNode result = results.get(0);
                         
                         if (result.has("c")) { // 'c' is the closing price
                             Double closePrice = result.get("c").asDouble();
+                            logger.info("💰 DEBUGGING: Polygon closing price found: ${} for {}", closePrice, symbol);
                             
                             if (closePrice > 0) {
-                                logger.info("Fetched Polygon end-of-day price for {}: ${} (date: {})", symbol, closePrice, dateStr);
+                                logger.info("✅ DEBUGGING: Successfully fetched Polygon end-of-day price for {}: ${} (date: {})", symbol, closePrice, dateStr);
                                 return new PriceData(closePrice, DataTier.END_OF_DAY, LocalDateTime.now(),
                                     "End-of-day closing price from Polygon (free tier) for " + dateStr);
                             }
                         }
                     }
+                } else {
+                    logger.warn("❌ DEBUGGING: Polygon API status not OK for {}: {}", symbol, jsonNode.get("status"));
                 }
                 
                 // Check for API limit or error messages
@@ -240,73 +236,6 @@ public class MarketService {
         return date;
     }
     
-    /**
-     * Fetch price from Alpha Vantage API
-     */
-    private Double fetchFromAlphaVantage(String symbol) {
-        try {
-            String url = String.format(
-                "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=%s&apikey=%s",
-                symbol, alphaVantageApiKey
-            );
-            
-            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
-            
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                JsonNode jsonNode = objectMapper.readTree(response.getBody());
-                JsonNode quote = jsonNode.get("Global Quote");
-                
-                if (quote != null && quote.has("05. price")) {
-                    return quote.get("05. price").asDouble();
-                }
-                
-                // Check for API limit error
-                if (jsonNode.has("Note") || jsonNode.has("Information")) {
-                    logger.warn("Alpha Vantage API limit reached for {}", symbol);
-                }
-            }
-        } catch (RestClientException e) {
-            logger.error("HTTP error fetching from Alpha Vantage for {}: {}", symbol, e.getMessage());
-        } catch (Exception e) {
-            logger.error("Error fetching from Alpha Vantage for {}: {}", symbol, e.getMessage());
-        }
-        
-        return null;
-    }
-    
-    /**
-     * Fetch price from Yahoo Finance (unofficial API)
-     */
-    private Double fetchFromYahooFinance(String symbol) {
-        try {
-            String url = String.format(
-                "https://query1.finance.yahoo.com/v8/finance/chart/%s",
-                symbol
-            );
-            
-            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
-            
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                JsonNode jsonNode = objectMapper.readTree(response.getBody());
-                JsonNode chart = jsonNode.get("chart");
-                
-                if (chart != null && chart.has("result") && chart.get("result").isArray()) {
-                    JsonNode result = chart.get("result").get(0);
-                    JsonNode meta = result.get("meta");
-                    
-                    if (meta != null && meta.has("regularMarketPrice")) {
-                        return meta.get("regularMarketPrice").asDouble();
-                    }
-                }
-            }
-        } catch (RestClientException e) {
-            logger.error("HTTP error fetching from Yahoo Finance for {}: {}", symbol, e.getMessage());
-        } catch (Exception e) {
-            logger.error("Error fetching from Yahoo Finance for {}: {}", symbol, e.getMessage());
-        }
-        
-        return null;
-    }
     
     
     /**

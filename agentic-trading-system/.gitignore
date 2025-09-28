@@ -1,0 +1,15 @@
+# Build artifacts
+bin/
+build/
+target/
+.gradle/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
