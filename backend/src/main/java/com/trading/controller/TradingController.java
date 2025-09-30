@@ -68,46 +68,15 @@ public class TradingController {
         }
     }
     
-    // Order Management Endpoints
-    @GetMapping("/orders")
-    public ResponseEntity<ToolResponse<List<TradeOrderResponse>>> getOrders(@RequestParam(required = false) String accountId) {
-        try {
-            List<TradeOrderResponse> orders = tradingService.getOrders(accountId);
-            return ResponseEntity.ok(ToolResponse.success(orders));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
-    }
-    
-    @GetMapping("/orders/{orderId}")
-    public ResponseEntity<ToolResponse<TradeOrderResponse>> getOrder(@PathVariable String orderId) {
-        try {
-            TradeOrderResponse order = tradingService.getOrder(orderId);
-            return ResponseEntity.ok(ToolResponse.success(order));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
-    }
-    
-    @PostMapping("/orders")
-    public ResponseEntity<ToolResponse<TradeOrderResponse>> createOrder(@RequestBody CreateOrderRequest request) {
-        try {
-            TradeOrderResponse order = tradingService.createOrder(request);
-            return ResponseEntity.ok(ToolResponse.success(order));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
-    }
-    
-    @DeleteMapping("/orders/{orderId}")
-    public ResponseEntity<ToolResponse<String>> cancelOrder(@PathVariable String orderId) {
-        try {
-            tradingService.cancelOrder(orderId);
-            return ResponseEntity.ok(ToolResponse.success("Order " + orderId + " cancelled successfully"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
-    }
+    // Order Management Endpoints - REMOVED
+    // Mock order endpoints eliminated as UI only shows completed trades
+    // The following endpoints were removed:
+    // - GET /api/trading/orders (returned mock order data)
+    // - GET /api/trading/orders/{orderId} (returned specific mock order)
+    // - POST /api/trading/orders (created mock orders)
+    // - DELETE /api/trading/orders/{orderId} (cancelled mock orders)
+    //
+    // If order management is needed in future, implement with database persistence
     
     // Agent Trades Endpoints
     @GetMapping("/agent-trades")

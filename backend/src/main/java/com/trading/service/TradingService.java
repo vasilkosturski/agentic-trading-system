@@ -26,21 +26,9 @@ public class TradingService {
     @Autowired
     private TradingAgentRepository agentRepository;
     
-    // Mock data for orders only (trades now come from database)
-    private final List<TradeOrderData> orders = new ArrayList<>();
-    
+    // Constructor - no mock data initialization needed
     public TradingService() {
-        initializeMockOrders();
-    }
-    
-    private void initializeMockOrders() {
-        // Initialize some mock orders (these will be replaced with real order system later)
-        orders.add(new TradeOrderData("order_1", "Warren", "AAPL", "BUY", "MARKET", 100, null, null,
-            "GTC", "FILLED", 100, 185.50, LocalDateTime.now().minusMinutes(10), LocalDateTime.now().minusMinutes(10), "Warren"));
-        orders.add(new TradeOrderData("order_2", "George", "SPY", "SELL", "LIMIT", 50, 445.20, null,
-            "DAY", "FILLED", 50, 445.20, LocalDateTime.now().minusMinutes(8), LocalDateTime.now().minusMinutes(8), "George"));
-        orders.add(new TradeOrderData("order_3", "Cathie", "TSLA", "BUY", "MARKET", 25, null, null,
-            "GTC", "FILLED", 25, 248.90, LocalDateTime.now().minusMinutes(5), LocalDateTime.now().minusMinutes(5), "Cathie"));
+        // All data now comes from database
     }
     
     /**
@@ -108,43 +96,9 @@ public class TradingService {
     // Agent control operations - REMOVED: These should be handled by PostgreSQLAgentMonitoringService
     // or moved to a dedicated agent management service that updates the database directly
     
-    // Order Operations
-    public List<TradeOrderResponse> getOrders(String accountId) {
-        return orders.stream()
-            .filter(order -> accountId == null || order.getAccountId().equals(accountId))
-            .map(this::convertToOrderResponse)
-            .toList();
-    }
-    
-    public TradeOrderResponse getOrder(String orderId) {
-        return orders.stream()
-            .filter(order -> order.getId().equals(orderId))
-            .findFirst()
-            .map(this::convertToOrderResponse)
-            .orElseThrow(() -> new RuntimeException("Order not found: " + orderId));
-    }
-    
-    public TradeOrderResponse createOrder(CreateOrderRequest request) {
-        String orderId = "order_" + System.currentTimeMillis();
-        TradeOrderData order = new TradeOrderData(
-            orderId, request.getAccountId(), request.getSymbol(), request.getType(), 
-            request.getOrderType(), request.getQuantity(), request.getPrice(), request.getStopPrice(),
-            request.getTimeInForce() != null ? request.getTimeInForce() : "DAY", 
-            "PENDING", 0, 0.0, LocalDateTime.now(), LocalDateTime.now(), request.getAgentId()
-        );
-        orders.add(order);
-        return convertToOrderResponse(order);
-    }
-    
-    public void cancelOrder(String orderId) {
-        orders.stream()
-            .filter(order -> order.getId().equals(orderId))
-            .findFirst()
-            .ifPresentOrElse(
-                order -> order.setStatus("CANCELLED"),
-                () -> { throw new RuntimeException("Order not found: " + orderId); }
-            );
-    }
+    // Order Operations - REMOVED: Mock order system eliminated
+    // Orders are not needed for current functionality as UI only shows completed trades
+    // If order management is needed in future, implement with database persistence
     
     // Agent Trades Operations - Now using real database data
     public List<AgentTradeResponse> getAgentTrades(String agentName) {
@@ -233,15 +187,7 @@ public class TradingService {
         );
     }
     
-    private TradeOrderResponse convertToOrderResponse(TradeOrderData order) {
-        return new TradeOrderResponse(
-            order.getId(), order.getAccountId(), order.getSymbol(), order.getType(),
-            order.getOrderType(), order.getQuantity(), order.getPrice(), order.getStopPrice(),
-            order.getTimeInForce(), order.getStatus(), order.getFilledQuantity(),
-            order.getAverageFillPrice(), order.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-            order.getUpdatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME), order.getAgentId()
-        );
-    }
+    // convertToOrderResponse method removed - no longer needed without mock orders
     
     /**
      * Convert AccountTransaction to AgentTradeResponse for API responses
@@ -304,42 +250,7 @@ public class TradingService {
     
     // AgentTradeData class removed - now using real AccountTransaction entities from database
     
-    private static class TradeOrderData {
-        private String id, accountId, symbol, type, orderType, timeInForce, status, agentId;
-        private int quantity, filledQuantity;
-        private Double price, stopPrice;
-        private double averageFillPrice;
-        private LocalDateTime createdAt, updatedAt;
-        
-        public TradeOrderData(String id, String accountId, String symbol, String type, String orderType,
-                             int quantity, Double price, Double stopPrice, String timeInForce, String status,
-                             int filledQuantity, double averageFillPrice, LocalDateTime createdAt, 
-                             LocalDateTime updatedAt, String agentId) {
-            this.id = id; this.accountId = accountId; this.symbol = symbol; this.type = type;
-            this.orderType = orderType; this.quantity = quantity; this.price = price; this.stopPrice = stopPrice;
-            this.timeInForce = timeInForce; this.status = status; this.filledQuantity = filledQuantity;
-            this.averageFillPrice = averageFillPrice; this.createdAt = createdAt; this.updatedAt = updatedAt;
-            this.agentId = agentId;
-        }
-        
-        // Getters and setters
-        public String getId() { return id; }
-        public String getAccountId() { return accountId; }
-        public String getSymbol() { return symbol; }
-        public String getType() { return type; }
-        public String getOrderType() { return orderType; }
-        public int getQuantity() { return quantity; }
-        public Double getPrice() { return price; }
-        public Double getStopPrice() { return stopPrice; }
-        public String getTimeInForce() { return timeInForce; }
-        public String getStatus() { return status; }
-        public void setStatus(String status) { this.status = status; }
-        public int getFilledQuantity() { return filledQuantity; }
-        public double getAverageFillPrice() { return averageFillPrice; }
-        public LocalDateTime getCreatedAt() { return createdAt; }
-        public LocalDateTime getUpdatedAt() { return updatedAt; }
-        public String getAgentId() { return agentId; }
-    }
+    // TradeOrderData class removed - no longer needed without mock orders
     
     // Response classes
     public static class AgentStatusResponse {
@@ -367,39 +278,7 @@ public class TradingService {
         public int getCurrentPositions() { return currentPositions; }
     }
     
-    public static class TradeOrderResponse {
-        private String id, accountId, symbol, type, orderType, timeInForce, status, createdAt, updatedAt, agentId;
-        private int quantity, filledQuantity;
-        private Double price, stopPrice;
-        private double averageFillPrice;
-        
-        public TradeOrderResponse(String id, String accountId, String symbol, String type, String orderType,
-                                 int quantity, Double price, Double stopPrice, String timeInForce, String status,
-                                 int filledQuantity, double averageFillPrice, String createdAt, String updatedAt, String agentId) {
-            this.id = id; this.accountId = accountId; this.symbol = symbol; this.type = type;
-            this.orderType = orderType; this.quantity = quantity; this.price = price; this.stopPrice = stopPrice;
-            this.timeInForce = timeInForce; this.status = status; this.filledQuantity = filledQuantity;
-            this.averageFillPrice = averageFillPrice; this.createdAt = createdAt; this.updatedAt = updatedAt;
-            this.agentId = agentId;
-        }
-        
-        // Getters
-        public String getId() { return id; }
-        public String getAccountId() { return accountId; }
-        public String getSymbol() { return symbol; }
-        public String getType() { return type; }
-        public String getOrderType() { return orderType; }
-        public int getQuantity() { return quantity; }
-        public Double getPrice() { return price; }
-        public Double getStopPrice() { return stopPrice; }
-        public String getTimeInForce() { return timeInForce; }
-        public String getStatus() { return status; }
-        public int getFilledQuantity() { return filledQuantity; }
-        public double getAverageFillPrice() { return averageFillPrice; }
-        public String getCreatedAt() { return createdAt; }
-        public String getUpdatedAt() { return updatedAt; }
-        public String getAgentId() { return agentId; }
-    }
+    // TradeOrderResponse class removed - no longer needed without mock orders
     
     public static class AgentTradeResponse {
         private String id, agentName, accountId, symbol, type, reasoning, timestamp, status, orderId;
@@ -486,31 +365,5 @@ public class TradingService {
         public double getExpectedShortfall() { return expectedShortfall; }
     }
     
-    public static class CreateOrderRequest {
-        private String accountId, symbol, type, orderType, timeInForce, agentId;
-        private int quantity;
-        private Double price, stopPrice;
-        
-        public CreateOrderRequest() {}
-        
-        // Getters and setters
-        public String getAccountId() { return accountId; }
-        public void setAccountId(String accountId) { this.accountId = accountId; }
-        public String getSymbol() { return symbol; }
-        public void setSymbol(String symbol) { this.symbol = symbol; }
-        public String getType() { return type; }
-        public void setType(String type) { this.type = type; }
-        public String getOrderType() { return orderType; }
-        public void setOrderType(String orderType) { this.orderType = orderType; }
-        public int getQuantity() { return quantity; }
-        public void setQuantity(int quantity) { this.quantity = quantity; }
-        public Double getPrice() { return price; }
-        public void setPrice(Double price) { this.price = price; }
-        public Double getStopPrice() { return stopPrice; }
-        public void setStopPrice(Double stopPrice) { this.stopPrice = stopPrice; }
-        public String getTimeInForce() { return timeInForce; }
-        public void setTimeInForce(String timeInForce) { this.timeInForce = timeInForce; }
-        public String getAgentId() { return agentId; }
-        public void setAgentId(String agentId) { this.agentId = agentId; }
-    }
+    // CreateOrderRequest class removed - no longer needed without mock orders
 }
