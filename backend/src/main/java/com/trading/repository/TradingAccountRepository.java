@@ -41,14 +41,5 @@ public interface TradingAccountRepository extends JpaRepository<TradingAccount, 
     @Query("SELECT ta FROM TradingAccount ta WHERE ta.balance > :minBalance")
     List<TradingAccount> findAccountsWithBalanceGreaterThan(@Param("minBalance") Double minBalance);
     
-    /**
-     * Get total portfolio value for an agent (balance + holdings value)
-     */
-    @Query("SELECT ta.balance + COALESCE(SUM(ah.quantity * ah.currentPrice), 0) " +
-           "FROM TradingAccount ta " +
-           "LEFT JOIN ta.holdings ah " +
-           "WHERE ta.agent.name = :agentName " +
-           "GROUP BY ta.id, ta.balance")
-    Optional<Double> getTotalPortfolioValue(@Param("agentName") String agentName);
     
 }

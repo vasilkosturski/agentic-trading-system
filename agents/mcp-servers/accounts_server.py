@@ -101,6 +101,23 @@ async def sell_shares(name: str, symbol: str, quantity: int, rationale: str) -> 
     except Exception as e:
         raise Exception(f"Failed to sell shares for {name}: {str(e)}")
 
+@mcp.tool()
+async def initialize_agent(name: str, initial_balance: float = 100000.0) -> str:
+    """Initialize agent account if it doesn't exist (idempotent).
+
+    Args:
+        name: The name of the agent (Warren, George, Ray, Cathie)
+        initial_balance: Starting balance (defaults to $100,000)
+    """
+    try:
+        result = await call_java_api("/tools/initialize_agent", "POST", {
+            "name": name,
+            "initialBalance": initial_balance
+        })
+        return f"Agent {name} initialized successfully"
+    except Exception as e:
+        raise Exception(f"Failed to initialize agent {name}: {str(e)}")
+
 # change_strategy tool removed - using hardcoded strategies from constructor only
 # This simplifies the design and keeps strategies consistent with trading system configuration
 
