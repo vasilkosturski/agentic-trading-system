@@ -145,18 +145,14 @@ public class AccountService {
             
             holding.setQuantity(newQuantity);
             holding.setAveragePrice(newValue / newQuantity);
-            holding.setCurrentPrice(price);
         } else {
             holding = new AccountHolding();
             holding.setAccount(account);
             holding.setSymbol(symbol);
             holding.setQuantity(quantity);
             holding.setAveragePrice(price);
-            holding.setCurrentPrice(price);
         }
-        
-        // Calculate market metrics
-        holding.calculateMarketMetrics();
+
         holdingRepository.save(holding);
         
         // Update agent statistics
@@ -207,12 +203,10 @@ public class AccountService {
         
         // Update holding
         holding.setQuantity(holding.getQuantity() - quantity);
-        holding.setCurrentPrice(price);
-        
+
         if (holding.getQuantity() == 0) {
             holdingRepository.delete(holding);
         } else {
-            holding.calculateMarketMetrics();
             holdingRepository.save(holding);
         }
         
@@ -234,10 +228,18 @@ public class AccountService {
         try {
             TradingAccount account = getAccount(agentName);
             
-            // Get current holdings
+            // Get current holdings with live market prices
             List<AccountHolding> holdings = holdingRepository.findByAccount(account);
             Double holdingsValue = holdings.stream()
-                .mapToDouble(h -> h.getQuantity() * h.getCurrentPrice())
+                .mapToDouble(h -> {
+                    try {
+                        MarketService.PriceData priceData = marketService.getSharePrice(h.getSymbol());
+                        return h.getQuantity() * priceData.getPrice();
+                    } catch (Exception e) {
+                        // Fallback to average purchase price if API fails
+                        return h.getQuantity() * h.getAveragePrice();
+                    }
+                })
                 .sum();
             
             // Calculate total portfolio value
@@ -282,11 +284,20 @@ public class AccountService {
         if (account == null) {
             return balance;
         }
-        
+
+        // Calculate holdings value using LIVE market prices (cached for 60 minutes)
         Double holdingsValue = holdingRepository.findByAccount(account).stream()
-            .mapToDouble(h -> h.getQuantity() * h.getCurrentPrice())
+            .mapToDouble(h -> {
+                try {
+                    MarketService.PriceData priceData = marketService.getSharePrice(h.getSymbol());
+                    return h.getQuantity() * priceData.getPrice();
+                } catch (Exception e) {
+                    // Fallback to average purchase price if API fails
+                    return h.getQuantity() * h.getAveragePrice();
+                }
+            })
             .sum();
-        
+
         return balance + holdingsValue;
     }
 
@@ -331,10 +342,18 @@ public class AccountService {
      * Create portfolio snapshot for an account
      */
     private void createPortfolioSnapshot(TradingAccount account, String snapshotType) {
-        // Calculate total portfolio value
+        // Calculate total portfolio value using live market prices
         List<AccountHolding> holdings = holdingRepository.findByAccount(account);
         double holdingsValue = holdings.stream()
-            .mapToDouble(h -> h.getQuantity() * h.getCurrentPrice())
+            .mapToDouble(h -> {
+                try {
+                    MarketService.PriceData priceData = marketService.getSharePrice(h.getSymbol());
+                    return h.getQuantity() * priceData.getPrice();
+                } catch (Exception e) {
+                    // Fallback to average purchase price if API fails
+                    return h.getQuantity() * h.getAveragePrice();
+                }
+            })
             .sum();
         
         double totalValue = account.getBalance() + holdingsValue;

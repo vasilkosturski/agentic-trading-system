@@ -53,11 +53,6 @@ public interface AccountHoldingRepository extends JpaRepository<AccountHolding, 
     @Query("SELECT ah FROM AccountHolding ah WHERE ah.account.agent.name = :agentName AND ah.quantity > 0")
     List<AccountHolding> findActiveHoldingsByAgent(@Param("agentName") String agentName);
     
-    /**
-     * Get total portfolio value for an agent (sum of all holdings)
-     */
-    @Query("SELECT COALESCE(SUM(ah.quantity * ah.currentPrice), 0) FROM AccountHolding ah WHERE ah.account.agent.name = :agentName")
-    Double getTotalHoldingsValueByAgent(@Param("agentName") String agentName);
     
     /**
      * Get total quantity of a symbol held by an agent
@@ -66,11 +61,6 @@ public interface AccountHoldingRepository extends JpaRepository<AccountHolding, 
     Integer getTotalQuantityByAgentAndSymbol(@Param("agentName") String agentName,
                                            @Param("symbol") String symbol);
     
-    /**
-     * Find holdings with unrealized gains/losses
-     */
-    @Query("SELECT ah FROM AccountHolding ah WHERE ah.quantity > 0 AND ah.currentPrice != ah.averagePrice")
-    List<AccountHolding> findHoldingsWithUnrealizedGains();
     
     /**
      * Get holdings summary for an agent (count of different symbols)
@@ -78,9 +68,4 @@ public interface AccountHoldingRepository extends JpaRepository<AccountHolding, 
     @Query("SELECT COUNT(DISTINCT ah.symbol) FROM AccountHolding ah WHERE ah.account.agent.name = :agentName AND ah.quantity > 0")
     Long getUniqueSymbolCountByAgent(@Param("agentName") String agentName);
     
-    /**
-     * Find top holdings by value for an agent
-     */
-    @Query("SELECT ah FROM AccountHolding ah WHERE ah.account.agent.name = :agentName AND ah.quantity > 0 ORDER BY (ah.quantity * ah.currentPrice) DESC")
-    List<AccountHolding> findTopHoldingsByValueForAgent(@Param("agentName") String agentName);
 }
