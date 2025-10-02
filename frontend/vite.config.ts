@@ -18,7 +18,8 @@ export default defineConfig({
       'localhost',
       '127.0.0.1',
       'trading.159.69.30.68.nip.io',
-      '.nip.io'
+      '.nip.io',
+      'agentic-trading.vkontech.com'
     ],
     proxy: {
       '/api': {
