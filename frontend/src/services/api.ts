@@ -1,7 +1,9 @@
 import axios from 'axios';
 
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+// Use relative path /api for production (works through ingress)
+// Override with VITE_API_BASE_URL for local development
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Create axios instance with default configuration
 export const apiClient = axios.create({
