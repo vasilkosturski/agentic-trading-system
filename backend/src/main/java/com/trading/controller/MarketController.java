@@ -95,7 +95,8 @@ public class MarketController {
     @GetMapping("/is-open")
     public ResponseEntity<ToolResponse<Boolean>> isMarketOpen() {
         try {
-            boolean isOpen = marketService.isMarketOpen();
+            MarketService.MarketStatus status = marketService.getMarketStatus();
+            boolean isOpen = "OPEN".equals(status.status);
             return ResponseEntity.ok(ToolResponse.success(isOpen));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));

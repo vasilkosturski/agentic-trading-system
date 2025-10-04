@@ -348,37 +348,8 @@ public class MarketService {
     }
 
     /**
-     * Check if market is currently open using Polygon API (with fallback to hardcoded hours)
-     */
-    public boolean isMarketOpen() {
-        // Try to fetch from Polygon API first
-        PolygonMarketStatusResponse polygonStatus = fetchPolygonMarketStatus();
-
-        if (polygonStatus != null) {
-            // Market is open if Polygon says "open" AND (it's regular hours OR we want to include extended hours)
-            // For now, we only consider regular trading hours (not pre-market or after-hours)
-            boolean isOpen = "open".equalsIgnoreCase(polygonStatus.market);
-            logger.info("Market status from Polygon API: {}", isOpen ? "OPEN" : "CLOSED");
-            return isOpen;
-        }
-
-        // Fallback to hardcoded hours if Polygon API fails
-        logger.warn("Using fallback hardcoded market hours check");
-        LocalTime now = LocalTime.now(ZoneId.of("America/New_York"));
-        LocalTime marketOpen = LocalTime.of(9, 30);
-        LocalTime marketClose = LocalTime.of(16, 0);
-
-        // Check if it's a weekday
-        int dayOfWeek = LocalDateTime.now(ZoneId.of("America/New_York")).getDayOfWeek().getValue();
-        boolean isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
-
-        boolean isOpen = isWeekday && now.isAfter(marketOpen) && now.isBefore(marketClose);
-        logger.info("Market status from fallback check: {}", isOpen ? "OPEN" : "CLOSED");
-        return isOpen;
-    }
-
-    /**
-     * Get market status information with enhanced details from Polygon API
+     * Get market status information with enhanced details from Polygon API.
+     * This is the single source of truth for market status - all other methods should use this.
      */
     public MarketStatus getMarketStatus() {
         PolygonMarketStatusResponse polygonStatus = fetchPolygonMarketStatus();
@@ -387,6 +358,7 @@ public class MarketService {
         if (polygonStatus != null) {
             boolean isOpen = "open".equalsIgnoreCase(polygonStatus.market);
             String status = isOpen ? "OPEN" : "CLOSED";
+            logger.info("Market status from Polygon API: {}", status);
 
             // Build detailed next event message
             String nextEvent;
@@ -411,13 +383,10 @@ public class MarketService {
                 now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
         }
 
-        // Fallback response
-        boolean isOpen = isMarketOpen();
-        String status = isOpen ? "OPEN" : "CLOSED";
-        String nextEvent = isOpen ? "Market closes at 4:00 PM ET" : "Market opens at 9:30 AM ET";
-        nextEvent += " (using fallback - Polygon API unavailable)";
-
-        return new MarketStatus(status, nextEvent, now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+        // Zero tolerance for fallback data - fail if Polygon API unavailable
+        logger.error("CRITICAL: Unable to fetch real market status - no fallback allowed");
+        throw new RuntimeException("Unable to fetch real market status. " +
+            "Polygon API failed. Check API keys and network connectivity.");
     }
     
     /**
