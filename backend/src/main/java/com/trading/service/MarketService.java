@@ -305,30 +305,118 @@ public class MarketService {
     }
     
     /**
-     * Check if market is currently open (US Eastern Time)
+     * Fetch market status from Polygon API
+     */
+    private PolygonMarketStatusResponse fetchPolygonMarketStatus() {
+        try {
+            if (!isPolygonAvailable()) {
+                logger.warn("Polygon API not available, falling back to hardcoded hours");
+                return null;
+            }
+
+            String url = String.format("https://api.polygon.io/v1/marketstatus/now?apiKey=%s", polygonApiKey);
+            logger.info("Fetching market status from Polygon API");
+
+            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                JsonNode jsonNode = objectMapper.readTree(response.getBody());
+
+                String market = jsonNode.has("market") ? jsonNode.get("market").asText() : "closed";
+                boolean earlyHours = jsonNode.has("earlyHours") ? jsonNode.get("earlyHours").asBoolean() : false;
+                boolean afterHours = jsonNode.has("afterHours") ? jsonNode.get("afterHours").asBoolean() : false;
+                String serverTime = jsonNode.has("serverTime") ? jsonNode.get("serverTime").asText() : "";
+
+                // Extract exchanges info
+                JsonNode exchanges = jsonNode.get("exchanges");
+                String nyseStatus = exchanges != null && exchanges.has("nyse") ? exchanges.get("nyse").asText() : "closed";
+                String nasdaqStatus = exchanges != null && exchanges.has("nasdaq") ? exchanges.get("nasdaq").asText() : "closed";
+
+                logger.info("Polygon market status: market={}, nyse={}, nasdaq={}, earlyHours={}, afterHours={}",
+                    market, nyseStatus, nasdaqStatus, earlyHours, afterHours);
+
+                return new PolygonMarketStatusResponse(market, earlyHours, afterHours, serverTime, nyseStatus, nasdaqStatus);
+            }
+
+            logger.warn("Failed to fetch Polygon market status: HTTP {}", response.getStatusCode());
+            return null;
+
+        } catch (Exception e) {
+            logger.error("Error fetching Polygon market status: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Check if market is currently open using Polygon API (with fallback to hardcoded hours)
      */
     public boolean isMarketOpen() {
+        // Try to fetch from Polygon API first
+        PolygonMarketStatusResponse polygonStatus = fetchPolygonMarketStatus();
+
+        if (polygonStatus != null) {
+            // Market is open if Polygon says "open" AND (it's regular hours OR we want to include extended hours)
+            // For now, we only consider regular trading hours (not pre-market or after-hours)
+            boolean isOpen = "open".equalsIgnoreCase(polygonStatus.market);
+            logger.info("Market status from Polygon API: {}", isOpen ? "OPEN" : "CLOSED");
+            return isOpen;
+        }
+
+        // Fallback to hardcoded hours if Polygon API fails
+        logger.warn("Using fallback hardcoded market hours check");
         LocalTime now = LocalTime.now(ZoneId.of("America/New_York"));
         LocalTime marketOpen = LocalTime.of(9, 30);
         LocalTime marketClose = LocalTime.of(16, 0);
-        
+
         // Check if it's a weekday
         int dayOfWeek = LocalDateTime.now(ZoneId.of("America/New_York")).getDayOfWeek().getValue();
         boolean isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
-        
-        return isWeekday && now.isAfter(marketOpen) && now.isBefore(marketClose);
+
+        boolean isOpen = isWeekday && now.isAfter(marketOpen) && now.isBefore(marketClose);
+        logger.info("Market status from fallback check: {}", isOpen ? "OPEN" : "CLOSED");
+        return isOpen;
     }
-    
+
     /**
-     * Get market status information
+     * Get market status information with enhanced details from Polygon API
      */
     public MarketStatus getMarketStatus() {
-        boolean isOpen = isMarketOpen();
+        PolygonMarketStatusResponse polygonStatus = fetchPolygonMarketStatus();
         LocalDateTime now = LocalDateTime.now(ZoneId.of("America/New_York"));
-        
+
+        if (polygonStatus != null) {
+            boolean isOpen = "open".equalsIgnoreCase(polygonStatus.market);
+            String status = isOpen ? "OPEN" : "CLOSED";
+
+            // Build detailed next event message
+            String nextEvent;
+            if (isOpen) {
+                if (polygonStatus.afterHours) {
+                    nextEvent = "After-hours trading (closes at 8:00 PM ET)";
+                } else {
+                    nextEvent = "Market closes at 4:00 PM ET";
+                }
+            } else {
+                if (polygonStatus.earlyHours) {
+                    nextEvent = "Pre-market trading (market opens at 9:30 AM ET)";
+                } else {
+                    nextEvent = "Market opens at 9:30 AM ET";
+                }
+            }
+
+            String additionalInfo = String.format("NYSE: %s, NASDAQ: %s",
+                polygonStatus.nyseStatus, polygonStatus.nasdaqStatus);
+
+            return new MarketStatus(status, nextEvent + " | " + additionalInfo,
+                now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+        }
+
+        // Fallback response
+        boolean isOpen = isMarketOpen();
         String status = isOpen ? "OPEN" : "CLOSED";
         String nextEvent = isOpen ? "Market closes at 4:00 PM ET" : "Market opens at 9:30 AM ET";
-        
+        nextEvent += " (using fallback - Polygon API unavailable)";
+
         return new MarketStatus(status, nextEvent, now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
     }
     
@@ -439,7 +527,7 @@ public class MarketService {
         private final DataTier dataTier;
         private final LocalDateTime timestamp;
         private final String warning;
-        
+
         public MarketIndicatorsData(MarketIndicators indicators, DataTier dataTier,
                                   LocalDateTime timestamp, String warning) {
             this.indicators = indicators;
@@ -447,10 +535,32 @@ public class MarketService {
             this.timestamp = timestamp;
             this.warning = warning;
         }
-        
+
         public MarketIndicators getIndicators() { return indicators; }
         public DataTier getDataTier() { return dataTier; }
         public LocalDateTime getTimestamp() { return timestamp; }
         public String getWarning() { return warning; }
+    }
+
+    /**
+     * Response from Polygon Market Status API
+     */
+    private static class PolygonMarketStatusResponse {
+        final String market;  // "open" or "closed"
+        final boolean earlyHours;  // pre-market (4am-9:30am)
+        final boolean afterHours;  // after-hours (4pm-8pm)
+        final String serverTime;
+        final String nyseStatus;
+        final String nasdaqStatus;
+
+        PolygonMarketStatusResponse(String market, boolean earlyHours, boolean afterHours,
+                                   String serverTime, String nyseStatus, String nasdaqStatus) {
+            this.market = market;
+            this.earlyHours = earlyHours;
+            this.afterHours = afterHours;
+            this.serverTime = serverTime;
+            this.nyseStatus = nyseStatus;
+            this.nasdaqStatus = nasdaqStatus;
+        }
     }
 }

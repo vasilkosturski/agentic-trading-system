@@ -42,29 +42,28 @@ public class AccountPortfolioSnapshot {
     @Column(name = "total_return_percent")
     private Double totalReturnPercent;
     
-    @Column(name = "snapshot_type", nullable = false)
-    private String snapshotType; // DAILY, HOURLY, TRANSACTION, MANUAL
+    @Column(name = "snapshot_type", nullable = true)
+    private String snapshotType; // DEPRECATED: No longer used, will be removed in future migration
     
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
     
     // Constructor with parameters
-    public AccountPortfolioSnapshot(TradingAccount account, LocalDateTime timestamp, 
+    public AccountPortfolioSnapshot(TradingAccount account, LocalDateTime timestamp,
                                   Double totalValue, Double cashBalance, Double holdingsValue) {
         this.account = account;
         this.timestamp = timestamp;
         this.totalValue = totalValue;
         this.cashBalance = cashBalance;
         this.holdingsValue = holdingsValue;
-        this.snapshotType = "MANUAL";
     }
     
-    public AccountPortfolioSnapshot(TradingAccount account, LocalDateTime timestamp, 
+    // DEPRECATED: Constructor kept for backwards compatibility, snapshotType parameter ignored
+    public AccountPortfolioSnapshot(TradingAccount account, LocalDateTime timestamp,
                                   Double totalValue, String snapshotType) {
         this.account = account;
         this.timestamp = timestamp;
         this.totalValue = totalValue;
-        this.snapshotType = snapshotType;
         this.cashBalance = 0.0;
         this.holdingsValue = totalValue;
     }
