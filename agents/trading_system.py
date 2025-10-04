@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import asyncio
+import aiohttp
 import logging
 import os
 from typing import List, Dict, Any
@@ -121,15 +122,42 @@ in exchange for the potential of exponential returns from revolutionary companie
         
         print("="*80 + "\n")
 
+async def check_market_status() -> bool:
+    """Check if market is open via backend API"""
+    try:
+        url = "http://backend-service:8080/api/market/status"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    is_open = data.get("status") == "OPEN"
+                    logger.info(f"📊 Market status: {data.get('status')} - {data.get('nextEvent')}")
+                    return is_open
+                else:
+                    logger.error(f"Failed to check market status: HTTP {response.status}")
+                    return False
+    except Exception as e:
+        logger.error(f"Error checking market status: {e}")
+        return False
+
 async def run_continuous_trading():
     """Run continuous trading cycles - matches source project pattern"""
     system = TradingSystem()
-    
+
     print(f"🔄 Starting scheduler to run every {RUN_EVERY_N_MINUTES} minutes")
     logger.info(f"Continuous trading loop started with {RUN_EVERY_N_MINUTES} minute intervals")
-    
+    logger.info("Market hours check: ALWAYS ENABLED (saves API costs)")
+
     try:
         while True:
+            # Always check market status before running agents to save API costs
+            is_market_open = await check_market_status()
+            if not is_market_open:
+                logger.info("⏸️  Market is closed. Skipping trading cycle to save API costs.")
+                logger.info(f"💤 Waiting {RUN_EVERY_N_MINUTES} minutes until next check...")
+                await asyncio.sleep(RUN_EVERY_N_MINUTES * 60)
+                continue
+
             logger.info("🚀 Starting new trading cycle...")
             await system.run_all_agents()
             logger.info(f"✅ Trading cycle completed. Waiting {RUN_EVERY_N_MINUTES} minutes until next cycle...")

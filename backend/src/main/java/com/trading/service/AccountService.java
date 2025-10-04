@@ -63,10 +63,10 @@ public class AccountService {
         account.setAgent(agent);
         
         account = tradingAccountRepository.save(account);
-        
+
         // Create initial portfolio snapshot
-        createPortfolioSnapshot(account, "INITIALIZATION");
-        
+        createPortfolioSnapshot(account);
+
         return account;
     }
 
@@ -157,10 +157,10 @@ public class AccountService {
         
         // Update agent statistics
         updateAgentStatistics(agentName);
-        
+
         // Create portfolio snapshot
-        createPortfolioSnapshot(account, "TRANSACTION");
-        
+        createPortfolioSnapshot(account);
+
         return "Successfully bought " + quantity + " shares of " + symbol + " at $" + String.format("%.2f", price) + " each";
     }
 
@@ -212,10 +212,10 @@ public class AccountService {
         
         // Update agent statistics
         updateAgentStatistics(agentName);
-        
+
         // Create portfolio snapshot
-        createPortfolioSnapshot(account, "TRANSACTION");
-        
+        createPortfolioSnapshot(account);
+
         return "Successfully sold " + quantity + " shares of " + symbol + " at $" + String.format("%.2f", price) + " each";
     }
 
@@ -306,7 +306,7 @@ public class AccountService {
      */
     public void createPortfolioSnapshot(String agentName) {
         TradingAccount account = getAccount(agentName);
-        createPortfolioSnapshot(account, "MANUAL");
+        createPortfolioSnapshot(account);
     }
 
     /**
@@ -341,7 +341,7 @@ public class AccountService {
     /**
      * Create portfolio snapshot for an account
      */
-    private void createPortfolioSnapshot(TradingAccount account, String snapshotType) {
+    private void createPortfolioSnapshot(TradingAccount account) {
         // Calculate total portfolio value using live market prices
         List<AccountHolding> holdings = holdingRepository.findByAccount(account);
         double holdingsValue = holdings.stream()
@@ -355,24 +355,23 @@ public class AccountService {
                 }
             })
             .sum();
-        
+
         double totalValue = account.getBalance() + holdingsValue;
-        
+
         AccountPortfolioSnapshot snapshot = new AccountPortfolioSnapshot();
         snapshot.setAccount(account);
         snapshot.setTimestamp(LocalDateTime.now());
         snapshot.setTotalValue(totalValue);
         snapshot.setCashBalance(account.getBalance());
         snapshot.setHoldingsValue(holdingsValue);
-        snapshot.setSnapshotType(snapshotType);
-        
+
         // Calculate P&L if we have previous snapshots
         AccountPortfolioSnapshot previousSnapshot = snapshotRepository
             .findTopByAccountOrderByTimestampDesc(account);
         if (previousSnapshot != null) {
             snapshot.calculateMetrics(100000.0, previousSnapshot.getTotalValue()); // Assume 100k initial
         }
-        
+
         snapshotRepository.save(snapshot);
     }
 
