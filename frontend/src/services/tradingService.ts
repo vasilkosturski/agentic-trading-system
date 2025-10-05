@@ -6,7 +6,7 @@ export interface AgentStatus {
   isActive: boolean;
   lastActivity: string;
   totalTrades: number;
-  successRate: number;
+  totalReturnPercent: number;
   portfolioValue: number;
   dayPnL: number;
   dayPnLPercent: number;

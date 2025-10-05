@@ -43,15 +43,12 @@ public class TradingAgent {
     
     @Column(name = "total_trades")
     private Integer totalTrades = 0;
-    
-    @Column(name = "successful_trades")
-    private Integer successfulTrades = 0;
-    
+
     @Column(name = "total_pnl")
     private Double totalPnl = 0.0;
 
-    @Column(name = "win_rate")
-    private Double winRate = 0.0;
+    @Column(name = "initial_capital")
+    private Double initialCapital;
     
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -81,30 +78,30 @@ public class TradingAgent {
         this.updatedAt = LocalDateTime.now();
     }
     
-    public void recordTrade(boolean successful, Double pnl) {
+    public void recordTrade(Double pnl) {
         this.totalTrades++;
-        if (successful) {
-            this.successfulTrades++;
-        }
         if (pnl != null) {
             this.totalPnl += pnl;
         }
-        updateWinRate();
         updateActivity();
     }
-    
-    private void updateWinRate() {
-        if (totalTrades > 0) {
-            this.winRate = (double) successfulTrades / totalTrades * 100;
+
+    public Double getTotalReturnPercent() {
+        if (initialCapital != null && initialCapital > 0 && tradingAccount != null) {
+            double currentValue = tradingAccount.getBalance();
+            return ((currentValue - initialCapital) / initialCapital) * 100;
         }
+        return 0.0;
     }
-    
+
     public boolean isPerformingWell() {
-        return winRate != null && winRate > 60.0 && totalPnl > 0;
+        Double returnPercent = getTotalReturnPercent();
+        return returnPercent != null && returnPercent > 5.0 && totalPnl > 0;
     }
-    
+
     public boolean needsAttention() {
-        return winRate != null && winRate < 40.0 || 
+        Double returnPercent = getTotalReturnPercent();
+        return (returnPercent != null && returnPercent < -10.0) ||
                (lastActivity != null && lastActivity.isBefore(LocalDateTime.now().minusDays(7)));
     }
 }

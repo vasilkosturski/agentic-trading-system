@@ -49,17 +49,25 @@ public class AccountService {
         // Create or get the trading agent
         Optional<TradingAgent> agentOpt = agentRepository.findByName(agentName);
         TradingAgent agent;
+        Double startingBalance = initialBalance != null ? initialBalance : 100000.0;
+
         if (agentOpt.isPresent()) {
             agent = agentOpt.get();
+            // Set initial capital if not already set
+            if (agent.getInitialCapital() == null) {
+                agent.setInitialCapital(startingBalance);
+                agent = agentRepository.save(agent);
+            }
         } else {
             agent = new TradingAgent(agentName, "Autonomous trading agent");
+            agent.setInitialCapital(startingBalance);
             agent = agentRepository.save(agent);
         }
-        
+
         // Create trading account
         TradingAccount account = new TradingAccount();
         account.setName(agentName);
-        account.setBalance(initialBalance != null ? initialBalance : 100000.0);
+        account.setBalance(startingBalance);
         account.setAgent(agent);
         
         account = tradingAccountRepository.save(account);

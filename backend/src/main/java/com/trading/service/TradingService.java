@@ -62,19 +62,17 @@ public class TradingService {
     public void updateAgentTradeStatistics(String agentName) {
         TradingAgent agent = agentRepository.findByName(agentName)
             .orElseThrow(() -> new RuntimeException("Agent not found: " + agentName));
-        
+
         // Get all transactions for this agent
         List<AccountTransaction> transactions = transactionRepository.findByAgentNameOrderByTransactionDateDesc(agentName);
-        
+
         // Calculate statistics
         int totalTrades = transactions.size();
-        int successfulTrades = totalTrades; // For now, assume all recorded trades are successful
-        
+
         // Update agent entity
         agent.setTotalTrades(totalTrades);
-        agent.setSuccessfulTrades(successfulTrades);
         agent.updateActivity();
-        
+
         agentRepository.save(agent);
     }
     
@@ -141,22 +139,19 @@ public class TradingService {
         }
         
         int totalTrades = transactions.size();
-        int successfulTrades = totalTrades; // All recorded transactions are considered successful
-        int failedTrades = 0;
         double totalVolume = transactions.stream()
             .mapToDouble(t -> Math.abs(t.getQuantity()) * t.getPrice())
             .sum();
-        
-        double winRate = totalTrades > 0 ? 1.0 : 0.0; // 100% for now since all recorded trades are successful
+
         double averageTradeSize = totalTrades > 0 ? totalVolume / totalTrades : 0.0;
-        
+
         // Calculate P&L (simplified - would need more complex logic for real P&L calculation)
         double totalPnL = 0.0; // This would require market data and position tracking
         double largestWin = 0.0;
         double largestLoss = 0.0;
-        
-        return new TradingStatsResponse(totalTrades, successfulTrades, failedTrades, totalVolume,
-            totalPnL, winRate, averageTradeSize, largestWin, largestLoss);
+
+        return new TradingStatsResponse(totalTrades, totalVolume,
+            totalPnL, averageTradeSize, largestWin, largestLoss);
     }
     
     // Portfolio Performance
@@ -257,21 +252,21 @@ public class TradingService {
         private String agentName, lastActivity;
         private boolean isActive;
         private int totalTrades, currentPositions;
-        private double successRate, portfolioValue, dayPnL, dayPnLPercent;
-        
+        private double totalReturnPercent, portfolioValue, dayPnL, dayPnLPercent;
+
         public AgentStatusResponse(String agentName, boolean isActive, String lastActivity, int totalTrades,
-                                  double successRate, double portfolioValue, double dayPnL, double dayPnLPercent, int currentPositions) {
+                                  double totalReturnPercent, double portfolioValue, double dayPnL, double dayPnLPercent, int currentPositions) {
             this.agentName = agentName; this.isActive = isActive; this.lastActivity = lastActivity;
-            this.totalTrades = totalTrades; this.successRate = successRate; this.portfolioValue = portfolioValue;
+            this.totalTrades = totalTrades; this.totalReturnPercent = totalReturnPercent; this.portfolioValue = portfolioValue;
             this.dayPnL = dayPnL; this.dayPnLPercent = dayPnLPercent; this.currentPositions = currentPositions;
         }
-        
+
         // Getters
         public String getAgentName() { return agentName; }
         public boolean isActive() { return isActive; }
         public String getLastActivity() { return lastActivity; }
         public int getTotalTrades() { return totalTrades; }
-        public double getSuccessRate() { return successRate; }
+        public double getTotalReturnPercent() { return totalReturnPercent; }
         public double getPortfolioValue() { return portfolioValue; }
         public double getDayPnL() { return dayPnL; }
         public double getDayPnLPercent() { return dayPnLPercent; }
@@ -309,23 +304,20 @@ public class TradingService {
     }
     
     public static class TradingStatsResponse {
-        private int totalTrades, successfulTrades, failedTrades;
-        private double totalVolume, totalPnL, winRate, averageTradeSize, largestWin, largestLoss;
-        
-        public TradingStatsResponse(int totalTrades, int successfulTrades, int failedTrades, double totalVolume,
-                                   double totalPnL, double winRate, double averageTradeSize, double largestWin, double largestLoss) {
-            this.totalTrades = totalTrades; this.successfulTrades = successfulTrades; this.failedTrades = failedTrades;
-            this.totalVolume = totalVolume; this.totalPnL = totalPnL; this.winRate = winRate;
+        private int totalTrades;
+        private double totalVolume, totalPnL, averageTradeSize, largestWin, largestLoss;
+
+        public TradingStatsResponse(int totalTrades, double totalVolume,
+                                   double totalPnL, double averageTradeSize, double largestWin, double largestLoss) {
+            this.totalTrades = totalTrades;
+            this.totalVolume = totalVolume; this.totalPnL = totalPnL;
             this.averageTradeSize = averageTradeSize; this.largestWin = largestWin; this.largestLoss = largestLoss;
         }
-        
+
         // Getters
         public int getTotalTrades() { return totalTrades; }
-        public int getSuccessfulTrades() { return successfulTrades; }
-        public int getFailedTrades() { return failedTrades; }
         public double getTotalVolume() { return totalVolume; }
         public double getTotalPnL() { return totalPnL; }
-        public double getWinRate() { return winRate; }
         public double getAverageTradeSize() { return averageTradeSize; }
         public double getLargestWin() { return largestWin; }
         public double getLargestLoss() { return largestLoss; }

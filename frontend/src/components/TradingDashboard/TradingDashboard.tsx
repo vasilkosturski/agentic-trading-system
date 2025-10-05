@@ -59,7 +59,8 @@ const TradingDashboard = () => {
     }).format(value);
   };
 
-  const formatPercent = (value: number) => {
+  const formatPercent = (value: number | undefined) => {
+    if (value === undefined || value === null) return '0.00%';
     const sign = value >= 0 ? '+' : '';
     return `${sign}${value.toFixed(2)}%`;
   };
@@ -139,10 +140,12 @@ const TradingDashboard = () => {
                     <div className="text-gray-500">Total Trades</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-semibold text-gray-900 dark:text-white">
-                      {agent.successRate.toFixed(1)}%
+                    <div className={`font-semibold ${
+                      (agent.totalReturnPercent ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {formatPercent(agent.totalReturnPercent)}
                     </div>
-                    <div className="text-gray-500">Success Rate</div>
+                    <div className="text-gray-500">Total Return</div>
                   </div>
                 </div>
                 
