@@ -69,27 +69,27 @@ public class AgentMonitoringService {
         
         // Get real trade data using existing TradingService method
         int totalTrades = tradingService.getAgentTrades(agentName).size();
-        double successRate = agent.getWinRate() != null ? agent.getWinRate() : 0.0;
-        
+        double totalReturnPercent = agent.getTotalReturnPercent() != null ? agent.getTotalReturnPercent() : 0.0;
+
         // Get real portfolio value using existing service method
         Double portfolioValue = accountService.getTotalPortfolioValue(agentName);
         if (portfolioValue == null) {
             portfolioValue = 10000.0; // Default initial balance if no account exists yet
         }
-        
+
         // Calculate daily P&L from portfolio snapshots
         double dayPnL = calculateDailyPnL(agentName);
         double dayPnLPercent = portfolioValue > 0 ? (dayPnL / portfolioValue) * 100 : 0.0;
-        
+
         // Get current positions count
         int currentPositions = getCurrentPositionsCount(agentName);
-        
+
         return new TradingService.AgentStatusResponse(
             agentName,
             isActive,
             lastActivity,
             totalTrades,
-            successRate,
+            totalReturnPercent,
             portfolioValue,
             dayPnL,
             dayPnLPercent,
