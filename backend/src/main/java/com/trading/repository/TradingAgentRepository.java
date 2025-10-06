@@ -47,12 +47,6 @@ public interface TradingAgentRepository extends JpaRepository<TradingAgent, Long
     List<TradingAgent> findAgentsWithPnlAbove(@Param("minPnl") Double minPnl);
     
     /**
-     * Find agents with win rate above threshold
-     */
-    @Query("SELECT ta FROM TradingAgent ta WHERE ta.winRate > :minWinRate")
-    List<TradingAgent> findAgentsWithWinRateAbove(@Param("minWinRate") Double minWinRate);
-    
-    /**
      * Find agents last active after specified date
      */
     @Query("SELECT ta FROM TradingAgent ta WHERE ta.lastActivity > :cutoffDate")
@@ -63,12 +57,6 @@ public interface TradingAgentRepository extends JpaRepository<TradingAgent, Long
      */
     @Query("SELECT ta FROM TradingAgent ta ORDER BY ta.totalPnl DESC")
     List<TradingAgent> findAgentsRankedByPnl();
-    
-    /**
-     * Get agent performance ranking by win rate
-     */
-    @Query("SELECT ta FROM TradingAgent ta ORDER BY ta.winRate DESC")
-    List<TradingAgent> findAgentsRankedByWinRate();
     
     /**
      * Get agent performance ranking by total trades (activity)
@@ -85,7 +73,7 @@ public interface TradingAgentRepository extends JpaRepository<TradingAgent, Long
     /**
      * Get average performance metrics across all active agents
      */
-    @Query("SELECT AVG(ta.totalPnl), AVG(ta.winRate), AVG(ta.totalTrades) FROM TradingAgent ta WHERE ta.isActive = true")
+    @Query("SELECT AVG(ta.totalPnl), AVG(ta.totalTrades) FROM TradingAgent ta WHERE ta.isActive = true")
     Object[] getAveragePerformanceMetrics();
     
     /**
