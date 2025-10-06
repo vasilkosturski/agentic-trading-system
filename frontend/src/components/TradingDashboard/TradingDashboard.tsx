@@ -101,14 +101,14 @@ const TradingDashboard = () => {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="trader-header">{agent.agentName}</h3>
                 <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
-                  agent.isActive 
+                  agent.active
                     ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
                     : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
                 }`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${
-                    agent.isActive ? 'bg-green-500' : 'bg-gray-500'
+                    agent.active ? 'bg-green-500' : 'bg-gray-500'
                   }`}></div>
-                  <span>{agent.isActive ? 'Active' : 'Inactive'}</span>
+                  <span>{agent.active ? 'Active' : 'Inactive'}</span>
                 </div>
               </div>
               
