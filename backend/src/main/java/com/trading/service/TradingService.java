@@ -175,9 +175,9 @@ public class TradingService {
     // Helper methods
     private AgentStatusResponse convertToAgentStatus(AgentData agent) {
         return new AgentStatusResponse(
-            agent.getAgentName(), agent.isActive(), 
+            agent.getAgentName(), agent.isActive(),
             agent.getLastActivity().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-            agent.getTotalTrades(), agent.getSuccessRate(), agent.getPortfolioValue(),
+            agent.getTotalTrades(), agent.getTotalReturnPercent(), agent.getPortfolioValue(),
             agent.getDayPnL(), agent.getDayPnLPercent(), agent.getCurrentPositions()
         );
     }
@@ -210,33 +210,31 @@ public class TradingService {
         private boolean isActive;
         private LocalDateTime lastActivity;
         private int totalTrades;
-        private double successRate;
+        private double totalReturnPercent;
         private double portfolioValue;
         private double dayPnL;
         private double dayPnLPercent;
         private int currentPositions;
-        
+
         public AgentData(String agentName, boolean isActive, LocalDateTime lastActivity, int totalTrades,
-                        double successRate, double portfolioValue, double dayPnL, double dayPnLPercent, int currentPositions) {
+                        double totalReturnPercent, double portfolioValue, double dayPnL, double dayPnLPercent, int currentPositions) {
             this.agentName = agentName;
             this.isActive = isActive;
             this.lastActivity = lastActivity;
             this.totalTrades = totalTrades;
-            this.successRate = successRate;
+            this.totalReturnPercent = totalReturnPercent;
             this.portfolioValue = portfolioValue;
             this.dayPnL = dayPnL;
             this.dayPnLPercent = dayPnLPercent;
             this.currentPositions = currentPositions;
         }
-        
-        // Getters and setters
+
+        // Getters
         public String getAgentName() { return agentName; }
         public boolean isActive() { return isActive; }
-        public void setActive(boolean active) { isActive = active; }
         public LocalDateTime getLastActivity() { return lastActivity; }
-        public void setLastActivity(LocalDateTime lastActivity) { this.lastActivity = lastActivity; }
         public int getTotalTrades() { return totalTrades; }
-        public double getSuccessRate() { return successRate; }
+        public double getTotalReturnPercent() { return totalReturnPercent; }
         public double getPortfolioValue() { return portfolioValue; }
         public double getDayPnL() { return dayPnL; }
         public double getDayPnLPercent() { return dayPnLPercent; }
