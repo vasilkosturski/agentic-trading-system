@@ -3,7 +3,7 @@ import { apiClient } from './api';
 // Types for agent status (only what's actually used)
 export interface AgentStatus {
   agentName: string;
-  isActive: boolean;
+  active: boolean;
   lastActivity: string;
   totalTrades: number;
   totalReturnPercent: number;
