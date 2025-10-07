@@ -72,9 +72,6 @@ public class AccountService {
         
         account = tradingAccountRepository.save(account);
 
-        // Create initial portfolio snapshot
-        createPortfolioSnapshot(account);
-
         return account;
     }
 
@@ -166,9 +163,6 @@ public class AccountService {
         // Update agent statistics
         updateAgentStatistics(agentName);
 
-        // Create portfolio snapshot
-        createPortfolioSnapshot(account);
-
         return "Successfully bought " + quantity + " shares of " + symbol + " at $" + String.format("%.2f", price) + " each";
     }
 
@@ -220,9 +214,6 @@ public class AccountService {
         
         // Update agent statistics
         updateAgentStatistics(agentName);
-
-        // Create portfolio snapshot
-        createPortfolioSnapshot(account);
 
         return "Successfully sold " + quantity + " shares of " + symbol + " at $" + String.format("%.2f", price) + " each";
     }
