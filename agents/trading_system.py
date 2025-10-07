@@ -129,10 +129,16 @@ async def check_market_status() -> bool:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
                 if response.status == 200:
-                    data = await response.json()
-                    is_open = data.get("status") == "OPEN"
-                    logger.info(f"📊 Market status: {data.get('status')} - {data.get('nextEvent')}")
-                    return is_open
+                    result = await response.json()
+                    # Backend returns wrapped format: {"success": true, "data": {...}}
+                    if result.get("success") and result.get("data"):
+                        data = result["data"]
+                        is_open = data.get("status") == "OPEN"
+                        logger.info(f"📊 Market status: {data.get('status')} - {data.get('nextEvent')}")
+                        return is_open
+                    else:
+                        logger.error(f"API returned error: {result.get('error')}")
+                        return False
                 else:
                     logger.error(f"Failed to check market status: HTTP {response.status}")
                     return False
