@@ -69,13 +69,16 @@ public class AgentMonitoringService {
         
         // Get real trade data using existing TradingService method
         int totalTrades = tradingService.getAgentTrades(agentName).size();
-        double totalReturnPercent = agent.getTotalReturnPercent() != null ? agent.getTotalReturnPercent() : 0.0;
 
         // Get real portfolio value using existing service method
         Double portfolioValue = accountService.getTotalPortfolioValue(agentName);
         if (portfolioValue == null) {
             portfolioValue = 10000.0; // Default initial balance if no account exists yet
         }
+
+        // Calculate total return from current portfolio value vs initial capital
+        Double initialCapital = agent.getInitialCapital() != null ? agent.getInitialCapital() : 100000.0;
+        double totalReturnPercent = ((portfolioValue - initialCapital) / initialCapital) * 100;
 
         // Calculate daily P&L from portfolio snapshots
         double dayPnL = calculateDailyPnL(agentName);
