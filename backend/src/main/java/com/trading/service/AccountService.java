@@ -141,16 +141,20 @@ public class AccountService {
         
         // Update or create holding
         AccountHolding holding = holdingRepository.findByAccountAndSymbol(account, symbol);
-        
+
         if (holding != null) {
+            logger.info("📊 Updating existing holding for {} - {}: current qty={}, adding qty={}",
+                agentName, symbol, holding.getQuantity(), quantity);
             // Calculate new average cost
             double currentValue = holding.getQuantity() * holding.getAveragePrice();
             double newValue = currentValue + totalCost;
             int newQuantity = holding.getQuantity() + quantity;
-            
+
             holding.setQuantity(newQuantity);
             holding.setAveragePrice(newValue / newQuantity);
         } else {
+            logger.info("🆕 Creating NEW holding for {} - {}: qty={}, avgPrice=${}",
+                agentName, symbol, quantity, price);
             holding = new AccountHolding();
             holding.setAccount(account);
             holding.setSymbol(symbol);
@@ -158,7 +162,15 @@ public class AccountService {
             holding.setAveragePrice(price);
         }
 
-        holdingRepository.save(holding);
+        try {
+            AccountHolding savedHolding = holdingRepository.save(holding);
+            logger.info("✅ Successfully saved holding for {} - {}: id={}, qty={}",
+                agentName, symbol, savedHolding.getId(), savedHolding.getQuantity());
+        } catch (Exception e) {
+            logger.error("❌ CRITICAL: Failed to save holding for {} - {}: {}",
+                agentName, symbol, e.getMessage(), e);
+            throw new RuntimeException("Failed to save holding: " + e.getMessage(), e);
+        }
         
         // Update agent statistics
         updateAgentStatistics(agentName);
