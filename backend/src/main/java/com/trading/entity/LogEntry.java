@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "agent_logs", schema = "agents")
@@ -19,24 +19,24 @@ public class LogEntry {
     
     @Column(name = "agent_name", nullable = false)
     private String name;
-    
+
     @Column(name = "log_datetime", nullable = false)
-    private LocalDateTime datetime = LocalDateTime.now();
-    
+    private Instant datetime = Instant.now();
+
     @Column(name = "log_type", nullable = false)
     private String type;
-    
+
     @Column(name = "log_message", columnDefinition = "TEXT")
     private String message;
-    
+
     @Column(name = "log_level")
     private String logLevel = "INFO"; // DEBUG, INFO, WARN, ERROR
-    
+
     @Column(name = "session_id")
     private String sessionId;
-    
+
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private Instant createdAt = Instant.now();
     
     // Constructor with parameters
     public LogEntry(String name, String type, String message) {

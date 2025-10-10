@@ -4,7 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @Table(name = "trading_agents", schema = "agents")
@@ -37,10 +38,10 @@ public class TradingAgent {
     
     @Column(name = "preferred_sectors", columnDefinition = "TEXT")
     private String preferredSectors; // JSON array of sectors
-    
+
     @Column(name = "last_activity")
-    private LocalDateTime lastActivity;
-    
+    private Instant lastActivity;
+
     @Column(name = "total_trades")
     private Integer totalTrades = 0;
 
@@ -49,12 +50,12 @@ public class TradingAgent {
 
     @Column(name = "initial_capital")
     private Double initialCapital;
-    
+
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
-    
+    private Instant createdAt = Instant.now();
+
     @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    private Instant updatedAt = Instant.now();
     
     // One-to-one relationship with trading account
     @OneToOne(mappedBy = "agent", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -69,13 +70,13 @@ public class TradingAgent {
     // JPA lifecycle callbacks
     @PreUpdate
     public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = Instant.now();
     }
-    
+
     // Business methods
     public void updateActivity() {
-        this.lastActivity = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
+        this.lastActivity = Instant.now();
+        this.updatedAt = Instant.now();
     }
     
     public void recordTrade(Double pnl) {
@@ -102,6 +103,6 @@ public class TradingAgent {
     public boolean needsAttention() {
         Double returnPercent = getTotalReturnPercent();
         return (returnPercent != null && returnPercent < -10.0) ||
-               (lastActivity != null && lastActivity.isBefore(LocalDateTime.now().minusDays(7)));
+               (lastActivity != null && lastActivity.isBefore(Instant.now().minus(7, ChronoUnit.DAYS)));
     }
 }

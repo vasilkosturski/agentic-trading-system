@@ -9,7 +9,7 @@ import com.trading.repository.TradingAgentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -45,7 +45,7 @@ public class TradingService {
         
         // Create and save the transaction
         AccountTransaction transaction = new AccountTransaction(
-            account, symbol, quantity, price, LocalDateTime.now(), rationale
+            account, symbol, quantity, price, Instant.now(), rationale
         );
         transaction = transactionRepository.save(transaction);
         

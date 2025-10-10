@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "account_transactions", schema = "trading")
@@ -31,23 +31,23 @@ public class AccountTransaction {
     private Double price;
     
     @Column(nullable = false)
-    private LocalDateTime timestamp;
-    
+    private Instant timestamp;
+
     @Column(columnDefinition = "TEXT")
     private String rationale;
-    
+
     @Column(name = "transaction_type", nullable = false)
     private String transactionType; // BUY, SELL
-    
+
     @Column(name = "total_amount", nullable = false)
     private Double totalAmount;
-    
+
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private Instant createdAt = Instant.now();
     
     // Constructor with parameters
-    public AccountTransaction(TradingAccount account, String symbol, Integer quantity, 
-                            Double price, LocalDateTime timestamp, String rationale) {
+    public AccountTransaction(TradingAccount account, String symbol, Integer quantity,
+                            Double price, Instant timestamp, String rationale) {
         this.account = account;
         this.symbol = symbol;
         this.quantity = quantity;

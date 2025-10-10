@@ -8,7 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -136,7 +136,7 @@ public class AccountService {
         transaction.setQuantity(quantity);
         transaction.setPrice(price);
         transaction.setRationale(rationale);
-        transaction.setTimestamp(LocalDateTime.now());
+        transaction.setTimestamp(Instant.now());
         transactionRepository.save(transaction);
         
         // Update or create holding
@@ -212,7 +212,7 @@ public class AccountService {
         transaction.setQuantity(quantity);
         transaction.setPrice(price);
         transaction.setRationale(rationale);
-        transaction.setTimestamp(LocalDateTime.now());
+        transaction.setTimestamp(Instant.now());
         transactionRepository.save(transaction);
         
         // Update holding
@@ -371,7 +371,7 @@ public class AccountService {
 
         AccountPortfolioSnapshot snapshot = new AccountPortfolioSnapshot();
         snapshot.setAccount(account);
-        snapshot.setTimestamp(LocalDateTime.now());
+        snapshot.setTimestamp(Instant.now());
         snapshot.setTotalValue(totalValue);
         snapshot.setCashBalance(account.getBalance());
         snapshot.setHoldingsValue(holdingsValue);
