@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "account_portfolio_snapshots", schema = "trading")
@@ -20,9 +20,9 @@ public class AccountPortfolioSnapshot {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
     private TradingAccount account;
-    
+
     @Column(nullable = false)
-    private LocalDateTime timestamp;
+    private Instant timestamp;
     
     @Column(name = "total_value", nullable = false)
     private Double totalValue;
@@ -44,12 +44,12 @@ public class AccountPortfolioSnapshot {
     
     @Column(name = "snapshot_type", nullable = true)
     private String snapshotType; // DEPRECATED: No longer used, will be removed in future migration
-    
+
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
-    
+    private Instant createdAt = Instant.now();
+
     // Constructor with parameters
-    public AccountPortfolioSnapshot(TradingAccount account, LocalDateTime timestamp,
+    public AccountPortfolioSnapshot(TradingAccount account, Instant timestamp,
                                   Double totalValue, Double cashBalance, Double holdingsValue) {
         this.account = account;
         this.timestamp = timestamp;
@@ -59,7 +59,7 @@ public class AccountPortfolioSnapshot {
     }
     
     // DEPRECATED: Constructor kept for backwards compatibility, snapshotType parameter ignored
-    public AccountPortfolioSnapshot(TradingAccount account, LocalDateTime timestamp,
+    public AccountPortfolioSnapshot(TradingAccount account, Instant timestamp,
                                   Double totalValue, String snapshotType) {
         this.account = account;
         this.timestamp = timestamp;

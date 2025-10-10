@@ -115,7 +115,8 @@ const TradingDashboard = () => {
               <div className="space-y-4">
                 <div className="text-center">
                   <div className={`text-2xl font-bold ${
-                    agent.dayPnL >= 0 ? 'text-green-600' : 'text-red-600'
+                    Math.abs(agent.totalReturnPercent ?? 0) < 0.01 ? 'text-gray-900 dark:text-white' :
+                    (agent.totalReturnPercent ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
                     {formatCurrency(agent.portfolioValue)}
                   </div>
@@ -123,6 +124,7 @@ const TradingDashboard = () => {
                     Portfolio Value
                   </div>
                   <div className={`text-sm font-medium ${
+                    Math.abs(agent.dayPnL) < 0.01 ? 'text-gray-600 dark:text-gray-400' :
                     agent.dayPnL >= 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
                     {formatCurrency(agent.dayPnL)} ({formatPercent(agent.dayPnLPercent)})
@@ -141,6 +143,7 @@ const TradingDashboard = () => {
                   </div>
                   <div className="text-center">
                     <div className={`font-semibold ${
+                      Math.abs(agent.totalReturnPercent ?? 0) < 0.01 ? 'text-gray-600 dark:text-gray-400' :
                       (agent.totalReturnPercent ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
                       {formatPercent(agent.totalReturnPercent)}

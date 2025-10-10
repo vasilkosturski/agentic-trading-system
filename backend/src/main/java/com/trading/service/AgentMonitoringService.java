@@ -7,8 +7,9 @@ import com.trading.repository.AccountPortfolioSnapshotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Optional;
@@ -63,9 +64,9 @@ public class AgentMonitoringService {
         boolean isActive = agent.getIsActive() != null ? agent.getIsActive() : false;
         
         // Format last activity
-        String lastActivity = agent.getLastActivity() != null 
-            ? agent.getLastActivity().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-            : LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        String lastActivity = agent.getLastActivity() != null
+            ? agent.getLastActivity().toString()
+            : Instant.now().toString();
         
         // Get real trade data using existing TradingService method
         int totalTrades = tradingService.getAgentTrades(agentName).size();
@@ -117,12 +118,14 @@ public class AgentMonitoringService {
             }
             
             // Find yesterday's snapshot for comparison
-            LocalDateTime yesterday = LocalDateTime.now().minusDays(1);
             List<AccountPortfolioSnapshot> snapshots = snapshotRepository.findByAgentNameOrderByTimestampDesc(agentName);
-            
+
+            // Get start of today (midnight UTC)
+            Instant startOfToday = LocalDate.now(ZoneId.of("UTC")).atStartOfDay(ZoneId.of("UTC")).toInstant();
+
             // Find the closest snapshot to yesterday
             for (AccountPortfolioSnapshot snapshot : snapshots) {
-                if (snapshot.getTimestamp().isBefore(LocalDateTime.now().withHour(0).withMinute(0).withSecond(0))) {
+                if (snapshot.getTimestamp().isBefore(startOfToday)) {
                     double previousValue = snapshot.getTotalValue() != null ? snapshot.getTotalValue() : currentValue;
                     return currentValue - previousValue;
                 }

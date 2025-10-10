@@ -14,11 +14,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.RestClientException;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -109,14 +111,14 @@ public class MarketService {
         if (cachedPrice != null && !cachedPrice.isExpired(cacheTtlMinutes)) {
             logger.debug("Returning cached price for {}: ${}", upperSymbol, cachedPrice.price);
             return new PriceData(cachedPrice.price, DataTier.CACHED, cachedPrice.timestamp,
-                "Data retrieved from cache (age: " + java.time.Duration.between(cachedPrice.timestamp, LocalDateTime.now()).toMinutes() + " minutes)");
+                "Data retrieved from cache (age: " + java.time.Duration.between(cachedPrice.timestamp, Instant.now()).toMinutes() + " minutes)");
         }
-        
+
         // Try to fetch real price
         logger.info("📡 DEBUGGING: Attempting to fetch real price for {} from external APIs", upperSymbol);
         PriceData realPriceData = fetchRealPrice(upperSymbol);
         if (realPriceData != null) {
-            LocalDateTime fetchTime = LocalDateTime.now();
+            Instant fetchTime = Instant.now();
             priceCache.put(upperSymbol, new CachedPrice(realPriceData.getPrice(), fetchTime));
             logger.info("✅ DEBUGGING: Successfully fetched real price for {}: ${} from {} ({})",
                 upperSymbol, realPriceData.getPrice(), realPriceData.getDataSource(), realPriceData.getDataTier());
@@ -190,7 +192,7 @@ public class MarketService {
                             
                             if (closePrice > 0) {
                                 logger.info("✅ DEBUGGING: Successfully fetched Polygon end-of-day price for {}: ${} (date: {})", symbol, closePrice, dateStr);
-                                return new PriceData(closePrice, DataTier.END_OF_DAY, LocalDateTime.now(),
+                                return new PriceData(closePrice, DataTier.END_OF_DAY, Instant.now(),
                                     "End-of-day closing price from Polygon (free tier) for " + dateStr);
                             }
                         }
@@ -247,24 +249,25 @@ public class MarketService {
         Double currentPrice = currentPriceData.getPrice();
         
         for (int i = days; i >= 0; i--) {
-            LocalDateTime date = LocalDateTime.now().minusDays(i);
+            Instant instant = Instant.now().minus(i, ChronoUnit.DAYS);
+            LocalDate date = instant.atZone(ZoneId.of("UTC")).toLocalDate();
             double variation = (random.nextDouble() - 0.5) * 0.1; // +/- 5%
             double price = currentPrice * (1 + variation);
-            
+
             prices.add(new HistoricalPrice(
                 date.format(DateTimeFormatter.ISO_LOCAL_DATE),
                 Math.round(price * 100.0) / 100.0
             ));
         }
-        
+
         // Add data consistency warning for mock data
         String warning = null;
         if (currentPriceData.getDataTier() == DataTier.MOCK) {
             warning = "Historical data is simulated and may not reflect actual market conditions";
         }
-        
+
         return new HistoricalPriceData(prices, currentPriceData.getDataTier(),
-            LocalDateTime.now(), warning);
+            Instant.now(), warning);
     }
     
     /**
@@ -299,9 +302,9 @@ public class MarketService {
             Math.round(sma20 * 100.0) / 100.0,
             Math.round(volatility * 100.0) / 100.0
         );
-        
+
         return new MarketIndicatorsData(indicators, historicalData.getDataTier(),
-            LocalDateTime.now(), historicalData.getWarning());
+            Instant.now(), historicalData.getWarning());
     }
     
     /**
@@ -353,7 +356,7 @@ public class MarketService {
      */
     public MarketStatus getMarketStatus() {
         PolygonMarketStatusResponse polygonStatus = fetchPolygonMarketStatus();
-        LocalDateTime now = LocalDateTime.now(ZoneId.of("America/New_York"));
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("America/New_York"));
 
         if (polygonStatus != null) {
             boolean isOpen = "open".equalsIgnoreCase(polygonStatus.market);
@@ -401,15 +404,15 @@ public class MarketService {
     
     private static class CachedPrice {
         final Double price;
-        final LocalDateTime timestamp;
-        
-        CachedPrice(Double price, LocalDateTime timestamp) {
+        final Instant timestamp;
+
+        CachedPrice(Double price, Instant timestamp) {
             this.price = price;
             this.timestamp = timestamp;
         }
-        
+
         boolean isExpired(int ttlMinutes) {
-            return LocalDateTime.now().isAfter(timestamp.plusMinutes(ttlMinutes));
+            return Instant.now().isAfter(timestamp.plus(ttlMinutes, ChronoUnit.MINUTES));
         }
     }
     
@@ -452,53 +455,53 @@ public class MarketService {
     public static class PriceData {
         private final Double price;
         private final DataTier dataTier;
-        private final LocalDateTime timestamp;
+        private final Instant timestamp;
         private final String dataSource;
-        
-        public PriceData(Double price, DataTier dataTier, LocalDateTime timestamp, String dataSource) {
+
+        public PriceData(Double price, DataTier dataTier, Instant timestamp, String dataSource) {
             this.price = price;
             this.dataTier = dataTier;
             this.timestamp = timestamp;
             this.dataSource = dataSource;
         }
-        
+
         public Double getPrice() { return price; }
         public DataTier getDataTier() { return dataTier; }
-        public LocalDateTime getTimestamp() { return timestamp; }
+        public Instant getTimestamp() { return timestamp; }
         public String getDataSource() { return dataSource; }
         public int getDataAgeMinutes() {
-            return (int) java.time.Duration.between(timestamp, LocalDateTime.now()).toMinutes();
+            return (int) java.time.Duration.between(timestamp, Instant.now()).toMinutes();
         }
     }
     
     public static class HistoricalPriceData {
         private final List<HistoricalPrice> prices;
         private final DataTier dataTier;
-        private final LocalDateTime timestamp;
+        private final Instant timestamp;
         private final String warning;
-        
+
         public HistoricalPriceData(List<HistoricalPrice> prices, DataTier dataTier,
-                                 LocalDateTime timestamp, String warning) {
+                                 Instant timestamp, String warning) {
             this.prices = prices;
             this.dataTier = dataTier;
             this.timestamp = timestamp;
             this.warning = warning;
         }
-        
+
         public List<HistoricalPrice> getPrices() { return prices; }
         public DataTier getDataTier() { return dataTier; }
-        public LocalDateTime getTimestamp() { return timestamp; }
+        public Instant getTimestamp() { return timestamp; }
         public String getWarning() { return warning; }
     }
     
     public static class MarketIndicatorsData {
         private final MarketIndicators indicators;
         private final DataTier dataTier;
-        private final LocalDateTime timestamp;
+        private final Instant timestamp;
         private final String warning;
 
         public MarketIndicatorsData(MarketIndicators indicators, DataTier dataTier,
-                                  LocalDateTime timestamp, String warning) {
+                                  Instant timestamp, String warning) {
             this.indicators = indicators;
             this.dataTier = dataTier;
             this.timestamp = timestamp;
@@ -507,7 +510,7 @@ public class MarketService {
 
         public MarketIndicators getIndicators() { return indicators; }
         public DataTier getDataTier() { return dataTier; }
-        public LocalDateTime getTimestamp() { return timestamp; }
+        public Instant getTimestamp() { return timestamp; }
         public String getWarning() { return warning; }
     }
 
