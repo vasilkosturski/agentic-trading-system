@@ -109,7 +109,32 @@ public class AccountService {
      */
     public String buyShares(String agentName, String symbol, Integer quantity, String rationale) {
         TradingAccount account = getAccount(agentName);
-        
+
+        // Check position limit BEFORE buying (max 10 positions per agent)
+        List<AccountHolding> currentHoldings = holdingRepository.findByAccount(account);
+        long activePositions = currentHoldings.stream()
+            .filter(h -> h.getQuantity() > 0)
+            .count();
+
+        // Check if adding new position (not adding to existing)
+        boolean isNewPosition = currentHoldings.stream()
+            .noneMatch(h -> h.getSymbol().equals(symbol) && h.getQuantity() > 0);
+
+        if (isNewPosition && activePositions >= 10) {
+            // List current holdings in error message to help agent decide what to sell
+            String holdingsList = currentHoldings.stream()
+                .filter(h -> h.getQuantity() > 0)
+                .map(h -> h.getSymbol())
+                .collect(Collectors.joining(", "));
+
+            throw new RuntimeException(
+                "❌ POSITION LIMIT REACHED: You currently hold 10 positions (" + holdingsList + "). " +
+                "Maximum allowed is 10 positions per agent. " +
+                "To buy " + symbol + ", you must first sell one of your existing positions. " +
+                "Review your holdings and sell your weakest/lowest-conviction position, then retry this purchase."
+            );
+        }
+
         // Get current market price from MarketService
         logger.info("🔍 DEBUGGING: Requesting real market price for {} from MarketService", symbol);
         MarketService.PriceData priceData = marketService.getSharePrice(symbol);
@@ -117,10 +142,10 @@ public class AccountService {
         logger.info("💰 DEBUGGING: Received price for {}: ${} from {} ({})",
             symbol, price, priceData.getDataSource(), priceData.getDataTier());
         Double totalCost = price * quantity;
-        
+
         // Check if sufficient funds
         if (totalCost > account.getBalance()) {
-            throw new RuntimeException("Insufficient funds to buy " + quantity + " shares of " + symbol + 
+            throw new RuntimeException("Insufficient funds to buy " + quantity + " shares of " + symbol +
                 ". Required: $" + String.format("%.2f", totalCost) + ", Available: $" + String.format("%.2f", account.getBalance()));
         }
         
