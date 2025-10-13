@@ -3,7 +3,7 @@ package com.trading.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * DTO for recent trade display in the frontend
@@ -18,6 +18,6 @@ public class RecentTradeDto {
     private Integer quantity;
     private Double price;
     private Double totalAmount;
-    private LocalDateTime timestamp;
+    private Instant timestamp;
     private String rationale;
 }

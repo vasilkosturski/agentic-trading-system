@@ -179,7 +179,8 @@ public class TradingService {
             agent.getAgentName(), agent.isActive(),
             agent.getLastActivity().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
             agent.getTotalTrades(), agent.getTotalReturnPercent(), agent.getPortfolioValue(),
-            agent.getDayPnL(), agent.getDayPnLPercent(), agent.getCurrentPositions()
+            agent.getDayPnL(), agent.getDayPnLPercent(), agent.getCurrentPositions(),
+            1800 // Default cycle interval: 30 minutes = 1800 seconds
         );
     }
     
@@ -199,7 +200,7 @@ public class TradingService {
             transaction.getPrice(),
             transaction.getRationale() != null ? transaction.getRationale() : "No rationale provided",
             1.0, // Default confidence for database transactions
-            transaction.getTimestamp().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+            transaction.getTimestamp().toString(), // Instant to ISO-8601 string
             "EXECUTED", // All database transactions are considered executed
             "N/A" // Order ID not tracked in current schema
         );
