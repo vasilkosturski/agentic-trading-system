@@ -1,3 +1,4 @@
+import React from 'react';
 import { useTradingAgents, useMarketStatus } from '../../hooks';
 import SimplePortfolioChart from './SimplePortfolioChart';
 import RecentTrades from './RecentTrades';
@@ -5,6 +6,28 @@ import RecentTrades from './RecentTrades';
 const TradingDashboard = () => {
   const { data: agents, isLoading, error, isError } = useTradingAgents();
   const { data: marketStatus, isLoading: marketStatusLoading } = useMarketStatus();
+
+  const formatNextCycle = (lastActivity: string, cycleIntervalSeconds: number) => {
+    if (!lastActivity || !cycleIntervalSeconds) {
+      return { text: 'Unknown', color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-100 dark:bg-gray-900/20' };
+    }
+
+    const lastActivityTime = new Date(lastActivity).getTime();
+    const nextCycleTime = lastActivityTime + (cycleIntervalSeconds * 1000);
+    const now = Date.now();
+    const msUntilNext = nextCycleTime - now;
+    const minutesUntilNext = Math.round(msUntilNext / 60000);
+
+    if (minutesUntilNext <= 0) {
+      return { text: 'Trading now...', color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20' };
+    }
+
+    if (minutesUntilNext === 1) {
+      return { text: 'Next cycle in 1 min', color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/20' };
+    }
+
+    return { text: `Next cycle in ${minutesUntilNext} min`, color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-100 dark:bg-gray-900/20' };
+  };
 
   if (isLoading) {
     return (
@@ -96,19 +119,17 @@ const TradingDashboard = () => {
         
         {/* 4-trader grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
-          {agents?.map((agent) => (
+          {agents?.map((agent) => {
+            const nextCycle = formatNextCycle(agent.lastActivity, agent.cycleIntervalSeconds);
+            return (
             <div key={agent.agentName} className="trading-card">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="trader-header">{agent.agentName}</h3>
-                <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
-                  agent.active
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
-                }`}>
+                <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${nextCycle.bg} ${nextCycle.color}`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${
-                    agent.active ? 'bg-green-500' : 'bg-gray-500'
+                    nextCycle.text === 'Trading now...' ? 'bg-green-500 animate-pulse' : 'bg-gray-500'
                   }`}></div>
-                  <span>{agent.active ? 'Active' : 'Inactive'}</span>
+                  <span>{nextCycle.text}</span>
                 </div>
               </div>
               
@@ -170,7 +191,8 @@ const TradingDashboard = () => {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
         
         {/* Recent Trades Section */}
