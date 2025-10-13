@@ -131,11 +131,12 @@ async def sell_shares(name: str, symbol: str, quantity: int, rationale: str) -> 
         logger.error(f"Failed to sell shares for {name}: {e}")
         raise Exception(f"Failed to sell {quantity} shares of {symbol}: {str(e)}")
 
-@function_tool
 async def initialize_agent(name: str, initial_balance: float = 100000.0) -> str:
     """Initialize agent account if it doesn't exist.
 
     This is idempotent - safe to call multiple times. If account exists, does nothing.
+
+    NOTE: This is NOT a function_tool - it's called internally by the system, not by agents.
 
     Args:
         name: The name of the agent (Warren, George, Ray, Cathie)
@@ -186,10 +187,10 @@ async def get_strategy(name: str) -> str:
         raise
 
 # All trading tools that agents can use
+# NOTE: initialize_agent is NOT included - it's called by the system, not agents
 TRADING_TOOLS = [
     get_balance,
     get_holdings,
     buy_shares,
     sell_shares,
-    initialize_agent,
 ]
