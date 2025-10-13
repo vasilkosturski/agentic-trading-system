@@ -3,7 +3,7 @@ package com.trading.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * Simple DTO for portfolio history data points used in charts
@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PortfolioHistoryPoint {
-    private LocalDateTime timestamp;
+    private Instant timestamp;
     private Double portfolioValue;
     
     @Override
