@@ -17,7 +17,18 @@ const TradingDashboard = () => {
     const now = Date.now();
     const msUntilNext = nextCycleTime - now;
     const minutesUntilNext = Math.round(msUntilNext / 60000);
+    const minutesSinceLastActivity = Math.round((now - lastActivityTime) / 60000);
 
+    // If cycle is overdue by more than 2 minutes, show time since last activity
+    if (minutesUntilNext < -2) {
+      return {
+        text: `Idle (${minutesSinceLastActivity} min ago)`,
+        color: 'text-gray-500 dark:text-gray-500',
+        bg: 'bg-gray-100 dark:bg-gray-900/20'
+      };
+    }
+
+    // If cycle time just passed (0-2 min overdue), show "Trading now..."
     if (minutesUntilNext <= 0) {
       return { text: 'Trading now...', color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/20' };
     }
