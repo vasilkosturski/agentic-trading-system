@@ -88,6 +88,10 @@ public class AgentMonitoringService {
         // Get current positions count
         int currentPositions = getCurrentPositionsCount(agentName);
 
+        // Cycle interval (30 minutes = 1800 seconds)
+        // Frontend will calculate: nextCycleTime = lastActivity + cycleIntervalSeconds
+        int cycleIntervalSeconds = 1800;
+
         return new TradingService.AgentStatusResponse(
             agentName,
             isActive,
@@ -97,7 +101,8 @@ public class AgentMonitoringService {
             portfolioValue,
             dayPnL,
             dayPnLPercent,
-            currentPositions
+            currentPositions,
+            cycleIntervalSeconds
         );
     }
     

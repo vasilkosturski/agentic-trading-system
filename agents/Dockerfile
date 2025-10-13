@@ -28,12 +28,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy agents source code
 COPY . .
 
-# Install MCP server dependencies
-WORKDIR /app/mcp-servers
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Return to main working directory
-WORKDIR /app
+# No longer need mcp-servers directory - using direct function tools instead
+# MCP dependencies for external services (Brave Search, Memory, Fetch) are installed globally above
 
 # Default command - can be overridden in docker-compose
 CMD ["python", "trading_system.py"]

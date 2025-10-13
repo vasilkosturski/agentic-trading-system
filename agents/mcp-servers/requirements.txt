@@ -1,7 +1,0 @@
-# Python MCP Server Dependencies
-mcp
-fastmcp
-aiohttp
-python-dotenv
-pydantic
-requests

@@ -250,14 +250,16 @@ public class TradingService {
     public static class AgentStatusResponse {
         private String agentName, lastActivity;
         private boolean isActive;
-        private int totalTrades, currentPositions;
+        private int totalTrades, currentPositions, cycleIntervalSeconds;
         private double totalReturnPercent, portfolioValue, dayPnL, dayPnLPercent;
 
         public AgentStatusResponse(String agentName, boolean isActive, String lastActivity, int totalTrades,
-                                  double totalReturnPercent, double portfolioValue, double dayPnL, double dayPnLPercent, int currentPositions) {
+                                  double totalReturnPercent, double portfolioValue, double dayPnL, double dayPnLPercent,
+                                  int currentPositions, int cycleIntervalSeconds) {
             this.agentName = agentName; this.isActive = isActive; this.lastActivity = lastActivity;
             this.totalTrades = totalTrades; this.totalReturnPercent = totalReturnPercent; this.portfolioValue = portfolioValue;
             this.dayPnL = dayPnL; this.dayPnLPercent = dayPnLPercent; this.currentPositions = currentPositions;
+            this.cycleIntervalSeconds = cycleIntervalSeconds;
         }
 
         // Getters
@@ -270,6 +272,7 @@ public class TradingService {
         public double getDayPnL() { return dayPnL; }
         public double getDayPnLPercent() { return dayPnLPercent; }
         public int getCurrentPositions() { return currentPositions; }
+        public int getCycleIntervalSeconds() { return cycleIntervalSeconds; }
     }
     
     // TradeOrderResponse class removed - no longer needed without mock orders
