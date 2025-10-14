@@ -92,9 +92,20 @@ public class AccountController {
             String symbol = (String) request.get("symbol");
             Integer quantity = (Integer) request.get("quantity");
             String rationale = (String) request.get("rationale");
-            
+
             String result = accountService.sellShares(name, symbol, quantity, rationale);
             return ResponseEntity.ok(new ToolResponse<>(true, result, null));
+        } catch (Exception e) {
+            return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
+        }
+    }
+
+    @PostMapping("/tools/update_activity")
+    public ResponseEntity<ToolResponse<String>> updateActivity(@RequestBody Map<String, Object> request) {
+        try {
+            String name = (String) request.get("name");
+            accountService.updateAgentActivity(name);
+            return ResponseEntity.ok(new ToolResponse<>(true, "Activity updated for " + name, null));
         } catch (Exception e) {
             return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
         }

@@ -196,9 +196,6 @@ public class AccountService {
                 agentName, symbol, e.getMessage(), e);
             throw new RuntimeException("Failed to save holding: " + e.getMessage(), e);
         }
-        
-        // Update agent statistics
-        updateAgentStatistics(agentName);
 
         return "Successfully bought " + quantity + " shares of " + symbol + " at $" + String.format("%.2f", price) + " each";
     }
@@ -248,9 +245,6 @@ public class AccountService {
         } else {
             holdingRepository.save(holding);
         }
-        
-        // Update agent statistics
-        updateAgentStatistics(agentName);
 
         return "Successfully sold " + quantity + " shares of " + symbol + " at $" + String.format("%.2f", price) + " each";
     }
@@ -359,18 +353,18 @@ public class AccountService {
 
 
     /**
-     * Update agent statistics
+     * Update agent activity timestamp (called on every cycle check via trading_system.py)
+     * Single source of truth for lastActivity updates
      */
-    private void updateAgentStatistics(String agentName) {
+    public void updateAgentActivity(String agentName) {
         Optional<TradingAgent> agentOpt = agentRepository.findByName(agentName);
         if (agentOpt.isPresent()) {
             TradingAgent agent = agentOpt.get();
-            TradingAccount account = tradingAccountRepository.findByName(agentName);
-            if (account != null) {
-                // Only update activity timestamp - trade counts calculated at query time
-                agent.updateActivity();
-                agentRepository.save(agent);
-            }
+            agent.updateActivity();
+            agentRepository.save(agent);
+            logger.debug("Updated activity timestamp for agent: {}", agentName);
+        } else {
+            throw new RuntimeException("Agent not found: " + agentName);
         }
     }
 

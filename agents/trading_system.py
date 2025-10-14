@@ -146,6 +146,25 @@ async def check_market_status() -> bool:
         logger.error(f"Error checking market status: {e}")
         return False
 
+async def update_all_agents_activity():
+    """Update lastActivity for all agents (called on every cycle, even when market closed)"""
+    agent_names = ["Warren", "George", "Ray", "Cathie"]
+    url = "http://backend-service:8080/api/accounts/tools/update_activity"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            for agent_name in agent_names:
+                try:
+                    async with session.post(url, json={"name": agent_name}) as response:
+                        if response.status == 200:
+                            logger.debug(f"✓ Updated activity for {agent_name}")
+                        else:
+                            logger.warning(f"Failed to update activity for {agent_name}: {response.status}")
+                except Exception as e:
+                    logger.warning(f"Error updating activity for {agent_name}: {e}")
+    except Exception as e:
+        logger.error(f"Error updating agents activity: {e}")
+
 async def run_continuous_trading():
     """Run continuous trading cycles - matches source project pattern"""
     system = TradingSystem()
@@ -158,15 +177,17 @@ async def run_continuous_trading():
         while True:
             # Always check market status before running agents to save API costs
             is_market_open = await check_market_status()
+
             if not is_market_open:
                 logger.info("⏸️  Market is closed. Skipping trading cycle to save API costs.")
-                logger.info(f"💤 Waiting {RUN_EVERY_N_MINUTES} minutes until next check...")
-                await asyncio.sleep(RUN_EVERY_N_MINUTES * 60)
-                continue
+            else:
+                logger.info("🚀 Starting new trading cycle...")
+                await system.run_all_agents()
+                logger.info(f"✅ Trading cycle completed.")
 
-            logger.info("🚀 Starting new trading cycle...")
-            await system.run_all_agents()
-            logger.info(f"✅ Trading cycle completed. Waiting {RUN_EVERY_N_MINUTES} minutes until next cycle...")
+            # Always update activity timestamp on every cycle (shows system is alive)
+            await update_all_agents_activity()
+            logger.info(f"💤 Waiting {RUN_EVERY_N_MINUTES} minutes until next cycle...")
             await asyncio.sleep(RUN_EVERY_N_MINUTES * 60)
     except KeyboardInterrupt:
         logger.info("🛑 Graceful shutdown requested (Ctrl+C)")

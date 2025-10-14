@@ -1,0 +1,77 @@
+# Serena MCP Configuration for Agentic Trading System
+language: python  # Primary language (multi-language project)
+
+project:
+  name: "agentic-trading-system"
+  description: "AI Trading System with Java backend, React frontend, Python agents"
+
+# Exclude heavy directories and build artifacts
+ignore:
+  # Frontend
+  - "frontend/node_modules/"
+  - "frontend/dist/"
+  - "frontend/build/"
+  - "frontend/.vite/"
+
+  # Backend
+  - "backend/build/"
+  - "backend/target/"
+  - "backend/.gradle/"
+  - "backend/bin/"
+
+  # Python
+  - "agents/__pycache__/"
+  - "agents/.venv/"
+  - "agents/venv/"
+  - "agents/.pytest_cache/"
+  - "agents/.uv/"
+
+  # Git and IDE
+  - ".git/"
+  - ".idea/"
+  - ".vscode/"
+  - "*.swp"
+  - "*.swo"
+  - ".DS_Store"
+
+  # Deployment
+  - "deployment/k3s/k8s-manifests/"  # Kubernetes YAML files (less critical)
+
+  # Database
+  - "database/backups/"
+
+# Language Server Protocol settings
+lsp:
+  # Only start language servers when needed
+  lazy_init: true
+
+  # Timeout for LSP operations (seconds)
+  timeout: 30
+
+  # Languages to support
+  languages:
+    - java
+    - python
+    - typescript
+    - javascript
+    - yaml
+    - sql
+
+# Performance tuning
+indexing:
+  # Run indexing in background
+  async: true
+
+  # Max file size to index (in KB)
+  max_file_size: 1000
+
+  # Incremental indexing on file changes
+  incremental: true
+
+# Read-only mode (set to false to allow edits)
+read_only: false
+
+# Memory settings
+memory:
+  enabled: true
+  max_memories: 100
