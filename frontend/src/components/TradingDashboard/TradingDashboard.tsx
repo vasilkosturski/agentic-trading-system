@@ -7,6 +7,22 @@ const TradingDashboard = () => {
   const { data: agents, isLoading, error, isError } = useTradingAgents();
   const { data: marketStatus, isLoading: marketStatusLoading } = useMarketStatus();
 
+  const formatTimeAgo = (minutes: number): string => {
+    if (minutes < 60) return `${minutes}m`;
+
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+
+    if (hours < 24) {
+      return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+    }
+
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+
+    return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+  };
+
   const formatNextCycle = (lastActivity: string, cycleIntervalSeconds: number) => {
     if (!lastActivity || !cycleIntervalSeconds) {
       return { text: 'Unknown', color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-100 dark:bg-gray-900/20' };
@@ -22,7 +38,7 @@ const TradingDashboard = () => {
     // If cycle is overdue by more than 2 minutes, show time since last activity
     if (minutesUntilNext < -2) {
       return {
-        text: `Idle (${minutesSinceLastActivity} min ago)`,
+        text: `Idle (${formatTimeAgo(minutesSinceLastActivity)} ago)`,
         color: 'text-gray-500 dark:text-gray-500',
         bg: 'bg-gray-100 dark:bg-gray-900/20'
       };
