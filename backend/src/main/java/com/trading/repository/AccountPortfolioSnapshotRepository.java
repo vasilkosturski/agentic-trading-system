@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,8 +29,8 @@ public interface AccountPortfolioSnapshotRepository extends JpaRepository<Accoun
      * Find snapshots within date range
      */
     @Query("SELECT aps FROM AccountPortfolioSnapshot aps WHERE aps.timestamp BETWEEN :startDate AND :endDate ORDER BY aps.timestamp DESC")
-    List<AccountPortfolioSnapshot> findByTimestampBetween(@Param("startDate") LocalDateTime startDate,
-                                                         @Param("endDate") LocalDateTime endDate);
+    List<AccountPortfolioSnapshot> findByTimestampBetween(@Param("startDate") Instant startDate,
+                                                         @Param("endDate") Instant endDate);
     
     /**
      * Find latest snapshot for an agent
@@ -54,7 +54,7 @@ public interface AccountPortfolioSnapshotRepository extends JpaRepository<Accoun
      */
     @Query("SELECT aps FROM AccountPortfolioSnapshot aps WHERE aps.account.agent.name = :agentName AND aps.timestamp >= :fromDate ORDER BY aps.timestamp ASC")
     List<AccountPortfolioSnapshot> getPortfolioPerformance(@Param("agentName") String agentName,
-                                                          @Param("fromDate") LocalDateTime fromDate);
+                                                          @Param("fromDate") Instant fromDate);
     
     /**
      * Find latest snapshot by account
@@ -72,7 +72,7 @@ public interface AccountPortfolioSnapshotRepository extends JpaRepository<Accoun
      */
     @Query("SELECT AVG(aps.totalValue) FROM AccountPortfolioSnapshot aps WHERE aps.account.agent.name = :agentName AND aps.timestamp >= :fromDate")
     Optional<Double> getAveragePortfolioValue(@Param("agentName") String agentName,
-                                            @Param("fromDate") LocalDateTime fromDate);
+                                            @Param("fromDate") Instant fromDate);
     
     /**
      * Get maximum portfolio value for an agent
@@ -96,5 +96,5 @@ public interface AccountPortfolioSnapshotRepository extends JpaRepository<Accoun
      * Delete old snapshots (older than specified date)
      */
     @Query("DELETE FROM AccountPortfolioSnapshot aps WHERE aps.timestamp < :cutoffDate")
-    void deleteSnapshotsOlderThan(@Param("cutoffDate") LocalDateTime cutoffDate);
+    void deleteSnapshotsOlderThan(@Param("cutoffDate") Instant cutoffDate);
 }

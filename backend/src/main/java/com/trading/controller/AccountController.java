@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -132,17 +132,22 @@ public class AccountController {
             @PathVariable String agentName,
             @RequestParam(defaultValue = "7") int days) {
         try {
-            LocalDateTime fromDate = LocalDateTime.now().minusDays(days);
+            // Use Instant (not LocalDateTime) to match entity field type
+            Instant fromDate = Instant.now().minus(days, java.time.temporal.ChronoUnit.DAYS);
             List<AccountPortfolioSnapshot> snapshots = snapshotRepository
                     .getPortfolioPerformance(agentName, fromDate);
-            
+
             // Convert to simple DTO
             List<PortfolioHistoryPoint> history = snapshots.stream()
                     .map(s -> new PortfolioHistoryPoint(s.getTimestamp(), s.getTotalValue()))
                     .collect(Collectors.toList());
-            
+
+            // Return empty list if no snapshots found (not an error)
             return ResponseEntity.ok(history);
         } catch (Exception e) {
+            // Log actual error for debugging
+            org.slf4j.LoggerFactory.getLogger(AccountController.class)
+                .error("Error fetching portfolio history for {}: {}", agentName, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
