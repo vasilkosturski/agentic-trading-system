@@ -125,8 +125,8 @@ public class AgentMonitoringService {
             // Find yesterday's snapshot for comparison
             List<AccountPortfolioSnapshot> snapshots = snapshotRepository.findByAgentNameOrderByTimestampDesc(agentName);
 
-            // Get start of today (midnight UTC)
-            Instant startOfToday = LocalDate.now(ZoneId.of("UTC")).atStartOfDay(ZoneId.of("UTC")).toInstant();
+            // Get start of today (midnight US Eastern - matches US stock trading day)
+            Instant startOfToday = LocalDate.now(ZoneId.of("America/New_York")).atStartOfDay(ZoneId.of("America/New_York")).toInstant();
 
             // Find the closest snapshot to yesterday
             for (AccountPortfolioSnapshot snapshot : snapshots) {
