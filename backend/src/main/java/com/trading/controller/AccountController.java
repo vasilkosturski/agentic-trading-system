@@ -3,6 +3,7 @@ package com.trading.controller;
 import com.trading.dto.PortfolioHistoryPoint;
 import com.trading.dto.RecentTradeDto;
 import com.trading.dto.ToolResponse;
+import com.trading.dto.TradeDetailResponse;
 import com.trading.entity.AccountPortfolioSnapshot;
 import com.trading.entity.AccountTransaction;
 import com.trading.repository.AccountPortfolioSnapshotRepository;
@@ -77,8 +78,12 @@ public class AccountController {
             String symbol = (String) request.get("symbol");
             Integer quantity = (Integer) request.get("quantity");
             String rationale = (String) request.get("rationale");
-            
-            String result = accountService.buyShares(name, symbol, quantity, rationale);
+            String fullReasoning = (String) request.get("fullReasoning");
+            String researchSources = (String) request.get("researchSources");
+            String agentContext = (String) request.get("agentContext");
+
+            String result = accountService.buyShares(name, symbol, quantity, rationale,
+                fullReasoning, researchSources, agentContext);
             return ResponseEntity.ok(new ToolResponse<>(true, result, null));
         } catch (Exception e) {
             return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
@@ -92,8 +97,12 @@ public class AccountController {
             String symbol = (String) request.get("symbol");
             Integer quantity = (Integer) request.get("quantity");
             String rationale = (String) request.get("rationale");
+            String fullReasoning = (String) request.get("fullReasoning");
+            String researchSources = (String) request.get("researchSources");
+            String agentContext = (String) request.get("agentContext");
 
-            String result = accountService.sellShares(name, symbol, quantity, rationale);
+            String result = accountService.sellShares(name, symbol, quantity, rationale,
+                fullReasoning, researchSources, agentContext);
             return ResponseEntity.ok(new ToolResponse<>(true, result, null));
         } catch (Exception e) {
             return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
@@ -168,7 +177,8 @@ public class AccountController {
             // Convert to DTOs
             List<RecentTradeDto> recentTrades = transactions.stream()
                     .map(t -> new RecentTradeDto(
-                            t.getAccount().getName(),
+                            t.getId(),
+                            t.getAccount().getAgent().getName(),
                             t.getTransactionType(),
                             t.getSymbol(),
                             Math.abs(t.getQuantity()), // Always show positive quantity
@@ -181,6 +191,62 @@ public class AccountController {
             
             return ResponseEntity.ok(recentTrades);
         } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // Trade detail endpoint
+    @GetMapping("/trades/{tradeId}")
+    public ResponseEntity<TradeDetailResponse> getTradeDetail(@PathVariable Long tradeId) {
+        try {
+            // Get the transaction
+            AccountTransaction transaction = transactionRepository.findById(tradeId)
+                    .orElseThrow(() -> new RuntimeException("Trade not found"));
+
+            // Build trade info
+            TradeDetailResponse.TradeInfo tradeInfo = new TradeDetailResponse.TradeInfo(
+                    transaction.getId(),
+                    transaction.getAccount().getAgent().getName(),
+                    transaction.getTransactionType(),
+                    transaction.getSymbol(),
+                    Math.abs(transaction.getQuantity()),
+                    transaction.getPrice(),
+                    transaction.getTotalAmount(),
+                    transaction.getTimestamp(),
+                    transaction.getRationale()
+            );
+
+            // Get related trades (same agent, same symbol, last 5)
+            List<TradeDetailResponse.RelatedTrade> relatedTrades = transactionRepository
+                    .findAll()
+                    .stream()
+                    .filter(t -> t.getId() != tradeId &&
+                            t.getAccount().getId().equals(transaction.getAccount().getId()) &&
+                            t.getSymbol().equals(transaction.getSymbol()))
+                    .sorted((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()))
+                    .limit(5)
+                    .map(t -> new TradeDetailResponse.RelatedTrade(
+                            t.getId(),
+                            t.getTransactionType(),
+                            Math.abs(t.getQuantity()),
+                            t.getPrice(),
+                            t.getTimestamp()
+                    ))
+                    .collect(Collectors.toList());
+
+            // Build response
+            TradeDetailResponse response = new TradeDetailResponse(
+                    tradeInfo,
+                    transaction.getFullReasoning(),
+                    transaction.getResearchSources(),
+                    transaction.getAgentContext(),
+                    relatedTrades
+            );
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(AccountController.class)
+                .error("Error fetching trade detail for {}: {}", tradeId, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }

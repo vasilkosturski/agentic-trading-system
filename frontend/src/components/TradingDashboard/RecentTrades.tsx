@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Dropdown } from 'primereact/dropdown';
@@ -13,6 +14,7 @@ import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
 
 const RecentTrades: React.FC = () => {
+  const navigate = useNavigate();
   const { trades, loading, error } = useRecentTrades(50);
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
   const [globalFilter, setGlobalFilter] = useState<string>('');
@@ -201,10 +203,12 @@ const RecentTrades: React.FC = () => {
           removableSort
           filterDisplay="row"
           emptyMessage="No trades found matching your criteria"
-          className="p-datatable-sm"
+          className="p-datatable-sm cursor-pointer"
           stripedRows
           showGridlines
           responsiveLayout="scroll"
+          onRowClick={(e) => navigate(`/trades/${e.data.id}`)}
+          rowClassName={() => 'hover:bg-gray-50 transition-colors duration-150'}
         >
           <Column 
             field="agentName" 
