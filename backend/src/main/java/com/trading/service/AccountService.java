@@ -108,6 +108,14 @@ public class AccountService {
      * Buy shares for an agent
      */
     public String buyShares(String agentName, String symbol, Integer quantity, String rationale) {
+        return buyShares(agentName, symbol, quantity, rationale, null, null, null);
+    }
+
+    /**
+     * Buy shares for an agent with detailed metadata
+     */
+    public String buyShares(String agentName, String symbol, Integer quantity, String rationale,
+                           String fullReasoning, String researchSources, String agentContext) {
         TradingAccount account = getAccount(agentName);
 
         // Check position limit BEFORE buying (max 10 positions per agent)
@@ -161,6 +169,9 @@ public class AccountService {
         transaction.setQuantity(quantity);
         transaction.setPrice(price);
         transaction.setRationale(rationale);
+        transaction.setFullReasoning(fullReasoning);
+        transaction.setResearchSources(researchSources);
+        transaction.setAgentContext(agentContext);
         transaction.setTimestamp(Instant.now());
         transactionRepository.save(transaction);
         
@@ -204,6 +215,14 @@ public class AccountService {
      * Sell shares for an agent
      */
     public String sellShares(String agentName, String symbol, Integer quantity, String rationale) {
+        return sellShares(agentName, symbol, quantity, rationale, null, null, null);
+    }
+
+    /**
+     * Sell shares for an agent with detailed metadata
+     */
+    public String sellShares(String agentName, String symbol, Integer quantity, String rationale,
+                            String fullReasoning, String researchSources, String agentContext) {
         TradingAccount account = getAccount(agentName);
         
         // Check if we have enough shares
@@ -234,6 +253,9 @@ public class AccountService {
         transaction.setQuantity(quantity);
         transaction.setPrice(price);
         transaction.setRationale(rationale);
+        transaction.setFullReasoning(fullReasoning);
+        transaction.setResearchSources(researchSources);
+        transaction.setAgentContext(agentContext);
         transaction.setTimestamp(Instant.now());
         transactionRepository.save(transaction);
         

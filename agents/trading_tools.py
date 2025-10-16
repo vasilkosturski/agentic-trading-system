@@ -5,6 +5,7 @@ Uses OpenAI Agents SDK @function_tool decorator for automatic schema generation
 """
 
 import aiohttp
+import json
 import logging
 from agents import function_tool
 from typing import Dict
@@ -70,7 +71,15 @@ async def get_holdings(name: str) -> Dict[str, int]:
         raise Exception(f"Failed to get holdings for {name}: {str(e)}")
 
 @function_tool
-async def buy_shares(name: str, symbol: str, quantity: int, rationale: str) -> str:
+async def buy_shares(
+    name: str,
+    symbol: str,
+    quantity: int,
+    rationale: str,
+    fullReasoning: str = None,
+    researchSources: str = None,
+    agentContext: str = None
+) -> str:
     """Buy shares of a stock.
 
     IMPORTANT: Maximum 10 positions per agent. If you already hold 10 different stocks,
@@ -80,7 +89,16 @@ async def buy_shares(name: str, symbol: str, quantity: int, rationale: str) -> s
         name: The name of the account holder
         symbol: The stock symbol (e.g., 'AAPL', 'GOOGL', 'TSLA')
         quantity: The number of shares to buy (must be positive integer)
-        rationale: Detailed explanation of why you're buying and how it fits your strategy
+        rationale: Brief explanation of the trade (1-2 sentences)
+        fullReasoning: (RECOMMENDED) Detailed explanation including:
+            - Why this stock fits your strategy
+            - Key research findings that informed your decision
+            - Risk assessment and conviction level
+            - How this fits with your existing portfolio
+        researchSources: (RECOMMENDED) JSON string with array of sources consulted.
+            Example: '[{"title": "Article Title", "url": "https://...", "snippet": "key quote"}]'
+        agentContext: (RECOMMENDED) JSON string with portfolio state before trade.
+            Example: '{"cashBefore": 50000, "portfolioValue": 100000, "positionCount": 5}'
 
     Returns:
         Confirmation message with transaction details
@@ -89,11 +107,27 @@ async def buy_shares(name: str, symbol: str, quantity: int, rationale: str) -> s
         Exception: If insufficient funds, position limit reached, or invalid symbol
     """
     try:
+        # Capture current portfolio state if not provided
+        if agentContext is None:
+            try:
+                balance = await _call_backend_api("/tools/get_balance", {"name": name})
+                holdings = await _call_backend_api("/tools/get_holdings", {"name": name})
+                agentContext = json.dumps({
+                    "cashBefore": float(balance),
+                    "positionsBefore": len(holdings),
+                    "holdingsBefore": holdings
+                })
+            except Exception as ctx_err:
+                logger.warning(f"Failed to capture agent context: {ctx_err}")
+
         result = await _call_backend_api("/tools/buy_shares", {
             "name": name,
             "symbol": symbol,
             "quantity": quantity,
-            "rationale": rationale
+            "rationale": rationale,
+            "fullReasoning": fullReasoning,
+            "researchSources": researchSources,
+            "agentContext": agentContext
         })
         logger.info(f"{name} bought {quantity} shares of {symbol}")
         return str(result)
@@ -103,14 +137,31 @@ async def buy_shares(name: str, symbol: str, quantity: int, rationale: str) -> s
         raise Exception(f"Failed to buy {quantity} shares of {symbol}: {str(e)}")
 
 @function_tool
-async def sell_shares(name: str, symbol: str, quantity: int, rationale: str) -> str:
+async def sell_shares(
+    name: str,
+    symbol: str,
+    quantity: int,
+    rationale: str,
+    fullReasoning: str = None,
+    researchSources: str = None,
+    agentContext: str = None
+) -> str:
     """Sell shares of a stock.
 
     Args:
         name: The name of the account holder
         symbol: The stock symbol (e.g., 'AAPL', 'GOOGL', 'TSLA')
         quantity: The number of shares to sell (must be positive and ≤ current holdings)
-        rationale: Detailed explanation of why you're selling and how it fits your strategy
+        rationale: Brief explanation of the trade (1-2 sentences)
+        fullReasoning: (RECOMMENDED) Detailed explanation including:
+            - Why you're exiting/reducing this position
+            - What changed in your thesis or market conditions
+            - Risk assessment and timing rationale
+            - Impact on portfolio allocation
+        researchSources: (RECOMMENDED) JSON string with array of sources consulted.
+            Example: '[{"title": "Article Title", "url": "https://...", "snippet": "key quote"}]'
+        agentContext: (RECOMMENDED) JSON string with portfolio state before trade.
+            Example: '{"cashBefore": 50000, "portfolioValue": 100000, "positionCount": 5}'
 
     Returns:
         Confirmation message with transaction details
@@ -119,11 +170,27 @@ async def sell_shares(name: str, symbol: str, quantity: int, rationale: str) -> 
         Exception: If you don't own enough shares or invalid symbol
     """
     try:
+        # Capture current portfolio state if not provided
+        if agentContext is None:
+            try:
+                balance = await _call_backend_api("/tools/get_balance", {"name": name})
+                holdings = await _call_backend_api("/tools/get_holdings", {"name": name})
+                agentContext = json.dumps({
+                    "cashBefore": float(balance),
+                    "positionsBefore": len(holdings),
+                    "holdingsBefore": holdings
+                })
+            except Exception as ctx_err:
+                logger.warning(f"Failed to capture agent context: {ctx_err}")
+
         result = await _call_backend_api("/tools/sell_shares", {
             "name": name,
             "symbol": symbol,
             "quantity": quantity,
-            "rationale": rationale
+            "rationale": rationale,
+            "fullReasoning": fullReasoning,
+            "researchSources": researchSources,
+            "agentContext": agentContext
         })
         logger.info(f"{name} sold {quantity} shares of {symbol}")
         return str(result)

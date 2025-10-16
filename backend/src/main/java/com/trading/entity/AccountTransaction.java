@@ -36,6 +36,15 @@ public class AccountTransaction {
     @Column(columnDefinition = "TEXT")
     private String rationale;
 
+    @Column(name = "full_reasoning", columnDefinition = "TEXT")
+    private String fullReasoning;
+
+    @Column(name = "research_sources", columnDefinition = "jsonb")
+    private String researchSources; // JSON array of research sources
+
+    @Column(name = "agent_context", columnDefinition = "jsonb")
+    private String agentContext; // JSON object with portfolio state before trade
+
     @Column(name = "transaction_type", nullable = false)
     private String transactionType; // BUY, SELL
 

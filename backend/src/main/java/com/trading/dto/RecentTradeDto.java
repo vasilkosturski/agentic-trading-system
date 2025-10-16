@@ -12,6 +12,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RecentTradeDto {
+    private Long id;
     private String agentName;
     private String transactionType; // BUY or SELL
     private String symbol;
