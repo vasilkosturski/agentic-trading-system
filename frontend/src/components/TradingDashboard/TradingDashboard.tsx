@@ -8,19 +8,49 @@ const TradingDashboard = () => {
   const { data: marketStatus, isLoading: marketStatusLoading } = useMarketStatus();
 
   const formatTimeAgo = (minutes: number): string => {
-    if (minutes < 60) return `${minutes}m`;
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
 
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
 
     if (hours < 24) {
-      return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+      return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m ago` : `${hours}h ago`;
     }
 
     const days = Math.floor(hours / 24);
     const remainingHours = hours % 24;
 
-    return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+    return remainingHours > 0 ? `${days}d ${remainingHours}h ago` : `${days}d ago`;
+  };
+
+  const getActivityStatus = (lastActivity: string) => {
+    const minutesAgo = Math.round((Date.now() - new Date(lastActivity).getTime()) / 60000);
+
+    if (minutesAgo <= 5) {
+      return {
+        text: formatTimeAgo(minutesAgo),
+        color: 'text-green-600 dark:text-green-400',
+        dotColor: 'bg-green-500',
+        tooltip: 'Active now'
+      };
+    }
+
+    if (minutesAgo <= 120) { // Within 2 hours
+      return {
+        text: formatTimeAgo(minutesAgo),
+        color: 'text-gray-600 dark:text-gray-400',
+        dotColor: 'bg-gray-400',
+        tooltip: 'Recently active'
+      };
+    }
+
+    return {
+      text: formatTimeAgo(minutesAgo),
+      color: 'text-red-500 dark:text-red-400',
+      dotColor: 'bg-red-500',
+      tooltip: 'Inactive'
+    };
   };
 
   const formatNextCycle = (lastActivity: string, cycleIntervalSeconds: number) => {
@@ -148,6 +178,7 @@ const TradingDashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
           {agents?.map((agent) => {
             const nextCycle = formatNextCycle(agent.lastActivity, agent.cycleIntervalSeconds);
+            const activityStatus = getActivityStatus(agent.lastActivity);
             return (
             <div key={agent.agentName} className="trading-card">
               <div className="flex items-center justify-between mb-4">
@@ -212,9 +243,13 @@ const TradingDashboard = () => {
                   <div className="text-xs text-gray-500 mb-2 text-center">7-Day Portfolio Value</div>
                   <SimplePortfolioChart agentName={agent.agentName} />
                 </div>
-                
-                <div className="text-xs text-gray-400 text-center">
-                  Last Activity: {new Date(agent.lastActivity).toLocaleTimeString()}
+
+                {/* Last Activity with Status Indicator */}
+                <div className="flex items-center justify-center space-x-2 text-xs" title={activityStatus.tooltip}>
+                  <div className={`w-2 h-2 rounded-full ${activityStatus.dotColor}`}></div>
+                  <span className={`font-medium ${activityStatus.color}`}>
+                    Last active {activityStatus.text}
+                  </span>
                 </div>
               </div>
             </div>
