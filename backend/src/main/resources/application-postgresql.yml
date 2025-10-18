@@ -26,6 +26,8 @@ spring:
           batch_size: 20
         order_inserts: true
         order_updates: true
+        hbm2ddl:
+          create_namespaces: true  # Automatically create schemas
         
 # Logging configuration for PostgreSQL
 logging:
