@@ -1,13 +1,14 @@
 # PostgreSQL Database - Agentic Trading System
 
-This directory contains PostgreSQL initialization scripts for the Agentic Trading System deployed on Kubernetes.
+This directory contains database documentation for the Agentic Trading System.
 
-## 📁 Files
+## 🔧 Schema Management
 
-| File | Purpose | Description |
-|------|---------|-------------|
-| [`init/01-init-database.sql`](init/01-init-database.sql) | Schema Setup | Creates schemas, extensions, and permissions |
-| [`init/02-create-schema.sql`](init/02-create-schema.sql) | Tables & Data | Complete table definitions with sample data |
+**Schema is managed by JPA auto-DDL** - all tables are automatically created from Java entities.
+
+- **Source of truth**: Java entities in `backend/src/main/java/com/trading/entity/`
+- **Auto-DDL mode**: `ddl-auto: update` (preserves data, adds new tables/columns)
+- **No manual SQL scripts needed** - JPA handles everything
 
 ## 🗄️ Database Schema
 
@@ -35,51 +36,39 @@ This directory contains PostgreSQL initialization scripts for the Agentic Tradin
 
 ## 🚀 Deployment
 
-### Kubernetes Deployment
-The database is automatically initialized when deployed via:
-
+### Normal Deployment (Preserves Data)
 ```bash
-# Single command deployment
+cd deployment/k3s
 ./deploy-to-k3s.sh
 ```
+- JPA auto-updates schema (adds new tables/columns)
+- All existing data preserved
+- Safe for production
 
-### Manual Initialization
-If you need to run the scripts manually:
-
+### Clean Deployment (Wipes Data)
 ```bash
-# Get PostgreSQL pod name
-POSTGRES_POD=$(kubectl get pods -n agentic-trading -l app=postgres -o jsonpath='{.items[0].metadata.name}')
-
-# Run initialization scripts
-kubectl exec -n agentic-trading $POSTGRES_POD -- psql -U trading_user -d agentic_trading -f /tmp/01-init-database.sql
-kubectl exec -n agentic-trading $POSTGRES_POD -- psql -U trading_user -d agentic_trading -f /tmp/02-create-schema.sql
+cd deployment/k3s
+./deploy-to-k3s.sh --clean --yes
 ```
+- Drops all schemas and data
+- JPA recreates everything from entities
+- Use when switching to JPA-managed schema or testing fresh install
 
-## 📊 Sample Data
+## 📊 Data Initialization
 
-The system includes realistic sample data:
+Agents and accounts are created automatically:
+
+### Agent Auto-Registration
+When agents start for the first time, they automatically:
+1. Create their agent record in `agents.trading_agents`
+2. Create their account in `trading.trading_accounts`
+3. Initialize with $100,000 starting balance
 
 ### Trading Agents
-- **Warren** - Value investor (30% risk tolerance, weekly trading)
-- **George** - Momentum trader (70% risk tolerance, daily trading)
-- **Ray** - Risk parity trader (50% risk tolerance, monthly trading)
-- **Cathie** - Growth investor (80% risk tolerance, weekly trading)
-
-### Trading Accounts
-- **Warren**: $100,000 initial balance
-- **George**: $50,000 initial balance
-- **Ray**: $75,000 initial balance
-- **Cathie**: $60,000 initial balance
-
-### Sample Transactions
-- **5 Recent trades** across all agents
-- **Realistic symbols**: AAPL, MSFT, TSLA, GOOGL, NVDA
-- **Trade rationales**: AI-generated reasoning for each trade
-
-### Portfolio History
-- **7 days** of portfolio snapshots for each agent
-- **Performance tracking** with daily values
-- **Chart data** for frontend visualization
+- **Warren** - Value investor ($100k initial)
+- **George** - Momentum trader ($100k initial)
+- **Ray** - Risk parity trader ($100k initial)
+- **Cathie** - Growth investor ($100k initial)
 
 ## 🔍 Database Access
 
@@ -168,17 +157,16 @@ kubectl exec statefulset/postgres -n agentic-trading -- psql -U trading_user -d 
 
 ## 📋 Schema Evolution
 
-### Adding New Tables
-1. Create migration SQL file
-2. Apply via kubectl exec
-3. Update JPA entities in backend
-4. Test with sample data
+### Adding New Tables/Columns
+1. Create/modify Java entity in `backend/src/main/java/com/trading/entity/`
+2. Deploy normally (`./deploy-to-k3s.sh`)
+3. JPA automatically creates/updates schema
+4. Done!
 
 ### Performance Optimization
-- **Indexes**: Optimized for common queries
-- **Partitioning**: Consider for large transaction tables
+- **Indexes**: Add via `@Index` annotation on entities
 - **Connection Pooling**: Configured in Spring Boot
-- **Query Optimization**: Monitor slow queries
+- **Query Optimization**: Monitor slow queries with `show-sql: true`
 
 ---
 
