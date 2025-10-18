@@ -45,6 +45,10 @@ public class AccountTransaction {
     @Column(name = "agent_context", columnDefinition = "jsonb")
     private String agentContext; // JSON object with portfolio state before trade
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "agent_run_id")
+    private AgentRun agentRun; // Link to the agent run that created this transaction
+
     @Column(name = "transaction_type", nullable = false)
     private String transactionType; // BUY, SELL
 
