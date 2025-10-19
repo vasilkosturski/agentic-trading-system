@@ -39,10 +39,10 @@ public class AccountTransaction {
     @Column(name = "full_reasoning", columnDefinition = "TEXT")
     private String fullReasoning;
 
-    @Column(name = "research_sources", columnDefinition = "jsonb")
+    @Column(name = "research_sources", columnDefinition = "TEXT")
     private String researchSources; // JSON array of research sources
 
-    @Column(name = "agent_context", columnDefinition = "jsonb")
+    @Column(name = "agent_context", columnDefinition = "TEXT")
     private String agentContext; // JSON object with portfolio state before trade
 
     @ManyToOne(fetch = FetchType.LAZY)

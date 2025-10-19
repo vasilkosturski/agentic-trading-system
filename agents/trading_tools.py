@@ -78,7 +78,8 @@ async def buy_shares(
     rationale: str,
     fullReasoning: str = None,
     researchSources: str = None,
-    agentContext: str = None
+    agentContext: str = None,
+    runId: int = None
 ) -> str:
     """Buy shares of a stock.
 
@@ -127,7 +128,8 @@ async def buy_shares(
             "rationale": rationale,
             "fullReasoning": fullReasoning,
             "researchSources": researchSources,
-            "agentContext": agentContext
+            "agentContext": agentContext,
+            "runId": runId
         })
         logger.info(f"{name} bought {quantity} shares of {symbol}")
         return str(result)
@@ -144,7 +146,8 @@ async def sell_shares(
     rationale: str,
     fullReasoning: str = None,
     researchSources: str = None,
-    agentContext: str = None
+    agentContext: str = None,
+    runId: int = None
 ) -> str:
     """Sell shares of a stock.
 
@@ -190,7 +193,8 @@ async def sell_shares(
             "rationale": rationale,
             "fullReasoning": fullReasoning,
             "researchSources": researchSources,
-            "agentContext": agentContext
+            "agentContext": agentContext,
+            "runId": runId
         })
         logger.info(f"{name} sold {quantity} shares of {symbol}")
         return str(result)

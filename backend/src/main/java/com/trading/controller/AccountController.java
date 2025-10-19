@@ -81,9 +81,10 @@ public class AccountController {
             String fullReasoning = (String) request.get("fullReasoning");
             String researchSources = (String) request.get("researchSources");
             String agentContext = (String) request.get("agentContext");
+            Long runId = request.get("runId") != null ? ((Number) request.get("runId")).longValue() : null;
 
             String result = accountService.buyShares(name, symbol, quantity, rationale,
-                fullReasoning, researchSources, agentContext);
+                fullReasoning, researchSources, agentContext, runId);
             return ResponseEntity.ok(new ToolResponse<>(true, result, null));
         } catch (Exception e) {
             return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
@@ -100,9 +101,10 @@ public class AccountController {
             String fullReasoning = (String) request.get("fullReasoning");
             String researchSources = (String) request.get("researchSources");
             String agentContext = (String) request.get("agentContext");
+            Long runId = request.get("runId") != null ? ((Number) request.get("runId")).longValue() : null;
 
             String result = accountService.sellShares(name, symbol, quantity, rationale,
-                fullReasoning, researchSources, agentContext);
+                fullReasoning, researchSources, agentContext, runId);
             return ResponseEntity.ok(new ToolResponse<>(true, result, null));
         } catch (Exception e) {
             return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));

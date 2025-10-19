@@ -36,6 +36,9 @@ public class AccountService {
     @Autowired
     private MarketService marketService;
 
+    @Autowired
+    private AgentRunRepository agentRunRepository;
+
     /**
      * Initialize agent and create trading account - should be called when agent starts
      */
@@ -108,14 +111,14 @@ public class AccountService {
      * Buy shares for an agent
      */
     public String buyShares(String agentName, String symbol, Integer quantity, String rationale) {
-        return buyShares(agentName, symbol, quantity, rationale, null, null, null);
+        return buyShares(agentName, symbol, quantity, rationale, null, null, null, null);
     }
 
     /**
      * Buy shares for an agent with detailed metadata
      */
     public String buyShares(String agentName, String symbol, Integer quantity, String rationale,
-                           String fullReasoning, String researchSources, String agentContext) {
+                           String fullReasoning, String researchSources, String agentContext, Long runId) {
         TradingAccount account = getAccount(agentName);
 
         // Check position limit BEFORE buying (max 10 positions per agent)
@@ -173,6 +176,14 @@ public class AccountService {
         transaction.setResearchSources(researchSources);
         transaction.setAgentContext(agentContext);
         transaction.setTimestamp(Instant.now());
+
+        // Link transaction to agent run if provided
+        if (runId != null) {
+            AgentRun agentRun = agentRunRepository.findById(runId)
+                .orElseThrow(() -> new RuntimeException("Agent run not found: " + runId));
+            transaction.setAgentRun(agentRun);
+        }
+
         transactionRepository.save(transaction);
         
         // Update or create holding
@@ -215,14 +226,14 @@ public class AccountService {
      * Sell shares for an agent
      */
     public String sellShares(String agentName, String symbol, Integer quantity, String rationale) {
-        return sellShares(agentName, symbol, quantity, rationale, null, null, null);
+        return sellShares(agentName, symbol, quantity, rationale, null, null, null, null);
     }
 
     /**
      * Sell shares for an agent with detailed metadata
      */
     public String sellShares(String agentName, String symbol, Integer quantity, String rationale,
-                            String fullReasoning, String researchSources, String agentContext) {
+                            String fullReasoning, String researchSources, String agentContext, Long runId) {
         TradingAccount account = getAccount(agentName);
         
         // Check if we have enough shares
@@ -257,6 +268,14 @@ public class AccountService {
         transaction.setResearchSources(researchSources);
         transaction.setAgentContext(agentContext);
         transaction.setTimestamp(Instant.now());
+
+        // Link transaction to agent run if provided
+        if (runId != null) {
+            AgentRun agentRun = agentRunRepository.findById(runId)
+                .orElseThrow(() -> new RuntimeException("Agent run not found: " + runId));
+            transaction.setAgentRun(agentRun);
+        }
+
         transactionRepository.save(transaction);
         
         // Update holding
