@@ -71,7 +71,7 @@ services:
       DATABASE_URL: "postgresql://trading_user:trading_password@postgres:5432/agentic_trading"
       ENVIRONMENT: "development"
       LOG_LEVEL: "DEBUG"
-      CONTINUOUS_MODE: "false"
+      CONTINUOUS_MODE: "true"
       RUN_EVERY_N_MINUTES: "60"
       RUN_EVEN_WHEN_MARKET_IS_CLOSED: "true"
     volumes:
