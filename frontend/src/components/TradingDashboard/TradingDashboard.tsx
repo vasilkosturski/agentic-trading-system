@@ -154,7 +154,10 @@ const TradingDashboard = () => {
         </h2>
         <div className="flex items-center justify-center space-x-4 mb-8">
           <p className="text-lg text-gray-600 dark:text-gray-300">
-            4 Autonomous Traders: Warren, George, Ray, and Cathie
+            {agents && agents.length > 0
+              ? `${agents.length} Autonomous Trader${agents.length !== 1 ? 's' : ''}: ${agents.map(a => a.agentName).join(', ')}`
+              : 'Loading traders...'
+            }
           </p>
           {!marketStatusLoading && marketStatus && (
             <div className="flex flex-col items-start">
