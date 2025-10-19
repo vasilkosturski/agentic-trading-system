@@ -20,6 +20,9 @@ from market_tools import MARKET_TOOLS
 # Import MCP params only for external services (Brave Search, Memory, Fetch)
 from mcp_params import researcher_mcp_server_params
 
+# Import run tracking
+from run_tracking import start_run, end_run, mark_run_as_error
+
 logger = logging.getLogger(__name__)
 
 class SimpleTrader:
@@ -205,27 +208,78 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
     async def run_agent(self, researcher_mcp_servers):
         """Run the agent - simplified without internal MCPs"""
         cycle_type = "trading" if self.do_trade else "rebalancing"
+        run_type = "TRADING" if self.do_trade else "REBALANCE"
         print(f"🤖 {self.name} starting {cycle_type} cycle at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
         # Initialize agent account (direct function call, not through agent)
         await initialize_agent(self.name)
 
-        # Create agent with direct tools
-        self.agent = await self.create_agent(researcher_mcp_servers)
-
         # Get account report (direct API call)
         account = await get_account_report(self.name)
         strategy = await self.get_strategy()
 
-        message = (
-            self.get_trade_message(strategy, account)
-            if self.do_trade
-            else self.get_rebalance_message(strategy, account)
-        )
+        # Prepare agent context for run tracking
+        from trading_tools import get_balance, get_holdings
+        balance = await get_balance(self.name)
+        holdings = await get_holdings(self.name)
+        agent_context = {
+            "balance": balance,
+            "holdings": holdings,
+            "positionCount": len(holdings),
+        }
 
-        await Runner.run(self.agent, message, max_turns=30)
+        # Market conditions (simplified - could be enhanced)
+        market_conditions = {
+            "timestamp": datetime.now().isoformat(),
+            "cycle_type": cycle_type,
+        }
 
-        print(f"✅ {self.name} completed {cycle_type} cycle at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        # Start run tracking
+        run_id = await start_run(self.name, run_type, agent_context, market_conditions)
+        if run_id is None:
+            logger.warning(f"Failed to start run tracking for {self.name}, continuing without tracking")
+
+        try:
+            # Create agent with direct tools
+            self.agent = await self.create_agent(researcher_mcp_servers)
+
+            message = (
+                self.get_trade_message(strategy, account)
+                if self.do_trade
+                else self.get_rebalance_message(strategy, account)
+            )
+
+            result = await Runner.run(self.agent, message, max_turns=30)
+
+            # Extract result data for run tracking
+            # The result contains messages with the agent's reasoning and final response
+            full_reasoning = ""
+            summary = ""
+            if result and hasattr(result, 'messages'):
+                # Get last assistant message as summary
+                assistant_messages = [m for m in result.messages if hasattr(m, 'role') and m.role == 'assistant']
+                if assistant_messages:
+                    last_message = assistant_messages[-1]
+                    summary = last_message.content if hasattr(last_message, 'content') else str(last_message)
+                    # Full reasoning is all assistant messages concatenated
+                    full_reasoning = "\n\n".join(
+                        m.content if hasattr(m, 'content') else str(m)
+                        for m in assistant_messages
+                    )
+
+            # End run tracking (with placeholder values for now - could be enhanced)
+            if run_id is not None:
+                research_sources = []  # Could extract from researcher tool calls
+                trade_count = 0  # Could count actual trades made
+                await end_run(run_id, full_reasoning or "Agent execution completed", research_sources, summary or "Completed", trade_count)
+
+            print(f"✅ {self.name} completed {cycle_type} cycle at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+        except Exception as e:
+            # Mark run as error if tracking was started
+            if run_id is not None:
+                await mark_run_as_error(run_id, str(e))
+            raise  # Re-raise the exception
 
     async def run_with_mcp_servers(self):
         """Run agent with MCP server context - only for external services (Brave Search, Memory, Fetch)"""
