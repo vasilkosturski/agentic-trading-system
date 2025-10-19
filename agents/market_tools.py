@@ -6,13 +6,14 @@ Uses OpenAI Agents SDK @function_tool decorator for automatic schema generation
 
 import aiohttp
 import logging
+import os
 from agents import function_tool
 from typing import Dict, List, Any
 
 logger = logging.getLogger(__name__)
 
-# Configuration
-BACKEND_URL = "http://backend-service:8080/api/market"
+# Configuration - Use environment variable or fallback to Docker service name
+BACKEND_URL = os.getenv("BACKEND_URL", "http://backend-service:8080") + "/api/market"
 
 async def _call_backend_api(endpoint: str) -> any:
     """Helper to call Java backend API"""

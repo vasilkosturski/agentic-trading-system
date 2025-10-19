@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useTradingAgents, useMarketStatus } from '../../hooks';
 import SimplePortfolioChart from './SimplePortfolioChart';
 import RecentTrades from './RecentTrades';
@@ -180,7 +181,8 @@ const TradingDashboard = () => {
             const nextCycle = formatNextCycle(agent.lastActivity, agent.cycleIntervalSeconds);
             const activityStatus = getActivityStatus(agent.lastActivity);
             return (
-            <div key={agent.agentName} className="trading-card">
+            <Link key={agent.agentName} to={`/agents/${agent.agentName}`}>
+            <div className="trading-card hover:shadow-xl hover:scale-[1.02] hover:border-blue-400 transition-all duration-200 cursor-pointer">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="trader-header">{agent.agentName}</h3>
                 <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${nextCycle.bg} ${nextCycle.color}`}>
@@ -253,6 +255,7 @@ const TradingDashboard = () => {
                 </div>
               </div>
             </div>
+            </Link>
             );
           })}
         </div>

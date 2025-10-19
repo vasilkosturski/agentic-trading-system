@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import TradingDashboard from './components/TradingDashboard/TradingDashboard'
 import TradeDetailPage from './components/TradeDetail/TradeDetailPage'
+import AgentDetailPage from './components/AgentDetailPage'
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
         <Routes>
           <Route path="/" element={<TradingDashboard />} />
           <Route path="/dashboard" element={<TradingDashboard />} />
+          <Route path="/agents/:agentName" element={<AgentDetailPage />} />
           <Route path="/trades/:tradeId" element={<TradeDetailPage />} />
         </Routes>
       </main>

@@ -125,7 +125,8 @@ in exchange for the potential of exponential returns from revolutionary companie
 async def check_market_status() -> bool:
     """Check if market is open via backend API"""
     try:
-        url = "http://backend-service:8080/api/market/status"
+        base_url = os.getenv("BACKEND_URL", "http://backend-service:8080")
+        url = f"{base_url}/api/market/status"
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
                 if response.status == 200:
@@ -149,7 +150,8 @@ async def check_market_status() -> bool:
 async def update_all_agents_activity():
     """Update lastActivity for all agents (called on every cycle, even when market closed)"""
     agent_names = ["Warren", "George", "Ray", "Cathie"]
-    url = "http://backend-service:8080/api/accounts/tools/update_activity"
+    base_url = os.getenv("BACKEND_URL", "http://backend-service:8080")
+    url = f"{base_url}/api/accounts/tools/update_activity"
 
     try:
         async with aiohttp.ClientSession() as session:
