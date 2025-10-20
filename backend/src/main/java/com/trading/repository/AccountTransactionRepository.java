@@ -83,4 +83,10 @@ public interface AccountTransactionRepository extends JpaRepository<AccountTrans
      */
     @Query("SELECT at FROM AccountTransaction at WHERE at.account = :account ORDER BY at.timestamp DESC")
     List<AccountTransaction> findByAccountOrderByTimestampDesc(@Param("account") TradingAccount account);
+
+    /**
+     * Find transactions by agent run ID
+     */
+    @Query("SELECT at FROM AccountTransaction at WHERE at.agentRun.id = :runId ORDER BY at.timestamp DESC")
+    List<AccountTransaction> findByAgentRunId(@Param("runId") Long runId);
 }
