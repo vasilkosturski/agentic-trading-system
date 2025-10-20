@@ -1,8 +1,11 @@
 package com.trading.controller;
 
 import com.trading.dto.AgentRunDto;
+import com.trading.dto.RunDetailDto;
 import com.trading.dto.ToolResponse;
+import com.trading.entity.AccountTransaction;
 import com.trading.entity.AgentRun;
+import com.trading.repository.AccountTransactionRepository;
 import com.trading.service.RunService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +26,9 @@ public class RunController {
 
     @Autowired
     private RunService runService;
+
+    @Autowired
+    private AccountTransactionRepository transactionRepository;
 
     /**
      * Start a new agent run
@@ -95,14 +101,15 @@ public class RunController {
     }
 
     /**
-     * Get a specific run by ID
+     * Get a specific run by ID with trades
      * GET /api/runs/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<AgentRunDto> getRun(@PathVariable Long id) {
+    public ResponseEntity<RunDetailDto> getRun(@PathVariable Long id) {
         try {
             AgentRun run = runService.getRun(id);
-            return ResponseEntity.ok(AgentRunDto.fromEntity(run));
+            List<AccountTransaction> transactions = transactionRepository.findByAgentRunId(id);
+            return ResponseEntity.ok(RunDetailDto.fromEntity(run, transactions));
         } catch (Exception e) {
             logger.error("Error getting run {}", id, e);
             return ResponseEntity.notFound().build();
