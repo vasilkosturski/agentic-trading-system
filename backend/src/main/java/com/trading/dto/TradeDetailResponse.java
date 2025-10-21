@@ -16,6 +16,8 @@ public class TradeDetailResponse {
     private String researchSources; // JSON string
     private String agentContext; // JSON string
     private List<RelatedTrade> relatedTrades;
+    private Long runId; // ID of the agent run that created this trade (null if not part of a run)
+    private String runSummary; // Summary of the run that created this trade
 
     @Data
     @NoArgsConstructor
