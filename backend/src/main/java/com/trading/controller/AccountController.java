@@ -236,13 +236,23 @@ public class AccountController {
                     ))
                     .collect(Collectors.toList());
 
+            // Get run info if available
+            Long runId = null;
+            String runSummary = null;
+            if (transaction.getAgentRun() != null) {
+                runId = transaction.getAgentRun().getId();
+                runSummary = transaction.getAgentRun().getSummary();
+            }
+
             // Build response
             TradeDetailResponse response = new TradeDetailResponse(
                     tradeInfo,
                     transaction.getFullReasoning(),
                     transaction.getResearchSources(),
                     transaction.getAgentContext(),
-                    relatedTrades
+                    relatedTrades,
+                    runId,
+                    runSummary
             );
 
             return ResponseEntity.ok(response);

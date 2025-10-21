@@ -34,6 +34,8 @@ export interface TradeDetail {
     price: number;
     timestamp: string;
   }>;
+  runId?: number | null; // ID of the agent run that created this trade
+  runSummary?: string | null; // Summary of the run that created this trade
 }
 
 export const tradesService = {

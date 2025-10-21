@@ -57,7 +57,7 @@ const TradeDetailPage: React.FC = () => {
     );
   }
 
-  const { trade, fullReasoning, researchSources, agentContext, relatedTrades } = tradeDetail;
+  const { trade, fullReasoning, researchSources, agentContext, relatedTrades, runId, runSummary } = tradeDetail;
 
   // Parse JSON strings if available
   let parsedSources: any[] = [];
@@ -204,6 +204,34 @@ const TradeDetailPage: React.FC = () => {
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {/* Run Link Section */}
+          {runId && (
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                <i className="pi pi-bolt text-blue-600 mr-2"></i>
+                Part of Run
+              </h2>
+              <div
+                onClick={() => navigate(`/runs/${runId}`)}
+                className="border-2 border-blue-200 rounded-lg p-4 hover:bg-blue-50 hover:border-blue-400 cursor-pointer transition-all"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600">Run ID</span>
+                  <span className="font-mono text-lg font-bold text-blue-600">#{runId}</span>
+                </div>
+                {runSummary && (
+                  <p className="text-sm text-gray-700 mt-2 line-clamp-2">
+                    {runSummary}
+                  </p>
+                )}
+                <div className="flex items-center justify-end mt-3 text-blue-600">
+                  <span className="text-sm font-medium">View run details</span>
+                  <i className="pi pi-arrow-right ml-2 text-xs"></i>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Agent Context */}
           {parsedContext && (
             <div className="bg-white rounded-xl shadow-lg p-6">
