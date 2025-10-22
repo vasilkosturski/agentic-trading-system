@@ -219,9 +219,9 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
         strategy = await self.get_strategy()
 
         # Prepare agent context for run tracking
-        from trading_tools import get_balance, get_holdings
-        balance = await get_balance(self.name)
-        holdings = await get_holdings(self.name)
+        from trading_tools import _get_balance_raw, _get_holdings_raw
+        balance = await _get_balance_raw(self.name)
+        holdings = await _get_holdings_raw(self.name)
         agent_context = {
             "balance": balance,
             "holdings": holdings,

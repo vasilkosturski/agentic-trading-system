@@ -112,10 +112,10 @@ async def buy_shares(
         # Capture current portfolio state if not provided
         if agentContext is None:
             try:
-                balance = await _call_backend_api("/tools/get_balance", {"name": name})
-                holdings = await _call_backend_api("/tools/get_holdings", {"name": name})
+                balance = await _get_balance_raw(name)
+                holdings = await _get_holdings_raw(name)
                 agentContext = json.dumps({
-                    "cashBefore": float(balance),
+                    "cashBefore": balance,
                     "positionsBefore": len(holdings),
                     "holdingsBefore": holdings
                 })
@@ -177,10 +177,10 @@ async def sell_shares(
         # Capture current portfolio state if not provided
         if agentContext is None:
             try:
-                balance = await _call_backend_api("/tools/get_balance", {"name": name})
-                holdings = await _call_backend_api("/tools/get_holdings", {"name": name})
+                balance = await _get_balance_raw(name)
+                holdings = await _get_holdings_raw(name)
                 agentContext = json.dumps({
-                    "cashBefore": float(balance),
+                    "cashBefore": balance,
                     "positionsBefore": len(holdings),
                     "holdingsBefore": holdings
                 })
@@ -229,6 +229,16 @@ async def initialize_agent(name: str, initial_balance: float = 100000.0) -> str:
         raise Exception(f"Failed to initialize agent {name}: {str(e)}")
 
 # Helper functions for system use (not agent tools)
+
+async def _get_balance_raw(name: str) -> float:
+    """Raw balance getter - for system use, not exposed to agents"""
+    result = await _call_backend_api("/tools/get_balance", {"name": name})
+    return float(result)
+
+async def _get_holdings_raw(name: str) -> Dict[str, int]:
+    """Raw holdings getter - for system use, not exposed to agents"""
+    result = await _call_backend_api("/tools/get_holdings", {"name": name})
+    return result
 
 async def get_account_report(name: str) -> str:
     """Get detailed account report - called by system, not exposed as agent tool"""
