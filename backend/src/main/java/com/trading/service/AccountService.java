@@ -235,7 +235,7 @@ public class AccountService {
     public String sellShares(String agentName, String symbol, Integer quantity, String rationale,
                             String fullReasoning, String researchSources, String agentContext, Long runId) {
         TradingAccount account = getAccount(agentName);
-        
+
         // Check if we have enough shares
         AccountHolding holding = holdingRepository.findByAccountAndSymbol(account, symbol);
         if (holding == null || holding.getQuantity() < quantity) {

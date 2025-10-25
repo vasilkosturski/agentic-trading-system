@@ -1,7 +1,7 @@
-import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { agentService, type AgentDetail } from '../services/agentService';
+import { tradesService, type RecentTrade } from '../services/tradesService';
 
 const AgentDetailPage = () => {
   const { agentName } = useParams<{ agentName: string }>();
@@ -9,6 +9,12 @@ const AgentDetailPage = () => {
   const { data: agentDetail, isLoading, error } = useQuery<AgentDetail>({
     queryKey: ['agentDetail', agentName],
     queryFn: () => agentService.getAgentDetail(agentName!),
+    enabled: !!agentName,
+  });
+
+  const { data: recentTrades = [], isLoading: tradesLoading } = useQuery<RecentTrade[]>({
+    queryKey: ['agentTrades', agentName],
+    queryFn: () => tradesService.getAgentTrades(agentName!),
     enabled: !!agentName,
   });
 
@@ -128,6 +134,73 @@ const AgentDetailPage = () => {
             <p className="text-gray-500 dark:text-gray-400">No holdings</p>
           )}
         </div>
+      </div>
+
+      {/* Recent Trades Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+          Recent Trades
+        </h2>
+        {tradesLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : recentTrades.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="border-b border-gray-200 dark:border-gray-700">
+                <tr className="text-left">
+                  <th className="pb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Time</th>
+                  <th className="pb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Type</th>
+                  <th className="pb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Symbol</th>
+                  <th className="pb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Qty</th>
+                  <th className="pb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Price</th>
+                  <th className="pb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Total</th>
+                  <th className="pb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Rationale</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentTrades.map((trade) => (
+                  <Link
+                    key={trade.id}
+                    to={`/trades/${trade.id}`}
+                    className="table-row hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                  >
+                    <td className="py-3 text-sm text-gray-900 dark:text-white">
+                      {new Date(trade.timestamp).toLocaleString()}
+                    </td>
+                    <td className="py-3">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        trade.transactionType === 'BUY'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+                      }`}>
+                        {trade.transactionType}
+                      </span>
+                    </td>
+                    <td className="py-3 text-sm font-medium text-gray-900 dark:text-white">
+                      {trade.symbol}
+                    </td>
+                    <td className="py-3 text-sm text-gray-900 dark:text-white">
+                      {trade.quantity}
+                    </td>
+                    <td className="py-3 text-sm text-gray-900 dark:text-white">
+                      {formatCurrency(trade.price)}
+                    </td>
+                    <td className="py-3 text-sm font-medium text-gray-900 dark:text-white">
+                      {formatCurrency(trade.totalAmount)}
+                    </td>
+                    <td className="py-3 text-sm text-gray-600 dark:text-gray-400 max-w-md truncate">
+                      {trade.rationale}
+                    </td>
+                  </Link>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-gray-500 dark:text-gray-400">No trades yet</p>
+        )}
       </div>
 
       {/* Recent Runs Section */}

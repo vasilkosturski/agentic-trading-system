@@ -48,6 +48,25 @@ export const tradesService = {
   },
 
   /**
+   * Get trades for a specific agent
+   */
+  async getAgentTrades(agentName: string): Promise<RecentTrade[]> {
+    const response = await apiClient.get<{ data: any[] }>(`/trading/agent-trades?agentName=${agentName}`);
+    // Map API response to RecentTrade interface
+    return response.data.data.map((trade: any) => ({
+      id: parseInt(trade.id),
+      agentName: trade.agentName,
+      transactionType: trade.type as 'BUY' | 'SELL',
+      symbol: trade.symbol,
+      quantity: trade.quantity,
+      price: trade.price,
+      totalAmount: trade.price * trade.quantity,
+      timestamp: trade.timestamp,
+      rationale: trade.reasoning || ''
+    }));
+  },
+
+  /**
    * Get detailed information about a specific trade
    */
   async getTradeDetail(tradeId: number): Promise<TradeDetail> {
