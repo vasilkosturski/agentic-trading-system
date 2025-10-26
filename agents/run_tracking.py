@@ -1,15 +1,18 @@
 """
 Helper functions for tracking agent runs via backend API.
 """
-import os
 import json
 import httpx
 from typing import Optional, Dict, Any
 import logging
 
+# Import centralized configuration
+from config import BACKEND_API_RUNS
+
 logger = logging.getLogger(__name__)
 
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8080")
+# Use centralized configuration
+BACKEND_URL = BACKEND_API_RUNS
 
 
 async def start_run(

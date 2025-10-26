@@ -7,14 +7,16 @@ Uses OpenAI Agents SDK @function_tool decorator for automatic schema generation
 import aiohttp
 import json
 import logging
-import os
 from agents import function_tool
 from typing import Dict
 
+# Import centralized configuration
+from config import BACKEND_API_ACCOUNTS, BACKEND_BASE_URL
+
 logger = logging.getLogger(__name__)
 
-# Configuration - Use environment variable or fallback to Docker service name
-BACKEND_URL = os.getenv("BACKEND_URL", "http://backend-service:8080") + "/api/accounts"
+# Use centralized configuration
+BACKEND_URL = BACKEND_API_ACCOUNTS
 
 async def _call_backend_api(endpoint: str, data: dict = None) -> any:
     """Helper to call Java backend API"""
@@ -243,8 +245,7 @@ async def _get_holdings_raw(name: str) -> Dict[str, int]:
 async def get_account_report(name: str) -> str:
     """Get detailed account report - called by system, not exposed as agent tool"""
     try:
-        base_url = os.getenv("BACKEND_URL", "http://backend-service:8080")
-        url = f"{base_url}/api/accounts/resources/accounts/{name}"
+        url = f"{BACKEND_BASE_URL}/api/accounts/resources/accounts/{name}"
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 if response.status == 200:
@@ -258,8 +259,7 @@ async def get_account_report(name: str) -> str:
 async def get_strategy(name: str) -> str:
     """Get agent strategy - called by system, not exposed as agent tool"""
     try:
-        base_url = os.getenv("BACKEND_URL", "http://backend-service:8080")
-        url = f"{base_url}/api/accounts/resources/strategy/{name}"
+        url = f"{BACKEND_BASE_URL}/api/accounts/resources/strategy/{name}"
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 if response.status == 200:
