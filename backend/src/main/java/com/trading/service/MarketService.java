@@ -56,13 +56,16 @@ public class MarketService {
     // Configuration - Polygon API only (simplified for demo)
     @Value("${market.polygon.api-key:}")
     private String polygonApiKey;
-    
+
+    @Value("${market.polygon.base-url:https://api.polygon.io}")
+    private String polygonBaseUrl;
+
     @Value("${market.polygon.enabled:true}")
     private boolean polygonEnabled;
-    
+
     @Value("${market.polygon.free-tier:true}")
     private boolean polygonFreeTier;
-    
+
     @Value("${market.cache.ttl-minutes:60}")
     private int cacheTtlMinutes;
     
@@ -166,8 +169,8 @@ public class MarketService {
             
             // Polygon aggregates endpoint for daily data
             String url = String.format(
-                "https://api.polygon.io/v2/aggs/ticker/%s/range/1/day/%s/%s?adjusted=true&sort=asc&limit=1&apikey=%s",
-                symbol, dateStr, dateStr, polygonApiKey
+                "%s/v2/aggs/ticker/%s/range/1/day/%s/%s?adjusted=true&sort=asc&limit=1&apikey=%s",
+                polygonBaseUrl, symbol, dateStr, dateStr, polygonApiKey
             );
             logger.info("🌐 DEBUGGING: Making Polygon API request to: {}", url.replace(polygonApiKey, "***API_KEY***"));
             
@@ -317,7 +320,7 @@ public class MarketService {
                 return null;
             }
 
-            String url = String.format("https://api.polygon.io/v1/marketstatus/now?apiKey=%s", polygonApiKey);
+            String url = String.format("%s/v1/marketstatus/now?apiKey=%s", polygonBaseUrl, polygonApiKey);
             logger.info("Fetching market status from Polygon API");
 
             ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);

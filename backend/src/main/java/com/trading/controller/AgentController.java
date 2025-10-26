@@ -19,7 +19,6 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/agents")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173", "https://agentic-trading.vkontech.com"})
 public class AgentController {
 
     @Autowired

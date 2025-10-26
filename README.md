@@ -60,6 +60,12 @@ You should see:
 
 ## 🔧 Configuration
 
+Note: Docker Compose automatically loads variables from a file named `.env` in this directory. If you use a differently named env file, run Compose with:
+
+```bash
+docker compose --env-file .env.custom up -d
+```
+
 ### Backend Configuration
 The backend uses PostgreSQL profile by default. Key configuration in [`src/main/resources/application-postgresql.yml`](backend/src/main/resources/application-postgresql.yml):
 
