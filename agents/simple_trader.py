@@ -14,7 +14,10 @@ from agents import Agent, Tool, Runner, trace
 from agents.mcp import MCPServerStdio
 
 # Import direct function tools (replaces internal MCPs)
-from trading_tools import TRADING_TOOLS, get_account_report, initialize_agent
+from trading_tools import get_account_report, initialize_agent
+from trading_tools import buy_shares, sell_shares
+from agents import function_tool
+from typing import Optional
 from market_tools import MARKET_TOOLS
 
 # Import MCP params only for external services (Brave Search, Memory, Fetch)
@@ -34,6 +37,10 @@ class SimpleTrader:
         self.model_name = model_name
         self.do_trade = True
         self.agent = None
+        # Per-run state (no globals)
+        self.current_run_id: Optional[int] = None
+        self.trade_count: int = 0
+        self.last_decision: Optional[dict] = None
 
     async def get_researcher_tool(self, researcher_mcp_servers) -> Tool:
         """Create researcher tool from external MCP servers (Brave Search, Memory, Fetch)
@@ -80,11 +87,11 @@ You actively manage your portfolio according to your strategy.
 Available tools:
 - Researcher: Research online for news and opportunities
 - Market data tools: lookup_share_price, get_historical_prices, get_market_indicators
-- Trading tools: buy_shares, sell_shares, get_balance, get_holdings
+- Decision tool: decide_action(action=BUY|SELL|HOLD, symbol?, quantity?, rationale)
 - Market status: get_market_status, is_market_open
 
 You have access to end-of-day market data from Polygon.io (previous trading day close).
-Use these tools to carry out research, make decisions, and execute trades.
+Account snapshot is provided in the prompt; do not query balance/holdings via tools.
 
 IMPORTANT: Maximum 10 positions per agent. You must sell before buying new positions if at limit.
 
@@ -123,13 +130,11 @@ TRADING DISCIPLINE:
   - Don't trade for the sake of trading
   - Patience is a virtue in investing
 
-CRITICAL - TOOL USAGE RULES:
-⚠️ **MATCH YOUR REASONING TO YOUR ACTION:**
-  - If you write reasoning about SELLING → use sell_shares() tool
-  - If you write reasoning about BUYING → use buy_shares() tool
-  - NEVER write "Selling XYZ" and then call buy_shares()
-  - NEVER write "Buying XYZ" and then call sell_shares()
-  - Your reasoning MUST match the tool you call - the system will reject mismatches
+CRITICAL - DECISION RULES:
+  - At the end of your analysis, call decide_action exactly once.
+  - If you decide BUY or SELL, include symbol and positive integer quantity.
+  - If you decide HOLD, set action=HOLD and omit symbol/quantity.
+  - The system will execute the action you decide; do NOT call any trading tools directly.
 
 PORTFOLIO CONSTRAINTS:
 - **MAXIMUM 10 POSITIONS AT ANY TIME** - This is a hard limit enforced by the system
@@ -201,8 +206,29 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
         """Create the agent with direct function tools + researcher MCP"""
         researcher_tool = await self.get_researcher_tool(researcher_mcp_servers)
 
-        # Combine all tools: researcher (MCP-based) + direct function tools
-        all_tools = [researcher_tool] + TRADING_TOOLS + MARKET_TOOLS
+        # Add a per-agent decide_action tool that records to instance state
+        @function_tool
+        async def decide_action(action: str, symbol: str = None, quantity: int = None, rationale: str = None) -> str:
+            act = (action or "").upper()
+            if act in ("BUY", "SELL"):
+                if not symbol or not isinstance(quantity, int) or quantity <= 0:
+                    raise ValueError("symbol and positive quantity are required for BUY/SELL")
+            else:
+                act = "HOLD"
+                symbol = symbol or ""
+                quantity = quantity or 0
+            decision = {
+                "action": act,
+                "symbol": symbol,
+                "quantity": quantity,
+                "rationale": rationale or "",
+            }
+            self.last_decision = decision
+            # Return a simple acknowledgement; the system reads self.last_decision
+            return "OK"
+
+        # Only expose market tools + decision tool (no account/trading side-effects)
+        all_tools = [researcher_tool] + MARKET_TOOLS + [decide_action]
 
         agent = Agent(
             name=self.name,
@@ -246,6 +272,10 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
         run_id = await start_run(self.name, run_type, agent_context, market_conditions)
         if run_id is None:
             logger.warning(f"Failed to start run tracking for {self.name}, continuing without tracking")
+        else:
+            self.current_run_id = run_id
+            self.trade_count = 0
+            self.last_decision = None
 
         try:
             # Create agent with direct tools
@@ -275,11 +305,26 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                         for m in assistant_messages
                     )
 
-            # End run tracking (with placeholder values for now - could be enhanced)
+            # Read structured decision from decide_action tool (if any) and dispatch deterministically
+            decision = self.last_decision
+            if decision and decision.get("action") in ("BUY", "SELL"):
+                action = decision["action"]
+                symbol = decision["symbol"]
+                quantity = int(decision["quantity"])
+                rationale = decision.get("rationale") or summary or "Decision"
+                try:
+                    if action == "BUY":
+                        await buy_shares(self.name, symbol, quantity, rationale, full_reasoning, runId=self.current_run_id)
+                    else:
+                        await sell_shares(self.name, symbol, quantity, rationale, full_reasoning, runId=self.current_run_id)
+                    self.trade_count += 1
+                except Exception as trade_err:
+                    logger.error(f"Trade execution failed: {trade_err}")
+
+            # End run tracking
             if run_id is not None:
                 research_sources = []  # Could extract from researcher tool calls
-                trade_count = 0  # Could count actual trades made
-                await end_run(run_id, full_reasoning or "Agent execution completed", research_sources, summary or "Completed", trade_count)
+                await end_run(run_id, full_reasoning or "Agent execution completed", research_sources, summary or "Completed", self.trade_count)
 
             print(f"✅ {self.name} completed {cycle_type} cycle at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -288,6 +333,10 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             if run_id is not None:
                 await mark_run_as_error(run_id, str(e))
             raise  # Re-raise the exception
+        finally:
+            self.current_run_id = None
+            self.trade_count = 0
+            self.last_decision = None
 
     async def run_with_mcp_servers(self):
         """Run agent with MCP server context - only for external services (Brave Search, Memory, Fetch)"""

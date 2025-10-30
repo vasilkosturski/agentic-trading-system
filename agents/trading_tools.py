@@ -270,11 +270,5 @@ async def get_strategy(name: str) -> str:
         logger.error(f"Failed to get strategy for {name}: {e}")
         raise
 
-# All trading tools that agents can use
-# NOTE: initialize_agent is NOT included - it's called by the system, not agents
-TRADING_TOOLS = [
-    get_balance,
-    get_holdings,
-    buy_shares,
-    sell_shares,
-]
+# No model-visible trading tools are exported. Account context is provided explicitly
+# by the orchestrator; trading actions are dispatched by code, not by the model.
