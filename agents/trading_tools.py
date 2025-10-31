@@ -73,7 +73,6 @@ async def get_holdings(name: str) -> Dict[str, int]:
         logger.error(f"Failed to get holdings for {name}: {e}")
         raise Exception(f"Failed to get holdings for {name}: {str(e)}")
 
-@function_tool
 async def buy_shares(
     name: str,
     symbol: str,
@@ -141,7 +140,6 @@ async def buy_shares(
         # Re-raise with original error message (includes position limit info)
         raise Exception(f"Failed to buy {quantity} shares of {symbol}: {str(e)}")
 
-@function_tool
 async def sell_shares(
     name: str,
     symbol: str,

@@ -11,7 +11,7 @@ from config import BACKEND_API_RUNS
 
 logger = logging.getLogger(__name__)
 
-# Use centralized configuration
+# Use centralized configuration; already points to /api/runs
 BACKEND_URL = BACKEND_API_RUNS
 
 
@@ -33,7 +33,7 @@ async def start_run(
     Returns:
         Run ID if successful, None if failed
     """
-    url = f"{BACKEND_URL}/api/runs/start"
+    url = f"{BACKEND_URL}/start"
 
     payload = {
         "agentName": agent_name,
@@ -82,7 +82,7 @@ async def end_run(
     Returns:
         True if successful, False if failed
     """
-    url = f"{BACKEND_URL}/api/runs/end"
+    url = f"{BACKEND_URL}/end"
 
     payload = {
         "runId": run_id,
@@ -122,7 +122,7 @@ async def mark_run_as_error(run_id: int, error_message: str) -> bool:
     Returns:
         True if successful, False if failed
     """
-    url = f"{BACKEND_URL}/api/runs/error"
+    url = f"{BACKEND_URL}/error"
 
     payload = {
         "runId": run_id,
