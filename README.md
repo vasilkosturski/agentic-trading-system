@@ -11,17 +11,26 @@ This guide covers running the system locally for development purposes. For produ
 
 ### 1. Database Setup
 
+The schema is generated automatically from the Java entities (`spring.jpa.hibernate.ddl-auto=update`).
+
 #### Option A: Local PostgreSQL
+
 ```bash
-# Install PostgreSQL and create database
-createdb agentic_trading
-psql -d agentic_trading -f database/init/01-init-database.sql
-psql -d agentic_trading -f database/init/02-create-schema.sql
+# Create database + user (run inside psql)
+CREATE USER trading_user WITH PASSWORD 'trading_password';
+CREATE DATABASE agentic_trading OWNER trading_user;
 ```
 
+> Tables are created on first backend startup—no SQL scripts required.
+
 #### Option B: Docker PostgreSQL
+
 ```bash
-docker run --name postgres-dev -e POSTGRES_DB=agentic_trading -e POSTGRES_USER=trading_user -e POSTGRES_PASSWORD=trading_password -p 5432:5432 -d postgres:15
+docker run --name postgres-dev \
+  -e POSTGRES_DB=agentic_trading \
+  -e POSTGRES_USER=trading_user \
+  -e POSTGRES_PASSWORD=trading_password \
+  -p 5432:5432 -d postgres:15
 ```
 
 ### 2. Start the Backend
@@ -119,7 +128,7 @@ VITE_APP_VERSION=1.0.0
 
 1. **Backend Changes**: Restart with `./gradlew bootRun`
 2. **Frontend Changes**: Hot reload automatically updates
-3. **Database Changes**: Apply SQL scripts manually
+3. **Database Changes**: Restart backend—JPA migrates schema automatically
 4. **API Changes**: Update both backend endpoints and frontend services
 
 ## 📁 Component Structure
@@ -140,9 +149,7 @@ agentic-trading-system/
 │   │   ├── services/        # API service layer
 │   │   └── App.tsx          # Main application
 │   └── package.json         # Dependencies
-├── database/init/            # PostgreSQL initialization
-│   ├── 01-init-database.sql # Schema and permissions
-│   └── 02-create-schema.sql # Tables and sample data
+├── database/                # Database documentation (JPA-managed schema)
 └── docs/                    # Technical documentation
 ```
 

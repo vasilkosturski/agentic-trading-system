@@ -1,4 +1,6 @@
 # Phase 7.1 Technical Specifications - SIMPLIFIED
+> **Status (October 2025): Archived design doc.** The current dashboard already includes simplified charts; treat the steps below as historical context only.
+
 *Simple Portfolio Value Graphs - Basic Implementation Guide*
 
 ## Overview

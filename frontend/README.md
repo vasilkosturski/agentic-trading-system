@@ -92,10 +92,10 @@ src/
 The dashboard displays:
 
 ### Agent Cards (4 Traders)
-- **Warren** ($100K) - Value investor, conservative
-- **George** ($50K) - Momentum trader, aggressive  
-- **Ray** ($75K) - Risk parity, balanced
-- **Cathie** ($60K) - Growth investor, innovation
+- **Warren** – Value investor
+- **George** – Macro / momentum
+- **Ray** – Risk parity
+- **Cathie** – Innovation/growth
 
 Each card shows:
 - Portfolio value and daily P&L
