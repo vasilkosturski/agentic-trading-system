@@ -1,4 +1,6 @@
 # Agentic Trading System - Updated Implementation Plan
+> **Status (October 2025): Historical reference only.** The production system now runs on Java Spring Boot + PostgreSQL + React with agent dispatcher safeguards. This document captures the earlier roadmap and is retained for context.
+
 *Enhanced Architecture: Replicate Core + Java Backend + React Frontend*
 
 ## Executive Summary

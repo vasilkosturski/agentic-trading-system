@@ -12,27 +12,13 @@ This directory contains database documentation for the Agentic Trading System.
 
 ## 🗄️ Database Schema
 
-### Schemas
-- **`trading`** - Core trading data (accounts, transactions, holdings)
-- **`agents`** - Agent management and logging
-- **`analytics`** - Performance metrics and analytics
+### Schemas + Tables
 
-### Key Tables
-
-#### Agents Schema
-- **`trading_agents`** - Agent definitions, status, and performance metrics
-- **`agent_logs`** - Agent activity and decision logging
-
-#### Trading Schema
-- **`trading_accounts`** - Account balances and agent associations
-- **`account_transactions`** - Complete trade history
-- **`account_holdings`** - Current stock positions
-- **`account_portfolio_snapshots`** - Historical portfolio values
-- **`market_data`** - Market data cache
-
-#### Analytics Schema
-- **`performance_metrics`** - Agent performance calculations
-- **`risk_metrics`** - Risk analysis and VaR calculations
+| Schema | Tables |
+| ------ | ------ |
+| `agents` | `trading_agents`, `agent_logs` |
+| `trading` | `trading_accounts`, `account_transactions`, `account_holdings`, `account_portfolio_snapshots` |
+| `analytics` | `agent_runs` |
 
 ## 🚀 Deployment
 
@@ -173,4 +159,4 @@ kubectl exec statefulset/postgres -n agentic-trading -- psql -U trading_user -d 
 **Database Version**: PostgreSQL 15  
 **Deployment**: Kubernetes StatefulSet  
 **Storage**: Persistent Volume (5Gi)  
-**Last Updated**: September 15, 2025
+**Last Updated**: October 30, 2025
