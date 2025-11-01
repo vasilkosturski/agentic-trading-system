@@ -9,6 +9,7 @@ import com.trading.entity.AccountTransaction;
 import com.trading.repository.AccountPortfolioSnapshotRepository;
 import com.trading.repository.AccountTransactionRepository;
 import com.trading.service.AccountService;
+import com.trading.service.AgentIdentityService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,11 +32,38 @@ public class AccountController {
     @Autowired
     private AccountTransactionRepository transactionRepository;
 
+    @Autowired
+    private AgentIdentityService agentIdentityService;
+
+    private String resolveAgentName(Object agentIdValue) {
+        if (agentIdValue == null) {
+            throw new IllegalArgumentException("agentId is required");
+        }
+        Long agentId;
+        if (agentIdValue instanceof Number number) {
+            agentId = number.longValue();
+        } else if (agentIdValue instanceof String stringValue) {
+            agentId = Long.parseLong(stringValue);
+        } else {
+            throw new IllegalArgumentException("Invalid agentId value: " + agentIdValue);
+        }
+        return agentIdentityService.requireAgentName(agentId);
+    }
+
     // Agent initialization endpoint
     @PostMapping("/tools/initialize_agent")
     public ResponseEntity<ToolResponse<String>> initializeAgent(@RequestBody Map<String, Object> request) {
         try {
-            String name = (String) request.get("name");
+            String name;
+            if (request.containsKey("agentId")) {
+                name = resolveAgentName(request.get("agentId"));
+            } else {
+                Object explicitName = request.get("name");
+                if (explicitName == null) {
+                    throw new IllegalArgumentException("agentId or name is required");
+                }
+                name = explicitName.toString();
+            }
             Double initialBalance = request.get("initialBalance") != null ?
                 ((Number) request.get("initialBalance")).doubleValue() : 100000.0;
             
@@ -49,9 +77,9 @@ public class AccountController {
 
     // MCP Tool endpoints
     @PostMapping("/tools/get_balance")
-    public ResponseEntity<ToolResponse<Double>> getBalance(@RequestBody Map<String, String> request) {
+    public ResponseEntity<ToolResponse<Double>> getBalance(@RequestBody Map<String, Object> request) {
         try {
-            String name = request.get("name");
+            String name = resolveAgentName(request.get("agentId"));
             Double balance = accountService.getBalance(name);
             return ResponseEntity.ok(new ToolResponse<>(true, balance, null));
         } catch (Exception e) {
@@ -60,9 +88,9 @@ public class AccountController {
     }
 
     @PostMapping("/tools/get_holdings")
-    public ResponseEntity<ToolResponse<Map<String, Integer>>> getHoldings(@RequestBody Map<String, String> request) {
+    public ResponseEntity<ToolResponse<Map<String, Integer>>> getHoldings(@RequestBody Map<String, Object> request) {
         try {
-            String name = request.get("name");
+            String name = resolveAgentName(request.get("agentId"));
             Map<String, Integer> holdings = accountService.getHoldings(name);
             return ResponseEntity.ok(new ToolResponse<>(true, holdings, null));
         } catch (Exception e) {
@@ -73,7 +101,7 @@ public class AccountController {
     @PostMapping("/tools/buy_shares")
     public ResponseEntity<ToolResponse<String>> buyShares(@RequestBody Map<String, Object> request) {
         try {
-            String name = (String) request.get("name");
+            String name = resolveAgentName(request.get("agentId"));
             String symbol = (String) request.get("symbol");
             Integer quantity = (Integer) request.get("quantity");
             String rationale = (String) request.get("rationale");
@@ -93,7 +121,7 @@ public class AccountController {
     @PostMapping("/tools/sell_shares")
     public ResponseEntity<ToolResponse<String>> sellShares(@RequestBody Map<String, Object> request) {
         try {
-            String name = (String) request.get("name");
+            String name = resolveAgentName(request.get("agentId"));
             String symbol = (String) request.get("symbol");
             Integer quantity = (Integer) request.get("quantity");
             String rationale = (String) request.get("rationale");
@@ -113,7 +141,7 @@ public class AccountController {
     @PostMapping("/tools/update_activity")
     public ResponseEntity<ToolResponse<String>> updateActivity(@RequestBody Map<String, Object> request) {
         try {
-            String name = (String) request.get("name");
+            String name = resolveAgentName(request.get("agentId"));
             accountService.updateAgentActivity(name);
             return ResponseEntity.ok(new ToolResponse<>(true, "Activity updated for " + name, null));
         } catch (Exception e) {
@@ -124,9 +152,10 @@ public class AccountController {
     // change_strategy endpoint removed - using hardcoded strategies only
 
     // MCP Resource endpoints
-    @GetMapping("/resources/accounts/{name}")
-    public ResponseEntity<String> getAccountResource(@PathVariable String name) {
+    @GetMapping("/resources/accounts/{agentId}")
+    public ResponseEntity<String> getAccountResource(@PathVariable Long agentId) {
         try {
+            String name = agentIdentityService.requireAgentName(agentId);
             String accountReport = accountService.getAccountReport(name);
             return ResponseEntity.ok(accountReport);
         } catch (Exception e) {
@@ -137,11 +166,13 @@ public class AccountController {
     // strategy resource endpoint removed - using hardcoded strategies only
     
     // Portfolio history endpoint for charts
-    @GetMapping("/portfolio/{agentName}/history")
+    @GetMapping("/portfolio/{agentId}/history")
     public ResponseEntity<List<PortfolioHistoryPoint>> getPortfolioHistory(
-            @PathVariable String agentName,
+            @PathVariable Long agentId,
             @RequestParam(defaultValue = "7") int days) {
+        String agentName = null;
         try {
+            agentName = agentIdentityService.requireAgentName(agentId);
             // Use Instant (not LocalDateTime) to match entity field type
             Instant fromDate = Instant.now().minus(days, java.time.temporal.ChronoUnit.DAYS);
             List<AccountPortfolioSnapshot> snapshots = snapshotRepository
@@ -157,7 +188,7 @@ public class AccountController {
         } catch (Exception e) {
             // Log actual error for debugging
             org.slf4j.LoggerFactory.getLogger(AccountController.class)
-                .error("Error fetching portfolio history for {}: {}", agentName, e.getMessage(), e);
+                .error("Error fetching portfolio history for {}: {}", agentName != null ? agentName : agentId, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }

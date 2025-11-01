@@ -6,6 +6,7 @@ import com.trading.dto.ToolResponse;
 import com.trading.entity.AccountTransaction;
 import com.trading.entity.AgentRun;
 import com.trading.repository.AccountTransactionRepository;
+import com.trading.service.AgentIdentityService;
 import com.trading.service.RunService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,18 +30,22 @@ public class RunController {
     @Autowired
     private AccountTransactionRepository transactionRepository;
 
+    @Autowired
+    private AgentIdentityService agentIdentityService;
+
     /**
      * Start a new agent run
      * POST /api/runs/start
-     * Body: { "agentName": "Warren", "runType": "TRADING", "agentContext": "{...}", "marketConditions": "{...}" }
+     * Body: { "agentId": 1, "runType": "TRADING", "agentContext": "{...}", "marketConditions": "{...}" }
      */
     @PostMapping("/start")
-    public ResponseEntity<ToolResponse<Long>> startRun(@RequestBody Map<String, String> request) {
+    public ResponseEntity<ToolResponse<Long>> startRun(@RequestBody Map<String, Object> request) {
         try {
-            String agentName = request.get("agentName");
-            String runType = request.get("runType");
-            String agentContext = request.get("agentContext");
-            String marketConditions = request.get("marketConditions");
+            Long agentId = ((Number) request.get("agentId")).longValue();
+            String agentName = agentIdentityService.requireAgentName(agentId);
+            String runType = (String) request.get("runType");
+            String agentContext = (String) request.get("agentContext");
+            String marketConditions = (String) request.get("marketConditions");
 
             AgentRun run = runService.startRun(agentName, runType, agentContext, marketConditions);
             return ResponseEntity.ok(new ToolResponse<>(true, run.getId(), null));
@@ -108,7 +113,8 @@ public class RunController {
         try {
             AgentRun run = runService.getRun(id);
             List<AccountTransaction> transactions = transactionRepository.findByAgentRunId(id);
-            return ResponseEntity.ok(RunDetailDto.fromEntity(run, transactions));
+            Long agentId = agentIdentityService.requireAgentIdByName(run.getAgentName());
+            return ResponseEntity.ok(RunDetailDto.fromEntity(run, transactions, agentId));
         } catch (Exception e) {
             logger.error("Error getting run {}", id, e);
             return ResponseEntity.notFound().build();
@@ -125,7 +131,7 @@ public class RunController {
         try {
             List<AgentRun> runs = runService.getRecentRuns(limit);
             List<AgentRunDto> dtos = runs.stream()
-                    .map(AgentRunDto::fromEntity)
+                    .map(run -> AgentRunDto.fromEntity(run, agentIdentityService.requireAgentIdByName(run.getAgentName())))
                     .collect(Collectors.toList());
             return ResponseEntity.ok(dtos);
         } catch (Exception e) {
@@ -136,35 +142,37 @@ public class RunController {
 
     /**
      * Get recent runs for a specific agent
-     * GET /api/runs/agent/{agentName}?limit=20
+     * GET /api/runs/agent/{agentId}?limit=20
      */
-    @GetMapping("/agent/{agentName}")
+    @GetMapping("/agent/{agentId}")
     public ResponseEntity<List<AgentRunDto>> getRecentRunsByAgent(
-            @PathVariable String agentName,
+            @PathVariable Long agentId,
             @RequestParam(defaultValue = "20") int limit) {
         try {
+            String agentName = agentIdentityService.requireAgentName(agentId);
             List<AgentRun> runs = runService.getRecentRunsByAgent(agentName, limit);
             List<AgentRunDto> dtos = runs.stream()
-                    .map(AgentRunDto::fromEntity)
+                    .map(run -> AgentRunDto.fromEntity(run, agentId))
                     .collect(Collectors.toList());
             return ResponseEntity.ok(dtos);
         } catch (Exception e) {
-            logger.error("Error getting runs for agent {}", agentName, e);
+            logger.error("Error getting runs for agent {}", agentId, e);
             return ResponseEntity.internalServerError().build();
         }
     }
 
     /**
      * Get run statistics for an agent
-     * GET /api/runs/agent/{agentName}/stats
+     * GET /api/runs/agent/{agentId}/stats
      */
-    @GetMapping("/agent/{agentName}/stats")
-    public ResponseEntity<RunService.RunStatistics> getRunStatistics(@PathVariable String agentName) {
+    @GetMapping("/agent/{agentId}/stats")
+    public ResponseEntity<RunService.RunStatistics> getRunStatistics(@PathVariable Long agentId) {
         try {
+            String agentName = agentIdentityService.requireAgentName(agentId);
             RunService.RunStatistics stats = runService.getRunStatistics(agentName);
             return ResponseEntity.ok(stats);
         } catch (Exception e) {
-            logger.error("Error getting statistics for agent {}", agentName, e);
+            logger.error("Error getting statistics for agent {}", agentId, e);
             return ResponseEntity.internalServerError().build();
         }
     }

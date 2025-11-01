@@ -3,11 +3,11 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'rec
 import { usePortfolioHistory } from '../../hooks';
 
 interface SimplePortfolioChartProps {
-  agentName: string;
+  agentId: number;
 }
 
-const SimplePortfolioChart: React.FC<SimplePortfolioChartProps> = ({ agentName }) => {
-  const { data: historyData, isLoading, error } = usePortfolioHistory(agentName, 7);
+const SimplePortfolioChart: React.FC<SimplePortfolioChartProps> = ({ agentId }) => {
+  const { data: historyData, isLoading, error } = usePortfolioHistory(agentId, 7);
 
   // Custom tooltip formatter
   const CustomTooltip = ({ active, payload, label }: any) => {

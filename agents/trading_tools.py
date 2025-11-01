@@ -39,49 +39,50 @@ async def _call_backend_api(endpoint: str, data: dict = None) -> any:
                     raise Exception(f"API call failed with status {response.status}")
 
 @function_tool
-async def get_balance(name: str) -> float:
+async def get_balance(agent_id: int) -> float:
     """Get the cash balance of the given account.
 
     Args:
-        name: The name of the account holder (e.g., 'Warren', 'George', 'Ray', 'Cathie')
+        agent_id: Backend identifier for the agent
 
     Returns:
         Current cash balance in USD as a float
     """
     try:
-        result = await _call_backend_api("/tools/get_balance", {"name": name})
+        result = await _call_backend_api("/tools/get_balance", {"agentId": agent_id})
         return float(result)
     except Exception as e:
-        logger.error(f"Failed to get balance for {name}: {e}")
-        raise Exception(f"Failed to get balance for {name}: {str(e)}")
+        logger.error(f"Failed to get balance for agent {agent_id}: {e}")
+        raise Exception(f"Failed to get balance for agent {agent_id}: {str(e)}")
 
 @function_tool
-async def get_holdings(name: str) -> Dict[str, int]:
+async def get_holdings(agent_id: int) -> Dict[str, int]:
     """Get the stock holdings of the given account.
 
     Args:
-        name: The name of the account holder
+        agent_id: Backend identifier for the agent
 
     Returns:
         Dictionary mapping stock symbols to quantities owned
         Example: {'AAPL': 10, 'GOOGL': 5, 'TSLA': 3}
     """
     try:
-        result = await _call_backend_api("/tools/get_holdings", {"name": name})
+        result = await _call_backend_api("/tools/get_holdings", {"agentId": agent_id})
         return result
     except Exception as e:
-        logger.error(f"Failed to get holdings for {name}: {e}")
-        raise Exception(f"Failed to get holdings for {name}: {str(e)}")
+        logger.error(f"Failed to get holdings for agent {agent_id}: {e}")
+        raise Exception(f"Failed to get holdings for agent {agent_id}: {str(e)}")
 
 async def buy_shares(
-    name: str,
+    agent_id: int,
     symbol: str,
     quantity: int,
     rationale: str,
     fullReasoning: str = None,
     researchSources: str = None,
     agentContext: str = None,
-    runId: int = None
+    runId: int = None,
+    agent_name: str | None = None
 ) -> str:
     """Buy shares of a stock.
 
@@ -89,7 +90,7 @@ async def buy_shares(
     you must sell one before buying a new one. Adding to existing positions is allowed.
 
     Args:
-        name: The name of the account holder
+        agent_id: Backend identifier for the agent
         symbol: The stock symbol (e.g., 'AAPL', 'GOOGL', 'TSLA')
         quantity: The number of shares to buy (must be positive integer)
         rationale: Brief explanation of the trade (1-2 sentences)
@@ -113,8 +114,8 @@ async def buy_shares(
         # Capture current portfolio state if not provided
         if agentContext is None:
             try:
-                balance = await _get_balance_raw(name)
-                holdings = await _get_holdings_raw(name)
+                balance = await _get_balance_raw(agent_id)
+                holdings = await _get_holdings_raw(agent_id)
                 agentContext = json.dumps({
                     "cashBefore": balance,
                     "positionsBefore": len(holdings),
@@ -124,7 +125,7 @@ async def buy_shares(
                 logger.warning(f"Failed to capture agent context: {ctx_err}")
 
         result = await _call_backend_api("/tools/buy_shares", {
-            "name": name,
+            "agentId": agent_id,
             "symbol": symbol,
             "quantity": quantity,
             "rationale": rationale,
@@ -133,27 +134,30 @@ async def buy_shares(
             "agentContext": agentContext,
             "runId": runId
         })
-        logger.info(f"{name} bought {quantity} shares of {symbol}")
+        who = agent_name or agent_id
+        logger.info(f"{who} bought {quantity} shares of {symbol}")
         return str(result)
     except Exception as e:
-        logger.error(f"Failed to buy shares for {name}: {e}")
+        who = agent_name or agent_id
+        logger.error(f"Failed to buy shares for {who}: {e}")
         # Re-raise with original error message (includes position limit info)
         raise Exception(f"Failed to buy {quantity} shares of {symbol}: {str(e)}")
 
 async def sell_shares(
-    name: str,
+    agent_id: int,
     symbol: str,
     quantity: int,
     rationale: str,
     fullReasoning: str = None,
     researchSources: str = None,
     agentContext: str = None,
-    runId: int = None
+    runId: int = None,
+    agent_name: str | None = None
 ) -> str:
     """Sell shares of a stock.
 
     Args:
-        name: The name of the account holder
+        agent_id: Backend identifier for the agent
         symbol: The stock symbol (e.g., 'AAPL', 'GOOGL', 'TSLA')
         quantity: The number of shares to sell (must be positive and ≤ current holdings)
         rationale: Brief explanation of the trade (1-2 sentences)
@@ -177,8 +181,8 @@ async def sell_shares(
         # Capture current portfolio state if not provided
         if agentContext is None:
             try:
-                balance = await _get_balance_raw(name)
-                holdings = await _get_holdings_raw(name)
+                balance = await _get_balance_raw(agent_id)
+                holdings = await _get_holdings_raw(agent_id)
                 agentContext = json.dumps({
                     "cashBefore": balance,
                     "positionsBefore": len(holdings),
@@ -188,7 +192,7 @@ async def sell_shares(
                 logger.warning(f"Failed to capture agent context: {ctx_err}")
 
         result = await _call_backend_api("/tools/sell_shares", {
-            "name": name,
+            "agentId": agent_id,
             "symbol": symbol,
             "quantity": quantity,
             "rationale": rationale,
@@ -197,10 +201,12 @@ async def sell_shares(
             "agentContext": agentContext,
             "runId": runId
         })
-        logger.info(f"{name} sold {quantity} shares of {symbol}")
+        who = agent_name or agent_id
+        logger.info(f"{who} sold {quantity} shares of {symbol}")
         return str(result)
     except Exception as e:
-        logger.error(f"Failed to sell shares for {name}: {e}")
+        who = agent_name or agent_id
+        logger.error(f"Failed to sell shares for {who}: {e}")
         raise Exception(f"Failed to sell {quantity} shares of {symbol}: {str(e)}")
 
 async def initialize_agent(name: str, initial_balance: float = 100000.0) -> str:
@@ -230,20 +236,20 @@ async def initialize_agent(name: str, initial_balance: float = 100000.0) -> str:
 
 # Helper functions for system use (not agent tools)
 
-async def _get_balance_raw(name: str) -> float:
+async def _get_balance_raw(agent_id: int) -> float:
     """Raw balance getter - for system use, not exposed to agents"""
-    result = await _call_backend_api("/tools/get_balance", {"name": name})
+    result = await _call_backend_api("/tools/get_balance", {"agentId": agent_id})
     return float(result)
 
-async def _get_holdings_raw(name: str) -> Dict[str, int]:
+async def _get_holdings_raw(agent_id: int) -> Dict[str, int]:
     """Raw holdings getter - for system use, not exposed to agents"""
-    result = await _call_backend_api("/tools/get_holdings", {"name": name})
+    result = await _call_backend_api("/tools/get_holdings", {"agentId": agent_id})
     return result
 
-async def get_account_report(name: str) -> str:
+async def get_account_report(agent_id: int) -> str:
     """Get detailed account report - called by system, not exposed as agent tool"""
     try:
-        url = f"{BACKEND_BASE_URL}/api/accounts/resources/accounts/{name}"
+        url = f"{BACKEND_BASE_URL}/api/accounts/resources/accounts/{agent_id}"
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 if response.status == 200:
@@ -251,7 +257,7 @@ async def get_account_report(name: str) -> str:
                 else:
                     raise Exception(f"Failed to get account report: status {response.status}")
     except Exception as e:
-        logger.error(f"Failed to get account report for {name}: {e}")
+        logger.error(f"Failed to get account report for agent {agent_id}: {e}")
         raise
 
 async def get_strategy(name: str) -> str:

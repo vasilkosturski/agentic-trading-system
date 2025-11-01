@@ -176,6 +176,7 @@ public class TradingService {
     // Helper methods
     private AgentStatusResponse convertToAgentStatus(AgentData agent) {
         return new AgentStatusResponse(
+            null,
             agent.getAgentName(), agent.isActive(),
             agent.getLastActivity().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
             agent.getTotalTrades(), agent.getTotalReturnPercent(), agent.getPortfolioValue(),
@@ -249,14 +250,16 @@ public class TradingService {
     
     // Response classes
     public static class AgentStatusResponse {
+        private Long agentId;
         private String agentName, lastActivity;
         private boolean isActive;
         private int totalTrades, currentPositions, cycleIntervalSeconds;
         private double totalReturnPercent, portfolioValue, dayPnL, dayPnLPercent;
 
-        public AgentStatusResponse(String agentName, boolean isActive, String lastActivity, int totalTrades,
+        public AgentStatusResponse(Long agentId, String agentName, boolean isActive, String lastActivity, int totalTrades,
                                   double totalReturnPercent, double portfolioValue, double dayPnL, double dayPnLPercent,
                                   int currentPositions, int cycleIntervalSeconds) {
+            this.agentId = agentId;
             this.agentName = agentName; this.isActive = isActive; this.lastActivity = lastActivity;
             this.totalTrades = totalTrades; this.totalReturnPercent = totalReturnPercent; this.portfolioValue = portfolioValue;
             this.dayPnL = dayPnL; this.dayPnLPercent = dayPnLPercent; this.currentPositions = currentPositions;
@@ -264,6 +267,7 @@ public class TradingService {
         }
 
         // Getters
+        public Long getAgentId() { return agentId; }
         public String getAgentName() { return agentName; }
         public boolean isActive() { return isActive; }
         public String getLastActivity() { return lastActivity; }

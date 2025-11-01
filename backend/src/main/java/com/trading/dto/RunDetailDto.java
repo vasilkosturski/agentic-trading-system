@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class RunDetailDto {
     private Long id;
+    private Long agentId;
     private String agentName;
     private String runType;
     private Instant startTime;
@@ -58,13 +59,14 @@ public class RunDetailDto {
     }
 
     // Factory method to create from AgentRun entity and transactions list
-    public static RunDetailDto fromEntity(AgentRun run, List<AccountTransaction> transactions) {
+    public static RunDetailDto fromEntity(AgentRun run, List<AccountTransaction> transactions, Long agentId) {
         List<TradeInfo> trades = transactions.stream()
                 .map(TradeInfo::fromEntity)
                 .collect(Collectors.toList());
 
         return new RunDetailDto(
                 run.getId(),
+                agentId,
                 run.getAgentName(),
                 run.getRunType(),
                 run.getStartTime(),

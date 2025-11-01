@@ -19,6 +19,7 @@ export interface RunSummary {
 }
 
 export interface AgentDetail {
+  id: number;
   name: string;
   strategy: string;
   initialCapital: number;
@@ -28,6 +29,7 @@ export interface AgentDetail {
 
 export interface AgentRun {
   id: number;
+  agentId: number | null;
   agentName: string;
   runType: string;
   startTime: string;
@@ -46,14 +48,14 @@ export interface AgentRun {
 // Agent API functions
 export const agentService = {
   // Get agent detail with portfolio and recent runs
-  getAgentDetail: async (agentName: string): Promise<AgentDetail> => {
-    const response = await apiClient.get(`/agents/${agentName}`);
+  getAgentDetail: async (agentId: number): Promise<AgentDetail> => {
+    const response = await apiClient.get(`/agents/${agentId}`);
     return response.data;
   },
 
   // Get agent runs history
-  getAgentRuns: async (agentName: string, limit: number = 10): Promise<AgentRun[]> => {
-    const response = await apiClient.get(`/agents/${agentName}/runs`, {
+  getAgentRuns: async (agentId: number, limit: number = 10): Promise<AgentRun[]> => {
+    const response = await apiClient.get(`/agents/${agentId}/runs`, {
       params: { limit }
     });
     return response.data;

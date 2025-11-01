@@ -50,8 +50,8 @@ export const tradesService = {
   /**
    * Get trades for a specific agent
    */
-  async getAgentTrades(agentName: string): Promise<RecentTrade[]> {
-    const response = await apiClient.get<{ data: any[] }>(`/trading/agent-trades?agentName=${agentName}`);
+  async getAgentTrades(agentId: number): Promise<RecentTrade[]> {
+    const response = await apiClient.get<{ data: any[] }>(`/trading/agent-trades?agentId=${agentId}`);
     // Map API response to RecentTrade interface
     return response.data.data.map((trade: any) => ({
       id: parseInt(trade.id),

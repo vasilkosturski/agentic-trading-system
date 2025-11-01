@@ -3,6 +3,7 @@ package com.trading.controller;
 import com.trading.dto.ToolResponse;
 import com.trading.service.TradingService;
 import com.trading.service.TradingService.*;
+import com.trading.service.AgentIdentityService;
 import com.trading.service.AgentMonitoringService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,9 @@ public class TradingController {
     
     @Autowired
     private AgentMonitoringService agentMonitoringService;
+
+    @Autowired
+    private AgentIdentityService agentIdentityService;
     
     
     // Agent Status Endpoints (Real Data from PostgreSQL)
@@ -36,10 +40,10 @@ public class TradingController {
     }
     
     
-    @GetMapping("/agents/{agentName}/status")
-    public ResponseEntity<ToolResponse<AgentStatusResponse>> getAgentStatus(@PathVariable String agentName) {
+    @GetMapping("/agents/{agentId}/status")
+    public ResponseEntity<ToolResponse<AgentStatusResponse>> getAgentStatus(@PathVariable Long agentId) {
         try {
-            AgentStatusResponse status = agentMonitoringService.getRealAgentStatus(agentName);
+            AgentStatusResponse status = agentMonitoringService.getRealAgentStatus(agentId);
             return ResponseEntity.ok(ToolResponse.success(status));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
@@ -47,9 +51,10 @@ public class TradingController {
     }
     
     
-    @PostMapping("/agents/{agentName}/start")
-    public ResponseEntity<ToolResponse<String>> startAgent(@PathVariable String agentName) {
+    @PostMapping("/agents/{agentId}/start")
+    public ResponseEntity<ToolResponse<String>> startAgent(@PathVariable Long agentId) {
         try {
+            String agentName = agentIdentityService.requireAgentName(agentId);
             agentMonitoringService.startAgent(agentName);
             return ResponseEntity.ok(ToolResponse.success("Agent " + agentName + " started successfully"));
         } catch (Exception e) {
@@ -57,9 +62,10 @@ public class TradingController {
         }
     }
     
-    @PostMapping("/agents/{agentName}/stop")
-    public ResponseEntity<ToolResponse<String>> stopAgent(@PathVariable String agentName) {
+    @PostMapping("/agents/{agentId}/stop")
+    public ResponseEntity<ToolResponse<String>> stopAgent(@PathVariable Long agentId) {
         try {
+            String agentName = agentIdentityService.requireAgentName(agentId);
             agentMonitoringService.stopAgent(agentName);
             return ResponseEntity.ok(ToolResponse.success("Agent " + agentName + " stopped successfully"));
         } catch (Exception e) {
@@ -79,8 +85,9 @@ public class TradingController {
     
     // Agent Trades Endpoints
     @GetMapping("/agent-trades")
-    public ResponseEntity<ToolResponse<List<AgentTradeResponse>>> getAgentTrades(@RequestParam(required = false) String agentName) {
+    public ResponseEntity<ToolResponse<List<AgentTradeResponse>>> getAgentTrades(@RequestParam(required = false) Long agentId) {
         try {
+            String agentName = agentId != null ? agentIdentityService.requireAgentName(agentId) : null;
             List<AgentTradeResponse> trades = tradingService.getAgentTrades(agentName);
             return ResponseEntity.ok(ToolResponse.success(trades));
         } catch (Exception e) {
@@ -102,8 +109,9 @@ public class TradingController {
     @GetMapping("/stats")
     public ResponseEntity<ToolResponse<TradingStatsResponse>> getTradingStats(
             @RequestParam(required = false) String accountId,
-            @RequestParam(required = false) String agentName) {
+            @RequestParam(required = false) Long agentId) {
         try {
+            String agentName = agentId != null ? agentIdentityService.requireAgentName(agentId) : null;
             TradingStatsResponse stats = tradingService.getTradingStats(accountId, agentName);
             return ResponseEntity.ok(ToolResponse.success(stats));
         } catch (Exception e) {
@@ -136,11 +144,12 @@ public class TradingController {
     }
     
     // Real Data Monitoring Endpoints - Temporarily disabled due to missing service
-    @GetMapping("/agents/{agentName}/logs")
+    @GetMapping("/agents/{agentId}/logs")
     public ResponseEntity<ToolResponse<List<String>>> getAgentLogs(
-            @PathVariable String agentName,
+            @PathVariable Long agentId,
             @RequestParam(defaultValue = "10") int limit) {
         try {
+            String agentName = agentIdentityService.requireAgentName(agentId);
             // List<String> logs = agentMonitoringService.getAgentLogs(agentName, limit);
             // Fallback until PostgreSQLAgentMonitoringService is implemented
             List<String> logs = List.of("Log functionality temporarily unavailable");

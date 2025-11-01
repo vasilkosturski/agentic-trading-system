@@ -13,6 +13,7 @@ export interface TradeInfo {
 
 export interface RunDetail {
   id: number;
+  agentId: number;
   agentName: string;
   runType: string;
   startTime: string;
