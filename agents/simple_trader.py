@@ -89,7 +89,9 @@ You actively manage your portfolio according to your strategy.
 Available tools:
 - Researcher: Research online for news and opportunities
 - Market data tools: lookup_share_price, get_historical_prices, get_market_indicators
-- Decision tool: decide_action(action=BUY|SELL|HOLD, symbol?, quantity?, rationale)
+- Decision tool: decide_action(action=BUY|SELL|HOLD, symbol?, quantity?, rationale, fullReasoning?)
+  - rationale: Brief summary (1-2 sentences) of the trade decision
+  - fullReasoning: Comprehensive analysis explaining your research, market conditions, and investment thesis (2-5 paragraphs)
 - Market status: get_market_status, is_market_open
 
 You have access to end-of-day market data from Polygon.io (previous trading day close).
@@ -135,6 +137,11 @@ TRADING DISCIPLINE:
 CRITICAL - DECISION RULES:
   - At the end of your analysis, call decide_action exactly once.
   - If you decide BUY or SELL, include symbol and positive integer quantity.
+  - Provide a brief rationale (1-2 sentences) and a comprehensive fullReasoning (2-5 paragraphs) explaining:
+    * Your research findings and data sources
+    * Market conditions and context
+    * Why this aligns with your investment strategy
+    * Risk considerations and position sizing rationale
   - If you decide HOLD, set action=HOLD and omit symbol/quantity.
   - The system will execute the action you decide; do NOT call any trading tools directly.
 
@@ -210,7 +217,7 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
 
         # Add a per-agent decide_action tool that records to instance state
         @function_tool
-        async def decide_action(action: str, symbol: str = None, quantity: int = None, rationale: str = None) -> str:
+        async def decide_action(action: str, symbol: str = None, quantity: int = None, rationale: str = None, fullReasoning: str = None) -> str:
             act = (action or "").upper()
             if act in ("BUY", "SELL"):
                 if not symbol or not isinstance(quantity, int) or quantity <= 0:
@@ -224,6 +231,7 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                 "symbol": symbol,
                 "quantity": quantity,
                 "rationale": rationale or "",
+                "fullReasoning": fullReasoning or "",
             }
             self.last_decision = decision
             # Return a simple acknowledgement; the system reads self.last_decision
@@ -316,11 +324,14 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                 symbol = decision["symbol"]
                 quantity = int(decision["quantity"])
                 rationale = decision.get("rationale") or summary or "Decision"
+                # Use fullReasoning from decision if available, otherwise fall back to conversation messages
+                decision_full_reasoning = decision.get("fullReasoning") or ""
+                final_full_reasoning = decision_full_reasoning if decision_full_reasoning else full_reasoning
                 try:
                     if action == "BUY":
-                        await buy_shares(self.agent_id, symbol, quantity, rationale, full_reasoning, runId=self.current_run_id, agent_name=self.name)
+                        await buy_shares(self.agent_id, symbol, quantity, rationale, final_full_reasoning, runId=self.current_run_id, agent_name=self.name)
                     else:
-                        await sell_shares(self.agent_id, symbol, quantity, rationale, full_reasoning, runId=self.current_run_id, agent_name=self.name)
+                        await sell_shares(self.agent_id, symbol, quantity, rationale, final_full_reasoning, runId=self.current_run_id, agent_name=self.name)
                     self.trade_count += 1
                 except Exception as trade_err:
                     logger.error(f"Trade execution failed: {trade_err}")
