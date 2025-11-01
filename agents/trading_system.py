@@ -4,10 +4,11 @@ import asyncio
 import aiohttp
 import logging
 import os
-from typing import List, Dict, Any
+from typing import List
 from dotenv import load_dotenv
 
 from simple_trader import SimpleTrader
+from config import BACKEND_API_AGENTS
 
 # Load environment variables
 load_dotenv(override=True)
@@ -25,10 +26,29 @@ logger = logging.getLogger(__name__)
 class TradingSystem:
     """Main trading system that orchestrates all four autonomous agents"""
     
-    def __init__(self):
-        # Create the four legendary traders with their strategies
-        self.agents = [
-            SimpleTrader("Warren", """
+    def __init__(self, agents: List[SimpleTrader]):
+        """Initialize with pre-configured agents (use create() factory method)"""
+        self.agents = agents
+    
+    @classmethod
+    async def create(cls):
+        """Factory method: fetch agent IDs once, then create traders with IDs."""
+        # Single API call to convert names to IDs
+        async with aiohttp.ClientSession() as session:
+            async with session.get(BACKEND_API_AGENTS) as response:
+                if response.status != 200:
+                    raise RuntimeError(f"Failed to load agents registry (status {response.status})")
+                data = await response.json()
+        
+        if isinstance(data, dict) and "data" in data:
+            data = data["data"]
+        
+        # Create name -> id mapping (one-time conversion)
+        name_to_id = {agent.get("name"): agent.get("id") for agent in data}
+        
+        # Create traders with IDs already set (no name lookup needed later)
+        agent_configs = [
+            ("Warren", """
 You are Warren, and you are named in homage to your role model, Warren Buffett.
 You are a value-oriented investor who prioritizes long-term wealth creation.
 You identify high-quality companies trading below their intrinsic value.
@@ -37,7 +57,7 @@ relying on meticulous fundamental analysis, steady cash flows, strong management
 and competitive advantages. You rarely react to short-term market movements, 
 trusting your deep research and value-driven strategy.
 """),
-            SimpleTrader("George", """
+            ("George", """
 You are George, and you are named in homage to your role model, George Soros.
 You are a contrarian macro investor who focuses on large-scale economic and political trends.
 You use reflexivity theory to identify market inefficiencies and bubbles.
@@ -45,7 +65,7 @@ You're willing to take large, concentrated positions when you have high convicti
 and you're not afraid to go against conventional wisdom. You focus on currencies,
 commodities, and broad market movements, looking for paradigm shifts and market dislocations.
 """),
-            SimpleTrader("Ray", """
+            ("Ray", """
 You are Ray, and you are named in homage to your role model, Ray Dalio.
 You are a systematic investor who focuses on risk parity and diversification.
 You believe in building all-weather portfolios that can perform across different economic environments.
@@ -53,7 +73,7 @@ You use systematic approaches, focus on uncorrelated returns, and emphasize risk
 You look for balance across asset classes and economic regimes, preferring steady,
 risk-adjusted returns over high-risk, high-reward strategies.
 """),
-            SimpleTrader("Cathie", """
+            ("Cathie", """
 You are Cathie, and you are named in homage to your role model, Cathie Wood.
 You are a growth investor focused on disruptive innovation and exponential technologies.
 You invest in companies that are transforming industries through artificial intelligence,
@@ -62,6 +82,17 @@ You have a long-term investment horizon and are willing to accept high volatilit
 in exchange for the potential of exponential returns from revolutionary companies.
 """)
         ]
+        
+        agents = []
+        for name, strategy in agent_configs:
+            agent_id = name_to_id.get(name)
+            if agent_id is None:
+                raise RuntimeError(f"Agent id not found for name: {name}")
+            agents.append(SimpleTrader(name, strategy, agent_id=agent_id))
+            logger.info(f"✓ Created {name} with agent ID {agent_id}")
+        
+        logger.info("✅ TradingSystem created with all agent IDs resolved")
+        return cls(agents)
     
     async def run_all_agents(self):
         """Run all four agents concurrently"""
@@ -150,26 +181,43 @@ async def check_market_status() -> bool:
 async def update_all_agents_activity():
     """Update lastActivity for all agents (called on every cycle, even when market closed)"""
     agent_names = ["Warren", "George", "Ray", "Cathie"]
-    from config import BACKEND_API_ACCOUNTS
-    url = f"{BACKEND_API_ACCOUNTS}/tools/update_activity"
+    from config import BACKEND_API_ACCOUNTS, BACKEND_API_AGENTS
+    update_url = f"{BACKEND_API_ACCOUNTS}/tools/update_activity"
 
     try:
         async with aiohttp.ClientSession() as session:
+            async with session.get(BACKEND_API_AGENTS) as response:
+                response.raise_for_status()
+                agent_registry = await response.json()
+
+            if isinstance(agent_registry, dict) and "data" in agent_registry:
+                agent_registry = agent_registry["data"]
+
+            if not isinstance(agent_registry, list):
+                raise RuntimeError("Unexpected agent registry payload")
+
+            name_to_id = {agent.get("name"): agent.get("id") for agent in agent_registry}
+
             for agent_name in agent_names:
+                agent_id = name_to_id.get(agent_name)
+                if agent_id is None:
+                    logger.warning(f"Skipping activity update for {agent_name}: id not found in registry")
+                    continue
+
                 try:
-                    async with session.post(url, json={"name": agent_name}) as response:
+                    async with session.post(update_url, json={"agentId": agent_id}) as response:
                         if response.status == 200:
-                            logger.debug(f"✓ Updated activity for {agent_name}")
+                            logger.debug(f"✓ Updated activity for {agent_name} (id={agent_id})")
                         else:
-                            logger.warning(f"Failed to update activity for {agent_name}: {response.status}")
+                            logger.warning(f"Failed to update activity for {agent_name} (id={agent_id}): {response.status}")
                 except Exception as e:
-                    logger.warning(f"Error updating activity for {agent_name}: {e}")
+                    logger.warning(f"Error updating activity for {agent_name} (id={agent_id}): {e}")
     except Exception as e:
         logger.error(f"Error updating agents activity: {e}")
 
 async def run_continuous_trading():
     """Run continuous trading cycles - matches source project pattern"""
-    system = TradingSystem()
+    system = await TradingSystem.create()  # Single API call: names → IDs, then create with IDs
 
     print(f"🔄 Starting scheduler to run every {RUN_EVERY_N_MINUTES} minutes")
     logger.info(f"Continuous trading loop started with {RUN_EVERY_N_MINUTES} minute intervals")
@@ -203,7 +251,7 @@ async def main():
     logger.info("🚀 Starting Agentic Trading System (single run)...")
     
     try:
-        system = TradingSystem()
+        system = await TradingSystem.create()  # Single API call: names → IDs, then create with IDs
         await system.run_all_agents()
         logger.info("✅ Trading system completed successfully")
     except Exception as e:

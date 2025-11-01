@@ -8,16 +8,17 @@ import asyncio
 import logging
 from contextlib import AsyncExitStack
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+
+import aiohttp
 
 from agents import Agent, Tool, Runner, trace
 from agents.mcp import MCPServerStdio
 
 # Import direct function tools (replaces internal MCPs)
 from trading_tools import get_account_report, initialize_agent
-from trading_tools import buy_shares, sell_shares
+from trading_tools import buy_shares, sell_shares, _get_balance_raw, _get_holdings_raw
 from agents import function_tool
-from typing import Optional
 from market_tools import MARKET_TOOLS
 
 # Import MCP params only for external services (Brave Search, Memory, Fetch)
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 class SimpleTrader:
     """Simple trader using OpenAI Agents SDK with direct function tools"""
 
-    def __init__(self, name: str, strategy: str, model_name: str = "gpt-4o-mini"):
+    def __init__(self, name: str, strategy: str, model_name: str = "gpt-4o-mini", agent_id: Optional[int] = None):
         self.name = name
         self.strategy = strategy
         self.model_name = model_name
@@ -41,6 +42,7 @@ class SimpleTrader:
         self.current_run_id: Optional[int] = None
         self.trade_count: int = 0
         self.last_decision: Optional[dict] = None
+        self.agent_id: Optional[int] = agent_id  # Set at TradingSystem initialization
 
     async def get_researcher_tool(self, researcher_mcp_servers) -> Tool:
         """Create researcher tool from external MCP servers (Brave Search, Memory, Fetch)
@@ -248,14 +250,16 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
         # Initialize agent account (direct function call, not through agent)
         await initialize_agent(self.name)
 
+        if self.agent_id is None:
+            raise RuntimeError(f"Agent id not set for {self.name}. Use TradingSystem.create() to instantiate.")
+
         # Get account report (direct API call)
-        account = await get_account_report(self.name)
+        account = await get_account_report(self.agent_id)
         strategy = await self.get_strategy()
 
         # Prepare agent context for run tracking
-        from trading_tools import _get_balance_raw, _get_holdings_raw
-        balance = await _get_balance_raw(self.name)
-        holdings = await _get_holdings_raw(self.name)
+        balance = await _get_balance_raw(self.agent_id)
+        holdings = await _get_holdings_raw(self.agent_id)
         agent_context = {
             "balance": balance,
             "holdings": holdings,
@@ -269,7 +273,7 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
         }
 
         # Start run tracking
-        run_id = await start_run(self.name, run_type, agent_context, market_conditions)
+        run_id = await start_run(self.agent_id, self.name, run_type, agent_context, market_conditions)
         if run_id is None:
             logger.warning(f"Failed to start run tracking for {self.name}, continuing without tracking")
         else:
@@ -314,9 +318,9 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                 rationale = decision.get("rationale") or summary or "Decision"
                 try:
                     if action == "BUY":
-                        await buy_shares(self.name, symbol, quantity, rationale, full_reasoning, runId=self.current_run_id)
+                        await buy_shares(self.agent_id, symbol, quantity, rationale, full_reasoning, runId=self.current_run_id, agent_name=self.name)
                     else:
-                        await sell_shares(self.name, symbol, quantity, rationale, full_reasoning, runId=self.current_run_id)
+                        await sell_shares(self.agent_id, symbol, quantity, rationale, full_reasoning, runId=self.current_run_id, agent_name=self.name)
                     self.trade_count += 1
                 except Exception as trade_err:
                     logger.error(f"Trade execution failed: {trade_err}")

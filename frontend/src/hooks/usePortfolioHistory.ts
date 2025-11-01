@@ -5,17 +5,17 @@ import { portfolioService, PortfolioHistoryPoint } from '../services/portfolioSe
 export const portfolioKeys = {
   all: ['portfolio'] as const,
   history: () => [...portfolioKeys.all, 'history'] as const,
-  agentHistory: (agentName: string, days: number) => [...portfolioKeys.history(), agentName, days] as const,
+  agentHistory: (agentId: number, days: number) => [...portfolioKeys.history(), agentId, days] as const,
 };
 
 // Hook to get portfolio history for a specific agent
-export const usePortfolioHistory = (agentName: string, days: number = 7) => {
+export const usePortfolioHistory = (agentId: number, days: number = 7) => {
   return useQuery({
-    queryKey: portfolioKeys.agentHistory(agentName, days),
-    queryFn: () => portfolioService.getPortfolioHistory(agentName, days),
+    queryKey: portfolioKeys.agentHistory(agentId, days),
+    queryFn: () => portfolioService.getPortfolioHistory(agentId, days),
     staleTime: 60 * 1000, // 1 minute - portfolio history doesn't change as frequently
     refetchInterval: 60 * 1000, // Refetch every minute
-    enabled: !!agentName, // Only run query if agentName is provided
+    enabled: typeof agentId === 'number' && !Number.isNaN(agentId),
     select: (data: PortfolioHistoryPoint[]) => {
       // Transform data for Recharts - ensure we have valid data points
       return data.map(point => ({

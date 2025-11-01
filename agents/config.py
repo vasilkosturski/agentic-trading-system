@@ -34,6 +34,11 @@ class Config:
         """Run tracking API endpoint."""
         return f"{self.BACKEND_BASE_URL}/api/runs"
 
+    @property
+    def BACKEND_API_AGENTS(self) -> str:
+        """Agent metadata API endpoint."""
+        return f"{self.BACKEND_BASE_URL}/api/agents"
+
     # Agent Configuration
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -81,3 +86,4 @@ BACKEND_BASE_URL = config.BACKEND_BASE_URL
 BACKEND_API_ACCOUNTS = config.BACKEND_API_ACCOUNTS
 BACKEND_API_MARKET = config.BACKEND_API_MARKET
 BACKEND_API_RUNS = config.BACKEND_API_RUNS
+BACKEND_API_AGENTS = config.BACKEND_API_AGENTS

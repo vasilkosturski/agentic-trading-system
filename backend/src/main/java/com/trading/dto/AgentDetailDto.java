@@ -11,6 +11,7 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AgentDetailDto {
+    private Long id;
     private String name;
     private String strategy;
     private Double initialCapital;

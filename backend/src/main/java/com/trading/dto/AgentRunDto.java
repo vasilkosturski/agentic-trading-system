@@ -12,6 +12,7 @@ import java.time.Instant;
 @AllArgsConstructor
 public class AgentRunDto {
     private Long id;
+    private Long agentId;
     private String agentName;
     private String runType;
     private Instant startTime;
@@ -30,6 +31,7 @@ public class AgentRunDto {
     public AgentRunDto(AgentRun run) {
         this.id = run.getId();
         this.agentName = run.getAgentName();
+        this.agentId = null;
         this.runType = run.getRunType();
         this.startTime = run.getStartTime();
         this.endTime = run.getEndTime();
@@ -47,5 +49,11 @@ public class AgentRunDto {
     // Static factory method
     public static AgentRunDto fromEntity(AgentRun run) {
         return new AgentRunDto(run);
+    }
+
+    public static AgentRunDto fromEntity(AgentRun run, Long agentId) {
+        AgentRunDto dto = new AgentRunDto(run);
+        dto.setAgentId(agentId);
+        return dto;
     }
 }

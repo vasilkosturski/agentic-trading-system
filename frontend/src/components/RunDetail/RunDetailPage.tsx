@@ -70,7 +70,13 @@ const RunDetailPage = () => {
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Back Button */}
       <button
-        onClick={() => navigate(`/agents/${runDetail.agentName}`)}
+        onClick={() => {
+          if (runDetail.agentId) {
+            navigate(`/agents/${runDetail.agentId}`);
+          } else {
+            navigate(-1);
+          }
+        }}
         className="text-blue-600 hover:underline mb-4 inline-block"
       >
         ← Back to {runDetail.agentName}

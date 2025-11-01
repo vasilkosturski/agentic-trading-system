@@ -16,6 +16,7 @@ BACKEND_URL = BACKEND_API_RUNS
 
 
 async def start_run(
+    agent_id: int,
     agent_name: str,
     run_type: str,
     agent_context: Dict[str, Any],
@@ -25,7 +26,8 @@ async def start_run(
     Start a new agent run and return the run ID.
 
     Args:
-        agent_name: Name of the agent (Warren, George, etc.)
+        agent_id: Backend identifier for the agent
+        agent_name: Name of the agent (used for logging only)
         run_type: Type of run (TRADING, REBALANCE)
         agent_context: Dict with portfolio state (cash, holdings, etc.)
         market_conditions: Dict with market status
@@ -36,6 +38,7 @@ async def start_run(
     url = f"{BACKEND_URL}/start"
 
     payload = {
+        "agentId": agent_id,
         "agentName": agent_name,
         "runType": run_type,
         "agentContext": json.dumps(agent_context),

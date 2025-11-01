@@ -4,18 +4,19 @@ import { agentService, type AgentDetail } from '../services/agentService';
 import { tradesService, type RecentTrade } from '../services/tradesService';
 
 const AgentDetailPage = () => {
-  const { agentName } = useParams<{ agentName: string }>();
+  const { agentId: agentIdParam } = useParams<{ agentId: string }>();
+  const agentId = agentIdParam ? Number(agentIdParam) : undefined;
 
   const { data: agentDetail, isLoading, error } = useQuery<AgentDetail>({
-    queryKey: ['agentDetail', agentName],
-    queryFn: () => agentService.getAgentDetail(agentName!),
-    enabled: !!agentName,
+    queryKey: ['agentDetail', agentId],
+    queryFn: () => agentService.getAgentDetail(agentId!),
+    enabled: typeof agentId === 'number' && !Number.isNaN(agentId),
   });
 
   const { data: recentTrades = [], isLoading: tradesLoading } = useQuery<RecentTrade[]>({
-    queryKey: ['agentTrades', agentName],
-    queryFn: () => tradesService.getAgentTrades(agentName!),
-    enabled: !!agentName,
+    queryKey: ['agentTrades', agentId],
+    queryFn: () => tradesService.getAgentTrades(agentId!),
+    enabled: typeof agentId === 'number' && !Number.isNaN(agentId),
   });
 
   if (isLoading) {

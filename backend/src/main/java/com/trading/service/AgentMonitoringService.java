@@ -47,12 +47,12 @@ public class AgentMonitoringService {
     /**
      * Get real agent status for a specific agent
      */
-    public TradingService.AgentStatusResponse getRealAgentStatus(String agentName) {
-        Optional<TradingAgent> agentOpt = agentRepository.findByName(agentName);
+    public TradingService.AgentStatusResponse getRealAgentStatus(Long agentId) {
+        Optional<TradingAgent> agentOpt = agentRepository.findById(agentId);
         if (agentOpt.isEmpty()) {
-            throw new RuntimeException("Agent not found: " + agentName);
+            throw new RuntimeException("Agent not found: " + agentId);
         }
-        
+
         return buildAgentStatusFromEntity(agentOpt.get());
     }
     
@@ -93,6 +93,7 @@ public class AgentMonitoringService {
         int cycleIntervalSeconds = 1800;
 
         return new TradingService.AgentStatusResponse(
+            agent.getId(),
             agentName,
             isActive,
             lastActivity,

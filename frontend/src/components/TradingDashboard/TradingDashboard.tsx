@@ -5,7 +5,7 @@ import SimplePortfolioChart from './SimplePortfolioChart';
 import RecentTrades from './RecentTrades';
 
 const TradingDashboard = () => {
-  const { data: agents, isLoading, error, isError } = useTradingAgents();
+  const { agents = [], isLoading, error, isError } = useTradingAgents();
   const { data: marketStatus, isLoading: marketStatusLoading } = useMarketStatus();
 
   const formatTimeAgo = (minutes: number): string => {
@@ -154,7 +154,7 @@ const TradingDashboard = () => {
         </h2>
         <div className="flex items-center justify-center space-x-4 mb-8">
           <p className="text-lg text-gray-600 dark:text-gray-300">
-            {agents && agents.length > 0
+            {agents.length > 0
               ? `${agents.length} Autonomous Trader${agents.length !== 1 ? 's' : ''}: ${agents.map(a => a.agentName).join(', ')}`
               : 'Loading traders...'
             }
@@ -180,11 +180,11 @@ const TradingDashboard = () => {
         
         {/* 4-trader grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
-          {agents?.map((agent) => {
+          {agents.map((agent) => {
             const nextCycle = formatNextCycle(agent.lastActivity, agent.cycleIntervalSeconds);
             const activityStatus = getActivityStatus(agent.lastActivity);
             return (
-            <Link key={agent.agentName} to={`/agents/${agent.agentName}`}>
+            <Link key={agent.agentId} to={`/agents/${agent.agentId}`}>
             <div className="trading-card hover:shadow-xl hover:scale-[1.02] hover:border-blue-400 transition-all duration-200 cursor-pointer">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="trader-header">{agent.agentName}</h3>
@@ -246,7 +246,7 @@ const TradingDashboard = () => {
                 {/* Portfolio Value Chart */}
                 <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
                   <div className="text-xs text-gray-500 mb-2 text-center">7-Day Portfolio Value</div>
-                  <SimplePortfolioChart agentName={agent.agentName} />
+                  <SimplePortfolioChart agentId={agent.agentId} />
                 </div>
 
                 {/* Last Activity with Status Indicator */}

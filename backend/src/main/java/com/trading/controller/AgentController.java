@@ -2,6 +2,7 @@ package com.trading.controller;
 
 import com.trading.dto.AgentDetailDto;
 import com.trading.dto.AgentRunDto;
+import com.trading.dto.AgentSummaryDto;
 import com.trading.entity.AgentRun;
 import com.trading.entity.TradingAccount;
 import com.trading.entity.TradingAgent;
@@ -9,11 +10,11 @@ import com.trading.repository.AgentRunRepository;
 import com.trading.repository.TradingAccountRepository;
 import com.trading.repository.TradingAgentRepository;
 import com.trading.service.AccountService;
+import com.trading.service.AgentIdentityService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -33,14 +34,33 @@ public class AgentController {
     @Autowired
     private AgentRunRepository runRepository;
 
-    private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_INSTANT;
+    @Autowired
+    private AgentIdentityService agentIdentityService;
 
-    @GetMapping("/{name}")
-    public ResponseEntity<AgentDetailDto> getAgentDetail(@PathVariable String name) {
+    @GetMapping
+    public ResponseEntity<List<AgentSummaryDto>> listAgents() {
         try {
-            // Get agent
-            TradingAgent agent = agentRepository.findByName(name)
-                    .orElseThrow(() -> new RuntimeException("Agent not found: " + name));
+            List<AgentSummaryDto> summaries = agentRepository.findAll().stream()
+                    .map(agent -> new AgentSummaryDto(
+                            agent.getId(),
+                            agent.getName(),
+                            agent.getDescription(),
+                            agent.getIsActive() != null && agent.getIsActive(),
+                            agent.getLastActivity() != null ? agent.getLastActivity().toString() : null
+                    ))
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(summaries);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/{agentId}")
+    public ResponseEntity<AgentDetailDto> getAgentDetail(@PathVariable Long agentId) {
+        try {
+            TradingAgent agent = agentIdentityService.requireAgent(agentId);
+            String name = agent.getName();
 
             // Get account for portfolio info
             TradingAccount account = accountRepository.findByName(name);
@@ -84,6 +104,7 @@ public class AgentController {
             // Build response (use description as strategy for now)
             String strategy = agent.getDescription() != null ? agent.getDescription() : "No strategy defined";
             AgentDetailDto detail = new AgentDetailDto(
+                    agent.getId(),
                     agent.getName(),
                     strategy,
                     initialCapital,
@@ -97,11 +118,13 @@ public class AgentController {
         }
     }
 
-    @GetMapping("/{name}/runs")
+    @GetMapping("/{agentId}/runs")
     public ResponseEntity<List<AgentRunDto>> getAgentRuns(
-            @PathVariable String name,
+            @PathVariable Long agentId,
             @RequestParam(defaultValue = "10") int limit) {
         try {
+            TradingAgent agent = agentIdentityService.requireAgent(agentId);
+            String name = agent.getName();
             List<AgentRun> runs = runRepository.findByAgentNameOrderByStartTimeDesc(name)
                     .stream()
                     .limit(limit)

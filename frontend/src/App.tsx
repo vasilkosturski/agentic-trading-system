@@ -32,7 +32,7 @@ function App() {
         <Routes>
           <Route path="/" element={<TradingDashboard />} />
           <Route path="/dashboard" element={<TradingDashboard />} />
-          <Route path="/agents/:agentName" element={<AgentDetailPage />} />
+          <Route path="/agents/:agentId" element={<AgentDetailPage />} />
           <Route path="/runs/:runId" element={<RunDetailPage />} />
           <Route path="/trades/:tradeId" element={<TradeDetailPage />} />
         </Routes>
