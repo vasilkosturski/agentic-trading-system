@@ -64,8 +64,6 @@ services:
     environment:
       # Match K3s environment variables exactly
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      PUSHOVER_USER_KEY: ${PUSHOVER_USER_KEY:-}
-      PUSHOVER_API_TOKEN: ${PUSHOVER_API_TOKEN:-}
       BRAVE_API_KEY: ${BRAVE_API_KEY:-}
       BACKEND_URL: "http://backend:8080"
       DATABASE_URL: "postgresql://trading_user:trading_password@postgres:5432/agentic_trading"
