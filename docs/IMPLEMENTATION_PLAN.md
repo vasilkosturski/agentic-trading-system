@@ -75,7 +75,7 @@ Our **hybrid system** combines proven autonomous agents with enterprise capabili
 - **Status**: ✅ **COMPLETED** - LibSQL memory system integrated, individual databases created, all agents have persistent memory capabilities
 
 #### ✅ 2.2 Push Notification MCP Server (2-3 days) - **COMPLETED**
-- **Task**: Add Pushover integration for trade alerts
+- **Task**: ~~Add Pushover integration for trade alerts~~ (Removed - not needed for demo)
 - **Source**: [`push_server.py:22-27`](../../../agents/6_mcp/push_server.py:22)
 - **Integration**: Real-time notifications for significant trades
 - **Enhancement**: Configurable alert thresholds and channels

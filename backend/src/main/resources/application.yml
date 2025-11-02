@@ -47,7 +47,4 @@ trading:
 
 # Push Notifications
 notifications:
-  pushover:
-    user: ${PUSHOVER_USER:}
-    token: ${PUSHOVER_TOKEN:}
     enabled: false
