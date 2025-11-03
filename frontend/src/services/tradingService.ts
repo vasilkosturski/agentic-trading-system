@@ -40,22 +40,37 @@ export const tradingService = {
   
   // Trigger a manual trading cycle
   triggerManualCycle: async (): Promise<TriggerCycleResponse> => {
-    const response = await apiClient.post('/trading/run-cycle');
-    
-    // Handle ToolResponse wrapper format
-    if (response.data && response.data.success && response.data.data) {
-      return response.data.data;
-    }
-    
-    // Handle error case (e.g., market closed)
-    if (response.data && !response.data.success) {
-      const errorData: TriggerCycleError = {
-        reason: response.data.data?.reason || 'UNKNOWN',
-        message: response.data.error || 'Failed to trigger trading cycle'
+    try {
+      const response = await apiClient.post('/trading/run-cycle');
+      
+      // Handle ToolResponse wrapper format (202 Accepted)
+      if (response.data && response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      
+      throw { reason: 'UNKNOWN', message: 'Unexpected response format' };
+    } catch (error: any) {
+      // Handle HTTP error responses (409 Conflict, 500 Error, etc.)
+      if (error.response) {
+        const status = error.response.status;
+        const data = error.response.data;
+        
+        // Extract error message from ToolResponse wrapper or direct error
+        const errorMessage = data?.error || data?.message || 'Failed to trigger trading cycle';
+        const reason = status === 409 ? 'MARKET_CLOSED' : 'SERVICE_ERROR';
+        
+        const errorData: TriggerCycleError = {
+          reason: reason,
+          message: errorMessage
+        };
+        throw errorData;
+      }
+      
+      // Network error or other issue
+      throw {
+        reason: 'NETWORK_ERROR',
+        message: error.message || 'Failed to connect to server'
       };
-      throw errorData;
     }
-    
-    throw { reason: 'UNKNOWN', message: 'Unexpected response format' };
   },
 };

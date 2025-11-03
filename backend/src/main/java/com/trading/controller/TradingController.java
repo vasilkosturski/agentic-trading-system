@@ -216,23 +216,27 @@ public class TradingController {
                     );
                 }
                 
-                boolean success = Boolean.TRUE.equals(response.get("success"));
-                String reason = (String) response.get("reason");
-                String message = (String) response.get("message");
+                // Check HTTP status code from agents service
+                int statusCode = responseEntity.getStatusCodeValue();
                 
-                if (success) {
+                if (statusCode == 202) {
+                    // Success - cycle triggered
                     logger.info("Manual cycle triggered successfully");
+                    String message = (String) response.get("message");
                     Map<String, Object> result = new HashMap<>();
                     result.put("message", message != null ? message : "Trading cycle triggered successfully");
                     result.put("timestamp", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-                    return ResponseEntity.ok(ToolResponse.success(result));
+                    return ResponseEntity.accepted().body(ToolResponse.success(result));
+                } else if (statusCode == 409) {
+                    // Conflict - market closed
+                    String error = (String) response.get("error");
+                    logger.info("Manual cycle not triggered: market closed");
+                    return ResponseEntity.status(409).body(ToolResponse.error(error != null ? error : "Market is closed"));
                 } else {
-                    // Not an error - just a business case (e.g., market closed)
-                    logger.info("Manual cycle not triggered: {} - {}", reason, message);
-                    Map<String, Object> result = new HashMap<>();
-                    result.put("reason", reason);
-                    result.put("message", message);
-                    return ResponseEntity.ok(ToolResponse.error(message != null ? message : "Failed to trigger cycle"));
+                    // Other error
+                    String error = (String) response.get("error");
+                    logger.warn("Manual cycle failed with status {}: {}", statusCode, error);
+                    return ResponseEntity.status(statusCode).body(ToolResponse.error(error != null ? error : "Failed to trigger cycle"));
                 }
             } catch (RestClientException e) {
                 logger.error("Failed to connect to agents service: {}", e.getMessage());

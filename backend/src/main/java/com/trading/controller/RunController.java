@@ -48,10 +48,13 @@ public class RunController {
             String marketConditions = (String) request.get("marketConditions");
 
             AgentRun run = runService.startRun(agentName, runType, agentContext, marketConditions);
-            return ResponseEntity.ok(new ToolResponse<>(true, run.getId(), null));
+            return ResponseEntity.status(201).body(ToolResponse.success(run.getId()));
+        } catch (IllegalArgumentException e) {
+            logger.error("Invalid request to start run", e);
+            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
         } catch (Exception e) {
             logger.error("Error starting run", e);
-            return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
+            return ResponseEntity.status(500).body(ToolResponse.error("Failed to start run"));
         }
     }
 
@@ -77,11 +80,17 @@ public class RunController {
                 run = runService.endRunWithNoTrade(runId, fullReasoning, researchSources, summary);
             }
 
-            return ResponseEntity.ok(new ToolResponse<>(true,
-                    "Run " + runId + " ended with outcome: " + run.getOutcome(), null));
-        } catch (Exception e) {
+            return ResponseEntity.ok(ToolResponse.success(
+                    "Run " + runId + " ended with outcome: " + run.getOutcome()));
+        } catch (IllegalArgumentException e) {
+            logger.error("Invalid request to end run", e);
+            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
+        } catch (RuntimeException e) {
+            if (e.getMessage() != null && e.getMessage().contains("not found")) {
+                return ResponseEntity.status(404).body(ToolResponse.error(e.getMessage()));
+            }
             logger.error("Error ending run", e);
-            return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
+            return ResponseEntity.status(500).body(ToolResponse.error("Failed to end run"));
         }
     }
 
@@ -97,10 +106,16 @@ public class RunController {
             String errorMessage = (String) request.get("errorMessage");
 
             runService.markRunAsError(runId, errorMessage);
-            return ResponseEntity.ok(new ToolResponse<>(true, "Run " + runId + " marked as error", null));
-        } catch (Exception e) {
+            return ResponseEntity.ok(ToolResponse.success("Run " + runId + " marked as error"));
+        } catch (IllegalArgumentException e) {
+            logger.error("Invalid request to mark run as error", e);
+            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
+        } catch (RuntimeException e) {
+            if (e.getMessage() != null && e.getMessage().contains("not found")) {
+                return ResponseEntity.status(404).body(ToolResponse.error(e.getMessage()));
+            }
             logger.error("Error marking run as error", e);
-            return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
+            return ResponseEntity.status(500).body(ToolResponse.error("Failed to mark run as error"));
         }
     }
 
