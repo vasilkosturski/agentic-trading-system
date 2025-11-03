@@ -51,19 +51,17 @@ class TradingAPIServer:
                 
                 if not is_market_open:
                     logger.info("📣 Manual cycle requested but market is closed")
-                    # Return 200 OK - this is a valid business case, not an error!
+                    # Return 409 Conflict - operation cannot be performed in current state
                     return jsonify({
-                        "success": False,
-                        "reason": "MARKET_CLOSED",
-                        "message": "Market is currently closed. Trading cycles only run when the market is open."
-                    }), 200
+                        "error": "Market is currently closed. Trading cycles only run when the market is open.",
+                        "reason": "MARKET_CLOSED"
+                    }), 409
             except Exception as e:
                 logger.error(f"Error checking market status: {e}")
                 # This is an actual error - return 500
                 return jsonify({
-                    "success": False,
-                    "reason": "SERVICE_ERROR",
-                    "message": f"Failed to check market status: {str(e)}"
+                    "error": f"Failed to check market status: {str(e)}",
+                    "reason": "SERVICE_ERROR"
                 }), 500
             
             # Signal the event to trigger a cycle immediately
@@ -72,10 +70,9 @@ class TradingAPIServer:
             logger.info("📣 Manual trading cycle triggered via API - market is open")
             
             return jsonify({
-                "success": True,
-                "reason": "TRIGGERED",
-                "message": "Trading cycle triggered successfully."
-            }), 200
+                "message": "Trading cycle triggered successfully.",
+                "status": "TRIGGERED"
+            }), 202  # 202 Accepted - request accepted for processing
     
     def run(self, port=8000):
         """Run the Flask API server in a separate daemon thread."""

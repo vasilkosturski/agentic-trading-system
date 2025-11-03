@@ -68,10 +68,12 @@ public class AccountController {
                 ((Number) request.get("initialBalance")).doubleValue() : 100000.0;
             
             accountService.initializeAgent(name, initialBalance);
-            return ResponseEntity.ok(new ToolResponse<>(true,
-                "Successfully initialized agent " + name, null));
+            return ResponseEntity.status(201).body(ToolResponse.success(
+                "Successfully initialized agent " + name));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
+            return ResponseEntity.status(500).body(ToolResponse.error("Failed to initialize agent"));
         }
     }
 
@@ -81,9 +83,14 @@ public class AccountController {
         try {
             String name = resolveAgentName(request.get("agentId"));
             Double balance = accountService.getBalance(name);
-            return ResponseEntity.ok(new ToolResponse<>(true, balance, null));
-        } catch (Exception e) {
-            return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
+            return ResponseEntity.ok(ToolResponse.success(balance));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
+        } catch (RuntimeException e) {
+            if (e.getMessage() != null && e.getMessage().contains("not found")) {
+                return ResponseEntity.status(404).body(ToolResponse.error(e.getMessage()));
+            }
+            return ResponseEntity.status(500).body(ToolResponse.error("Failed to get balance"));
         }
     }
 
@@ -92,9 +99,14 @@ public class AccountController {
         try {
             String name = resolveAgentName(request.get("agentId"));
             Map<String, Integer> holdings = accountService.getHoldings(name);
-            return ResponseEntity.ok(new ToolResponse<>(true, holdings, null));
-        } catch (Exception e) {
-            return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
+            return ResponseEntity.ok(ToolResponse.success(holdings));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
+        } catch (RuntimeException e) {
+            if (e.getMessage() != null && e.getMessage().contains("not found")) {
+                return ResponseEntity.status(404).body(ToolResponse.error(e.getMessage()));
+            }
+            return ResponseEntity.status(500).body(ToolResponse.error("Failed to get holdings"));
         }
     }
 
@@ -112,9 +124,16 @@ public class AccountController {
 
             String result = accountService.buyShares(name, symbol, quantity, rationale,
                 fullReasoning, researchSources, agentContext, runId);
-            return ResponseEntity.ok(new ToolResponse<>(true, result, null));
-        } catch (Exception e) {
-            return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
+            return ResponseEntity.status(201).body(ToolResponse.success(result));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
+        } catch (RuntimeException e) {
+            // Business rule violations (insufficient funds, position limit, etc.)
+            if (e.getMessage() != null && (e.getMessage().contains("Insufficient") || 
+                e.getMessage().contains("maximum") || e.getMessage().contains("limit"))) {
+                return ResponseEntity.status(409).body(ToolResponse.error(e.getMessage()));
+            }
+            return ResponseEntity.status(500).body(ToolResponse.error("Failed to buy shares"));
         }
     }
 
@@ -132,20 +151,31 @@ public class AccountController {
 
             String result = accountService.sellShares(name, symbol, quantity, rationale,
                 fullReasoning, researchSources, agentContext, runId);
-            return ResponseEntity.ok(new ToolResponse<>(true, result, null));
-        } catch (Exception e) {
-            return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
+            return ResponseEntity.status(201).body(ToolResponse.success(result));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
+        } catch (RuntimeException e) {
+            // Business rule violations (insufficient shares, etc.)
+            if (e.getMessage() != null && e.getMessage().contains("Insufficient")) {
+                return ResponseEntity.status(409).body(ToolResponse.error(e.getMessage()));
+            }
+            return ResponseEntity.status(500).body(ToolResponse.error("Failed to sell shares"));
         }
     }
 
     @PostMapping("/tools/update_activity")
-    public ResponseEntity<ToolResponse<String>> updateActivity(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<Void> updateActivity(@RequestBody Map<String, Object> request) {
         try {
             String name = resolveAgentName(request.get("agentId"));
             accountService.updateAgentActivity(name);
-            return ResponseEntity.ok(new ToolResponse<>(true, "Activity updated for " + name, null));
-        } catch (Exception e) {
-            return ResponseEntity.ok(new ToolResponse<>(false, null, e.getMessage()));
+            return ResponseEntity.noContent().build();  // 204 No Content
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (RuntimeException e) {
+            if (e.getMessage() != null && e.getMessage().contains("not found")) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.status(500).build();
         }
     }
 
