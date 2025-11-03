@@ -1,12 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTradingAgents, useMarketStatus } from '../../hooks';
 import SimplePortfolioChart from './SimplePortfolioChart';
 import RecentTrades from './RecentTrades';
+import { tradingService } from '../../services/tradingService';
+import { Toast } from 'primereact/toast';
 
 const TradingDashboard = () => {
   const { agents = [], isLoading, error, isError } = useTradingAgents();
   const { data: marketStatus, isLoading: marketStatusLoading } = useMarketStatus();
+  const [isTriggering, setIsTriggering] = useState(false);
+  const toast = React.useRef<Toast>(null);
 
   const formatTimeAgo = (minutes: number): string => {
     if (minutes < 1) return 'just now';
@@ -146,13 +150,49 @@ const TradingDashboard = () => {
     return `${sign}${value.toFixed(2)}%`;
   };
 
+  const handleTriggerCycle = async () => {
+    setIsTriggering(true);
+    try {
+      const result = await tradingService.triggerManualCycle();
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Trading Cycle Triggered',
+        detail: result.message || 'All agents will run shortly. Check back in a few minutes for results.',
+        life: 5000,
+      });
+    } catch (error: any) {
+      // Check for explicit reason field (proper API contract)
+      const reason = error.reason;
+      const message = error.message || 'Failed to trigger trading cycle';
+      
+      if (reason === 'MARKET_CLOSED') {
+        toast.current?.show({
+          severity: 'warn',
+          summary: 'Market Closed',
+          detail: message,
+          life: 5000,
+        });
+      } else {
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: message,
+          life: 5000,
+        });
+      }
+    } finally {
+      setIsTriggering(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      <Toast ref={toast} />
       <div className="text-center py-8">
         <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
           Trading Dashboard
         </h2>
-        <div className="flex items-center justify-center space-x-4 mb-8">
+        <div className="flex items-center justify-center space-x-4 mb-6">
           <p className="text-lg text-gray-600 dark:text-gray-300">
             {agents.length > 0
               ? `${agents.length} Autonomous Trader${agents.length !== 1 ? 's' : ''}: ${agents.map(a => a.agentName).join(', ')}`
@@ -176,6 +216,31 @@ const TradingDashboard = () => {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Manual Trading Cycle Button */}
+        <div className="mb-8">
+          <button
+            onClick={handleTriggerCycle}
+            disabled={isTriggering}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors flex items-center space-x-2 disabled:cursor-not-allowed mx-auto shadow-md hover:shadow-lg"
+            title="Trigger a manual trading cycle for all agents (only runs if market is open)"
+          >
+            {isTriggering ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <span>Running Trading Cycle...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Run Trading Cycle for All Agents</span>
+              </>
+            )}
+          </button>
         </div>
         
         {/* 4-trader grid */}

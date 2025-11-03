@@ -21,3 +21,6 @@ mcp>=0.1.0
 
 # HTTP requests
 requests>=2.28.0
+
+# Flask for API server
+flask>=3.0.0

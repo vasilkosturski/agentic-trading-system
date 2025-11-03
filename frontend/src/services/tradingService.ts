@@ -12,6 +12,17 @@ export interface AgentStatus {
   dayPnL: number;
   dayPnLPercent: number;
   currentPositions: number;
+  cycleIntervalSeconds?: number;
+}
+
+export interface TriggerCycleResponse {
+  message: string;
+  timestamp?: string;
+}
+
+export interface TriggerCycleError {
+  reason: string;
+  message: string;
 }
 
 // Trading API functions - only what's actually used
@@ -25,5 +36,26 @@ export const tradingService = {
     }
     // Fallback to direct data if not wrapped
     return response.data || [];
+  },
+  
+  // Trigger a manual trading cycle
+  triggerManualCycle: async (): Promise<TriggerCycleResponse> => {
+    const response = await apiClient.post('/trading/run-cycle');
+    
+    // Handle ToolResponse wrapper format
+    if (response.data && response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    
+    // Handle error case (e.g., market closed)
+    if (response.data && !response.data.success) {
+      const errorData: TriggerCycleError = {
+        reason: response.data.data?.reason || 'UNKNOWN',
+        message: response.data.error || 'Failed to trigger trading cycle'
+      };
+      throw errorData;
+    }
+    
+    throw { reason: 'UNKNOWN', message: 'Unexpected response format' };
   },
 };

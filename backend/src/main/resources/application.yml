@@ -48,3 +48,8 @@ trading:
 # Push Notifications
 notifications:
     enabled: false
+
+# Agents API Configuration
+agents:
+  api:
+    url: ${AGENTS_API_URL:http://agents-service:8000}

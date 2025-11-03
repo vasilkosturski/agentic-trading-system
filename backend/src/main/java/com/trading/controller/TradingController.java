@@ -6,17 +6,25 @@ import com.trading.service.TradingService.*;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.AgentMonitoringService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClientException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/trading")
 public class TradingController {
+    
+    private static final Logger logger = LoggerFactory.getLogger(TradingController.class);
     
     @Autowired
     private TradingService tradingService;
@@ -26,6 +34,20 @@ public class TradingController {
 
     @Autowired
     private AgentIdentityService agentIdentityService;
+    
+    @Value("${agents.api.url:http://agents-service:8000}")
+    private String agentsApiUrl;
+    
+    private final RestTemplate restTemplate;
+    
+    public TradingController() {
+        // Configure RestTemplate with longer timeouts for agents service
+        this.restTemplate = new RestTemplate();
+        this.restTemplate.setRequestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {{
+            setConnectTimeout(30000); // 30 seconds
+            setReadTimeout(60000);    // 60 seconds
+        }});
+    }
     
     
     // Agent Status Endpoints (Real Data from PostgreSQL)
@@ -149,7 +171,8 @@ public class TradingController {
             @PathVariable Long agentId,
             @RequestParam(defaultValue = "10") int limit) {
         try {
-            String agentName = agentIdentityService.requireAgentName(agentId);
+            // Verify agent exists
+            agentIdentityService.requireAgentName(agentId);
             // List<String> logs = agentMonitoringService.getAgentLogs(agentName, limit);
             // Fallback until PostgreSQLAgentMonitoringService is implemented
             List<String> logs = List.of("Log functionality temporarily unavailable");
@@ -170,6 +193,58 @@ public class TradingController {
             return ResponseEntity.ok(ToolResponse.success(status));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
+        }
+    }
+    
+    @PostMapping("/run-cycle")
+    public ResponseEntity<ToolResponse<Map<String, Object>>> triggerManualCycle() {
+        try {
+            logger.info("Manual trading cycle requested via API");
+            
+            // Call the Python agents API to trigger a cycle
+            String url = agentsApiUrl + "/api/trigger-cycle";
+            logger.info("Attempting to connect to agents service at: {}", url);
+            
+            try {
+                ResponseEntity<Map> responseEntity = restTemplate.postForEntity(url, null, Map.class);
+                Map<String, Object> response = responseEntity.getBody();
+                
+                if (response == null) {
+                    logger.error("Received null response from agents service");
+                    return ResponseEntity.status(503).body(
+                        ToolResponse.error("Agents service returned invalid response")
+                    );
+                }
+                
+                boolean success = Boolean.TRUE.equals(response.get("success"));
+                String reason = (String) response.get("reason");
+                String message = (String) response.get("message");
+                
+                if (success) {
+                    logger.info("Manual cycle triggered successfully");
+                    Map<String, Object> result = new HashMap<>();
+                    result.put("message", message != null ? message : "Trading cycle triggered successfully");
+                    result.put("timestamp", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                    return ResponseEntity.ok(ToolResponse.success(result));
+                } else {
+                    // Not an error - just a business case (e.g., market closed)
+                    logger.info("Manual cycle not triggered: {} - {}", reason, message);
+                    Map<String, Object> result = new HashMap<>();
+                    result.put("reason", reason);
+                    result.put("message", message);
+                    return ResponseEntity.ok(ToolResponse.error(message != null ? message : "Failed to trigger cycle"));
+                }
+            } catch (RestClientException e) {
+                logger.error("Failed to connect to agents service: {}", e.getMessage());
+                return ResponseEntity.status(503).body(
+                    ToolResponse.error("Agents service unavailable. Please ensure the trading system is running.")
+                );
+            }
+        } catch (Exception e) {
+            logger.error("Error triggering manual cycle", e);
+            return ResponseEntity.status(500).body(
+                ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Internal server error")
+            );
         }
     }
     
