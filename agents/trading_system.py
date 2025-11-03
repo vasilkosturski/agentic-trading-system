@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 from simple_trader import SimpleTrader
 from config import BACKEND_API_AGENTS
+from api_server import TradingAPIServer
 
 # Load environment variables
 load_dotenv(override=True)
@@ -218,27 +219,51 @@ async def update_all_agents_activity():
 async def run_continuous_trading():
     """Run continuous trading cycles - matches source project pattern"""
     system = await TradingSystem.create()  # Single API call: names → IDs, then create with IDs
+    
+    # Create event for manual cycle triggers
+    manual_cycle_event = asyncio.Event()
+    
+    # Start the API server for manual cycle triggers (proper encapsulation, no globals!)
+    api_server = TradingAPIServer(
+        trading_system=system,
+        check_market_status_func=check_market_status,
+        manual_cycle_event=manual_cycle_event
+    )
+    api_server.run(port=8000)
 
     print(f"🔄 Starting scheduler to run every {RUN_EVERY_N_MINUTES} minutes")
     logger.info(f"Continuous trading loop started with {RUN_EVERY_N_MINUTES} minute intervals")
     logger.info("Market hours check: ALWAYS ENABLED (saves API costs)")
+    logger.info("📡 Manual cycle trigger available at http://localhost:8000/api/trigger-cycle")
 
     try:
         while True:
-            # Always check market status before running agents to save API costs
+            # Wait for either: scheduled time OR manual trigger event
+            sleep_seconds = RUN_EVERY_N_MINUTES * 60
+            
+            try:
+                # Wait for manual trigger with timeout (scheduled interval)
+                await asyncio.wait_for(manual_cycle_event.wait(), timeout=sleep_seconds)
+                # Manual trigger received!
+                logger.info("📣 Manual cycle triggered - starting immediately...")
+                manual_cycle_event.clear()  # Reset for next trigger
+            except asyncio.TimeoutError:
+                # Normal scheduled cycle
+                logger.info("⏰ Scheduled cycle time reached")
+            
+            # Check market status and run if open
             is_market_open = await check_market_status()
 
             if not is_market_open:
                 logger.info("⏸️  Market is closed. Skipping trading cycle to save API costs.")
             else:
-                logger.info("🚀 Starting new trading cycle...")
+                logger.info("🚀 Starting trading cycle...")
                 await system.run_all_agents()
                 logger.info(f"✅ Trading cycle completed.")
 
             # Always update activity timestamp on every cycle (shows system is alive)
             await update_all_agents_activity()
-            logger.info(f"💤 Waiting {RUN_EVERY_N_MINUTES} minutes until next cycle...")
-            await asyncio.sleep(RUN_EVERY_N_MINUTES * 60)
+            
     except KeyboardInterrupt:
         logger.info("🛑 Graceful shutdown requested (Ctrl+C)")
         print("\n🛑 Shutting down trading system gracefully...")

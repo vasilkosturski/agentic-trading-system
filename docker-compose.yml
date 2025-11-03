@@ -83,9 +83,10 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    ports:
+      - "8000:8000"  # API server for manual cycle triggers
     # Run the production autonomous trading system
     command: python trading_system.py
-    # No ports exposed - agents are autonomous scripts
 
   # React Frontend
   frontend:
