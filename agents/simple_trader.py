@@ -27,6 +27,9 @@ from mcp_params import researcher_mcp_server_params
 # Import run tracking
 from run_tracking import start_run, end_run, mark_run_as_error
 
+# Import status broadcasting
+from status_broadcaster import broadcast_status, PHASE_INITIALIZING, PHASE_RESEARCHING, PHASE_DECIDING, PHASE_TRADING, PHASE_COMPLETED, PHASE_ERROR
+
 logger = logging.getLogger(__name__)
 
 class SimpleTrader:
@@ -260,7 +263,10 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
 
         if self.agent_id is None:
             raise RuntimeError(f"Agent id not set for {self.name}. Use TradingSystem.create() to instantiate.")
-
+        
+        # Broadcast: INITIALIZING
+        broadcast_status(self.agent_id, self.name, PHASE_INITIALIZING, "Starting trading cycle", 0)
+        
         # Get account report (direct API call)
         account = await get_account_report(self.agent_id)
         strategy = await self.get_strategy()
@@ -290,6 +296,9 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             self.last_decision = None
 
         try:
+            # Broadcast: RESEARCHING (combined: fetching data, research, analysis)
+            broadcast_status(self.agent_id, self.name, PHASE_RESEARCHING, "Researching and analyzing market opportunities", 30)
+            
             # Create agent with direct tools
             self.agent = await self.create_agent(researcher_mcp_servers)
 
@@ -298,8 +307,11 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                 if self.do_trade
                 else self.get_rebalance_message(strategy, account)
             )
-
+            
             result = await Runner.run(self.agent, message, max_turns=30)
+            
+            # Broadcast: DECIDING (after agent completes reasoning)
+            broadcast_status(self.agent_id, self.name, PHASE_DECIDING, "Making investment decision", 70)
 
             # Extract result data for run tracking
             # The result contains messages with the agent's reasoning and final response
@@ -320,6 +332,9 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             # Read structured decision from decide_action tool (if any) and dispatch deterministically
             decision = self.last_decision
             if decision and decision.get("action") in ("BUY", "SELL"):
+                # Broadcast: TRADING
+                broadcast_status(self.agent_id, self.name, PHASE_TRADING, "Executing trade", 90)
+                
                 action = decision["action"]
                 symbol = decision["symbol"]
                 quantity = int(decision["quantity"])
@@ -341,9 +356,16 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                 research_sources = []  # Could extract from researcher tool calls
                 await end_run(run_id, full_reasoning or "Agent execution completed", research_sources, summary or "Completed", self.trade_count)
 
+            # Broadcast: COMPLETED
+            outcome_message = f"Completed - {self.trade_count} trade(s) executed" if self.trade_count > 0 else "Completed - No trades (HOLD decision)"
+            broadcast_status(self.agent_id, self.name, PHASE_COMPLETED, outcome_message, 100, outcome=outcome_message)
+            
             print(f"✅ {self.name} completed {cycle_type} cycle at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
         except Exception as e:
+            # Broadcast: ERROR
+            broadcast_status(self.agent_id, self.name, PHASE_ERROR, f"Error: {str(e)}", 0, outcome=f"Failed: {str(e)}")
+            
             # Mark run as error if tracking was started
             if run_id is not None:
                 await mark_run_as_error(run_id, str(e))

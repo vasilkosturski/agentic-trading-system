@@ -1,16 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTradingAgents, useMarketStatus } from '../../hooks';
 import SimplePortfolioChart from './SimplePortfolioChart';
 import RecentTrades from './RecentTrades';
 import { tradingService } from '../../services/tradingService';
 import { Toast } from 'primereact/toast';
+import { webSocketService, AgentStatusUpdate } from '../../services/webSocketService';
+import { LiveAgentActivity } from '../LiveAgentActivity/LiveAgentActivity';
 
 const TradingDashboard = () => {
-  const { agents = [], isLoading, error, isError } = useTradingAgents();
+  const { agents = [], isLoading, error, isError, refetch } = useTradingAgents();
   const { data: marketStatus, isLoading: marketStatusLoading } = useMarketStatus();
   const [isTriggering, setIsTriggering] = useState(false);
+  const [agentStatuses, setAgentStatuses] = useState<Map<number, AgentStatusUpdate>>(new Map());
+  const [isCycleRunning, setIsCycleRunning] = useState(false);
   const toast = React.useRef<Toast>(null);
+
+  // Connect to WebSocket on mount
+  useEffect(() => {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+    webSocketService.connect(apiUrl);
+
+    const unsubscribe = webSocketService.subscribe((update: AgentStatusUpdate) => {
+      setAgentStatuses(prev => {
+        const newMap = new Map(prev);
+        newMap.set(update.agentId, update);
+        return newMap;
+      });
+
+      // Detect cycle start (any agent starts = cycle is running)
+      if (update.phase === 'INITIALIZING') {
+        setIsCycleRunning(true);
+      }
+
+      // Check if all agents completed
+      if (update.phase === 'COMPLETED' || update.phase === 'ERROR') {
+        setAgentStatuses(current => {
+          const allCompleted = Array.from(current.values()).every(
+            s => s.phase === 'COMPLETED' || s.phase === 'ERROR'
+          );
+          if (allCompleted && current.size === 4) { // We have 4 agents
+            setIsCycleRunning(false);
+            // Refresh dashboard data after 2 seconds
+            setTimeout(() => {
+              refetch();
+              setAgentStatuses(new Map()); // Clear statuses
+            }, 2000);
+          }
+          return current;
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      webSocketService.disconnect();
+    };
+  }, [refetch]);
 
   const formatTimeAgo = (minutes: number): string => {
     if (minutes < 1) return 'just now';
@@ -152,13 +198,14 @@ const TradingDashboard = () => {
 
   const handleTriggerCycle = async () => {
     setIsTriggering(true);
+    
     try {
       const result = await tradingService.triggerManualCycle();
       toast.current?.show({
         severity: 'success',
-        summary: 'Trading Cycle Triggered',
-        detail: result.message || 'All agents will run shortly. Check back in a few minutes for results.',
-        life: 5000,
+        summary: 'Trading Cycle Started',
+        detail: 'Watch the agents work in real-time below',
+        life: 3000,
       });
     } catch (error: any) {
       // Check for explicit reason field (proper API contract)
@@ -242,6 +289,9 @@ const TradingDashboard = () => {
             )}
           </button>
         </div>
+
+        {/* Live Agent Activity */}
+        <LiveAgentActivity agentStatuses={agentStatuses} isRunning={isCycleRunning} />
         
         {/* 4-trader grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
