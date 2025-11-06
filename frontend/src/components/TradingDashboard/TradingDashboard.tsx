@@ -18,7 +18,7 @@ const TradingDashboard = () => {
 
   // Connect to WebSocket on mount
   useEffect(() => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+    const apiUrl = import.meta.env.VITE_API_BASE_URL || '/api';
     webSocketService.connect(apiUrl);
 
     const unsubscribe = webSocketService.subscribe((update: AgentStatusUpdate) => {
@@ -200,7 +200,7 @@ const TradingDashboard = () => {
     setIsTriggering(true);
     
     try {
-      const result = await tradingService.triggerManualCycle();
+      await tradingService.triggerManualCycle();
       toast.current?.show({
         severity: 'success',
         summary: 'Trading Cycle Started',
@@ -296,7 +296,7 @@ const TradingDashboard = () => {
         {/* 4-trader grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
           {agents.map((agent) => {
-            const nextCycle = formatNextCycle(agent.lastActivity, agent.cycleIntervalSeconds);
+            const nextCycle = formatNextCycle(agent.lastActivity, agent.cycleIntervalSeconds ?? 3600);
             const activityStatus = getActivityStatus(agent.lastActivity);
             return (
             <Link key={agent.agentId} to={`/agents/${agent.agentId}`}>
