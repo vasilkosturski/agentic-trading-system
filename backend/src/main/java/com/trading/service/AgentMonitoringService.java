@@ -52,7 +52,7 @@ public class AgentMonitoringService {
         if (agentOpt.isEmpty()) {
             throw new RuntimeException("Agent not found: " + agentId);
         }
-
+        
         return buildAgentStatusFromEntity(agentOpt.get());
     }
     

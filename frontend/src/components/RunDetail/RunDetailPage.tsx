@@ -1,4 +1,3 @@
-import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { runService, type RunDetail } from '../../services/runService';

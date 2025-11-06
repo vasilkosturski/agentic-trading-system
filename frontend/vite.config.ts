@@ -11,6 +11,9 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  define: {
+    global: 'globalThis',
+  },
   server: {
     port: 3000,
     host: true,
@@ -19,6 +22,8 @@ export default defineConfig({
       '127.0.0.1',
       'agentic-trading.vkontech.com'
     ],
+    // Development proxy: redirect /api requests to backend running on separate port
+    // In production, frontend and backend share same origin via ingress
     proxy: {
       '/api': {
         target: 'http://localhost:8080',

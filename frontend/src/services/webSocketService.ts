@@ -26,7 +26,20 @@ class WebSocketService {
       return;
     }
 
-    const wsUrl = apiUrl.replace(/^http/, 'ws') + '/ws';
+    // Convert HTTP/HTTPS URL to WS/WSS
+    // apiUrl can be: /api (relative) or http://localhost:8080/api (absolute)
+    let wsUrl: string;
+    
+    if (apiUrl.startsWith('http')) {
+      // Absolute URL: convert http/https to ws/wss
+      wsUrl = apiUrl.replace(/^https?/, 'ws') + '/ws';
+    } else {
+      // Relative URL: use window location to determine protocol
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const host = window.location.host;
+      wsUrl = `${protocol}://${host}${apiUrl}/ws`;
+    }
+    
     console.log('Connecting to WebSocket:', wsUrl);
 
     this.client = new Client({
