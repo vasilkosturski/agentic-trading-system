@@ -31,10 +31,12 @@ def researcher_mcp_server_params(name: str):
 
     - mcp-server-fetch: Standard web content retrieval
     - Brave Search: Third-party web search API
-    - Memory (libsql): Third-party memory/context storage
+
+    NOTE: Memory is now stored in PostgreSQL directly via trading_tools.py
+    No separate MCP needed - use PostgreSQL fields (full_reasoning, research_sources, agent_context)
 
     Args:
-        name: Agent name for unique memory database
+        name: Agent name (for reference, not used for memory)
 
     Returns:
         List of MCP server parameter dicts
@@ -50,10 +52,6 @@ def researcher_mcp_server_params(name: str):
             "env": brave_env,
         },
 
-        # Memory - Third-party context storage (legitimate MCP use case)
-        {
-            "command": "npx",
-            "args": ["-y", "mcp-memory-libsql"],
-            "env": {"LIBSQL_URL": f"file:./memory/{name}.db"},
-        },
+        # Memory removed - use PostgreSQL instead via trading_tools.py
+        # This simplifies architecture and prevents data loss on pod restart
     ]
