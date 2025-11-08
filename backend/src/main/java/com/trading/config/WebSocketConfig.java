@@ -21,7 +21,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // WebSocket endpoint for clients to connect
-        registry.addEndpoint("/ws")
+        // Register at both /ws and /api/ws to handle Traefik path stripping
+        // Client requests /api/ws -> Traefik strips /api -> backend receives /ws
+        registry.addEndpoint("/ws", "/api/ws")
                 .setAllowedOriginPatterns("*") // Allow all origins for demo
                 .withSockJS(); // Fallback for browsers without WebSocket support
     }

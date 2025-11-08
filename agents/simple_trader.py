@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
 SimpleTrader - Refactored to use direct HTTP function tools instead of internal MCPs
-Keeps external MCPs for Brave Search, Memory, and Fetch (third-party services)
+Keeps external MCPs for Brave Search and Fetch (third-party services)
+Memory stored directly in PostgreSQL via trading_tools.py fields (full_reasoning, research_sources, agent_context)
 """
 
 import asyncio
+import json
 import logging
 from contextlib import AsyncExitStack
 from datetime import datetime
@@ -48,9 +50,10 @@ class SimpleTrader:
         self.agent_id: Optional[int] = agent_id  # Set at TradingSystem initialization
 
     async def get_researcher_tool(self, researcher_mcp_servers) -> Tool:
-        """Create researcher tool from external MCP servers (Brave Search, Memory, Fetch)
+        """Create researcher tool from external MCP servers (Brave Search, Fetch)
 
-        These are legitimate MCPs - we don't control Brave Search or Memory services
+        These are legitimate MCPs - we don't control Brave Search services
+        Memory is now stored directly in PostgreSQL via trading_tools.py fields
         """
         researcher_instructions = f"""You are a financial researcher. You help with research and analysis for trading decisions.
 Based on the request, you carry out necessary research and respond with your findings.
@@ -342,11 +345,44 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                 # Use fullReasoning from decision if available, otherwise fall back to conversation messages
                 decision_full_reasoning = decision.get("fullReasoning") or ""
                 final_full_reasoning = decision_full_reasoning if decision_full_reasoning else full_reasoning
+                
+                # Prepare research sources as JSON
+                research_sources_json = json.dumps([])  # Could be enhanced to extract from researcher tool
+                
+                # Prepare agent context before trade
+                portfolio_context = {
+                    "cashBefore": balance,
+                    "positionsBefore": len(holdings),
+                    "holdingsBefore": holdings,
+                    "timestamp": datetime.now().isoformat(),
+                }
+                agent_context_json = json.dumps(portfolio_context)
+                
                 try:
                     if action == "BUY":
-                        await buy_shares(self.agent_id, symbol, quantity, rationale, final_full_reasoning, runId=self.current_run_id, agent_name=self.name)
+                        await buy_shares(
+                            self.agent_id, 
+                            symbol, 
+                            quantity, 
+                            rationale, 
+                            fullReasoning=final_full_reasoning,
+                            researchSources=research_sources_json,
+                            agentContext=agent_context_json,
+                            runId=self.current_run_id, 
+                            agent_name=self.name
+                        )
                     else:
-                        await sell_shares(self.agent_id, symbol, quantity, rationale, final_full_reasoning, runId=self.current_run_id, agent_name=self.name)
+                        await sell_shares(
+                            self.agent_id, 
+                            symbol, 
+                            quantity, 
+                            rationale, 
+                            fullReasoning=final_full_reasoning,
+                            researchSources=research_sources_json,
+                            agentContext=agent_context_json,
+                            runId=self.current_run_id, 
+                            agent_name=self.name
+                        )
                     self.trade_count += 1
                 except Exception as trade_err:
                     logger.error(f"Trade execution failed: {trade_err}")

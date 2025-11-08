@@ -26,24 +26,25 @@ class WebSocketService {
       return;
     }
 
-    // Convert HTTP/HTTPS URL to WS/WSS
+    // SockJS requires HTTP/HTTPS URLs, not WS/WSS
+    // It will automatically upgrade to WebSocket internally
     // apiUrl can be: /api (relative) or http://localhost:8080/api (absolute)
-    let wsUrl: string;
+    let sockJsUrl: string;
     
     if (apiUrl.startsWith('http')) {
-      // Absolute URL: convert http/https to ws/wss
-      wsUrl = apiUrl.replace(/^https?/, 'ws') + '/ws';
+      // Absolute URL: use HTTP/HTTPS as-is
+      sockJsUrl = apiUrl + '/ws';
     } else {
-      // Relative URL: use window location to determine protocol
-      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      // Relative URL: construct full URL using window location
+      const protocol = window.location.protocol;
       const host = window.location.host;
-      wsUrl = `${protocol}://${host}${apiUrl}/ws`;
+      sockJsUrl = `${protocol}//${host}${apiUrl}/ws`;
     }
     
-    console.log('Connecting to WebSocket:', wsUrl);
+    console.log('Connecting to WebSocket via SockJS:', sockJsUrl);
 
     this.client = new Client({
-      webSocketFactory: () => new SockJS(wsUrl),
+      webSocketFactory: () => new SockJS(sockJsUrl),
       reconnectDelay: this.reconnectDelay,
       heartbeatIncoming: 10000,
       heartbeatOutgoing: 10000,
