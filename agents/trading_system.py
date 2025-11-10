@@ -235,11 +235,16 @@ async def run_continuous_trading():
     logger.info(f"Continuous trading loop started with {RUN_EVERY_N_MINUTES} minute intervals")
     logger.info("Market hours check: ALWAYS ENABLED (saves API costs)")
     logger.info("📡 Manual cycle trigger available at http://localhost:8000/api/trigger-cycle")
+    logger.info(f"⏰ First cycle will run in {RUN_EVERY_N_MINUTES} minutes or when manually triggered")
+    logger.info(f"🔧 DEBUG: Event loop: {asyncio.get_event_loop()}")
+    logger.info(f"🔧 DEBUG: Manual cycle event: {manual_cycle_event}")
 
     try:
+        logger.info("🚀 Entering main trading loop...")
         while True:
             # Wait for either: scheduled time OR manual trigger event
             sleep_seconds = RUN_EVERY_N_MINUTES * 60
+            logger.info(f"💤 Waiting {RUN_EVERY_N_MINUTES} minutes for next cycle (or manual trigger)...")
             
             try:
                 # Wait for manual trigger with timeout (scheduled interval)
@@ -252,7 +257,9 @@ async def run_continuous_trading():
                 logger.info("⏰ Scheduled cycle time reached")
             
             # Check market status and run if open
+            logger.info("🔍 Checking market status...")
             is_market_open = await check_market_status()
+            logger.info(f"📊 Market status: {'OPEN' if is_market_open else 'CLOSED'}")
 
             if not is_market_open:
                 logger.info("⏸️  Market is closed. Skipping trading cycle to save API costs.")
