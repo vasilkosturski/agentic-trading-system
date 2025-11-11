@@ -22,6 +22,7 @@ from trading_tools import get_account_report, initialize_agent
 from trading_tools import buy_shares, sell_shares, _get_balance_raw, _get_holdings_raw
 from agents import function_tool
 from market_tools import MARKET_TOOLS
+from memory_tools import get_trading_history, get_recent_activity
 
 # Import MCP params only for external services (Brave Search, Memory, Fetch)
 from mcp_params import researcher_mcp_server_params
@@ -95,6 +96,9 @@ You actively manage your portfolio according to your strategy.
 Available tools:
 - Researcher: Research online for news and opportunities
 - Market data tools: lookup_share_price, get_historical_prices, get_market_indicators
+- Memory tools: query_trading_history(symbol, days), query_recent_activity(days)
+  - Use these to remember your past decisions and reasoning about stocks
+  - Check your history before making decisions to maintain consistency
 - Decision tool: decide_action(action=BUY|SELL|HOLD, symbol?, quantity?, rationale, fullReasoning?)
   - rationale: Brief summary (1-2 sentences) of the trade decision
   - fullReasoning: Comprehensive analysis explaining your research, market conditions, and investment thesis (2-5 paragraphs)
@@ -243,8 +247,43 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             # Return a simple acknowledgement; the system reads self.last_decision
             return "OK"
 
-        # Only expose market tools + decision tool (no account/trading side-effects)
-        all_tools = [researcher_tool] + MARKET_TOOLS + [decide_action]
+        # Memory tools - query past decisions and reasoning
+        @function_tool
+        async def query_trading_history(symbol: str, days: int = 30) -> str:
+            """
+            Get your complete trading history for a specific stock.
+            Shows all trades (BUY/SELL), your reasoning at the time, market conditions,
+            and times you considered but didn't trade.
+            
+            Use this to remember your thesis and conviction level for a stock.
+            
+            Args:
+                symbol: Stock symbol (e.g., 'NVDA', 'AAPL')
+                days: How many days back to look (default 30)
+            
+            Returns:
+                Natural language summary of your trading history for this stock
+            """
+            return await get_trading_history(self.name, symbol, days)
+        
+        @function_tool
+        async def query_recent_activity(days: int = 7) -> str:
+            """
+            Get your recent trading activity across all stocks.
+            Shows what you've been doing, thinking, and considering in recent runs.
+            
+            Use this to understand your current portfolio strategy and avoid repetitive trades.
+            
+            Args:
+                days: How many days back to look (default 7)
+            
+            Returns:
+                Natural language summary of your recent activity
+            """
+            return await get_recent_activity(self.name, days)
+
+        # Only expose market tools + decision tool + memory tools (no account/trading side-effects)
+        all_tools = [researcher_tool] + MARKET_TOOLS + [decide_action, query_trading_history, query_recent_activity]
 
         agent = Agent(
             name=self.name,
