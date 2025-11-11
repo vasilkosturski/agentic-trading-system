@@ -5,6 +5,7 @@ Uses OpenAI Agents SDK @function_tool decorator for automatic schema generation
 """
 
 import aiohttp
+import asyncio
 import json
 import logging
 from agents import function_tool
@@ -21,22 +22,43 @@ BACKEND_URL = BACKEND_API_ACCOUNTS
 async def _call_backend_api(endpoint: str, data: dict = None) -> any:
     """Helper to call Java backend API"""
     url = f"{BACKEND_URL}{endpoint}"
+    timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout
 
-    async with aiohttp.ClientSession() as session:
-        if data:
-            async with session.post(url, json=data) as response:
-                result = await response.json()
-                if response.status == 200 and result.get("success"):
-                    return result.get("data")
-                else:
-                    error_msg = result.get("error", "Unknown error")
-                    raise Exception(f"API call failed: {error_msg}")
-        else:
-            async with session.get(url) as response:
-                if response.status == 200:
-                    return await response.text()
-                else:
-                    raise Exception(f"API call failed with status {response.status}")
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            if data:
+                logger.debug(f"POST {url} with data: {data}")
+                async with session.post(url, json=data) as response:
+                    response_text = await response.text()
+                    logger.debug(f"Response status: {response.status}, body: {response_text}")
+
+                    try:
+                        result = json.loads(response_text)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse JSON response from {url}: {response_text}")
+                        raise Exception(f"Invalid JSON response from API: {str(e)}")
+
+                    if response.status == 200 and result.get("success"):
+                        return result.get("data")
+                    else:
+                        error_msg = result.get("error") or f"HTTP {response.status}"
+                        logger.error(f"API call failed: {error_msg}, response: {result}")
+                        raise Exception(f"API call failed: {error_msg}")
+            else:
+                logger.debug(f"GET {url}")
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        return await response.text()
+                    else:
+                        response_text = await response.text()
+                        logger.error(f"GET failed with status {response.status}: {response_text}")
+                        raise Exception(f"API call failed with status {response.status}")
+    except aiohttp.ClientError as e:
+        logger.error(f"Network error calling {url}: {type(e).__name__}: {str(e)}")
+        raise Exception(f"Network error: {str(e)}")
+    except asyncio.TimeoutError:
+        logger.error(f"Timeout calling {url} after 30 seconds")
+        raise Exception(f"Request timeout after 30 seconds")
 
 @function_tool
 async def get_balance(agent_id: int) -> float:
