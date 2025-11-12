@@ -38,7 +38,8 @@ async def _call_backend_api(endpoint: str, data: dict = None) -> any:
                         logger.error(f"Failed to parse JSON response from {url}: {response_text}")
                         raise Exception(f"Invalid JSON response from API: {str(e)}")
 
-                    if response.status == 200 and result.get("success"):
+                    # Accept both 200 (OK) and 201 (Created) as success
+                    if response.status in [200, 201] and result.get("success"):
                         return result.get("data")
                     else:
                         error_msg = result.get("error") or f"HTTP {response.status}"
