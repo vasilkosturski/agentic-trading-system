@@ -5,7 +5,11 @@ import com.trading.dto.RunDetailDto;
 import com.trading.dto.ToolResponse;
 import com.trading.entity.AccountTransaction;
 import com.trading.entity.AgentRun;
+import com.trading.entity.AgentToolCall;
+import com.trading.entity.AgentReasoningStep;
 import com.trading.repository.AccountTransactionRepository;
+import com.trading.repository.AgentToolCallRepository;
+import com.trading.repository.AgentReasoningStepRepository;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.RunService;
 import org.slf4j.Logger;
@@ -29,6 +33,12 @@ public class RunController {
 
     @Autowired
     private AccountTransactionRepository transactionRepository;
+
+    @Autowired
+    private AgentToolCallRepository toolCallRepository;
+
+    @Autowired
+    private AgentReasoningStepRepository reasoningStepRepository;
 
     @Autowired
     private AgentIdentityService agentIdentityService;
@@ -120,7 +130,75 @@ public class RunController {
     }
 
     /**
-     * Get a specific run by ID with trades
+     * Log a tool call for a run
+     * POST /api/runs/{runId}/tool-call
+     * Body: { "toolName": "...", "inputParams": "{...}", "outputResult": "...", "timestamp": "...", "durationMs": 123, "success": true, "errorMessage": null, "sequenceNumber": 1 }
+     */
+    @PostMapping("/{runId}/tool-call")
+    public ResponseEntity<ToolResponse<Long>> logToolCall(@PathVariable Long runId, @RequestBody Map<String, Object> request) {
+        try {
+            String toolName = (String) request.get("toolName");
+            String inputParams = (String) request.get("inputParams");
+            String outputResult = (String) request.get("outputResult");
+            String timestampStr = (String) request.get("timestamp");
+            Long durationMs = request.get("durationMs") != null ? 
+                    ((Number) request.get("durationMs")).longValue() : null;
+            Boolean success = request.get("success") != null ? 
+                    (Boolean) request.get("success") : true;
+            String errorMessage = (String) request.get("errorMessage");
+            Integer sequenceNumber = ((Number) request.get("sequenceNumber")).intValue();
+
+            java.time.Instant timestamp = java.time.Instant.parse(timestampStr);
+
+            AgentToolCall toolCall = new AgentToolCall(
+                    runId, toolName, inputParams, outputResult, 
+                    timestamp, durationMs, success, errorMessage, sequenceNumber
+            );
+            AgentToolCall saved = toolCallRepository.save(toolCall);
+
+            return ResponseEntity.status(201).body(ToolResponse.success(saved.getId()));
+        } catch (IllegalArgumentException e) {
+            logger.error("Invalid request to log tool call for run {}", runId, e);
+            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Error logging tool call for run {}", runId, e);
+            return ResponseEntity.status(500).body(ToolResponse.error("Failed to log tool call"));
+        }
+    }
+
+    /**
+     * Log a reasoning step for a run
+     * POST /api/runs/{runId}/reasoning-step
+     * Body: { "stepType": "research", "stepDescription": "...", "reasoningText": "...", "timestamp": "...", "sequenceNumber": 1 }
+     */
+    @PostMapping("/{runId}/reasoning-step")
+    public ResponseEntity<ToolResponse<Long>> logReasoningStep(@PathVariable Long runId, @RequestBody Map<String, Object> request) {
+        try {
+            String stepType = (String) request.get("stepType");
+            String stepDescription = (String) request.get("stepDescription");
+            String reasoningText = (String) request.get("reasoningText");
+            String timestampStr = (String) request.get("timestamp");
+            Integer sequenceNumber = ((Number) request.get("sequenceNumber")).intValue();
+
+            java.time.Instant timestamp = java.time.Instant.parse(timestampStr);
+
+            AgentReasoningStep reasoningStep = new AgentReasoningStep(
+                    runId, stepType, stepDescription, reasoningText, timestamp, sequenceNumber
+            );
+            AgentReasoningStep saved = reasoningStepRepository.save(reasoningStep);
+
+            return ResponseEntity.status(201).body(ToolResponse.success(saved.getId()));
+        } catch (IllegalArgumentException e) {
+            logger.error("Invalid request to log reasoning step for run {}", runId, e);
+            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Error logging reasoning step for run {}", runId, e);
+            return ResponseEntity.status(500).body(ToolResponse.error("Failed to log reasoning step"));
+        }
+    }
+
+    /**
+     * Get a specific run by ID with trades, tool calls, and reasoning steps
      * GET /api/runs/{id}
      */
     @GetMapping("/{id}")
@@ -128,8 +206,10 @@ public class RunController {
         try {
             AgentRun run = runService.getRun(id);
             List<AccountTransaction> transactions = transactionRepository.findByAgentRunId(id);
+            List<AgentToolCall> toolCalls = toolCallRepository.findByAgentRunIdOrderBySequenceNumberAsc(id);
+            List<AgentReasoningStep> reasoningSteps = reasoningStepRepository.findByAgentRunIdOrderBySequenceNumberAsc(id);
             Long agentId = agentIdentityService.requireAgentIdByName(run.getAgentName());
-            return ResponseEntity.ok(RunDetailDto.fromEntity(run, transactions, agentId));
+            return ResponseEntity.ok(RunDetailDto.fromEntity(run, transactions, toolCalls, reasoningSteps, agentId));
         } catch (Exception e) {
             logger.error("Error getting run {}", id, e);
             return ResponseEntity.notFound().build();

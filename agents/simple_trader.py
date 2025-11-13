@@ -33,6 +33,9 @@ from run_tracking import start_run, end_run, mark_run_as_error
 # Import status broadcasting
 from status_broadcaster import broadcast_status, PHASE_INITIALIZING, PHASE_RESEARCHING, PHASE_DECIDING, PHASE_TRADING, PHASE_COMPLETED, PHASE_ERROR
 
+# Import tool tracking
+from tool_tracking import ToolTracker
+
 logger = logging.getLogger(__name__)
 
 class SimpleTrader:
@@ -49,6 +52,7 @@ class SimpleTrader:
         self.trade_count: int = 0
         self.last_decision: Optional[dict] = None
         self.agent_id: Optional[int] = agent_id  # Set at TradingSystem initialization
+        self.tracker: Optional[ToolTracker] = None  # Tool tracking for transparency
 
     async def get_researcher_tool(self, researcher_mcp_servers) -> Tool:
         """Create researcher tool from external MCP servers (Brave Search, Fetch)
@@ -247,7 +251,7 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             # Return a simple acknowledgement; the system reads self.last_decision
             return "OK"
 
-        # Memory tools - query past decisions and reasoning
+        # Memory tools - query past decisions and reasoning (with tracking wrapper)
         @function_tool
         async def query_trading_history(symbol: str, days: int = 30) -> str:
             """
@@ -264,7 +268,29 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             Returns:
                 Natural language summary of your trading history for this stock
             """
-            return await get_trading_history(self.name, symbol, days)
+            import time
+            start_time = time.time()
+            success = True
+            error_msg = None
+            result = None
+            try:
+                result = await get_trading_history(self.name, symbol, days)
+                return result
+            except Exception as e:
+                success = False
+                error_msg = str(e)
+                raise
+            finally:
+                if self.tracker:
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    self.tracker.track_tool_call(
+                        tool_name="query_trading_history",
+                        input_params={"symbol": symbol, "days": days},
+                        output_result=result if success else None,
+                        duration_ms=duration_ms,
+                        success=success,
+                        error_message=error_msg
+                    )
         
         @function_tool
         async def query_recent_activity(days: int = 7) -> str:
@@ -280,10 +306,49 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             Returns:
                 Natural language summary of your recent activity
             """
-            return await get_recent_activity(self.name, days)
+            import time
+            start_time = time.time()
+            success = True
+            error_msg = None
+            result = None
+            try:
+                result = await get_recent_activity(self.name, days)
+                return result
+            except Exception as e:
+                success = False
+                error_msg = str(e)
+                raise
+            finally:
+                if self.tracker:
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    self.tracker.track_tool_call(
+                        tool_name="query_recent_activity",
+                        input_params={"days": days},
+                        output_result=result if success else None,
+                        duration_ms=duration_ms,
+                        success=success,
+                        error_message=error_msg
+                    )
+
+        # Wrap market tools with tracking
+        from tool_tracking import create_tracked_tool
+        
+        tracked_market_tools = []
+        for tool in MARKET_TOOLS:
+            # Create a tracked version of each market tool
+            if self.tracker and hasattr(tool, '__wrapped__'):
+                # Tool is already a function_tool, wrap the underlying function
+                original_func = tool.__wrapped__
+                tracked_func = create_tracked_tool(self.tracker, original_func, tool.__name__)
+                # Re-wrap with function_tool decorator
+                tracked_tool = function_tool(tracked_func)
+                tracked_market_tools.append(tracked_tool)
+            else:
+                # No tracker or can't wrap - use as-is
+                tracked_market_tools.append(tool)
 
         # Only expose market tools + decision tool + memory tools (no account/trading side-effects)
-        all_tools = [researcher_tool] + MARKET_TOOLS + [decide_action, query_trading_history, query_recent_activity]
+        all_tools = [researcher_tool] + tracked_market_tools + [decide_action, query_trading_history, query_recent_activity]
 
         agent = Agent(
             name=self.name,
@@ -336,10 +401,31 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             self.current_run_id = run_id
             self.trade_count = 0
             self.last_decision = None
+            
+        # Initialize tool tracker for transparency
+        self.tracker = ToolTracker(run_id)
+        
+        # Log initialization reasoning
+        init_reasoning = f"Starting {cycle_type} cycle. Current balance: ${balance:.2f}, " \
+                       f"Positions: {len(holdings)}, Strategy: {strategy[:100]}..."
+        self.tracker.log_reasoning_step(
+            step_type="initialization",
+            step_description=f"Initialized {cycle_type} cycle",
+            reasoning_text=init_reasoning
+        )
 
         try:
             # Broadcast: RESEARCHING (combined: fetching data, research, analysis)
             broadcast_status(self.agent_id, self.name, PHASE_RESEARCHING, "Researching and analyzing market opportunities", 30)
+            
+            # Log research phase reasoning
+            research_reasoning = f"Beginning market research and analysis phase. " \
+                               f"Will investigate opportunities consistent with strategy."
+            self.tracker.log_reasoning_step(
+                step_type="research",
+                step_description="Starting market research and opportunity analysis",
+                reasoning_text=research_reasoning
+            )
             
             # Create agent with direct tools
             self.agent = await self.create_agent(researcher_mcp_servers)
@@ -374,13 +460,23 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             # Read structured decision from decide_action tool (if any) and dispatch deterministically
             decision = self.last_decision
             if decision and decision.get("action") in ("BUY", "SELL"):
-                # Broadcast: TRADING
-                broadcast_status(self.agent_id, self.name, PHASE_TRADING, "Executing trade", 90)
-                
+                # Extract decision details
                 action = decision["action"]
                 symbol = decision["symbol"]
                 quantity = int(decision["quantity"])
                 rationale = decision.get("rationale") or summary or "Decision"
+                
+                # Log decision reasoning
+                decision_reasoning = f"Decision: {action} {quantity} shares of {symbol}. " \
+                                   f"Rationale: {rationale}"
+                self.tracker.log_reasoning_step(
+                    step_type="decision",
+                    step_description=f"Decided to {action} {symbol}",
+                    reasoning_text=decision_reasoning
+                )
+                
+                # Broadcast: TRADING
+                broadcast_status(self.agent_id, self.name, PHASE_TRADING, "Executing trade", 90)
                 # Use fullReasoning from decision if available, otherwise fall back to conversation messages
                 decision_full_reasoning = decision.get("fullReasoning") or ""
                 final_full_reasoning = decision_full_reasoning if decision_full_reasoning else full_reasoning
@@ -423,8 +519,33 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                             agent_name=self.name
                         )
                     self.trade_count += 1
+                    
+                    # Log execution success
+                    execution_reasoning = f"Successfully executed {action} order for {quantity} shares of {symbol}."
+                    self.tracker.log_reasoning_step(
+                        step_type="execution",
+                        step_description=f"Executed {action} trade for {symbol}",
+                        reasoning_text=execution_reasoning
+                    )
                 except Exception as trade_err:
                     logger.error(f"Trade execution failed: {trade_err}")
+                    
+                    # Log execution failure
+                    error_reasoning = f"Trade execution failed: {str(trade_err)}"
+                    self.tracker.log_reasoning_step(
+                        step_type="execution",
+                        step_description=f"Failed to execute {action} trade",
+                        reasoning_text=error_reasoning
+                    )
+            else:
+                # HOLD decision - log it
+                hold_reasoning = f"Decision: HOLD. No trades executed this cycle. " \
+                               f"Portfolio remains unchanged. Summary: {summary[:200] if summary else 'No summary provided'}"
+                self.tracker.log_reasoning_step(
+                    step_type="decision",
+                    step_description="Decided to HOLD (no trades)",
+                    reasoning_text=hold_reasoning
+                )
 
             # End run tracking
             if run_id is not None:
@@ -449,6 +570,7 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             self.current_run_id = None
             self.trade_count = 0
             self.last_decision = None
+            self.tracker = None  # Clean up tracker
 
     async def run_with_mcp_servers(self):
         """Run agent with MCP server context - only for external services (Brave Search, Memory, Fetch)"""
