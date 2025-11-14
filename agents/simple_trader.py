@@ -103,10 +103,22 @@ Available tools:
 - Memory tools: query_trading_history(symbol, days), query_recent_activity(days)
   - Use these to remember your past decisions and reasoning about stocks
   - Check your history before making decisions to maintain consistency
-- Decision tool: decide_action(action=BUY|SELL|HOLD, symbol?, quantity?, rationale, fullReasoning?)
-  - rationale: Brief summary (1-2 sentences) of the trade decision
-  - fullReasoning: Comprehensive analysis explaining your research, market conditions, and investment thesis (2-5 paragraphs)
 - Market status: get_market_status, is_market_open
+
+**CRITICAL - How to Make Decisions:**
+You MUST call decide_action() exactly once at the end. Use these EXACT formats:
+
+To BUY a stock:
+  decide_action(action="BUY", symbol="NVDA", quantity=50, rationale="...", fullReasoning="...")
+  
+To SELL a stock:
+  decide_action(action="SELL", symbol="NVDA", quantity=50, rationale="...", fullReasoning="...")
+  
+To do nothing:
+  decide_action(action="HOLD")
+
+The action parameter MUST be the string "BUY", "SELL", or "HOLD" - nothing else.
+Your rationale and fullReasoning must match your action (don't say "sell" if action="BUY").
 
 You have access to end-of-day market data from Polygon.io (previous trading day close).
 Account snapshot is provided in the prompt; do not query balance/holdings via tools.
@@ -123,30 +135,31 @@ Your investment strategy:
         """Get trading message with updated instructions"""
         return f"""You are conducting your regular portfolio review and market analysis.
 
-IMPORTANT: This is a REVIEW cycle, not a mandate to trade. Most of the time, you should do NOTHING.
-Quality over quantity - only trade when you have strong conviction.
+THIS IS A SIMULATION ENVIRONMENT - Be active and demonstrate your trading strategy!
+Your goal is to build and manage an interesting portfolio that reflects your investment philosophy.
 
-YOUR REVIEW PROCESS:
+YOUR TRADING APPROACH:
 1. Use the research tool to check relevant news and market conditions
-2. Review your current holdings - are any positions underperforming or breaking your thesis?
-3. Look for potential new opportunities consistent with your strategy
-4. Make a thoughtful decision: Should you sell something? Buy something? Or hold steady?
+2. Review your current holdings - are any underperforming or ready to take profits?
+3. Actively look for new opportunities consistent with your strategy
+4. Make decisions to either improve your portfolio or capitalize on opportunities
 
-TRADING DISCIPLINE:
-- **AIM FOR ~1 TRADE PER DAY MAXIMUM** - Be selective, not hyperactive
-- **SELLING is just as important as BUYING**:
+TRADING MINDSET:
+- **BE PROACTIVE**: This is your chance to demonstrate your trading style
+- **BUILD POSITIONS**: If you have cash and see opportunities aligned with your strategy, take action
+- **MANAGE ACTIVELY**: Don't be afraid to adjust positions based on market conditions
+- **SELLING is important too**:
   - Sell positions that have broken your investment thesis
   - Take profits on winners that have reached targets
   - Cut losses on underperformers
-  - Sell to make room for higher-conviction opportunities
-- **BUYING should be rare and high-conviction**:
-  - Only buy when you see exceptional value or opportunity
-  - Ask yourself: "Is this truly better than what I already own?"
-  - Prefer holding cash over mediocre investments
-- **DOING NOTHING is often the best decision**:
-  - If your portfolio looks good and no urgent opportunities exist, just hold
-  - Don't trade for the sake of trading
-  - Patience is a virtue in investing
+  - Sell to make room for better opportunities
+- **BUYING when you see value**:
+  - If a stock fits your strategy and current conditions support it, buy
+  - Build diversified positions across 5-10 stocks that match your philosophy
+  - Use your cash wisely but don't hoard it unnecessarily
+- **HOLD only when portfolio is well-positioned**:
+  - If you already have good positions and no better opportunities exist, hold
+  - But don't be too conservative - this is a demonstration environment
 
 CRITICAL - DECISION RULES:
   - At the end of your analysis, call decide_action exactly once.
@@ -182,26 +195,28 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
         """Get rebalancing message"""
         return f"""You are conducting a portfolio rebalancing review.
 
-IMPORTANT: This is a REVIEW, not a mandate to rebalance. Most of the time, your portfolio is fine as-is.
-Only rebalance if positions have materially drifted from your strategy or if conviction has changed.
+THIS IS A SIMULATION - Actively manage your portfolio to demonstrate your strategy!
+Review your positions and make adjustments to keep your portfolio aligned with your investment thesis.
 
 YOUR REBALANCING REVIEW:
 1. Use the research tool to check news affecting your current holdings
 2. Evaluate each position: Does it still fit your strategy and risk tolerance?
 3. Check if any positions have grown too large or too small relative to conviction
-4. Decide if any adjustments are needed, or if portfolio should remain unchanged
+4. Look for opportunities to optimize your portfolio composition
 
-REBALANCING DISCIPLINE:
-- **MOST CYCLES: DO NOTHING** - If positions are working, let them work
+REBALANCING APPROACH:
+- **ACTIVELY MANAGE**: This is your chance to show active portfolio management
 - **SELLING criteria**:
   - Position has broken your investment thesis
   - Risk/reward no longer favorable
-  - Position size has grown beyond your risk tolerance
+  - Position size doesn't match your conviction level
   - Better opportunity exists and you need room (10-position limit)
+  - Position has achieved profit targets
 - **BUYING during rebalance**:
-  - Only to replace sold positions or fill gaps in strategy
-  - Not about finding new opportunities (that's for trading cycles)
-  - Focus on strengthening existing strategy execution
+  - Replace sold positions with better opportunities
+  - Fill gaps in your strategy execution
+  - Add new positions that strengthen your portfolio
+  - Build up underweight positions that match your thesis
 
 PORTFOLIO CONSTRAINTS:
 - **MAXIMUM 10 POSITIONS AT ANY TIME** - Hard limit enforced by system
@@ -233,13 +248,34 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
         @function_tool
         async def decide_action(action: str, symbol: str = None, quantity: int = None, rationale: str = None, fullReasoning: str = None) -> str:
             act = (action or "").upper()
+            
+            # CRITICAL DEBUG: Log what agent is passing to decide_action
+            logger.error(f"🔴 DECIDE_ACTION CALLED: action={action}, symbol={symbol}, quantity={quantity}")
+            logger.error(f"🔴 DECIDE_ACTION RATIONALE: {rationale[:200] if rationale else 'None'}")
+            
+            # VALIDATION: Check if action matches reasoning
             if act in ("BUY", "SELL"):
                 if not symbol or not isinstance(quantity, int) or quantity <= 0:
                     raise ValueError("symbol and positive quantity are required for BUY/SELL")
+                
+                # Check for mismatch between action and reasoning
+                reasoning_text = (rationale or "") + " " + (fullReasoning or "")
+                reasoning_lower = reasoning_text.lower()
+                
+                if act == "BUY" and ("sell" in reasoning_lower or "selling" in reasoning_lower):
+                    error_msg = f"CRITICAL ERROR: action=BUY but reasoning mentions 'sell'. This is a mismatch! Reasoning: {rationale[:100]}"
+                    logger.error(f"🚨 {error_msg}")
+                    raise ValueError(error_msg)
+                
+                if act == "SELL" and ("buy" in reasoning_lower or "buying" in reasoning_lower or "purchase" in reasoning_lower):
+                    error_msg = f"CRITICAL ERROR: action=SELL but reasoning mentions 'buy'. This is a mismatch! Reasoning: {rationale[:100]}"
+                    logger.error(f"🚨 {error_msg}")
+                    raise ValueError(error_msg)
             else:
                 act = "HOLD"
                 symbol = symbol or ""
                 quantity = quantity or 0
+            
             decision = {
                 "action": act,
                 "symbol": symbol,
@@ -248,6 +284,10 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                 "fullReasoning": fullReasoning or "",
             }
             self.last_decision = decision
+            
+            # CRITICAL DEBUG: Log the normalized decision
+            logger.error(f"🔴 DECISION STORED: {decision}")
+            
             # Return a simple acknowledgement; the system reads self.last_decision
             return "OK"
 
@@ -389,12 +429,20 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
 
             # Read structured decision from decide_action tool (if any) and dispatch deterministically
             decision = self.last_decision
+            
+            # CRITICAL DEBUG: Log what we're about to execute
+            logger.error(f"🟡 ABOUT TO EXECUTE: decision={decision}")
+            
             if decision and decision.get("action") in ("BUY", "SELL"):
                 # Extract decision details
                 action = decision["action"]
                 symbol = decision["symbol"]
                 quantity = int(decision["quantity"])
                 rationale = decision.get("rationale") or summary or "Decision"
+                
+                # CRITICAL DEBUG: Log execution details
+                logger.error(f"🟢 EXECUTING: {action} {quantity} shares of {symbol}")
+                logger.error(f"🟢 RATIONALE: {rationale[:200]}")
                 
                 # Log decision
                 decision_text = f"{action} {quantity} shares of {symbol}. Rationale: {rationale}"
