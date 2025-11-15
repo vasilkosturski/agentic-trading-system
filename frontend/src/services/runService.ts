@@ -11,6 +11,27 @@ export interface TradeInfo {
   totalAmount: number;
 }
 
+export interface ToolCallInfo {
+  id: number;
+  toolName: string;
+  inputParams: string | null; // JSON string
+  outputResult: string | null; // JSON string or text
+  timestamp: string;
+  durationMs: number | null;
+  success: boolean;
+  errorMessage: string | null;
+  sequenceNumber: number;
+}
+
+export interface ReasoningStepInfo {
+  id: number;
+  stepType: string; // e.g., "initialization", "research", "analysis", "decision", "execution"
+  stepDescription: string;
+  reasoningText: string;
+  timestamp: string;
+  sequenceNumber: number;
+}
+
 export interface RunDetail {
   id: number;
   agentId: number;
@@ -28,6 +49,8 @@ export interface RunDetail {
   marketConditions: string | null; // JSON string
   durationSeconds: number | null;
   trades: TradeInfo[];
+  toolCalls?: ToolCallInfo[]; // Agent transparency: tool calls
+  reasoningSteps?: ReasoningStepInfo[]; // Agent transparency: reasoning steps
 }
 
 export const runService = {

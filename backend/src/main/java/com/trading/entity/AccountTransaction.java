@@ -49,8 +49,9 @@ public class AccountTransaction {
     @JoinColumn(name = "agent_run_id")
     private AgentRun agentRun; // Link to the agent run that created this transaction
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "transaction_type", nullable = false)
-    private String transactionType; // BUY, SELL
+    private TransactionType transactionType; // BUY, SELL - MUST be set explicitly!
 
     @Column(name = "total_amount", nullable = false)
     private Double totalAmount;
@@ -59,6 +60,7 @@ public class AccountTransaction {
     private Instant createdAt = Instant.now();
     
     // Constructor with parameters
+    // NOTE: This constructor does NOT set transactionType - it must be set explicitly
     public AccountTransaction(TradingAccount account, String symbol, Integer quantity,
                             Double price, Instant timestamp, String rationale) {
         this.account = account;
@@ -67,7 +69,7 @@ public class AccountTransaction {
         this.price = price;
         this.timestamp = timestamp;
         this.rationale = rationale;
-        this.transactionType = quantity > 0 ? "BUY" : "SELL";
+        // transactionType must be set explicitly after construction
         this.totalAmount = Math.abs(quantity) * price;
     }
     
@@ -77,17 +79,20 @@ public class AccountTransaction {
     }
     
     public boolean isBuy() {
-        return quantity > 0;
+        return transactionType == TransactionType.BUY;
     }
     
     public boolean isSell() {
-        return quantity < 0;
+        return transactionType == TransactionType.SELL;
     }
     
     // Custom setters that need business logic
     public void setQuantity(Integer quantity) { 
         this.quantity = quantity;
-        this.transactionType = quantity > 0 ? "BUY" : "SELL";
+        // IMPORTANT: Do NOT auto-set transactionType here!
+        // Transaction type must be set explicitly by the service layer.
+        // Setting it based on quantity sign caused critical bug where SELL 
+        // transactions were recorded as BUY because quantity was positive.
         if (this.price != null) {
             this.totalAmount = Math.abs(quantity) * this.price;
         }
