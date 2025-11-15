@@ -241,7 +241,7 @@ public class AccountController {
                     .map(t -> new RecentTradeDto(
                             t.getId(),
                             t.getAccount().getAgent().getName(),
-                            t.getTransactionType(),
+                            t.getTransactionType().name(),  // Convert enum to string
                             t.getSymbol(),
                             Math.abs(t.getQuantity()), // Always show positive quantity
                             t.getPrice(),
@@ -269,7 +269,7 @@ public class AccountController {
             TradeDetailResponse.TradeInfo tradeInfo = new TradeDetailResponse.TradeInfo(
                     transaction.getId(),
                     transaction.getAccount().getAgent().getName(),
-                    transaction.getTransactionType(),
+                    transaction.getTransactionType().name(),  // Convert enum to string
                     transaction.getSymbol(),
                     Math.abs(transaction.getQuantity()),
                     transaction.getPrice(),
@@ -289,7 +289,7 @@ public class AccountController {
                     .limit(5)
                     .map(t -> new TradeDetailResponse.RelatedTrade(
                             t.getId(),
-                            t.getTransactionType(),
+                            t.getTransactionType().name(),  // Convert enum to string
                             Math.abs(t.getQuantity()),
                             t.getPrice(),
                             t.getTimestamp()

@@ -4,6 +4,7 @@ import com.trading.dto.RecentActivityResponse;
 import com.trading.dto.TradingHistoryResponse;
 import com.trading.entity.AccountTransaction;
 import com.trading.entity.AgentRun;
+import com.trading.entity.TransactionType;
 import com.trading.entity.TradingAccount;
 import com.trading.repository.AccountTransactionRepository;
 import com.trading.repository.AgentRunRepository;
@@ -120,7 +121,7 @@ public class MemoryService {
                 double totalCost = 0;
                 int totalShares = 0;
                 for (AccountTransaction t : transactions) {
-                    if ("BUY".equals(t.getTransactionType())) {
+                    if (TransactionType.BUY.equals(t.getTransactionType())) {
                         totalCost += Math.abs(t.getTotalAmount());
                         totalShares += t.getQuantity();
                     }
@@ -140,7 +141,7 @@ public class MemoryService {
         for (AccountTransaction t : transactions) {
             TradingHistoryResponse.Trade trade = new TradingHistoryResponse.Trade();
             trade.setDate(t.getTimestamp().toString());
-            trade.setType(t.getTransactionType());
+            trade.setType(t.getTransactionType().name());  // Convert enum to string
             trade.setQuantity(Math.abs(t.getQuantity()));
             trade.setPrice(Math.round(t.getPrice() * 100.0) / 100.0);
             trade.setTotalAmount(Math.round(Math.abs(t.getTotalAmount()) * 100.0) / 100.0);
@@ -152,8 +153,8 @@ public class MemoryService {
         response.setTrades(trades);
 
         // Summary
-        long buyCount = transactions.stream().filter(t -> "BUY".equals(t.getTransactionType())).count();
-        long sellCount = transactions.stream().filter(t -> "SELL".equals(t.getTransactionType())).count();
+        long buyCount = transactions.stream().filter(t -> TransactionType.BUY.equals(t.getTransactionType())).count();
+        long sellCount = transactions.stream().filter(t -> TransactionType.SELL.equals(t.getTransactionType())).count();
         
         TradingHistoryResponse.Summary summary = new TradingHistoryResponse.Summary();
         summary.setTotalTrades(transactions.size());
@@ -201,7 +202,7 @@ public class MemoryService {
                     List<RecentActivityResponse.Trade> trades = new ArrayList<>();
                     for (AccountTransaction t : runTrades) {
                         RecentActivityResponse.Trade trade = new RecentActivityResponse.Trade();
-                        trade.setType(t.getTransactionType());
+                        trade.setType(t.getTransactionType().name());  // Convert enum to string
                         trade.setSymbol(t.getSymbol());
                         trade.setQuantity(Math.abs(t.getQuantity()));
                         trade.setPrice(Math.round(t.getPrice() * 100.0) / 100.0);

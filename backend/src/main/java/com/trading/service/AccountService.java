@@ -168,7 +168,7 @@ public class AccountService {
         AccountTransaction transaction = new AccountTransaction();
         transaction.setAccount(account);
         transaction.setSymbol(symbol);
-        transaction.setTransactionType("BUY");
+        transaction.setTransactionType(TransactionType.BUY);  // EXPLICIT enum - never derived!
         transaction.setQuantity(quantity);
         transaction.setPrice(price);
         transaction.setRationale(rationale);
@@ -260,7 +260,7 @@ public class AccountService {
         AccountTransaction transaction = new AccountTransaction();
         transaction.setAccount(account);
         transaction.setSymbol(symbol);
-        transaction.setTransactionType("SELL");
+        transaction.setTransactionType(TransactionType.SELL);  // EXPLICIT enum - never derived!
         transaction.setQuantity(quantity);
         transaction.setPrice(price);
         transaction.setRationale(rationale);

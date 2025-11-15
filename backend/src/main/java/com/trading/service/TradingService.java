@@ -1,6 +1,7 @@
 package com.trading.service;
 
 import com.trading.entity.AccountTransaction;
+import com.trading.entity.TransactionType;
 import com.trading.entity.TradingAccount;
 import com.trading.entity.TradingAgent;
 import com.trading.repository.AccountTransactionRepository;
@@ -48,6 +49,8 @@ public class TradingService {
         AccountTransaction transaction = new AccountTransaction(
             account, symbol, quantity, price, Instant.now(), rationale
         );
+        // Must set transaction type explicitly (not derived from quantity sign)
+        transaction.setTransactionType(quantity > 0 ? TransactionType.BUY : TransactionType.SELL);
         transaction = transactionRepository.save(transaction);
         
         // Update agent statistics
@@ -196,7 +199,7 @@ public class TradingService {
             transaction.getAccount().getAgent().getName(),
             transaction.getAccount().getName(),
             transaction.getSymbol(),
-            transaction.getTransactionType(),
+            transaction.getTransactionType().name(),  // Convert enum to string for API
             Math.abs(transaction.getQuantity()),
             transaction.getPrice(),
             transaction.getRationale() != null ? transaction.getRationale() : "No rationale provided",

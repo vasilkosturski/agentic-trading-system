@@ -56,7 +56,7 @@ public class RunDetailDto {
                     transaction.getPrice(),
                     transaction.getTimestamp(),
                     transaction.getRationale(),
-                    transaction.getTransactionType(),
+                    transaction.getTransactionType().name(),  // Convert enum to string
                     transaction.getTotalAmount()
             );
         }
