@@ -82,27 +82,6 @@ public class MarketController {
         }
     }
     
-    @GetMapping("/status")
-    public ResponseEntity<ToolResponse<MarketService.MarketStatus>> getMarketStatus() {
-        try {
-            MarketService.MarketStatus status = marketService.getMarketStatus();
-            return ResponseEntity.ok(ToolResponse.success(status));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
-    }
-    
-    @GetMapping("/is-open")
-    public ResponseEntity<ToolResponse<Boolean>> isMarketOpen() {
-        try {
-            MarketService.MarketStatus status = marketService.getMarketStatus();
-            boolean isOpen = "OPEN".equals(status.status);
-            return ResponseEntity.ok(ToolResponse.success(isOpen));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
-    }
-    
     @PostMapping("/cache/clear")
     public ResponseEntity<ToolResponse<String>> clearCache() {
         try {

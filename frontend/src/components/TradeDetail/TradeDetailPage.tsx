@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { tradesService } from '../../services/tradesService';
 import { Tag } from 'primereact/tag';
+import AgentReasoningTimeline from '../shared/AgentReasoningTimeline';
 
 const TradeDetailPage: React.FC = () => {
   const { tradeId } = useParams<{ tradeId: string }>();
@@ -57,7 +58,7 @@ const TradeDetailPage: React.FC = () => {
     );
   }
 
-  const { trade, fullReasoning, researchSources, agentContext, relatedTrades, runId, runSummary } = tradeDetail;
+  const { trade, fullReasoning, researchSources, agentContext, relatedTrades, runId, runSummary, reasoningSteps } = tradeDetail;
 
   // Parse JSON strings if available
   let parsedSources: any[] = [];
@@ -130,25 +131,11 @@ const TradeDetailPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Decision Reasoning */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-              <i className="pi pi-comments text-blue-600 mr-2"></i>
-              Decision Reasoning
-            </h2>
-            {fullReasoning ? (
-              <div className="prose max-w-none">
-                <p className="text-gray-700 whitespace-pre-wrap">{fullReasoning}</p>
-              </div>
-            ) : (
-              <div>
-                <p className="text-gray-700">{trade.rationale}</p>
-                <p className="text-sm text-gray-500 mt-2 italic">
-                  Full reasoning not available for this trade
-                </p>
-              </div>
-            )}
-          </div>
+          {/* Agent Reasoning Timeline */}
+          <AgentReasoningTimeline
+            reasoningSteps={reasoningSteps}
+            fallbackReasoning={fullReasoning || trade.rationale}
+          />
 
           {/* Research Sources */}
           {parsedSources.length > 0 && (

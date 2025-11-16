@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useTradingAgents, useMarketStatus } from '../../hooks';
+import { useTradingAgents } from '../../hooks';
 import SimplePortfolioChart from './SimplePortfolioChart';
 import RecentTrades from './RecentTrades';
 import { tradingService } from '../../services/tradingService';
@@ -10,7 +10,6 @@ import { LiveAgentActivity } from '../LiveAgentActivity/LiveAgentActivity';
 
 const TradingDashboard = () => {
   const { agents = [], isLoading, error, isError, refetch } = useTradingAgents();
-  const { data: marketStatus, isLoading: marketStatusLoading } = useMarketStatus();
   const [isTriggering, setIsTriggering] = useState(false);
   const [agentStatuses, setAgentStatuses] = useState<Map<number, AgentStatusUpdate>>(new Map());
   const [isCycleRunning, setIsCycleRunning] = useState(false);
@@ -212,21 +211,13 @@ const TradingDashboard = () => {
       const reason = error.reason;
       const message = error.message || 'Failed to trigger trading cycle';
       
-      if (reason === 'MARKET_CLOSED') {
-        toast.current?.show({
-          severity: 'warn',
-          summary: 'Market Closed',
-          detail: message,
-          life: 5000,
-        });
-      } else {
-        toast.current?.show({
-          severity: 'error',
-          summary: 'Error',
-          detail: message,
-          life: 5000,
-        });
-      }
+      // Note: MARKET_CLOSED shouldn't happen in demo mode, but kept for safety
+      toast.current?.show({
+        severity: reason === 'MARKET_CLOSED' ? 'warn' : 'error',
+        summary: reason === 'MARKET_CLOSED' ? 'Market Closed' : 'Error',
+        detail: message,
+        life: 5000,
+      });
     } finally {
       setIsTriggering(false);
     }
@@ -246,23 +237,6 @@ const TradingDashboard = () => {
               : 'Loading traders...'
             }
           </p>
-          {!marketStatusLoading && marketStatus && (
-            <div className="flex flex-col items-start">
-              <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${
-                marketStatus.status === 'OPEN'
-                  ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                  : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-              }`}>
-                <div className={`w-2 h-2 rounded-full ${
-                  marketStatus.status === 'OPEN' ? 'bg-green-500' : 'bg-red-500'
-                }`}></div>
-                <span>Market {marketStatus.status === 'OPEN' ? 'Open' : 'Closed'}</span>
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Next: {marketStatus.nextEvent} • As of {new Date(marketStatus.currentTime).toLocaleTimeString()}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Manual Trading Cycle Button */}
@@ -271,7 +245,7 @@ const TradingDashboard = () => {
             onClick={handleTriggerCycle}
             disabled={isTriggering}
             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors flex items-center space-x-2 disabled:cursor-not-allowed mx-auto shadow-md hover:shadow-lg"
-            title="Trigger a manual trading cycle for all agents (only runs if market is open)"
+            title="Trigger a manual trading cycle for all agents (demo mode - runs 24/7 with end-of-day data)"
           >
             {isTriggering ? (
               <>

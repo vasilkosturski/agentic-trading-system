@@ -154,31 +154,6 @@ in exchange for the potential of exponential returns from revolutionary companie
         
         print("="*80 + "\n")
 
-async def check_market_status() -> bool:
-    """Check if market is open via backend API"""
-    try:
-        from config import BACKEND_API_MARKET
-        url = f"{BACKEND_API_MARKET}/status"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                if response.status == 200:
-                    result = await response.json()
-                    # Backend returns wrapped format: {"success": true, "data": {...}}
-                    if result.get("success") and result.get("data"):
-                        data = result["data"]
-                        is_open = data.get("status") == "OPEN"
-                        logger.info(f"📊 Market status: {data.get('status')} - {data.get('nextEvent')}")
-                        return is_open
-                    else:
-                        logger.error(f"API returned error: {result.get('error')}")
-                        return False
-                else:
-                    logger.error(f"Failed to check market status: HTTP {response.status}")
-                    return False
-    except Exception as e:
-        logger.error(f"Error checking market status: {e}")
-        return False
-
 async def update_all_agents_activity():
     """Update lastActivity for all agents (called on every cycle, even when market closed)"""
     agent_names = ["Warren", "George", "Ray", "Cathie"]
@@ -226,14 +201,13 @@ async def run_continuous_trading():
     # Start the API server for manual cycle triggers (proper encapsulation, no globals!)
     api_server = TradingAPIServer(
         trading_system=system,
-        check_market_status_func=check_market_status,
         manual_cycle_event=manual_cycle_event
     )
     api_server.run(port=8000)
 
     print(f"🔄 Starting scheduler to run every {RUN_EVERY_N_MINUTES} minutes")
     logger.info(f"Continuous trading loop started with {RUN_EVERY_N_MINUTES} minute intervals")
-    logger.info("Market hours check: ALWAYS ENABLED (saves API costs)")
+    logger.info("🎓 Demo mode: Trading enabled 24/7 (using end-of-day data)")
     logger.info("📡 Manual cycle trigger available at http://localhost:8000/api/trigger-cycle")
     logger.info(f"⏰ First cycle will run in {RUN_EVERY_N_MINUTES} minutes or when manually triggered")
     logger.info(f"🔧 DEBUG: Event loop: {asyncio.get_event_loop()}")
@@ -256,17 +230,10 @@ async def run_continuous_trading():
                 # Normal scheduled cycle
                 logger.info("⏰ Scheduled cycle time reached")
             
-            # Check market status and run if open
-            logger.info("🔍 Checking market status...")
-            is_market_open = await check_market_status()
-            logger.info(f"📊 Market status: {'OPEN' if is_market_open else 'CLOSED'}")
-
-            if not is_market_open:
-                logger.info("⏸️  Market is closed. Skipping trading cycle to save API costs.")
-            else:
-                logger.info("🚀 Starting trading cycle...")
-                await system.run_all_agents()
-                logger.info(f"✅ Trading cycle completed.")
+            # Always run trading cycle (demo system with end-of-day data)
+            logger.info("🚀 Starting trading cycle...")
+            await system.run_all_agents()
+            logger.info(f"✅ Trading cycle completed.")
 
             # Always update activity timestamp on every cycle (shows system is alive)
             await update_all_agents_activity()
