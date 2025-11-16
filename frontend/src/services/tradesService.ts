@@ -1,4 +1,5 @@
 import { apiClient } from './api';
+import { ReasoningStep } from '../components/shared/AgentReasoningTimeline';
 
 export interface RecentTrade {
   id: number;
@@ -36,6 +37,7 @@ export interface TradeDetail {
   }>;
   runId?: number | null; // ID of the agent run that created this trade
   runSummary?: string | null; // Summary of the run that created this trade
+  reasoningSteps?: ReasoningStep[]; // Agent reasoning timeline
 }
 
 export const tradesService = {

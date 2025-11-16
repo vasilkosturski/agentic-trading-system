@@ -311,91 +311,6 @@ public class MarketService {
     }
     
     /**
-     * Fetch market status from Polygon API
-     */
-    private PolygonMarketStatusResponse fetchPolygonMarketStatus() {
-        try {
-            if (!isPolygonAvailable()) {
-                logger.warn("Polygon API not available, falling back to hardcoded hours");
-                return null;
-            }
-
-            String url = String.format("%s/v1/marketstatus/now?apiKey=%s", polygonBaseUrl, polygonApiKey);
-            logger.info("Fetching market status from Polygon API");
-
-            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
-
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                JsonNode jsonNode = objectMapper.readTree(response.getBody());
-
-                String market = jsonNode.has("market") ? jsonNode.get("market").asText() : "closed";
-                boolean earlyHours = jsonNode.has("earlyHours") ? jsonNode.get("earlyHours").asBoolean() : false;
-                boolean afterHours = jsonNode.has("afterHours") ? jsonNode.get("afterHours").asBoolean() : false;
-                String serverTime = jsonNode.has("serverTime") ? jsonNode.get("serverTime").asText() : "";
-
-                // Extract exchanges info
-                JsonNode exchanges = jsonNode.get("exchanges");
-                String nyseStatus = exchanges != null && exchanges.has("nyse") ? exchanges.get("nyse").asText() : "closed";
-                String nasdaqStatus = exchanges != null && exchanges.has("nasdaq") ? exchanges.get("nasdaq").asText() : "closed";
-
-                logger.info("Polygon market status: market={}, nyse={}, nasdaq={}, earlyHours={}, afterHours={}",
-                    market, nyseStatus, nasdaqStatus, earlyHours, afterHours);
-
-                return new PolygonMarketStatusResponse(market, earlyHours, afterHours, serverTime, nyseStatus, nasdaqStatus);
-            }
-
-            logger.warn("Failed to fetch Polygon market status: HTTP {}", response.getStatusCode());
-            return null;
-
-        } catch (Exception e) {
-            logger.error("Error fetching Polygon market status: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * Get market status information with enhanced details from Polygon API.
-     * This is the single source of truth for market status - all other methods should use this.
-     */
-    public MarketStatus getMarketStatus() {
-        PolygonMarketStatusResponse polygonStatus = fetchPolygonMarketStatus();
-        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("America/New_York"));
-
-        if (polygonStatus != null) {
-            boolean isOpen = "open".equalsIgnoreCase(polygonStatus.market);
-            String status = isOpen ? "OPEN" : "CLOSED";
-            logger.info("Market status from Polygon API: {}", status);
-
-            // Build detailed next event message
-            String nextEvent;
-            if (isOpen) {
-                if (polygonStatus.afterHours) {
-                    nextEvent = "After-hours trading (closes at 8:00 PM ET)";
-                } else {
-                    nextEvent = "Market closes at 4:00 PM ET";
-                }
-            } else {
-                if (polygonStatus.earlyHours) {
-                    nextEvent = "Pre-market trading (market opens at 9:30 AM ET)";
-                } else {
-                    nextEvent = "Market opens at 9:30 AM ET";
-                }
-            }
-
-            String additionalInfo = String.format("NYSE: %s, NASDAQ: %s",
-                polygonStatus.nyseStatus, polygonStatus.nasdaqStatus);
-
-            return new MarketStatus(status, nextEvent + " | " + additionalInfo,
-                now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-        }
-
-        // Zero tolerance for fallback data - fail if Polygon API unavailable
-        logger.error("CRITICAL: Unable to fetch real market status - no fallback allowed");
-        throw new RuntimeException("Unable to fetch real market status. " +
-            "Polygon API failed. Check API keys and network connectivity.");
-    }
-    
-    /**
      * Clear price cache (useful for testing or manual refresh)
      */
     public void clearCache() {
@@ -438,18 +353,6 @@ public class MarketService {
             this.sma5 = sma5;
             this.sma20 = sma20;
             this.volatility = volatility;
-        }
-    }
-    
-    public static class MarketStatus {
-        public final String status;
-        public final String nextEvent;
-        public final String currentTime;
-        
-        public MarketStatus(String status, String nextEvent, String currentTime) {
-            this.status = status;
-            this.nextEvent = nextEvent;
-            this.currentTime = currentTime;
         }
     }
     
@@ -515,27 +418,5 @@ public class MarketService {
         public DataTier getDataTier() { return dataTier; }
         public Instant getTimestamp() { return timestamp; }
         public String getWarning() { return warning; }
-    }
-
-    /**
-     * Response from Polygon Market Status API
-     */
-    private static class PolygonMarketStatusResponse {
-        final String market;  // "open" or "closed"
-        final boolean earlyHours;  // pre-market (4am-9:30am)
-        final boolean afterHours;  // after-hours (4pm-8pm)
-        final String serverTime;
-        final String nyseStatus;
-        final String nasdaqStatus;
-
-        PolygonMarketStatusResponse(String market, boolean earlyHours, boolean afterHours,
-                                   String serverTime, String nyseStatus, String nasdaqStatus) {
-            this.market = market;
-            this.earlyHours = earlyHours;
-            this.afterHours = afterHours;
-            this.serverTime = serverTime;
-            this.nyseStatus = nyseStatus;
-            this.nasdaqStatus = nasdaqStatus;
-        }
     }
 }

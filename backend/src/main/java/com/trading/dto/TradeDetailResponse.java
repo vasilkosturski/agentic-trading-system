@@ -18,6 +18,7 @@ public class TradeDetailResponse {
     private List<RelatedTrade> relatedTrades;
     private Long runId; // ID of the agent run that created this trade (null if not part of a run)
     private String runSummary; // Summary of the run that created this trade
+    private List<RunDetailDto.ReasoningStepInfo> reasoningSteps; // Agent reasoning timeline
 
     @Data
     @NoArgsConstructor

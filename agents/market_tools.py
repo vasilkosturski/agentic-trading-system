@@ -128,49 +128,10 @@ async def get_market_indicators(symbol: str) -> Dict[str, float]:
         logger.error(f"Failed to get market indicators for {symbol}: {e}")
         raise Exception(f"Failed to get market indicators for {symbol}: {str(e)}")
 
-@function_tool
-async def get_market_status() -> Dict[str, str]:
-    """Get current stock market status.
-
-    Tells you if US stock market is currently open for trading.
-
-    Returns:
-        Dictionary with:
-        - status: 'OPEN' or 'CLOSED'
-        - next_event: Description of next market event
-        - current_time: Current Eastern Time (market timezone)
-    """
-    try:
-        result = await _call_backend_api("/status")
-        return {
-            "status": result["status"],
-            "next_event": result["nextEvent"],
-            "current_time": result["currentTime"]
-        }
-    except Exception as e:
-        logger.error(f"Failed to get market status: {e}")
-        raise Exception(f"Failed to get market status: {str(e)}")
-
-@function_tool
-async def is_market_open() -> bool:
-    """Check if the stock market is currently open.
-
-    Returns:
-        True if market is open for trading, False otherwise
-    """
-    try:
-        result = await _call_backend_api("/is-open")
-        return bool(result)
-    except Exception as e:
-        logger.error(f"Failed to check if market is open: {e}")
-        raise Exception(f"Failed to check if market is open: {str(e)}")
-
 # All market data tools that agents can use
 MARKET_TOOLS = [
     lookup_share_price,
     get_price_with_metadata,
     get_historical_prices,
     get_market_indicators,
-    get_market_status,
-    is_market_open,
 ]

@@ -103,7 +103,6 @@ Available tools:
 - Memory tools: query_trading_history(symbol, days), query_recent_activity(days)
   - Use these to remember your past decisions and reasoning about stocks
   - Check your history before making decisions to maintain consistency
-- Market status: get_market_status, is_market_open
 
 **CRITICAL - How to Make Decisions:**
 You MUST call decide_action() exactly once at the end. Use these EXACT formats:

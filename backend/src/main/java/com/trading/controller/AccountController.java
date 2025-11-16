@@ -2,12 +2,14 @@ package com.trading.controller;
 
 import com.trading.dto.PortfolioHistoryPoint;
 import com.trading.dto.RecentTradeDto;
+import com.trading.dto.RunDetailDto;
 import com.trading.dto.ToolResponse;
 import com.trading.dto.TradeDetailResponse;
 import com.trading.entity.AccountPortfolioSnapshot;
 import com.trading.entity.AccountTransaction;
 import com.trading.repository.AccountPortfolioSnapshotRepository;
 import com.trading.repository.AccountTransactionRepository;
+import com.trading.repository.AgentReasoningStepRepository;
 import com.trading.service.AccountService;
 import com.trading.service.AgentIdentityService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +33,9 @@ public class AccountController {
     
     @Autowired
     private AccountTransactionRepository transactionRepository;
+
+    @Autowired
+    private AgentReasoningStepRepository reasoningStepRepository;
 
     @Autowired
     private AgentIdentityService agentIdentityService;
@@ -296,12 +301,21 @@ public class AccountController {
                     ))
                     .collect(Collectors.toList());
 
-            // Get run info if available
+            // Get run info and reasoning steps if available
             Long runId = null;
             String runSummary = null;
+            List<RunDetailDto.ReasoningStepInfo> reasoningSteps = null;
+            
             if (transaction.getAgentRun() != null) {
                 runId = transaction.getAgentRun().getId();
                 runSummary = transaction.getAgentRun().getSummary();
+                
+                // Fetch reasoning steps from the run
+                reasoningSteps = reasoningStepRepository
+                        .findByAgentRunIdOrderBySequenceNumberAsc(runId)
+                        .stream()
+                        .map(RunDetailDto.ReasoningStepInfo::fromEntity)
+                        .collect(Collectors.toList());
             }
 
             // Build response
@@ -312,7 +326,8 @@ public class AccountController {
                     transaction.getAgentContext(),
                     relatedTrades,
                     runId,
-                    runSummary
+                    runSummary,
+                    reasoningSteps
             );
 
             return ResponseEntity.ok(response);

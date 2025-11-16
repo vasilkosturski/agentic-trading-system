@@ -15,17 +15,15 @@ logger = logging.getLogger(__name__)
 class TradingAPIServer:
     """Encapsulates the Flask API server and its dependencies."""
     
-    def __init__(self, trading_system, check_market_status_func, manual_cycle_event):
+    def __init__(self, trading_system, manual_cycle_event):
         """
         Initialize the API server with dependencies.
         
         Args:
             trading_system: The TradingSystem instance
-            check_market_status_func: Async function to check if market is open
             manual_cycle_event: asyncio.Event to signal manual cycle triggers
         """
         self.trading_system = trading_system
-        self.check_market_status_func = check_market_status_func
         self.manual_cycle_event = manual_cycle_event
         self.app = Flask(__name__)
         self._setup_routes()
@@ -40,34 +38,13 @@ class TradingAPIServer:
         
         @self.app.route('/api/trigger-cycle', methods=['POST'])
         def trigger_cycle():
-            """Trigger a manual trading cycle."""
-            # Check market status before triggering
-            try:
-                # Run the async market check in a new event loop
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                is_market_open = loop.run_until_complete(self.check_market_status_func())
-                loop.close()
-                
-                if not is_market_open:
-                    logger.info("📣 Manual cycle requested but market is closed")
-                    # Return 409 Conflict - operation cannot be performed in current state
-                    return jsonify({
-                        "error": "Market is currently closed. Trading cycles only run when the market is open.",
-                        "reason": "MARKET_CLOSED"
-                    }), 409
-            except Exception as e:
-                logger.error(f"Error checking market status: {e}")
-                # This is an actual error - return 500
-                return jsonify({
-                    "error": f"Failed to check market status: {str(e)}",
-                    "reason": "SERVICE_ERROR"
-                }), 500
+            """Trigger a manual trading cycle (demo mode - always allowed)."""
+            logger.info("📣 Manual trading cycle triggered via API")
             
             # Signal the event to trigger a cycle immediately
             # Use call_soon_threadsafe to safely signal from Flask thread to async loop
             self.manual_cycle_event._loop.call_soon_threadsafe(self.manual_cycle_event.set)
-            logger.info("📣 Manual trading cycle triggered via API - market is open")
+            logger.info("✅ Manual trading cycle triggered successfully")
             
             return jsonify({
                 "message": "Trading cycle triggered successfully.",
