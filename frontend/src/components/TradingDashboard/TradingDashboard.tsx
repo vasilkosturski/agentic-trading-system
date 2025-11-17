@@ -198,6 +198,24 @@ const TradingDashboard = () => {
   const handleTriggerCycle = async () => {
     setIsTriggering(true);
     
+    // Immediately show Live Agent Activity with placeholder statuses
+    setIsCycleRunning(true);
+    const placeholderStatuses = new Map<number, AgentStatusUpdate>();
+    
+    agents.forEach(agent => {
+      placeholderStatuses.set(agent.agentId, {
+        agentId: agent.agentId,
+        agentName: agent.agentName,
+        phase: 'INITIALIZING',
+        message: 'Initializing trading cycle...',
+        progress: 0,
+        outcome: undefined,
+        timestamp: new Date().toISOString()
+      });
+    });
+    
+    setAgentStatuses(placeholderStatuses);
+    
     try {
       await tradingService.triggerManualCycle();
       toast.current?.show({
@@ -207,6 +225,10 @@ const TradingDashboard = () => {
         life: 3000,
       });
     } catch (error: any) {
+      // On error, clear the placeholder statuses and reset running state
+      setAgentStatuses(new Map());
+      setIsCycleRunning(false);
+      
       // Check for explicit reason field (proper API contract)
       const reason = error.reason;
       const message = error.message || 'Failed to trigger trading cycle';

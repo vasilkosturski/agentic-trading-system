@@ -16,7 +16,7 @@ import java.time.Instant;
  */
 @RestController
 @RequestMapping("/api/agents")
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*", allowCredentials = "false")
 public class AgentStatusController {
     
     private static final Logger logger = LoggerFactory.getLogger(AgentStatusController.class);
