@@ -54,6 +54,36 @@ class SimpleTrader:
         self.agent_id: Optional[int] = agent_id  # Set at TradingSystem initialization
         self.tracker: Optional[ToolTracker] = None  # Tool tracking for transparency
 
+    def _extract_urls_from_text(self, text: str) -> List[Dict[str, str]]:
+        """Extract URLs and titles from text (Brave Search results).
+
+        Args:
+            text: Text containing URLs (markdown or plain)
+
+        Returns:
+            List of dicts with 'title' and 'url' keys
+        """
+        import re
+
+        sources = []
+
+        # Pattern 1: Markdown links [Title](URL)
+        markdown_links = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', text)
+        for title, url in markdown_links:
+            if url.startswith('http'):
+                sources.append({"title": title.strip(), "url": url.strip()})
+
+        # Pattern 2: Plain URLs (as fallback)
+        if not sources:
+            url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+            urls = re.findall(url_pattern, text)
+            for url in urls[:5]:  # Limit to 5
+                # Try to extract domain as title
+                domain = url.split('//')[-1].split('/')[0]
+                sources.append({"title": domain, "url": url})
+
+        return sources[:5]  # Max 5 sources
+
     async def get_researcher_tool(self, researcher_mcp_servers) -> Tool:
         """Create researcher tool from external MCP servers (Brave Search, Fetch)
 
@@ -291,40 +321,51 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             return "OK"
 
         # Memory tools - query past decisions and reasoning
-        # Just use the regular memory functions - we'll track Researcher tool calls via logs
+        # Track historical data access for transparency
         @function_tool
         async def query_trading_history(symbol: str, days: int = 30) -> str:
             """
             Get your complete trading history for a specific stock.
             Shows all trades (BUY/SELL), your reasoning at the time, market conditions,
             and times you considered but didn't trade.
-            
+
             Use this to remember your thesis and conviction level for a stock.
-            
+
             Args:
                 symbol: Stock symbol (e.g., 'NVDA', 'AAPL')
                 days: How many days back to look (default 30)
-            
+
             Returns:
                 Natural language summary of your trading history for this stock
             """
-            return await get_trading_history(self.name, symbol, days)
+            result = await get_trading_history(self.name, symbol, days)
+            # Track that historical data was accessed
+            if self.tracker and result:
+                # Extract key facts from the result for display
+                summary = result[:150] + "..." if len(result) > 150 else result
+                self.tracker.log_data_access(f"Trading History ({symbol})", summary)
+            return result
         
         @function_tool
         async def query_recent_activity(days: int = 7) -> str:
             """
             Get your recent trading activity across all stocks.
             Shows what you've been doing, thinking, and considering in recent runs.
-            
+
             Use this to understand your current portfolio strategy and avoid repetitive trades.
-            
+
             Args:
                 days: How many days back to look (default 7)
-            
+
             Returns:
                 Natural language summary of your recent activity
             """
-            return await get_recent_activity(self.name, days)
+            result = await get_recent_activity(self.name, days)
+            # Track that historical data was accessed
+            if self.tracker and result:
+                summary = result[:150] + "..." if len(result) > 150 else result
+                self.tracker.log_data_access(f"Recent Activity ({days}d)", summary)
+            return result
 
         # Use tools as-is - no wrapping needed
         # OpenAI SDK logs will show us when they're called
@@ -384,7 +425,19 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             
         # Initialize tool tracker for transparency
         self.tracker = ToolTracker(run_id)
-        
+
+        # Log initial data access for transparency
+        portfolio_info = f"Balance: ${balance:.2f}"
+        if holdings:
+            # holdings is a Dict[symbol, quantity], not a list
+            symbols = list(holdings.keys())[:5]  # First 5 symbols
+            positions_str = ", ".join(symbols) + ("..." if len(holdings) > 5 else "")
+            portfolio_info += f", Holdings: {len(holdings)} position(s) ({positions_str})"
+        else:
+            portfolio_info += ", Holdings: None"
+
+        self.tracker.log_data_access("Portfolio", portfolio_info)
+
         # Log initialization
         init_text = f"Starting {cycle_type} cycle. Balance: ${balance:.2f}, Positions: {len(holdings)}"
         self.tracker.log_reasoning("initialization", f"Started {cycle_type} cycle", init_text)
@@ -392,9 +445,8 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
         try:
             # Broadcast: RESEARCHING (combined: fetching data, research, analysis)
             broadcast_status(self.agent_id, self.name, PHASE_RESEARCHING, "Researching and analyzing market opportunities", 30)
-            
-            # Log research phase
-            self.tracker.log_reasoning("research", "Starting research", "Beginning market research and analysis")
+
+            # NOTE: Research phase logging will be enhanced after agent completes with actual research data
             
             # Create agent with direct tools
             self.agent = await self.create_agent(researcher_mcp_servers)
@@ -406,15 +458,46 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             )
             
             result = await Runner.run(self.agent, message, max_turns=30)
-            
-            # Broadcast: DECIDING (after agent completes reasoning)
-            broadcast_status(self.agent_id, self.name, PHASE_DECIDING, "Making investment decision", 70)
 
-            # Extract result data for run tracking
-            # The result contains messages with the agent's reasoning and final response
+            # Extract result data and tool usage for transparency
             full_reasoning = ""
             summary = ""
+            research_conducted = False
+
             if result and hasattr(result, 'messages'):
+                # Parse messages to extract tool usage
+                for i, msg in enumerate(result.messages):
+                    # Check if this is a tool call message
+                    if hasattr(msg, 'role') and msg.role == 'tool':
+                        tool_name = getattr(msg, 'name', 'unknown_tool')
+                        tool_result_full = getattr(msg, 'content', '')
+                        tool_result = tool_result_full[:300]  # Truncate for logging
+                        self.tracker.log_tool_call(tool_name, {}, tool_result)
+
+                        # Special handling for Researcher tool
+                        if tool_name == 'Researcher':
+                            research_conducted = True
+
+                            # Try to extract URLs from the result
+                            sources = self._extract_urls_from_text(tool_result_full)
+
+                            # Try to find the query from the previous message (the assistant's tool call)
+                            query = "Market research"
+                            if i > 0:
+                                prev_msg = result.messages[i-1]
+                                if hasattr(prev_msg, 'role') and prev_msg.role == 'assistant':
+                                    # Try to extract query from assistant's message
+                                    prev_content = getattr(prev_msg, 'content', '')
+                                    if isinstance(prev_content, str) and len(prev_content) > 0:
+                                        # Look for quoted text or extract first sentence
+                                        query_match = prev_content.split('\n')[0][:100] if prev_content else "Market research"
+                                        query = query_match
+
+                            # Create summary from first 200 chars of result
+                            result_summary = tool_result_full[:200] if tool_result_full else "Research completed via Brave Search"
+
+                            self.tracker.log_research_query(query, result_summary, sources)
+
                 # Get last assistant message as summary
                 assistant_messages = [m for m in result.messages if hasattr(m, 'role') and m.role == 'assistant']
                 if assistant_messages:
@@ -425,6 +508,15 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                         m.content if hasattr(m, 'content') else str(m)
                         for m in assistant_messages
                     )
+
+            # Log research phase with actual data (NOW after we've parsed tool usage)
+            research_text = "Completed market research and analysis"
+            if research_conducted:
+                research_text += ". Used Researcher tool to gather current market information."
+            self.tracker.log_reasoning("research", "Research completed", research_text)
+
+            # Broadcast: DECIDING (after agent completes reasoning)
+            broadcast_status(self.agent_id, self.name, PHASE_DECIDING, "Making investment decision", 70)
 
             # Read structured decision from decide_action tool (if any) and dispatch deterministically
             decision = self.last_decision
@@ -442,9 +534,11 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                 # CRITICAL DEBUG: Log execution details
                 logger.error(f"🟢 EXECUTING: {action} {quantity} shares of {symbol}")
                 logger.error(f"🟢 RATIONALE: {rationale[:200]}")
-                
-                # Log decision
-                decision_text = f"{action} {quantity} shares of {symbol}. Rationale: {rationale}"
+
+                # Log decision with full context (tracker will add data sources automatically)
+                decision_text = f"{action} {quantity} shares of {symbol}.\n\nRationale: {rationale}"
+                if decision.get("fullReasoning"):
+                    decision_text += f"\n\n{decision['fullReasoning']}"
                 self.tracker.log_reasoning("decision", f"Decided: {action} {symbol}", decision_text)
                 
                 # Broadcast: TRADING
