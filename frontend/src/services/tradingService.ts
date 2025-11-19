@@ -54,11 +54,21 @@ export const tradingService = {
       if (error.response) {
         const status = error.response.status;
         const data = error.response.data;
-        
+
         // Extract error message from ToolResponse wrapper or direct error
         const errorMessage = data?.error || data?.message || 'Failed to trigger trading cycle';
-        const reason = status === 409 ? 'MARKET_CLOSED' : 'SERVICE_ERROR';
-        
+
+        // Determine reason based on status and message content
+        let reason = 'SERVICE_ERROR';
+        if (status === 409) {
+          // Check message content to determine if it's MARKET_CLOSED or ALREADY_RUNNING
+          if (errorMessage.toLowerCase().includes('already in progress') || errorMessage.toLowerCase().includes('already running')) {
+            reason = 'ALREADY_RUNNING';
+          } else {
+            reason = 'MARKET_CLOSED';
+          }
+        }
+
         const errorData: TriggerCycleError = {
           reason: reason,
           message: errorMessage

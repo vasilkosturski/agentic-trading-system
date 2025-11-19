@@ -14,17 +14,19 @@ logger = logging.getLogger(__name__)
 
 class TradingAPIServer:
     """Encapsulates the Flask API server and its dependencies."""
-    
-    def __init__(self, trading_system, manual_cycle_event):
+
+    def __init__(self, trading_system, manual_cycle_event, cycle_running_flag):
         """
         Initialize the API server with dependencies.
-        
+
         Args:
             trading_system: The TradingSystem instance
             manual_cycle_event: asyncio.Event to signal manual cycle triggers
+            cycle_running_flag: dict with 'running' boolean to track cycle state
         """
         self.trading_system = trading_system
         self.manual_cycle_event = manual_cycle_event
+        self.cycle_running_flag = cycle_running_flag
         self.app = Flask(__name__)
         self._setup_routes()
     
@@ -39,13 +41,21 @@ class TradingAPIServer:
         @self.app.route('/api/trigger-cycle', methods=['POST'])
         def trigger_cycle():
             """Trigger a manual trading cycle (demo mode - always allowed)."""
-            logger.info("📣 Manual trading cycle triggered via API")
-            
+            logger.info("📣 Manual trading cycle requested via API")
+
+            # Check if a cycle is already running
+            if self.cycle_running_flag['running']:
+                logger.warning("⚠️ Trading cycle already in progress - rejecting duplicate request")
+                return jsonify({
+                    "message": "A trading cycle is already in progress. Please wait for it to complete.",
+                    "status": "ALREADY_RUNNING"
+                }), 409  # 409 Conflict
+
             # Signal the event to trigger a cycle immediately
             # Use call_soon_threadsafe to safely signal from Flask thread to async loop
             self.manual_cycle_event._loop.call_soon_threadsafe(self.manual_cycle_event.set)
             logger.info("✅ Manual trading cycle triggered successfully")
-            
+
             return jsonify({
                 "message": "Trading cycle triggered successfully.",
                 "status": "TRIGGERED"

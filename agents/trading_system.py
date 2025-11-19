@@ -194,14 +194,18 @@ async def update_all_agents_activity():
 async def run_continuous_trading():
     """Run continuous trading cycles - matches source project pattern"""
     system = await TradingSystem.create()  # Single API call: names → IDs, then create with IDs
-    
+
     # Create event for manual cycle triggers
     manual_cycle_event = asyncio.Event()
-    
+
+    # Create flag to track if a cycle is currently running (thread-safe dict)
+    cycle_running_flag = {'running': False}
+
     # Start the API server for manual cycle triggers (proper encapsulation, no globals!)
     api_server = TradingAPIServer(
         trading_system=system,
-        manual_cycle_event=manual_cycle_event
+        manual_cycle_event=manual_cycle_event,
+        cycle_running_flag=cycle_running_flag
     )
     api_server.run(port=8000)
 
@@ -232,11 +236,20 @@ async def run_continuous_trading():
             
             # Always run trading cycle (demo system with end-of-day data)
             logger.info("🚀 Starting trading cycle...")
-            await system.run_all_agents()
-            logger.info(f"✅ Trading cycle completed.")
 
-            # Always update activity timestamp on every cycle (shows system is alive)
-            await update_all_agents_activity()
+            # Set flag to indicate cycle is running
+            cycle_running_flag['running'] = True
+
+            try:
+                await system.run_all_agents()
+                logger.info(f"✅ Trading cycle completed.")
+
+                # Always update activity timestamp on every cycle (shows system is alive)
+                await update_all_agents_activity()
+            finally:
+                # Always clear the flag, even if there was an error
+                cycle_running_flag['running'] = False
+                logger.info("🔓 Trading cycle lock released")
             
     except KeyboardInterrupt:
         logger.info("🛑 Graceful shutdown requested (Ctrl+C)")

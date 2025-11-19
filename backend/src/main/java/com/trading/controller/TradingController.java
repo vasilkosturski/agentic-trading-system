@@ -208,17 +208,17 @@ public class TradingController {
             try {
                 ResponseEntity<Map> responseEntity = restTemplate.postForEntity(url, null, Map.class);
                 Map<String, Object> response = responseEntity.getBody();
-                
+
                 if (response == null) {
                     logger.error("Received null response from agents service");
                     return ResponseEntity.status(503).body(
                         ToolResponse.error("Agents service returned invalid response")
                     );
                 }
-                
+
                 // Check HTTP status code from agents service
                 int statusCode = responseEntity.getStatusCodeValue();
-                
+
                 if (statusCode == 202) {
                     // Success - cycle triggered
                     logger.info("Manual cycle triggered successfully");
@@ -228,15 +228,40 @@ public class TradingController {
                     result.put("timestamp", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
                     return ResponseEntity.accepted().body(ToolResponse.success(result));
                 } else if (statusCode == 409) {
-                    // Conflict - market closed
-                    String error = (String) response.get("error");
-                    logger.info("Manual cycle not triggered: market closed");
-                    return ResponseEntity.status(409).body(ToolResponse.error(error != null ? error : "Market is closed"));
+                    // Conflict - cycle already running
+                    String message = (String) response.get("message");
+                    logger.info("Manual cycle not triggered: {}", message);
+                    return ResponseEntity.status(409).body(ToolResponse.error(message != null ? message : "Trading cycle is already in progress"));
                 } else {
                     // Other error
                     String error = (String) response.get("error");
                     logger.warn("Manual cycle failed with status {}: {}", statusCode, error);
                     return ResponseEntity.status(statusCode).body(ToolResponse.error(error != null ? error : "Failed to trigger cycle"));
+                }
+            } catch (org.springframework.web.client.HttpClientErrorException e) {
+                // Handle 4xx errors (including 409) from agents service
+                if (e.getStatusCode().value() == 409) {
+                    logger.info("Manual cycle not triggered: cycle already running");
+                    // Parse the response body to get the message
+                    try {
+                        String responseBody = e.getResponseBodyAsString();
+                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> errorResponse = (Map<String, Object>) mapper.readValue(responseBody, Map.class);
+                        String message = (String) errorResponse.get("message");
+                        return ResponseEntity.status(409).body(
+                            ToolResponse.error(message != null ? message : "A trading cycle is already in progress. Please wait for it to complete.")
+                        );
+                    } catch (Exception parseError) {
+                        return ResponseEntity.status(409).body(
+                            ToolResponse.error("A trading cycle is already in progress. Please wait for it to complete.")
+                        );
+                    }
+                } else {
+                    logger.error("Client error from agents service: {}", e.getMessage());
+                    return ResponseEntity.status(e.getStatusCode().value()).body(
+                        ToolResponse.error("Agents service error: " + e.getMessage())
+                    );
                 }
             } catch (RestClientException e) {
                 logger.error("Failed to connect to agents service: {}", e.getMessage());

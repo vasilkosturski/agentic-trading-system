@@ -11,12 +11,12 @@ interface LiveAgentActivityProps {
 }
 
 const phaseConfig: Record<string, { icon: string; color: string; label: string }> = {
-  INITIALIZING: { icon: '🔄', color: 'bg-blue-500', label: 'Initializing' },
-  RESEARCHING: { icon: '🔍', color: 'bg-cyan-500', label: 'Researching & Analyzing' },
-  DECIDING: { icon: '💭', color: 'bg-yellow-500', label: 'Making Decision' },
-  TRADING: { icon: '💰', color: 'bg-green-500', label: 'Executing Trade' },
-  COMPLETED: { icon: '✅', color: 'bg-gray-500', label: 'Completed' },
-  ERROR: { icon: '❌', color: 'bg-red-500', label: 'Error' },
+  INITIALIZING: { icon: '🔄', color: 'bg-blue-900', label: 'Initializing' },
+  RESEARCHING: { icon: '🔍', color: 'bg-cyan-800', label: 'Researching & Analyzing' },
+  DECIDING: { icon: '💭', color: 'bg-yellow-700', label: 'Making Decision' },
+  TRADING: { icon: '💰', color: 'bg-green-700', label: 'Executing Trade' },
+  COMPLETED: { icon: '✅', color: 'bg-gray-700', label: 'Completed' },
+  ERROR: { icon: '❌', color: 'bg-red-700', label: 'Error' },
 };
 
 const AgentCard: React.FC<{ status: AgentStatusUpdate }> = ({ status }) => {
@@ -40,7 +40,7 @@ const AgentCard: React.FC<{ status: AgentStatusUpdate }> = ({ status }) => {
           </div>
           
           <div className="mb-2">
-            <span className={`inline-block px-2 py-1 rounded text-xs font-semibold text-white ${phase.color}`}>
+            <span className={`inline-block px-2 py-1 rounded text-xs font-bold text-white ${phase.color}`}>
               {phase.label}
             </span>
           </div>
@@ -90,18 +90,20 @@ export const LiveAgentActivity: React.FC<LiveAgentActivityProps> = ({ agentStatu
             <span className="animate-pulse">🤖</span> Live Agent Activity
           </h2>
           {isRunning && (
-            <Badge value="Running" severity="info" className="animate-pulse" />
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-green-800 text-white animate-pulse">
+              Running
+            </span>
           )}
         </div>
 
         {isRunning && Array.from(agentStatuses.values()).every(s => s.phase === 'INITIALIZING') && (
-          <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-sm text-blue-700 dark:text-blue-300 m-0 flex items-center gap-2">
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+          <div className="mb-3 p-3 bg-cyan-800 rounded-lg">
+            <p className="text-sm text-white m-0 flex items-center gap-2">
+              <svg className="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span><strong>Please wait 30-60 seconds</strong> - Agents are starting up and connecting to services...</span>
+              <span className="text-white">Please wait 30-60 seconds - Agents are starting up and connecting to services...</span>
             </p>
           </div>
         )}
