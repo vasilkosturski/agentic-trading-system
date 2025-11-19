@@ -228,15 +228,17 @@ const TradingDashboard = () => {
       // On error, clear the placeholder statuses and reset running state
       setAgentStatuses(new Map());
       setIsCycleRunning(false);
-      
+
       // Check for explicit reason field (proper API contract)
       const reason = error.reason;
       const message = error.message || 'Failed to trigger trading cycle';
-      
-      // Note: MARKET_CLOSED shouldn't happen in demo mode, but kept for safety
+
+      // Handle 409 Conflict (cycle already running) with a warning instead of error
+      const isAlreadyRunning = reason === 'ALREADY_RUNNING' || error.status === 409;
+
       toast.current?.show({
-        severity: reason === 'MARKET_CLOSED' ? 'warn' : 'error',
-        summary: reason === 'MARKET_CLOSED' ? 'Market Closed' : 'Error',
+        severity: isAlreadyRunning ? 'info' : reason === 'MARKET_CLOSED' ? 'warn' : 'error',
+        summary: isAlreadyRunning ? 'Cycle In Progress' : reason === 'MARKET_CLOSED' ? 'Market Closed' : 'Error',
         detail: message,
         life: 5000,
       });
@@ -265,14 +267,20 @@ const TradingDashboard = () => {
         <div className="mb-8">
           <button
             onClick={handleTriggerCycle}
-            disabled={isTriggering}
+            disabled={isTriggering || isCycleRunning}
             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors flex items-center space-x-2 disabled:cursor-not-allowed mx-auto shadow-md hover:shadow-lg"
-            title="Trigger a manual trading cycle for all agents (demo mode - runs 24/7 with end-of-day data)"
+            title={
+              isCycleRunning
+                ? "A trading cycle is already in progress - please wait for it to complete"
+                : "Trigger a manual trading cycle for all agents (demo mode - runs 24/7 with end-of-day data)"
+            }
           >
-            {isTriggering ? (
+            {isTriggering || isCycleRunning ? (
               <>
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                <span>Running Trading Cycle...</span>
+                <span>
+                  {isTriggering ? 'Starting Trading Cycle...' : 'Trading Cycle In Progress...'}
+                </span>
               </>
             ) : (
               <>
