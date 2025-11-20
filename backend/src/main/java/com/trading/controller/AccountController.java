@@ -69,8 +69,11 @@ public class AccountController {
                 }
                 name = explicitName.toString();
             }
-            Double initialBalance = request.get("initialBalance") != null ?
-                ((Number) request.get("initialBalance")).doubleValue() : 100000.0;
+            Object initialBalanceObj = request.get("initialBalance");
+            if (initialBalanceObj == null) {
+                throw new IllegalArgumentException("initialBalance is required");
+            }
+            Double initialBalance = ((Number) initialBalanceObj).doubleValue();
             
             accountService.initializeAgent(name, initialBalance);
             return ResponseEntity.status(201).body(ToolResponse.success(

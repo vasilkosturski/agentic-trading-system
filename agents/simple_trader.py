@@ -55,10 +55,10 @@ class SimpleTrader:
         self.tracker: Optional[ToolTracker] = None  # Tool tracking for transparency
 
     def _extract_urls_from_text(self, text: str) -> List[Dict[str, str]]:
-        """Extract URLs and titles from text (Brave Search results).
+        """Extract URLs and titles from Researcher's SOURCE citations.
 
         Args:
-            text: Text containing URLs (markdown or plain)
+            text: Text containing SOURCE citations in format [SOURCE: Title](URL)
 
         Returns:
             List of dicts with 'title' and 'url' keys
@@ -67,13 +67,21 @@ class SimpleTrader:
 
         sources = []
 
-        # Pattern 1: Markdown links [Title](URL)
-        markdown_links = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', text)
-        for title, url in markdown_links:
+        # Pattern 1: SOURCE citations (priority) - [SOURCE: Title](URL)
+        source_pattern = r'\[SOURCE:\s*([^\]]+)\]\(([^)]+)\)'
+        source_citations = re.findall(source_pattern, text)
+        for title, url in source_citations:
             if url.startswith('http'):
                 sources.append({"title": title.strip(), "url": url.strip()})
 
-        # Pattern 2: Plain URLs (as fallback)
+        # Pattern 2: Regular markdown links (fallback) - [Title](URL)
+        if not sources:
+            markdown_links = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', text)
+            for title, url in markdown_links:
+                if url.startswith('http') and 'SOURCE' not in title:
+                    sources.append({"title": title.strip(), "url": url.strip()})
+
+        # Pattern 3: Plain URLs (last resort fallback)
         if not sources:
             url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
             urls = re.findall(url_pattern, text)
@@ -82,7 +90,37 @@ class SimpleTrader:
                 domain = url.split('//')[-1].split('/')[0]
                 sources.append({"title": domain, "url": url})
 
-        return sources[:5]  # Max 5 sources
+        return sources  # Return all SOURCE citations (no arbitrary limit)
+
+    def _parse_research_summary(self, research_text: str, sources: List[Dict[str, str]]) -> str:
+        """Parse research result to create summary with source count.
+
+        Args:
+            research_text: Full research result text (with SOURCE citations)
+            sources: List of extracted URL citations from agent
+
+        Returns:
+            Clean summary of research with source count
+        """
+        if not research_text:
+            return "Research completed"
+
+        # Remove SOURCE citation markers to get clean text
+        import re
+        clean_text = re.sub(r'\[SOURCE:[^\]]+\]\([^)]+\)', '', research_text)
+
+        # Get first 250 chars of meaningful content
+        lines = [line.strip() for line in clean_text.split('\n') if line.strip() and not line.strip().startswith('http')]
+        summary_text = ' '.join(lines)[:250].strip()
+
+        if len(' '.join(lines)) > 250:
+            summary_text += "..."
+
+        # Add source citation count
+        if sources:
+            summary_text += f" (Cited {len(sources)} source{'s' if len(sources) != 1 else ''})"
+
+        return summary_text if summary_text else "Research completed"
 
     async def get_researcher_tool(self, researcher_mcp_servers) -> Tool:
         """Create researcher tool from external MCP servers (Brave Search, Fetch)
@@ -104,6 +142,16 @@ Make use of your knowledge graph tools to store and recall entity information; u
 you have worked on previously, and store new information about companies, stocks and market conditions.
 Also use it to store web addresses that you find interesting so you can check them later.
 Draw on your knowledge graph to build your expertise over time.
+
+CRITICAL - Source Citations:
+When you find relevant information, ALWAYS cite your sources using this exact format:
+[SOURCE: Article Title](full-url)
+
+Example:
+"Tesla's stock rose 5% after earnings beat [SOURCE: Yahoo Finance - Tesla Earnings](https://finance.yahoo.com/news/tesla-earnings-beat).
+The company reported strong growth in China [SOURCE: Reuters - Tesla China Sales](https://reuters.com/tesla-china)."
+
+Only cite sources you actually used for your findings. Do not cite sources you didn't find useful.
 
 Focus on finding relevant news, market conditions, and company information to support trading decisions.
 The current datetime is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
@@ -341,7 +389,6 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             result = await get_trading_history(self.name, symbol, days)
             # Track that historical data was accessed
             if self.tracker and result:
-                # Extract key facts from the result for display
                 summary = result[:150] + "..." if len(result) > 150 else result
                 self.tracker.log_data_access(f"Trading History ({symbol})", summary)
             return result
@@ -464,38 +511,70 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             summary = ""
             research_conducted = False
 
+            logger.info(f"🔍 Agent result type: {type(result)}")
+            logger.info(f"🔍 Has messages attr? {hasattr(result, 'messages') if result else 'result is None'}")
+            if result:
+                logger.info(f"🔍 Result attributes: {dir(result)}")
+
             if result and hasattr(result, 'messages'):
                 # Parse messages to extract tool usage
+                logger.info(f"📋 Parsing {len(result.messages)} messages from agent result")
                 for i, msg in enumerate(result.messages):
+                    msg_role = getattr(msg, 'role', 'no_role')
+                    msg_type = type(msg).__name__
+                    logger.info(f"  Message #{i}: role={msg_role}, type={msg_type}")
+
                     # Check if this is a tool call message
                     if hasattr(msg, 'role') and msg.role == 'tool':
                         tool_name = getattr(msg, 'name', 'unknown_tool')
+                        logger.info(f"  ✅ Found tool call: {tool_name}")
                         tool_result_full = getattr(msg, 'content', '')
                         tool_result = tool_result_full[:300]  # Truncate for logging
                         self.tracker.log_tool_call(tool_name, {}, tool_result)
 
                         # Special handling for Researcher tool
                         if tool_name == 'Researcher':
+                            logger.info(f"  🔍 RESEARCHER TOOL DETECTED!")
                             research_conducted = True
 
                             # Try to extract URLs from the result
                             sources = self._extract_urls_from_text(tool_result_full)
+                            logger.info(f"  📎 Extracted {len(sources)} source URLs from Researcher result")
+                            if sources:
+                                for src in sources[:3]:  # Log first 3
+                                    logger.info(f"    - {src.get('title', 'No title')}: {src.get('url', 'No URL')}")
 
                             # Try to find the query from the previous message (the assistant's tool call)
                             query = "Market research"
                             if i > 0:
                                 prev_msg = result.messages[i-1]
                                 if hasattr(prev_msg, 'role') and prev_msg.role == 'assistant':
-                                    # Try to extract query from assistant's message
+                                    # Try to extract query from assistant's tool calls or content
                                     prev_content = getattr(prev_msg, 'content', '')
-                                    if isinstance(prev_content, str) and len(prev_content) > 0:
-                                        # Look for quoted text or extract first sentence
-                                        query_match = prev_content.split('\n')[0][:100] if prev_content else "Market research"
-                                        query = query_match
+                                    # Check if there are tool_calls in the message
+                                    if hasattr(prev_msg, 'tool_calls') and prev_msg.tool_calls:
+                                        # Get the first tool call's arguments (this is the actual query)
+                                        tool_call = prev_msg.tool_calls[0]
+                                        if hasattr(tool_call, 'function') and hasattr(tool_call.function, 'arguments'):
+                                            try:
+                                                args = json.loads(tool_call.function.arguments)
+                                                # Researcher tool typically takes a query/request argument
+                                                query = args.get('query', args.get('request', args.get('message', 'Market research')))
+                                                if isinstance(query, str):
+                                                    query = query[:150]  # Truncate long queries
+                                            except:
+                                                pass
+                                    elif isinstance(prev_content, str) and len(prev_content) > 0:
+                                        # Fallback: extract first sentence
+                                        query = prev_content.split('\n')[0][:100]
 
-                            # Create summary from first 200 chars of result
-                            result_summary = tool_result_full[:200] if tool_result_full else "Research completed via Brave Search"
+                            # Create better summary from result
+                            # Parse the result to extract key insights
+                            result_summary = self._parse_research_summary(tool_result_full, sources)
 
+                            logger.info(f"  💾 Logging research query with {len(sources)} sources")
+                            logger.info(f"    Query: {query[:100]}")
+                            logger.info(f"    Summary: {result_summary[:150]}")
                             self.tracker.log_research_query(query, result_summary, sources)
 
                 # Get last assistant message as summary
