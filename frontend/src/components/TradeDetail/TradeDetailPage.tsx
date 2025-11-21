@@ -62,10 +62,15 @@ const TradeDetailPage: React.FC = () => {
 
   // Parse JSON strings if available
   let parsedSources: any[] = [];
+  let researchSummary: string = '';
   let parsedContext: any = null;
 
   try {
-    if (researchSources) parsedSources = JSON.parse(researchSources);
+    if (researchSources) {
+      const parsed = JSON.parse(researchSources);
+      parsedSources = parsed.sources || [];
+      researchSummary = parsed.summary || '';
+    }
   } catch (e) {
     console.error('Failed to parse research sources:', e);
   }
@@ -142,9 +147,20 @@ const TradeDetailPage: React.FC = () => {
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
                 <i className="pi pi-book text-blue-600 mr-2"></i>
-                Research Sources
+                Web Research Sources
               </h2>
+
+              {/* Research Summary */}
+              {researchSummary && (
+                <div className="mb-5 p-4 bg-blue-50 border-l-4 border-blue-600 rounded">
+                  <p className="text-sm font-semibold text-blue-900 mb-1">Research Summary</p>
+                  <p className="text-sm text-gray-700">{researchSummary}</p>
+                </div>
+              )}
+
+              {/* Sources List */}
               <div className="space-y-3">
+                <p className="text-sm font-semibold text-gray-700 mb-2">Sources Referenced:</p>
                 {parsedSources.map((source: any, index: number) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
                     <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 font-medium flex items-center">
