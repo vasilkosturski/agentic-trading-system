@@ -1,6 +1,6 @@
 package com.trading.controller;
 
-import com.trading.dto.ToolResponse;
+import com.trading.dto.response.ToolResponse;
 import com.trading.model.AgentStatusUpdate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

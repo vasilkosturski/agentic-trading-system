@@ -1,7 +1,7 @@
 package com.trading.controller;
 
-import com.trading.dto.RecentActivityResponse;
-import com.trading.dto.TradingHistoryResponse;
+import com.trading.dto.response.RecentActivityResponse;
+import com.trading.dto.response.TradingHistoryResponse;
 import com.trading.service.MemoryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

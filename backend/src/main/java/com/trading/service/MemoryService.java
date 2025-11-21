@@ -1,7 +1,7 @@
 package com.trading.service;
 
-import com.trading.dto.RecentActivityResponse;
-import com.trading.dto.TradingHistoryResponse;
+import com.trading.dto.response.RecentActivityResponse;
+import com.trading.dto.response.TradingHistoryResponse;
 import com.trading.entity.AccountTransaction;
 import com.trading.entity.AgentRun;
 import com.trading.entity.TransactionType;

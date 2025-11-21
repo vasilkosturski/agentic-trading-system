@@ -1,6 +1,6 @@
 package com.trading.controller;
 
-import com.trading.dto.ToolResponse;
+import com.trading.dto.response.ToolResponse;
 import com.trading.service.MarketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

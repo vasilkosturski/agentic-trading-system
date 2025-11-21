@@ -1,10 +1,12 @@
 package com.trading.controller;
 
-import com.trading.dto.PortfolioHistoryPoint;
-import com.trading.dto.RecentTradeDto;
-import com.trading.dto.RunDetailDto;
-import com.trading.dto.ToolResponse;
-import com.trading.dto.TradeDetailResponse;
+import com.trading.dto.request.InitializeAgentRequest;
+import com.trading.dto.response.PortfolioHistoryPoint;
+import com.trading.dto.response.RecentTradeDto;
+import com.trading.dto.response.RunDetailDto;
+import com.trading.dto.response.ToolResponse;
+import com.trading.dto.response.TradeDetailResponse;
+import jakarta.validation.Valid;
 import com.trading.entity.AccountPortfolioSnapshot;
 import com.trading.entity.AccountTransaction;
 import com.trading.repository.AccountPortfolioSnapshotRepository;
@@ -57,31 +59,15 @@ public class AccountController {
 
     // Agent initialization endpoint
     @PostMapping("/tools/initialize_agent")
-    public ResponseEntity<ToolResponse<String>> initializeAgent(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<ToolResponse<String>> initializeAgent(@RequestBody @Valid InitializeAgentRequest request) {
         try {
-            String name;
-            if (request.containsKey("agentId")) {
-                name = resolveAgentName(request.get("agentId"));
-            } else {
-                Object explicitName = request.get("name");
-                if (explicitName == null) {
-                    throw new IllegalArgumentException("agentId or name is required");
-                }
-                name = explicitName.toString();
-            }
-            Object initialBalanceObj = request.get("initialBalance");
-            if (initialBalanceObj == null) {
-                throw new IllegalArgumentException("initialBalance is required");
-            }
-            Double initialBalance = ((Number) initialBalanceObj).doubleValue();
-            
-            accountService.initializeAgent(name, initialBalance);
+            accountService.initializeAgent(request.getName(), request.getInitialBalance());
             return ResponseEntity.status(201).body(ToolResponse.success(
-                "Successfully initialized agent " + name));
+                "Successfully initialized agent " + request.getName()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(ToolResponse.error("Failed to initialize agent"));
+            return ResponseEntity.status(500).body(ToolResponse.error("Failed to initialize agent: " + e.getMessage()));
         }
     }
 

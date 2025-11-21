@@ -143,15 +143,21 @@ you have worked on previously, and store new information about companies, stocks
 Also use it to store web addresses that you find interesting so you can check them later.
 Draw on your knowledge graph to build your expertise over time.
 
-CRITICAL - Source Citations:
-When you find relevant information, ALWAYS cite your sources using this exact format:
-[SOURCE: Article Title](full-url)
+**CRITICAL: You MUST return your findings as a JSON object.**
 
-Example:
-"Tesla's stock rose 5% after earnings beat [SOURCE: Yahoo Finance - Tesla Earnings](https://finance.yahoo.com/news/tesla-earnings-beat).
-The company reported strong growth in China [SOURCE: Reuters - Tesla China Sales](https://reuters.com/tesla-china)."
+Your JSON response must have this exact structure:
+{{
+  "summary": "Brief 2-3 sentence summary of key findings",
+  "sources": [
+    {{"title": "Article Title", "url": "https://full-url-used.com"}}
+  ]
+}}
 
-Only cite sources you actually used for your findings. Do not cite sources you didn't find useful.
+IMPORTANT:
+- Only include sources you ACTUALLY USED and found relevant for your findings
+- Do NOT include sources you didn't find useful or didn't use
+- The summary should synthesize what you learned from ALL the sources combined
+- If you didn't find any useful sources, return empty sources array: []
 
 Focus on finding relevant news, market conditions, and company information to support trading decisions.
 The current datetime is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
@@ -176,26 +182,47 @@ You are {self.name}, a trader on the stock market. Your account is under your na
 You actively manage your portfolio according to your strategy.
 
 Available tools:
-- Researcher: Research online for news and opportunities
+- Researcher: Research online for news and opportunities (returns JSON with summary and sources)
 - Market data tools: lookup_share_price, get_historical_prices, get_market_indicators
 - Memory tools: query_trading_history(symbol, days), query_recent_activity(days)
   - Use these to remember your past decisions and reasoning about stocks
   - Check your history before making decisions to maintain consistency
 
-**CRITICAL - How to Make Decisions:**
-You MUST call decide_action() exactly once at the end. Use these EXACT formats:
+**CRITICAL - Decision Workflow:**
 
-To BUY a stock:
-  decide_action(action="BUY", symbol="NVDA", quantity=50, rationale="...", fullReasoning="...")
-  
-To SELL a stock:
-  decide_action(action="SELL", symbol="NVDA", quantity=50, rationale="...", fullReasoning="...")
-  
-To do nothing:
-  decide_action(action="HOLD")
+1. **Research**: Use the Researcher tool to gather market information
+   - Researcher returns JSON with summary and sources list
+   - Store this result - you'll need to pass it to decide_action
 
-The action parameter MUST be the string "BUY", "SELL", or "HOLD" - nothing else.
-Your rationale and fullReasoning must match your action (don't say "sell" if action="BUY").
+2. **Decide**: Call decide_action() EXACTLY ONCE at the end with your decision AND research sources
+
+   To BUY a stock:
+     decide_action(
+       action="BUY",
+       symbol="NVDA",
+       quantity=50,
+       rationale="Brief reason",
+       fullReasoning="Complete analysis",
+       researchSources='... the JSON string from Researcher ...'
+     )
+
+   To SELL a stock:
+     decide_action(
+       action="SELL",
+       symbol="NVDA",
+       quantity=50,
+       rationale="Brief reason",
+       fullReasoning="Complete analysis",
+       researchSources='... the JSON string from Researcher ...'
+     )
+
+   To do nothing:
+     decide_action(action="HOLD", rationale="...", fullReasoning="...")
+
+**IMPORTANT:**
+- The action parameter MUST be "BUY", "SELL", or "HOLD" - nothing else
+- Your rationale and fullReasoning must match your action (don't say "sell" if action="BUY")
+- Always pass researchSources (the Researcher's JSON) to decide_action for transparency
 
 You have access to end-of-day market data from Polygon.io (previous trading day close).
 Account snapshot is provided in the prompt; do not query balance/holdings via tools.
@@ -216,7 +243,9 @@ THIS IS A SIMULATION ENVIRONMENT - Be active and demonstrate your trading strate
 Your goal is to build and manage an interesting portfolio that reflects your investment philosophy.
 
 YOUR TRADING APPROACH:
-1. Use the research tool to check relevant news and market conditions
+1. Use the Researcher tool to check relevant news and market conditions
+   - Researcher returns JSON with summary and sources
+   - Save this JSON - you'll need to pass it to decide_action for transparency
 2. Review your current holdings - are any underperforming or ready to take profits?
 3. Actively look for new opportunities consistent with your strategy
 4. Make decisions to either improve your portfolio or capitalize on opportunities
@@ -246,6 +275,9 @@ CRITICAL - DECISION RULES:
     * Market conditions and context
     * Why this aligns with your investment strategy
     * Risk considerations and position sizing rationale
+  - **ALWAYS pass researchSources parameter** with the JSON string from Researcher tool
+    * This ensures transparency - users can see what sources you used
+    * Pass the complete JSON response from the Researcher tool
   - If you decide HOLD, set action=HOLD and omit symbol/quantity.
   - The system will execute the action you decide; do NOT call any trading tools directly.
 
@@ -323,27 +355,48 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
 
         # Add a per-agent decide_action tool that records to instance state
         @function_tool
-        async def decide_action(action: str, symbol: str = None, quantity: int = None, rationale: str = None, fullReasoning: str = None) -> str:
+        async def decide_action(
+            action: str,
+            symbol: str = None,
+            quantity: int = None,
+            rationale: str = None,
+            fullReasoning: str = None,
+            researchSources: str = None
+        ) -> str:
+            """Record your trading decision with research sources.
+
+            Args:
+                action: BUY, SELL, or HOLD
+                symbol: Stock symbol (required for BUY/SELL)
+                quantity: Number of shares (required for BUY/SELL)
+                rationale: Brief explanation of decision
+                fullReasoning: Complete reasoning (optional)
+                researchSources: JSON string with research sources from Researcher tool
+
+            Returns:
+                Confirmation message
+            """
             act = (action or "").upper()
-            
+
             # CRITICAL DEBUG: Log what agent is passing to decide_action
             logger.error(f"🔴 DECIDE_ACTION CALLED: action={action}, symbol={symbol}, quantity={quantity}")
             logger.error(f"🔴 DECIDE_ACTION RATIONALE: {rationale[:200] if rationale else 'None'}")
-            
+            logger.error(f"🔴 RESEARCH SOURCES: {researchSources[:300] if researchSources else 'None'}")
+
             # VALIDATION: Check if action matches reasoning
             if act in ("BUY", "SELL"):
                 if not symbol or not isinstance(quantity, int) or quantity <= 0:
                     raise ValueError("symbol and positive quantity are required for BUY/SELL")
-                
+
                 # Check for mismatch between action and reasoning
                 reasoning_text = (rationale or "") + " " + (fullReasoning or "")
                 reasoning_lower = reasoning_text.lower()
-                
+
                 if act == "BUY" and ("sell" in reasoning_lower or "selling" in reasoning_lower):
                     error_msg = f"CRITICAL ERROR: action=BUY but reasoning mentions 'sell'. This is a mismatch! Reasoning: {rationale[:100]}"
                     logger.error(f"🚨 {error_msg}")
                     raise ValueError(error_msg)
-                
+
                 if act == "SELL" and ("buy" in reasoning_lower or "buying" in reasoning_lower or "purchase" in reasoning_lower):
                     error_msg = f"CRITICAL ERROR: action=SELL but reasoning mentions 'buy'. This is a mismatch! Reasoning: {rationale[:100]}"
                     logger.error(f"🚨 {error_msg}")
@@ -352,21 +405,22 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                 act = "HOLD"
                 symbol = symbol or ""
                 quantity = quantity or 0
-            
+
             decision = {
                 "action": act,
                 "symbol": symbol,
                 "quantity": quantity,
                 "rationale": rationale or "",
                 "fullReasoning": fullReasoning or "",
+                "researchSources": researchSources or "[]",  # Store research sources
             }
             self.last_decision = decision
-            
+
             # CRITICAL DEBUG: Log the normalized decision
             logger.error(f"🔴 DECISION STORED: {decision}")
-            
+
             # Return a simple acknowledgement; the system reads self.last_decision
-            return "OK"
+            return "Decision recorded. The system will validate and execute this trade."
 
         # Memory tools - query past decisions and reasoning
         # Track historical data access for transparency
@@ -625,10 +679,10 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                 # Use fullReasoning from decision if available, otherwise fall back to conversation messages
                 decision_full_reasoning = decision.get("fullReasoning") or ""
                 final_full_reasoning = decision_full_reasoning if decision_full_reasoning else full_reasoning
-                
-                # Prepare research sources as JSON
-                research_sources_json = json.dumps([])  # Could be enhanced to extract from researcher tool
-                
+
+                # Get research sources from decision (agent passed them via decide_action)
+                research_sources_json = decision.get("researchSources", "[]")
+
                 # Prepare agent context before trade
                 portfolio_context = {
                     "cashBefore": balance,

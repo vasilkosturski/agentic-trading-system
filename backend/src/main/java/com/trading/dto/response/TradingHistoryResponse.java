@@ -1,4 +1,4 @@
-package com.trading.dto;
+package com.trading.dto.response;
 
 import java.util.List;
 
