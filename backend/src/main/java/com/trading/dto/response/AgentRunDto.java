@@ -1,4 +1,4 @@
-package com.trading.dto;
+package com.trading.dto.response;
 
 import com.trading.entity.AgentRun;
 import lombok.AllArgsConstructor;

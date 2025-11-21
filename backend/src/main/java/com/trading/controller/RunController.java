@@ -1,8 +1,8 @@
 package com.trading.controller;
 
-import com.trading.dto.AgentRunDto;
-import com.trading.dto.RunDetailDto;
-import com.trading.dto.ToolResponse;
+import com.trading.dto.response.AgentRunDto;
+import com.trading.dto.response.RunDetailDto;
+import com.trading.dto.response.ToolResponse;
 import com.trading.entity.AccountTransaction;
 import com.trading.entity.AgentRun;
 import com.trading.entity.AgentToolCall;
