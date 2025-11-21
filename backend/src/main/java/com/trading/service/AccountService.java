@@ -54,42 +54,32 @@ public class AccountService {
             throw new IllegalArgumentException("Initial balance is required");
         }
         
-        // Step 1: Check if TradingAgent exists
+        // Step 1: Check if TradingAccount already exists (idempotent - return if exists)
+        TradingAccount existingAccount = tradingAccountRepository.findByName(agentName);
+        if (existingAccount != null) {
+            return existingAccount;
+        }
+        
+        // Step 2: Check if TradingAgent exists
         Optional<TradingAgent> agentOpt = agentRepository.findByName(agentName);
         TradingAgent agent;
         
         if (agentOpt.isPresent()) {
-            // Agent exists - use it and ensure initial capital is set
+            // Agent exists - use it as-is (don't update initialCapital to preserve historical data)
             agent = agentOpt.get();
-            if (agent.getInitialCapital() == null) {
-                agent.setInitialCapital(initialBalance);
-                agent = agentRepository.save(agent);
-            }
-            
-            // Step 2: Check if TradingAccount exists for this agent
-            TradingAccount existingAccount = tradingAccountRepository.findByName(agentName);
-            if (existingAccount != null) {
-                return existingAccount;
-            }
-            
-            // Step 3: Agent exists but account doesn't - create account
-            TradingAccount account = new TradingAccount();
-            account.setName(agentName);
-            account.setBalance(initialBalance);
-            account.setAgent(agent);
-            return tradingAccountRepository.save(account);
         } else {
-            // Step 4: Agent doesn't exist - create both agent and account
+            // Agent doesn't exist - create it with initial capital
             agent = new TradingAgent(agentName, "Autonomous trading agent");
             agent.setInitialCapital(initialBalance);
             agent = agentRepository.save(agent);
-            
-            TradingAccount account = new TradingAccount();
-            account.setName(agentName);
-            account.setBalance(initialBalance);
-            account.setAgent(agent);
-            return tradingAccountRepository.save(account);
         }
+        
+        // Step 3: Create trading account (agent exists at this point)
+        TradingAccount account = new TradingAccount();
+        account.setName(agentName);
+        account.setBalance(initialBalance);
+        account.setAgent(agent);
+        return tradingAccountRepository.save(account);
     }
 
     /**
