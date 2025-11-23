@@ -58,23 +58,103 @@ const TradeDetailPage: React.FC = () => {
     );
   }
 
-  const { trade, fullReasoning, researchSources, agentContext, relatedTrades, runId, runSummary, reasoningSteps } = tradeDetail;
+  const { trade, fullReasoning, agentContext, relatedTrades, runId, runSummary, reasoningSteps } = tradeDetail;
 
   // Parse JSON strings if available
-  let parsedSources: any[] = [];
   let parsedContext: any = null;
-
-  try {
-    if (researchSources) parsedSources = JSON.parse(researchSources);
-  } catch (e) {
-    console.error('Failed to parse research sources:', e);
-  }
 
   try {
     if (agentContext) parsedContext = JSON.parse(agentContext);
   } catch (e) {
     console.error('Failed to parse agent context:', e);
   }
+
+  /**
+   * Parse reasoning text to extract structured data context and sources.
+   * The reasoning text contains special markers:
+   * - "📊 Data Context:" for historical database access
+   * - "🌐 Market Research:" for web research
+   * - "  • " for source citations
+   */
+  const parseReasoningText = (text: string) => {
+    if (!text) return { cleanText: '', dataContext: [], sources: [] };
+
+    const lines = text.split('\n');
+    let cleanText = '';
+    const dataContext: string[] = [];
+    const sources: any[] = [];
+    let currentSection: 'clean' | 'data' | 'research' | 'sources' = 'clean';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      if (trimmed.startsWith('📊 Data Context:')) {
+        currentSection = 'data';
+        continue;
+      } else if (trimmed.startsWith('🌐 Market Research:')) {
+        currentSection = 'research';
+        continue;
+      } else if (trimmed === 'Sources:') {
+        currentSection = 'sources';
+        continue;
+      }
+
+      if (currentSection === 'data' && trimmed && !trimmed.startsWith('🌐')) {
+        dataContext.push(trimmed);
+      } else if (currentSection === 'sources' && trimmed.startsWith('•')) {
+        // Parse source: "• Title - URL"
+        const sourceText = trimmed.substring(1).trim();
+        const dashIndex = sourceText.lastIndexOf(' - ');
+        if (dashIndex > 0) {
+          const title = sourceText.substring(0, dashIndex).trim();
+          const url = sourceText.substring(dashIndex + 3).trim();
+          sources.push({ title, url });
+        }
+      } else if (currentSection === 'clean') {
+        cleanText += line + '\n';
+      } else if (currentSection === 'research' && trimmed && !trimmed.startsWith('Sources:')) {
+        cleanText += line + '\n';
+      }
+    }
+
+    return { cleanText: cleanText.trim(), dataContext, sources };
+  };
+
+  /**
+   * Build enhanced reasoning steps from backend data.
+   * Uses actual reasoning steps from the run, enriched with parsed data sources.
+   */
+  const buildEnhancedSteps = () => {
+    if (!reasoningSteps || reasoningSteps.length === 0) {
+      // Fallback: build basic steps if no reasoning data
+      return [{
+        id: 1,
+        stepType: 'decision',
+        stepDescription: `Decided: ${trade.type} ${trade.quantity} shares of ${trade.symbol}`,
+        reasoningText: trade.rationale || 'Investment decision based on analysis.',
+        timestamp: trade.timestamp,
+        sequenceNumber: 1
+      }];
+    }
+
+    // Use actual reasoning steps from backend, parse and enhance them
+    return reasoningSteps.map((step: any) => {
+      const { cleanText, dataContext, sources } = parseReasoningText(step.reasoningText);
+
+      return {
+        id: step.id,
+        stepType: step.stepType,
+        stepDescription: step.stepDescription,
+        reasoningText: cleanText || step.reasoningText,
+        timestamp: step.timestamp,
+        sequenceNumber: step.sequenceNumber,
+        sources: sources.length > 0 ? sources : undefined,
+        dataContext: dataContext.length > 0 ? dataContext : undefined
+      };
+    });
+  };
+
+  const enhancedSteps = buildEnhancedSteps();
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -131,32 +211,11 @@ const TradeDetailPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Agent Reasoning Timeline */}
+          {/* Agent Reasoning Timeline with integrated research sources */}
           <AgentReasoningTimeline
-            reasoningSteps={reasoningSteps}
-            fallbackReasoning={fullReasoning || trade.rationale}
+            reasoningSteps={enhancedSteps}
+            fallbackReasoning={fullReasoning}
           />
-
-          {/* Research Sources */}
-          {parsedSources.length > 0 && (
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <i className="pi pi-book text-blue-600 mr-2"></i>
-                Research Sources
-              </h2>
-              <div className="space-y-3">
-                {parsedSources.map((source: any, index: number) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                    <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 font-medium flex items-center">
-                      {source.title}
-                      <i className="pi pi-external-link ml-2 text-sm"></i>
-                    </a>
-                    {source.snippet && <p className="text-sm text-gray-600 mt-2">{source.snippet}</p>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Related Trades */}
           {relatedTrades && relatedTrades.length > 0 && (
