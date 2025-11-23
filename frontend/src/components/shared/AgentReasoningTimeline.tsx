@@ -14,6 +14,7 @@ export interface ReasoningStep {
   timestamp: string;
   sequenceNumber: number;
   sources?: ResearchSource[];
+  dataContext?: string[]; // Historical data accessed (portfolio, trading history, etc.)
 }
 
 interface AgentReasoningTimelineProps {
@@ -125,11 +126,30 @@ const AgentReasoningTimeline: React.FC<AgentReasoningTimelineProps> = ({
                       {step.reasoningText}
                     </p>
 
+                    {/* Historical data context if present */}
+                    {step.dataContext && step.dataContext.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 flex items-center">
+                          <i className="pi pi-database mr-1.5 text-[10px]"></i>
+                          Historical Data Accessed:
+                        </p>
+                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-md p-3 space-y-1.5">
+                          {step.dataContext.map((item, idx) => (
+                            <div key={idx} className="text-xs text-gray-700 dark:text-gray-300 flex items-start">
+                              <span className="text-blue-600 dark:text-blue-400 mr-2">•</span>
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Research sources if present */}
                     {step.sources && step.sources.length > 0 && (
                       <div className="mt-3 space-y-2">
-                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-                          Sources ({step.sources.length}):
+                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 flex items-center">
+                          <i className="pi pi-globe mr-1.5 text-[10px]"></i>
+                          Web Research Sources ({step.sources.length}):
                         </p>
                         <div className="space-y-1.5">
                           {step.sources.map((source, idx) => (
