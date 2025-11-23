@@ -58,22 +58,10 @@ const TradeDetailPage: React.FC = () => {
     );
   }
 
-  const { trade, fullReasoning, researchSources, agentContext, relatedTrades, runId, runSummary } = tradeDetail;
+  const { trade, fullReasoning, agentContext, relatedTrades, runId, runSummary, reasoningSteps } = tradeDetail;
 
   // Parse JSON strings if available
-  let parsedSources: any[] = [];
-  let researchSummary: string = '';
   let parsedContext: any = null;
-
-  try {
-    if (researchSources) {
-      const parsed = JSON.parse(researchSources);
-      parsedSources = parsed.sources || [];
-      researchSummary = parsed.summary || '';
-    }
-  } catch (e) {
-    console.error('Failed to parse research sources:', e);
-  }
 
   try {
     if (agentContext) parsedContext = JSON.parse(agentContext);
@@ -81,34 +69,89 @@ const TradeDetailPage: React.FC = () => {
     console.error('Failed to parse agent context:', e);
   }
 
-  // Build enhanced reasoning steps with research sources integrated
-  const buildEnhancedSteps = () => {
-    const steps: any[] = [];
+  /**
+   * Parse reasoning text to extract structured data context and sources.
+   * The reasoning text contains special markers:
+   * - "📊 Data Context:" for historical database access
+   * - "🌐 Market Research:" for web research
+   * - "  • " for source citations
+   */
+  const parseReasoningText = (text: string) => {
+    if (!text) return { cleanText: '', dataContext: [], sources: [] };
 
-    // Add research step if sources exist
-    if (parsedSources.length > 0 || researchSummary) {
-      steps.push({
-        id: 1,
-        stepType: 'research',
-        stepDescription: 'Market Research & Analysis',
-        reasoningText: researchSummary || 'Analyzed market conditions and recent developments.',
-        timestamp: trade.timestamp,
-        sequenceNumber: 1,
-        sources: parsedSources
-      });
+    const lines = text.split('\n');
+    let cleanText = '';
+    const dataContext: string[] = [];
+    const sources: any[] = [];
+    let currentSection: 'clean' | 'data' | 'research' | 'sources' = 'clean';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      if (trimmed.startsWith('📊 Data Context:')) {
+        currentSection = 'data';
+        continue;
+      } else if (trimmed.startsWith('🌐 Market Research:')) {
+        currentSection = 'research';
+        continue;
+      } else if (trimmed === 'Sources:') {
+        currentSection = 'sources';
+        continue;
+      }
+
+      if (currentSection === 'data' && trimmed && !trimmed.startsWith('🌐')) {
+        dataContext.push(trimmed);
+      } else if (currentSection === 'sources' && trimmed.startsWith('•')) {
+        // Parse source: "• Title - URL"
+        const sourceText = trimmed.substring(1).trim();
+        const dashIndex = sourceText.lastIndexOf(' - ');
+        if (dashIndex > 0) {
+          const title = sourceText.substring(0, dashIndex).trim();
+          const url = sourceText.substring(dashIndex + 3).trim();
+          sources.push({ title, url });
+        }
+      } else if (currentSection === 'clean') {
+        cleanText += line + '\n';
+      } else if (currentSection === 'research' && trimmed && !trimmed.startsWith('Sources:')) {
+        cleanText += line + '\n';
+      }
     }
 
-    // Add decision step with brief rationale
-    steps.push({
-      id: 2,
-      stepType: 'decision',
-      stepDescription: `Decided: ${trade.type} ${trade.quantity} shares of ${trade.symbol}`,
-      reasoningText: trade.rationale || 'Investment decision based on analysis.',
-      timestamp: trade.timestamp,
-      sequenceNumber: 2
-    });
+    return { cleanText: cleanText.trim(), dataContext, sources };
+  };
 
-    return steps;
+  /**
+   * Build enhanced reasoning steps from backend data.
+   * Uses actual reasoning steps from the run, enriched with parsed data sources.
+   */
+  const buildEnhancedSteps = () => {
+    if (!reasoningSteps || reasoningSteps.length === 0) {
+      // Fallback: build basic steps if no reasoning data
+      return [{
+        id: 1,
+        stepType: 'decision',
+        stepDescription: `Decided: ${trade.type} ${trade.quantity} shares of ${trade.symbol}`,
+        reasoningText: trade.rationale || 'Investment decision based on analysis.',
+        timestamp: trade.timestamp,
+        sequenceNumber: 1
+      }];
+    }
+
+    // Use actual reasoning steps from backend, parse and enhance them
+    return reasoningSteps.map((step: any) => {
+      const { cleanText, dataContext, sources } = parseReasoningText(step.reasoningText);
+
+      return {
+        id: step.id,
+        stepType: step.stepType,
+        stepDescription: step.stepDescription,
+        reasoningText: cleanText || step.reasoningText,
+        timestamp: step.timestamp,
+        sequenceNumber: step.sequenceNumber,
+        sources: sources.length > 0 ? sources : undefined,
+        dataContext: dataContext.length > 0 ? dataContext : undefined
+      };
+    });
   };
 
   const enhancedSteps = buildEnhancedSteps();

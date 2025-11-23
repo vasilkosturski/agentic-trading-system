@@ -163,7 +163,7 @@ const RunDetailPage = () => {
       {/* Agent Reasoning Timeline */}
       <AgentReasoningTimeline
         reasoningSteps={runDetail.reasoningSteps}
-        fallbackReasoning={runDetail.fullReasoning}
+        fallbackReasoning={runDetail.fullReasoning || undefined}
       />
 
       {/* Research Sources */}
