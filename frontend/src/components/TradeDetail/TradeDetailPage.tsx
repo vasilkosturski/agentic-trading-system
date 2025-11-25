@@ -58,15 +58,17 @@ const TradeDetailPage: React.FC = () => {
     );
   }
 
-  const { trade, fullReasoning, agentContext, relatedTrades, runId, runSummary, reasoningSteps } = tradeDetail;
+  const { trade, fullReasoning, researchSources, agentContext, relatedTrades, runId, runSummary, reasoningSteps } = tradeDetail;
 
   // Parse JSON strings if available
   let parsedContext: any = null;
+  let parsedSources: any[] = [];
 
   try {
     if (agentContext) parsedContext = JSON.parse(agentContext);
+    if (researchSources) parsedSources = JSON.parse(researchSources);
   } catch (e) {
-    console.error('Failed to parse agent context:', e);
+    console.error('Failed to parse JSON fields:', e);
   }
 
   /**
@@ -141,6 +143,11 @@ const TradeDetailPage: React.FC = () => {
     return reasoningSteps.map((step: any) => {
       const { cleanText, dataContext, sources } = parseReasoningText(step.reasoningText);
 
+      // For research steps, inject the parsed sources from backend
+      const stepSources = step.stepType === 'research' && parsedSources.length > 0
+        ? parsedSources
+        : (sources.length > 0 ? sources : undefined);
+
       return {
         id: step.id,
         stepType: step.stepType,
@@ -148,7 +155,7 @@ const TradeDetailPage: React.FC = () => {
         reasoningText: cleanText || step.reasoningText,
         timestamp: step.timestamp,
         sequenceNumber: step.sequenceNumber,
-        sources: sources.length > 0 ? sources : undefined,
+        sources: stepSources,
         dataContext: dataContext.length > 0 ? dataContext : undefined
       };
     });

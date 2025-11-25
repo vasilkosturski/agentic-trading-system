@@ -35,21 +35,6 @@ const AgentReasoningTimeline: React.FC<AgentReasoningTimelineProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Full Reasoning Section - shown first */}
-      {hasReasoning && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center">
-            <i className="pi pi-file-edit text-blue-600 mr-2"></i>
-            Full Reasoning
-          </h2>
-          <div className="prose prose-sm max-w-none">
-            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-              {fallbackReasoning}
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Timeline Section */}
       {hasSteps && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
@@ -172,6 +157,20 @@ const AgentReasoningTimeline: React.FC<AgentReasoningTimelineProps> = ({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Fallback section - only show if no steps available */}
+      {!hasSteps && hasReasoning && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-3">
+            Trade Reasoning
+          </h2>
+          <div className="prose prose-sm max-w-none">
+            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+              {fallbackReasoning}
+            </p>
           </div>
         </div>
       )}
