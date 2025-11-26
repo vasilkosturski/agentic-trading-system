@@ -63,10 +63,8 @@ public class AgentController {
             String name = agent.getName();
 
             // Get account for portfolio info
-            TradingAccount account = accountRepository.findByName(name);
-            if (account == null) {
-                throw new RuntimeException("Account not found for agent: " + name);
-            }
+            TradingAccount account = accountRepository.findByAgentName(name)
+                .orElseThrow(() -> new RuntimeException("Account not found for agent: " + name));
 
             // Build portfolio info
             Double cashBalance = account.getBalance();

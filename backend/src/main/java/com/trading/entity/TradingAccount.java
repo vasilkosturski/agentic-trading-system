@@ -18,10 +18,7 @@ public class TradingAccount {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
-    @Column(unique = true, nullable = false)
-    private String name;
-    
+
     @Column(nullable = false)
     private Double balance;
     
@@ -49,9 +46,9 @@ public class TradingAccount {
     @JoinColumn(name = "agent_id")
     private TradingAgent agent;
     
-    // Constructor with parameters
-    public TradingAccount(String name, Double balance) {
-        this.name = name;
+    // Constructor with agent and balance
+    public TradingAccount(TradingAgent agent, Double balance) {
+        this.agent = agent;
         this.balance = balance;
     }
     

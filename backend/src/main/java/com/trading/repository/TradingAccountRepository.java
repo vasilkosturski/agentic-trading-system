@@ -19,17 +19,6 @@ public interface TradingAccountRepository extends JpaRepository<TradingAccount, 
     Optional<TradingAccount> findByAgentName(@Param("agentName") String agentName);
     
     /**
-     * Find trading account by name (for PostgreSQL schema)
-     */
-    TradingAccount findByName(String name);
-    
-    /**
-     * Find all accounts for a specific agent (case-insensitive by account name)
-     */
-    @Query("SELECT ta FROM TradingAccount ta WHERE UPPER(ta.name) = UPPER(:agentName)")
-    List<TradingAccount> findByAgentNameIgnoreCase(@Param("agentName") String agentName);
-    
-    /**
      * Check if account exists by agent name
      */
     @Query("SELECT COUNT(ta) > 0 FROM TradingAccount ta WHERE ta.agent.name = :agentName")
