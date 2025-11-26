@@ -53,10 +53,8 @@ public class MemoryService {
         }
 
         // Get account
-        TradingAccount account = accountRepository.findByName(agentName);
-        if (account == null) {
-            throw new IllegalArgumentException("Agent not found: " + agentName);
-        }
+        TradingAccount account = accountRepository.findByAgentName(agentName)
+            .orElseThrow(() -> new IllegalArgumentException("Agent not found: " + agentName));
 
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
 

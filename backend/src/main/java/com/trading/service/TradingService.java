@@ -40,10 +40,8 @@ public class TradingService {
     public AccountTransaction recordTrade(String agentName, String symbol, Integer quantity,
                                         Double price, String rationale) {
         // Find the trading account for this agent
-        TradingAccount account = accountRepository.findByName(agentName);
-        if (account == null) {
-            throw new RuntimeException("Trading account not found for agent: " + agentName);
-        }
+        TradingAccount account = accountRepository.findByAgentName(agentName)
+            .orElseThrow(() -> new RuntimeException("Trading account not found for agent: " + agentName));
         
         // Create and save the transaction
         AccountTransaction transaction = new AccountTransaction(
@@ -133,10 +131,8 @@ public class TradingService {
         if (agentName != null) {
             transactions = transactionRepository.findByAgentNameOrderByTransactionDateDesc(agentName);
         } else if (accountId != null) {
-            TradingAccount account = accountRepository.findByName(accountId);
-            if (account == null) {
-                throw new RuntimeException("Account not found: " + accountId);
-            }
+            TradingAccount account = accountRepository.findByAgentName(accountId)
+                .orElseThrow(() -> new RuntimeException("Account not found: " + accountId));
             transactions = transactionRepository.findByAccountOrderByTimestampDesc(account);
         } else {
             transactions = transactionRepository.findAll();

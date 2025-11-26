@@ -20,7 +20,8 @@ export default defineConfig({
     allowedHosts: [
       'localhost',
       '127.0.0.1',
-      'agentic-trading.vkontech.com'
+      'agentic-trading.vkontech.com',
+      'staging.agentic-trading.vkontech.com'
     ],
     // Development proxy: redirect /api requests to backend running on separate port
     // In production, frontend and backend share same origin via ingress

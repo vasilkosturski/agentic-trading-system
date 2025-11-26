@@ -41,45 +41,34 @@ public class AccountService {
 
     /**
      * Initialize agent and create trading account - should be called when agent starts
-     * @param agentName Name of the agent (required)
-     * @param initialBalance Initial cash balance (required)
+     * @param agentName Name of the agent (validated at controller layer)
+     * @param initialBalance Initial cash balance (validated at controller layer)
      * @return TradingAccount for the agent
-     * @throws IllegalArgumentException if agentName or initialBalance is null
      */
     public TradingAccount initializeAgent(String agentName, Double initialBalance) {
-        if (agentName == null || agentName.trim().isEmpty()) {
-            throw new IllegalArgumentException("Agent name is required");
-        }
-        if (initialBalance == null) {
-            throw new IllegalArgumentException("Initial balance is required");
-        }
-        
-        // Step 1: Check if TradingAccount already exists (idempotent - return if exists)
-        TradingAccount existingAccount = tradingAccountRepository.findByName(agentName);
-        if (existingAccount != null) {
-            return existingAccount;
-        }
-        
-        // Step 2: Check if TradingAgent exists
+        // Step 1: Check if TradingAgent exists
         Optional<TradingAgent> agentOpt = agentRepository.findByName(agentName);
-        TradingAgent agent;
-        
+
         if (agentOpt.isPresent()) {
-            // Agent exists - use it as-is (don't update initialCapital to preserve historical data)
-            agent = agentOpt.get();
-        } else {
-            // Agent doesn't exist - create it with initial capital
-            agent = new TradingAgent(agentName, "Autonomous trading agent");
-            agent.setInitialCapital(initialBalance);
-            agent = agentRepository.save(agent);
+            // Agent exists - check if account exists
+            TradingAgent agent = agentOpt.get();
+            Optional<TradingAccount> accountOpt = tradingAccountRepository.findByAgentName(agentName);
+
+            if (accountOpt.isPresent()) {
+                // Account exists - return it
+                return accountOpt.get();
+            }
+            else {
+                return tradingAccountRepository.save(new TradingAccount(agent, initialBalance));
+            }
         }
-        
-        // Step 3: Create trading account (agent exists at this point)
-        TradingAccount account = new TradingAccount();
-        account.setName(agentName);
-        account.setBalance(initialBalance);
-        account.setAgent(agent);
-        return tradingAccountRepository.save(account);
+
+        // Agent doesn't exist - create agent and account
+        TradingAgent agent = new TradingAgent(agentName, "Autonomous trading agent");
+        agent.setInitialCapital(initialBalance);
+        agent = agentRepository.save(agent);
+
+        return tradingAccountRepository.save(new TradingAccount(agent, initialBalance));
     }
 
     /**
@@ -94,12 +83,12 @@ public class AccountService {
      * Get holdings for an agent as Map<Symbol, Quantity>
      */
     public Map<String, Integer> getHoldings(String agentName) {
-        TradingAccount account = tradingAccountRepository.findByName(agentName);
-        if (account == null) {
+        Optional<TradingAccount> accountOpt = tradingAccountRepository.findByAgentName(agentName);
+        if (accountOpt.isEmpty()) {
             return new HashMap<>();
         }
-        
-        List<AccountHolding> holdings = holdingRepository.findByAccount(account);
+
+        List<AccountHolding> holdings = holdingRepository.findByAccount(accountOpt.get());
         Map<String, Integer> holdingsMap = new HashMap<>();
         
         for (AccountHolding holding : holdings) {
@@ -355,13 +344,13 @@ public class AccountService {
      */
     public Double getTotalPortfolioValue(String agentName) {
         Double balance = getBalance(agentName);
-        TradingAccount account = tradingAccountRepository.findByName(agentName);
-        if (account == null) {
+        Optional<TradingAccount> accountOpt = tradingAccountRepository.findByAgentName(agentName);
+        if (accountOpt.isEmpty()) {
             return balance;
         }
 
         // Calculate holdings value using LIVE market prices (cached for 60 minutes)
-        Double holdingsValue = holdingRepository.findByAccount(account).stream()
+        Double holdingsValue = holdingRepository.findByAccount(accountOpt.get()).stream()
             .mapToDouble(h -> {
                 try {
                     MarketService.PriceData priceData = marketService.getSharePrice(h.getSymbol());
@@ -388,12 +377,9 @@ public class AccountService {
      * Get trading account for an agent - expects account to already exist
      */
     private TradingAccount getAccount(String agentName) {
-        TradingAccount account = tradingAccountRepository.findByName(agentName);
-        if (account == null) {
-            throw new RuntimeException("Trading account not found for agent: " + agentName +
-                ". Agent must be initialized before trading operations.");
-        }
-        return account;
+        return tradingAccountRepository.findByAgentName(agentName)
+            .orElseThrow(() -> new RuntimeException("Trading account not found for agent: " + agentName +
+                ". Agent must be initialized before trading operations."));
     }
 
 
