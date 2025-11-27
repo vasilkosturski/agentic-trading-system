@@ -193,7 +193,7 @@ public class TradingService {
         return new AgentTradeResponse(
             transaction.getId().toString(),
             transaction.getAccount().getAgent().getName(),
-            transaction.getAccount().getName(),
+            transaction.getAccount().getAgent().getName(),
             transaction.getSymbol(),
             transaction.getTransactionType().name(),  // Convert enum to string for API
             Math.abs(transaction.getQuantity()),
