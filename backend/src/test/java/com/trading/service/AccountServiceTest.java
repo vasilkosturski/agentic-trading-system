@@ -182,5 +182,42 @@ class AccountServiceTest {
         verify(tradingAccountRepository, never()).save(any());
         verify(agentRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("Should return balance when account exists")
+    void testGetBalance_AccountExists_ReturnsBalance() {
+        // Arrange
+        String agentName = "TestAgent";
+        Double expectedBalance = 100000.0;
+
+        when(tradingAccountRepository.findByAgentName(agentName))
+            .thenReturn(Optional.of(testAccount));
+
+        // Act
+        Double result = accountService.getBalance(agentName);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(expectedBalance, result);
+        assertEquals(testAccount.getBalance(), result);
+    }
+
+    @Test
+    @DisplayName("Should throw exception when account does not exist")
+    void testGetBalance_AccountMissing_ThrowsException() {
+        // Arrange
+        String agentName = "NonExistentAgent";
+
+        when(tradingAccountRepository.findByAgentName(agentName))
+            .thenReturn(Optional.empty());
+
+        // Act & Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            accountService.getBalance(agentName);
+        });
+
+        assertEquals("Trading account not found for agent: " + agentName +
+            ". Agent must be initialized before trading operations.", exception.getMessage());
+    }
 }
 
