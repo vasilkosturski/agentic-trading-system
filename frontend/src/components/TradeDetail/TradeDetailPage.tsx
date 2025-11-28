@@ -66,7 +66,11 @@ const TradeDetailPage: React.FC = () => {
 
   try {
     if (agentContext) parsedContext = JSON.parse(agentContext);
-    if (researchSources) parsedSources = JSON.parse(researchSources);
+    if (researchSources) {
+      const parsed = JSON.parse(researchSources);
+      // Extract sources array from {summary, sources} structure
+      parsedSources = parsed.sources || [];
+    }
   } catch (e) {
     console.error('Failed to parse JSON fields:', e);
   }
@@ -147,6 +151,15 @@ const TradeDetailPage: React.FC = () => {
       const stepSources = step.stepType === 'research' && parsedSources.length > 0
         ? parsedSources
         : (sources.length > 0 ? sources : undefined);
+
+      if (step.stepType === 'research') {
+        console.log('[DEBUG] Research step sources:', {
+          stepType: step.stepType,
+          parsedSourcesCount: parsedSources.length,
+          textSourcesCount: sources.length,
+          finalSources: stepSources
+        });
+      }
 
       return {
         id: step.id,
