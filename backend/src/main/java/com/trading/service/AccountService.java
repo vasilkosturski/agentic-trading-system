@@ -1,5 +1,6 @@
 package com.trading.service;
 
+import com.trading.dto.response.HoldingDto;
 import com.trading.entity.*;
 import com.trading.repository.*;
 import org.slf4j.Logger;
@@ -80,38 +81,38 @@ public class AccountService {
     }
 
     /**
-     * Get holdings for an agent as Map<Symbol, Quantity>
+     * Get holdings for an agent as List<HoldingDto>
      */
-    public Map<String, Integer> getHoldings(String agentName) {
-        Optional<TradingAccount> accountOpt = tradingAccountRepository.findByAgentName(agentName);
-        if (accountOpt.isEmpty()) {
-            return new HashMap<>();
-        }
+    public List<HoldingDto> getHoldings(String agentName) {
+        TradingAccount account = getAccount(agentName);
 
-        List<AccountHolding> holdings = holdingRepository.findByAccount(accountOpt.get());
-        Map<String, Integer> holdingsMap = new HashMap<>();
+        List<AccountHolding> holdings = holdingRepository.findByAccount(account);
+        List<HoldingDto> holdingsList = new ArrayList<>();
         
         for (AccountHolding holding : holdings) {
-            if (holding.getQuantity() > 0) {
-                holdingsMap.put(holding.getSymbol(), holding.getQuantity());
-            }
+            holdingsList.add(new HoldingDto(
+                holding.getSymbol(),
+                holding.getQuantity(),
+                holding.getAveragePrice()
+            ));
         }
         
-        return holdingsMap;
+        return holdingsList;
     }
 
     /**
      * Buy shares for an agent
      */
     public String buyShares(String agentName, String symbol, Integer quantity, String rationale) {
-        return buyShares(agentName, symbol, quantity, rationale, null, null, null, null);
+        return buyShares(agentName, symbol, quantity, rationale, null, null, null, null, null);
     }
 
     /**
      * Buy shares for an agent with detailed metadata
      */
     public String buyShares(String agentName, String symbol, Integer quantity, String rationale,
-                           String fullReasoning, String researchSources, String agentContext, Long runId) {
+                           String fullReasoning, String researchSources, String historicalContext,
+                           String agentContext, Long runId) {
         TradingAccount account = getAccount(agentName);
 
         // Check position limit BEFORE buying (max 10 positions per agent)
@@ -167,6 +168,7 @@ public class AccountService {
         transaction.setRationale(rationale);
         transaction.setFullReasoning(fullReasoning);
         transaction.setResearchSources(researchSources);
+        transaction.setHistoricalContext(historicalContext);
         transaction.setAgentContext(agentContext);
         transaction.setTimestamp(Instant.now());
 
@@ -219,14 +221,15 @@ public class AccountService {
      * Sell shares for an agent
      */
     public String sellShares(String agentName, String symbol, Integer quantity, String rationale) {
-        return sellShares(agentName, symbol, quantity, rationale, null, null, null, null);
+        return sellShares(agentName, symbol, quantity, rationale, null, null, null, null, null);
     }
 
     /**
      * Sell shares for an agent with detailed metadata
      */
     public String sellShares(String agentName, String symbol, Integer quantity, String rationale,
-                            String fullReasoning, String researchSources, String agentContext, Long runId) {
+                            String fullReasoning, String researchSources, String historicalContext,
+                            String agentContext, Long runId) {
         TradingAccount account = getAccount(agentName);
 
         // Check if we have enough shares
@@ -259,6 +262,7 @@ public class AccountService {
         transaction.setRationale(rationale);
         transaction.setFullReasoning(fullReasoning);
         transaction.setResearchSources(researchSources);
+        transaction.setHistoricalContext(historicalContext);
         transaction.setAgentContext(agentContext);
         transaction.setTimestamp(Instant.now());
 

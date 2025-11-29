@@ -58,11 +58,12 @@ const TradeDetailPage: React.FC = () => {
     );
   }
 
-  const { trade, fullReasoning, researchSources, agentContext, relatedTrades, runId, runSummary, reasoningSteps } = tradeDetail;
+  const { trade, fullReasoning, researchSources, historicalContext, agentContext, relatedTrades, runId, runSummary, reasoningSteps } = tradeDetail;
 
   // Parse JSON strings if available
   let parsedContext: any = null;
   let parsedSources: any[] = [];
+  let parsedHistoricalInsights: any[] = [];
 
   try {
     if (agentContext) parsedContext = JSON.parse(agentContext);
@@ -70,6 +71,11 @@ const TradeDetailPage: React.FC = () => {
       const parsed = JSON.parse(researchSources);
       // Extract sources array from {summary, sources} structure
       parsedSources = parsed.sources || [];
+    }
+    if (historicalContext) {
+      const parsed = JSON.parse(historicalContext);
+      // Extract insights array from {summary, insights} structure
+      parsedHistoricalInsights = parsed.insights || [];
     }
   } catch (e) {
     console.error('Failed to parse JSON fields:', e);
@@ -152,12 +158,25 @@ const TradeDetailPage: React.FC = () => {
         ? parsedSources
         : (sources.length > 0 ? sources : undefined);
 
+      // For decision steps, inject historical insights
+      const stepHistoricalInsights = step.stepType === 'decision' && parsedHistoricalInsights.length > 0
+        ? parsedHistoricalInsights
+        : undefined;
+
       if (step.stepType === 'research') {
         console.log('[DEBUG] Research step sources:', {
           stepType: step.stepType,
           parsedSourcesCount: parsedSources.length,
           textSourcesCount: sources.length,
           finalSources: stepSources
+        });
+      }
+
+      if (step.stepType === 'decision' && parsedHistoricalInsights.length > 0) {
+        console.log('[DEBUG] Decision step historical insights:', {
+          stepType: step.stepType,
+          insightsCount: parsedHistoricalInsights.length,
+          insights: parsedHistoricalInsights
         });
       }
 
@@ -169,7 +188,8 @@ const TradeDetailPage: React.FC = () => {
         timestamp: step.timestamp,
         sequenceNumber: step.sequenceNumber,
         sources: stepSources,
-        dataContext: dataContext.length > 0 ? dataContext : undefined
+        dataContext: dataContext.length > 0 ? dataContext : undefined,
+        historicalInsights: stepHistoricalInsights
       };
     });
   };

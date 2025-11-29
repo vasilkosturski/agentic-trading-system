@@ -194,7 +194,13 @@ Available tools:
    - Researcher returns JSON with summary and sources list
    - Store this result - you'll need to pass it to decide_action
 
-2. **Decide**: Call decide_action() EXACTLY ONCE at the end with your decision AND research sources
+2. **Historical Context**: Use query_trading_history(symbol, days) to review your past trades
+   - Analyze the fullReasoning from your previous decisions
+   - Extract key insights and learning in a JSON format
+   - Structure it as: {{"summary": "...", "insights": [{{"date": "...", "insight": "..."}}]}}
+   - Store this JSON - you'll pass it to decide_action as historicalContext
+
+3. **Decide**: Call decide_action() EXACTLY ONCE at the end with your decision, research sources, AND historical context
 
    To BUY a stock:
      decide_action(
@@ -203,7 +209,8 @@ Available tools:
        quantity=50,
        rationale="Brief reason",
        fullReasoning="Complete analysis",
-       researchSources='... the JSON string from Researcher ...'
+       researchSources='... the JSON string from Researcher ...',
+       historicalContext='... the JSON with your historical insights ...'
      )
 
    To SELL a stock:
@@ -213,7 +220,8 @@ Available tools:
        quantity=50,
        rationale="Brief reason",
        fullReasoning="Complete analysis",
-       researchSources='... the JSON string from Researcher ...'
+       researchSources='... the JSON string from Researcher ...',
+       historicalContext='... the JSON with your historical insights ...'
      )
 
    To do nothing:
@@ -223,6 +231,7 @@ Available tools:
 - The action parameter MUST be "BUY", "SELL", or "HOLD" - nothing else
 - Your rationale and fullReasoning must match your action (don't say "sell" if action="BUY")
 - Always pass researchSources (the Researcher's JSON) to decide_action for transparency
+- Always pass historicalContext (your analysis of past trades) to decide_action for transparency
 
 You have access to end-of-day market data from Polygon.io (previous trading day close).
 Account snapshot is provided in the prompt; do not query balance/holdings via tools.
@@ -275,9 +284,15 @@ CRITICAL - DECISION RULES:
     * Market conditions and context
     * Why this aligns with your investment strategy
     * Risk considerations and position sizing rationale
+    * Insights from your trading history and past decisions
   - **ALWAYS pass researchSources parameter** with the JSON string from Researcher tool
     * This ensures transparency - users can see what sources you used
     * Pass the complete JSON response from the Researcher tool
+  - **ALWAYS pass historicalContext parameter** with JSON containing your historical insights
+    * Query past trades using query_trading_history(symbol, days)
+    * Analyze your previous fullReasoning to extract insights
+    * Create JSON: {{"summary": "Key patterns from past trades", "insights": [{{"date": "2025-01-01", "insight": "What you learned"}}]}}
+    * This ensures transparency - users can see what you learned from history
   - If you decide HOLD, set action=HOLD and omit symbol/quantity.
   - The system will execute the action you decide; do NOT call any trading tools directly.
 
@@ -361,9 +376,10 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             quantity: int = None,
             rationale: str = None,
             fullReasoning: str = None,
-            researchSources: str = None
+            researchSources: str = None,
+            historicalContext: str = None
         ) -> str:
-            """Record your trading decision with research sources.
+            """Record your trading decision with research sources and historical context.
 
             Args:
                 action: BUY, SELL, or HOLD
@@ -372,6 +388,7 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                 rationale: Brief explanation of decision
                 fullReasoning: Complete reasoning (optional)
                 researchSources: JSON string with research sources from Researcher tool
+                historicalContext: JSON string with historical insights from past trades
 
             Returns:
                 Confirmation message
@@ -413,6 +430,7 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                 "rationale": rationale or "",
                 "fullReasoning": fullReasoning or "",
                 "researchSources": researchSources or "[]",  # Store research sources
+                "historicalContext": historicalContext or "[]",  # Store historical insights
             }
             self.last_decision = decision
 
@@ -680,8 +698,9 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                 decision_full_reasoning = decision.get("fullReasoning") or ""
                 final_full_reasoning = decision_full_reasoning if decision_full_reasoning else full_reasoning
 
-                # Get research sources from decision (agent passed them via decide_action)
+                # Get research sources and historical context from decision (agent passed them via decide_action)
                 research_sources_json = decision.get("researchSources", "[]")
+                historical_context_json = decision.get("historicalContext", "[]")
 
                 # Prepare agent context before trade
                 portfolio_context = {
@@ -695,26 +714,28 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                 try:
                     if action == "BUY":
                         await buy_shares(
-                            self.agent_id, 
-                            symbol, 
-                            quantity, 
-                            rationale, 
+                            self.agent_id,
+                            symbol,
+                            quantity,
+                            rationale,
                             fullReasoning=final_full_reasoning,
                             researchSources=research_sources_json,
+                            historicalContext=historical_context_json,
                             agentContext=agent_context_json,
-                            runId=self.current_run_id, 
+                            runId=self.current_run_id,
                             agent_name=self.name
                         )
                     else:
                         await sell_shares(
-                            self.agent_id, 
-                            symbol, 
-                            quantity, 
-                            rationale, 
+                            self.agent_id,
+                            symbol,
+                            quantity,
+                            rationale,
                             fullReasoning=final_full_reasoning,
                             researchSources=research_sources_json,
+                            historicalContext=historical_context_json,
                             agentContext=agent_context_json,
-                            runId=self.current_run_id, 
+                            runId=self.current_run_id,
                             agent_name=self.name
                         )
                     self.trade_count += 1

@@ -1,5 +1,6 @@
 package com.trading.service;
 
+import com.trading.dto.response.HoldingDto;
 import com.trading.dto.response.RecentActivityResponse;
 import com.trading.dto.response.TradingHistoryResponse;
 import com.trading.entity.AccountTransaction;
@@ -112,8 +113,12 @@ public class MemoryService {
 
         // Current position
         try {
-            var holdings = accountService.getHoldings(agentName);
-            Integer currentShares = holdings.get(symbol);
+            List<HoldingDto> holdings = accountService.getHoldings(agentName);
+            HoldingDto holding = holdings.stream()
+                .filter(h -> symbol.equals(h.getSymbol()))
+                .findFirst()
+                .orElse(null);
+            Integer currentShares = holding != null ? holding.getQuantity() : null;
             if (currentShares != null && currentShares > 0) {
                 // Calculate average cost
                 double totalCost = 0;
@@ -145,6 +150,9 @@ public class MemoryService {
             trade.setTotalAmount(Math.round(Math.abs(t.getTotalAmount()) * 100.0) / 100.0);
             if (t.getRationale() != null && !t.getRationale().isEmpty()) {
                 trade.setRationale(t.getRationale());
+            }
+            if (t.getFullReasoning() != null && !t.getFullReasoning().isEmpty()) {
+                trade.setFullReasoning(t.getFullReasoning());
             }
             trades.add(trade);
         }

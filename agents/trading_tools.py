@@ -103,6 +103,7 @@ async def buy_shares(
     rationale: str,
     fullReasoning: str = None,
     researchSources: str = None,
+    historicalContext: str = None,
     agentContext: str = None,
     runId: int = None,
     agent_name: str | None = None
@@ -124,6 +125,8 @@ async def buy_shares(
             - How this fits with your existing portfolio
         researchSources: (RECOMMENDED) JSON string with array of sources consulted.
             Example: '[{"title": "Article Title", "url": "https://...", "snippet": "key quote"}]'
+        historicalContext: (RECOMMENDED) JSON string with historical insights from past trades.
+            Example: '{"summary": "...", "insights": [{"date": "...", "insight": "..."}]}'
         agentContext: (RECOMMENDED) JSON string with portfolio state before trade.
             Example: '{"cashBefore": 50000, "portfolioValue": 100000, "positionCount": 5}'
 
@@ -154,6 +157,7 @@ async def buy_shares(
             "rationale": rationale,
             "fullReasoning": fullReasoning,
             "researchSources": researchSources,
+            "historicalContext": historicalContext,
             "agentContext": agentContext,
             "runId": runId
         })
@@ -173,6 +177,7 @@ async def sell_shares(
     rationale: str,
     fullReasoning: str = None,
     researchSources: str = None,
+    historicalContext: str = None,
     agentContext: str = None,
     runId: int = None,
     agent_name: str | None = None
@@ -191,6 +196,8 @@ async def sell_shares(
             - Impact on portfolio allocation
         researchSources: (RECOMMENDED) JSON string with array of sources consulted.
             Example: '[{"title": "Article Title", "url": "https://...", "snippet": "key quote"}]'
+        historicalContext: (RECOMMENDED) JSON string with historical insights from past trades.
+            Example: '{"summary": "...", "insights": [{"date": "...", "insight": "..."}]}'
         agentContext: (RECOMMENDED) JSON string with portfolio state before trade.
             Example: '{"cashBefore": 50000, "portfolioValue": 100000, "positionCount": 5}'
 
@@ -221,6 +228,7 @@ async def sell_shares(
             "rationale": rationale,
             "fullReasoning": fullReasoning,
             "researchSources": researchSources,
+            "historicalContext": historicalContext,
             "agentContext": agentContext,
             "runId": runId
         })

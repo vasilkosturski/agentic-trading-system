@@ -1,9 +1,15 @@
 import { apiClient } from './api';
 
 // Types for agent detail
+export interface HoldingDto {
+  symbol: string;
+  quantity: number;
+  averagePrice: number | null;
+}
+
 export interface PortfolioInfo {
   cashBalance: number;
-  holdings: { [symbol: string]: number };
+  holdings: HoldingDto[];
   totalValue: number;
   totalReturn: number;
   totalReturnPercent: number;

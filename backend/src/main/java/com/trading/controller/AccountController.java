@@ -1,6 +1,7 @@
 package com.trading.controller;
 
 import com.trading.dto.request.InitializeAgentRequest;
+import com.trading.dto.response.HoldingDto;
 import com.trading.dto.response.PortfolioHistoryPoint;
 import com.trading.dto.response.RecentTradeDto;
 import com.trading.dto.response.RunDetailDto;
@@ -89,10 +90,10 @@ public class AccountController {
     }
 
     @PostMapping("/tools/get_holdings")
-    public ResponseEntity<ToolResponse<Map<String, Integer>>> getHoldings(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<ToolResponse<List<HoldingDto>>> getHoldings(@RequestBody Map<String, Object> request) {
         try {
             String name = resolveAgentName(request.get("agentId"));
-            Map<String, Integer> holdings = accountService.getHoldings(name);
+            List<HoldingDto> holdings = accountService.getHoldings(name);
             return ResponseEntity.ok(ToolResponse.success(holdings));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
@@ -113,11 +114,12 @@ public class AccountController {
             String rationale = (String) request.get("rationale");
             String fullReasoning = (String) request.get("fullReasoning");
             String researchSources = (String) request.get("researchSources");
+            String historicalContext = (String) request.get("historicalContext");
             String agentContext = (String) request.get("agentContext");
             Long runId = request.get("runId") != null ? ((Number) request.get("runId")).longValue() : null;
 
             String result = accountService.buyShares(name, symbol, quantity, rationale,
-                fullReasoning, researchSources, agentContext, runId);
+                fullReasoning, researchSources, historicalContext, agentContext, runId);
             return ResponseEntity.status(201).body(ToolResponse.success(result));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
@@ -140,11 +142,12 @@ public class AccountController {
             String rationale = (String) request.get("rationale");
             String fullReasoning = (String) request.get("fullReasoning");
             String researchSources = (String) request.get("researchSources");
+            String historicalContext = (String) request.get("historicalContext");
             String agentContext = (String) request.get("agentContext");
             Long runId = request.get("runId") != null ? ((Number) request.get("runId")).longValue() : null;
 
             String result = accountService.sellShares(name, symbol, quantity, rationale,
-                fullReasoning, researchSources, agentContext, runId);
+                fullReasoning, researchSources, historicalContext, agentContext, runId);
             return ResponseEntity.status(201).body(ToolResponse.success(result));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
@@ -312,6 +315,7 @@ public class AccountController {
                     tradeInfo,
                     transaction.getFullReasoning(),
                     transaction.getResearchSources(),
+                    transaction.getHistoricalContext(),
                     transaction.getAgentContext(),
                     relatedTrades,
                     runId,

@@ -27,6 +27,7 @@ export interface TradeDetail {
   };
   fullReasoning?: string;
   researchSources?: string; // JSON string
+  historicalContext?: string; // JSON string
   agentContext?: string; // JSON string
   relatedTrades?: Array<{
     id: number;

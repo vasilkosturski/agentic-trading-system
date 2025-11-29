@@ -6,6 +6,11 @@ export interface ResearchSource {
   snippet?: string;
 }
 
+export interface HistoricalInsight {
+  date: string;
+  insight: string;
+}
+
 export interface ReasoningStep {
   id: number;
   stepType: string;
@@ -15,6 +20,7 @@ export interface ReasoningStep {
   sequenceNumber: number;
   sources?: ResearchSource[];
   dataContext?: string[]; // Historical data accessed (portfolio, trading history, etc.)
+  historicalInsights?: HistoricalInsight[]; // Insights from past trades
 }
 
 interface AgentReasoningTimelineProps {
@@ -123,6 +129,30 @@ const AgentReasoningTimeline: React.FC<AgentReasoningTimelineProps> = ({
                             <div key={idx} className="text-xs text-gray-700 dark:text-gray-300 flex items-start">
                               <span className="text-blue-600 dark:text-blue-400 mr-2">•</span>
                               <span>{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Historical insights if present */}
+                    {step.historicalInsights && step.historicalInsights.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 flex items-center">
+                          <i className="pi pi-history mr-1.5 text-[10px]"></i>
+                          Insights from Past Trades ({step.historicalInsights.length}):
+                        </p>
+                        <div className="space-y-1.5">
+                          {step.historicalInsights.map((insight, idx) => (
+                            <div key={idx} className="bg-amber-50 dark:bg-amber-900/20 rounded-md p-2.5 border-l-2 border-amber-400 dark:border-amber-600">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                                  {new Date(insight.date).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-700 dark:text-gray-300">
+                                {insight.insight}
+                              </p>
                             </div>
                           ))}
                         </div>
