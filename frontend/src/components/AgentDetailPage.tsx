@@ -122,12 +122,17 @@ const AgentDetailPage = () => {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
             Current Holdings
           </h3>
-          {Object.keys(agentDetail.portfolio.holdings).length > 0 ? (
+          {agentDetail.portfolio.holdings.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(agentDetail.portfolio.holdings).map(([symbol, quantity]) => (
-                <div key={symbol} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-center">
-                  <div className="font-bold text-gray-900 dark:text-white">{symbol}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">{quantity} shares</div>
+              {agentDetail.portfolio.holdings.map((holding) => (
+                <div key={holding.symbol} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-center">
+                  <div className="font-bold text-gray-900 dark:text-white">{holding.symbol}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">{holding.quantity} shares</div>
+                  {holding.averagePrice && (
+                    <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                      Avg: ${holding.averagePrice.toFixed(2)}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

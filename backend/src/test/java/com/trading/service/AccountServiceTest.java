@@ -1,7 +1,10 @@
 package com.trading.service;
 
+import com.trading.dto.response.HoldingDto;
+import com.trading.entity.AccountHolding;
 import com.trading.entity.TradingAccount;
 import com.trading.entity.TradingAgent;
+import com.trading.repository.AccountHoldingRepository;
 import com.trading.repository.TradingAccountRepository;
 import com.trading.repository.TradingAgentRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,7 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Optional;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -28,6 +31,9 @@ class AccountServiceTest {
 
     @Mock
     private TradingAccountRepository tradingAccountRepository;
+
+    @Mock
+    private AccountHoldingRepository holdingRepository;
 
     @InjectMocks
     private AccountService accountService;
@@ -218,6 +224,56 @@ class AccountServiceTest {
 
         assertEquals("Trading account not found for agent: " + agentName +
             ". Agent must be initialized before trading operations.", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should return holdings list when account has holdings")
+    void testGetHoldings_AccountHasHoldings_ReturnsList() {
+        // Arrange
+        String agentName = "TestAgent";
+        
+        AccountHolding holding1 = new AccountHolding(testAccount, "AAPL", 10, 150.0);
+        AccountHolding holding2 = new AccountHolding(testAccount, "GOOGL", 5, 2800.0);
+        List<AccountHolding> holdings = Arrays.asList(holding1, holding2);
+
+        when(tradingAccountRepository.findByAgentName(agentName))
+            .thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccount(testAccount))
+            .thenReturn(holdings);
+
+        // Act
+        List<HoldingDto> result = accountService.getHoldings(agentName);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(2, result.size());
+        
+        assertEquals("AAPL", result.get(0).getSymbol());
+        assertEquals(10, result.get(0).getQuantity());
+        assertEquals(150.0, result.get(0).getAveragePrice());
+        
+        assertEquals("GOOGL", result.get(1).getSymbol());
+        assertEquals(5, result.get(1).getQuantity());
+        assertEquals(2800.0, result.get(1).getAveragePrice());
+    }
+
+    @Test
+    @DisplayName("Should throw exception when account does not exist")
+    void testGetHoldings_AccountMissing_ThrowsException() {
+        // Arrange
+        String agentName = "NonExistentAgent";
+
+        when(tradingAccountRepository.findByAgentName(agentName))
+            .thenReturn(Optional.empty());
+
+        // Act & Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            accountService.getHoldings(agentName);
+        });
+
+        assertEquals("Trading account not found for agent: " + agentName +
+            ". Agent must be initialized before trading operations.", exception.getMessage());
+        verify(holdingRepository, never()).findByAccount(any()); // Ensure holdingRepository is not called
     }
 }
 

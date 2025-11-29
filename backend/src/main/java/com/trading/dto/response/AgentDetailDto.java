@@ -5,7 +5,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
-import java.util.Map;
 
 @Data
 @NoArgsConstructor
@@ -23,7 +22,7 @@ public class AgentDetailDto {
     @AllArgsConstructor
     public static class PortfolioInfo {
         private Double cashBalance;
-        private Map<String, Integer> holdings;
+        private List<HoldingDto> holdings;
         private Double totalValue;
         private Double totalReturn;
         private Double totalReturnPercent;
