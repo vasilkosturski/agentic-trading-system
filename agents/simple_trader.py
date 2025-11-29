@@ -804,6 +804,6 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             await self.run_with_trace()
             logger.info(f"{self.name} agent completed successfully")
         except Exception as e:
-            logger.error(f"Error running {self.name} agent: {e}")
+            logger.error(f"Error running {self.name} agent: {e}", exc_info=True)
         # Toggle between trading and rebalancing
         self.do_trade = not self.do_trade

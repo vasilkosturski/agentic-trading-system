@@ -103,13 +103,6 @@ public class AccountService {
     /**
      * Buy shares for an agent
      */
-    public String buyShares(String agentName, String symbol, Integer quantity, String rationale) {
-        return buyShares(agentName, symbol, quantity, rationale, null, null, null, null, null);
-    }
-
-    /**
-     * Buy shares for an agent with detailed metadata
-     */
     public String buyShares(String agentName, String symbol, Integer quantity, String rationale,
                            String fullReasoning, String researchSources, String historicalContext,
                            String agentContext, Long runId) {
@@ -219,13 +212,6 @@ public class AccountService {
 
     /**
      * Sell shares for an agent
-     */
-    public String sellShares(String agentName, String symbol, Integer quantity, String rationale) {
-        return sellShares(agentName, symbol, quantity, rationale, null, null, null, null, null);
-    }
-
-    /**
-     * Sell shares for an agent with detailed metadata
      */
     public String sellShares(String agentName, String symbol, Integer quantity, String rationale,
                             String fullReasoning, String researchSources, String historicalContext,
