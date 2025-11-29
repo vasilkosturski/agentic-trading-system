@@ -548,8 +548,8 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
         # Log initial data access for transparency
         portfolio_info = f"Balance: ${balance:.2f}"
         if holdings:
-            # holdings is a Dict[symbol, quantity], not a list
-            symbols = list(holdings.keys())[:5]  # First 5 symbols
+            # holdings is a List[Dict] with {symbol, quantity, averagePrice}
+            symbols = [h["symbol"] for h in holdings[:5]]  # First 5 symbols
             positions_str = ", ".join(symbols) + ("..." if len(holdings) > 5 else "")
             portfolio_info += f", Holdings: {len(holdings)} position(s) ({positions_str})"
         else:

@@ -53,6 +53,12 @@ public interface AccountHoldingRepository extends JpaRepository<AccountHolding, 
     @Query("SELECT ah FROM AccountHolding ah WHERE ah.account.agent.name = :agentName AND ah.quantity > 0")
     List<AccountHolding> findActiveHoldingsByAgent(@Param("agentName") String agentName);
     
+    /**
+     * Find active holdings for a specific account (quantity > 0)
+     */
+    @Query("SELECT ah FROM AccountHolding ah WHERE ah.account = :account AND ah.quantity > 0")
+    List<AccountHolding> findActiveHoldingsByAccount(@Param("account") TradingAccount account);
+    
     
     /**
      * Get total quantity of a symbol held by an agent

@@ -9,7 +9,7 @@ import asyncio
 import json
 import logging
 from agents import function_tool
-from typing import Dict
+from typing import Dict, List, Any
 
 # Import centralized configuration
 from config import BACKEND_API_ACCOUNTS, BACKEND_BASE_URL
@@ -272,8 +272,12 @@ async def _get_balance_raw(agent_id: int) -> float:
     result = await _call_backend_api("/tools/get_balance", {"agentId": agent_id})
     return float(result)
 
-async def _get_holdings_raw(agent_id: int) -> Dict[str, int]:
-    """Raw holdings getter - for system use, not exposed to agents"""
+async def _get_holdings_raw(agent_id: int) -> List[Dict[str, Any]]:
+    """Raw holdings getter - for system use, not exposed to agents
+
+    Returns:
+        List of holdings: [{"symbol": "AAPL", "quantity": 10, "averagePrice": 150.0}, ...]
+    """
     result = await _call_backend_api("/tools/get_holdings", {"agentId": agent_id})
     return result
 

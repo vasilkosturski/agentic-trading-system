@@ -109,19 +109,16 @@ public class AccountService {
         TradingAccount account = getAccount(agentName);
 
         // Check position limit BEFORE buying (max 10 positions per agent)
-        List<AccountHolding> currentHoldings = holdingRepository.findByAccount(account);
-        long activePositions = currentHoldings.stream()
-            .filter(h -> h.getQuantity() > 0)
-            .count();
+        List<AccountHolding> currentHoldings = holdingRepository.findActiveHoldingsByAccount(account);
+        long activePositions = currentHoldings.size();
 
         // Check if adding new position (not adding to existing)
         boolean isNewPosition = currentHoldings.stream()
-            .noneMatch(h -> h.getSymbol().equals(symbol) && h.getQuantity() > 0);
+            .noneMatch(h -> h.getSymbol().equals(symbol));
 
         if (isNewPosition && activePositions >= 10) {
             // List current holdings in error message to help agent decide what to sell
             String holdingsList = currentHoldings.stream()
-                .filter(h -> h.getQuantity() > 0)
                 .map(h -> h.getSymbol())
                 .collect(Collectors.joining(", "));
 
