@@ -10,7 +10,7 @@ export interface RecentTrade {
   price: number;
   totalAmount: number;
   timestamp: string;
-  rationale: string;
+  // Note: rationale removed - reasoning is stored on AgentRun, not on individual transactions
 }
 
 export interface TradeDetail {
@@ -23,12 +23,14 @@ export interface TradeDetail {
     price: number;
     totalValue: number;
     timestamp: string;
-    rationale: string;
+    // Note: rationale removed - reasoning is stored on AgentRun, not on individual transactions
   };
-  fullReasoning?: string;
-  researchSources?: string; // JSON string
-  historicalContext?: string; // JSON string
-  agentContext?: string; // JSON string
+  // All reasoning fields come from the AgentRun that created this trade:
+  summary?: string; // Simple summary (brief explanation)
+  fullReasoning?: string; // Full detailed reasoning
+  researchSources?: string; // JSON string array of web sources
+  historicalContext?: string; // JSON object with historical insights (past trades, agent context)
+  // Note: agentContext removed - merged into historicalContext
   relatedTrades?: Array<{
     id: number;
     type: 'BUY' | 'SELL';
@@ -64,8 +66,8 @@ export const tradesService = {
       quantity: trade.quantity,
       price: trade.price,
       totalAmount: trade.price * trade.quantity,
-      timestamp: trade.timestamp,
-      rationale: trade.reasoning || ''
+      timestamp: trade.timestamp
+      // Note: rationale removed - trades no longer have individual rationale
     }));
   },
 

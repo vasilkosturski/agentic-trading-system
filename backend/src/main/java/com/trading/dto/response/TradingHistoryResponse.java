@@ -31,8 +31,6 @@ public class TradingHistoryResponse {
         private int quantity;
         private double price;
         private double totalAmount;
-        private String rationale;
-        private String fullReasoning;
 
         public String getDate() { return date; }
         public void setDate(String date) { this.date = date; }
@@ -44,10 +42,6 @@ public class TradingHistoryResponse {
         public void setPrice(double price) { this.price = price; }
         public double getTotalAmount() { return totalAmount; }
         public void setTotalAmount(double totalAmount) { this.totalAmount = totalAmount; }
-        public String getRationale() { return rationale; }
-        public void setRationale(String rationale) { this.rationale = rationale; }
-        public String getFullReasoning() { return fullReasoning; }
-        public void setFullReasoning(String fullReasoning) { this.fullReasoning = fullReasoning; }
     }
 
     public static class Summary {

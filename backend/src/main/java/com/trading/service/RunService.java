@@ -23,10 +23,10 @@ public class RunService {
     /**
      * Start a new agent run
      */
-    public AgentRun startRun(String agentName, String runType, String agentContext, String marketConditions) {
+    public AgentRun startRun(String agentName, String runType, String marketConditions) {
         logger.info("Starting {} run for agent: {}", runType, agentName);
 
-        AgentRun run = new AgentRun(agentName, runType, agentContext, marketConditions);
+        AgentRun run = new AgentRun(agentName, runType, marketConditions);
         run = agentRunRepository.save(run);
 
         logger.info("Created run ID: {} for agent: {}", run.getId(), agentName);
@@ -36,12 +36,12 @@ public class RunService {
     /**
      * End a run that resulted in trades
      */
-    public AgentRun endRunWithTrades(Long runId, String fullReasoning, String researchSources,
-                                     String summary, Integer tradeCount) {
+    public AgentRun endRunWithTrades(Long runId, String summary, String fullReasoning, String researchSources,
+                                     String historicalContext, Integer tradeCount) {
         logger.info("Ending run {} with {} trades", runId, tradeCount);
 
         AgentRun run = getRun(runId);
-        run.markAsTraded(fullReasoning, researchSources, summary, tradeCount);
+        run.markAsTraded(summary, fullReasoning, researchSources, historicalContext, tradeCount);
         run = agentRunRepository.save(run);
 
         logger.info("Run {} completed with outcome: {}", runId, run.getOutcome());
@@ -51,11 +51,12 @@ public class RunService {
     /**
      * End a run that resulted in no trades
      */
-    public AgentRun endRunWithNoTrade(Long runId, String fullReasoning, String researchSources, String summary) {
+    public AgentRun endRunWithNoTrade(Long runId, String summary, String fullReasoning, String researchSources, 
+                                      String historicalContext) {
         logger.info("Ending run {} with no trades", runId);
 
         AgentRun run = getRun(runId);
-        run.markAsNoTrade(fullReasoning, researchSources, summary);
+        run.markAsNoTrade(summary, fullReasoning, researchSources, historicalContext);
         run = agentRunRepository.save(run);
 
         logger.info("Run {} completed with outcome: {}", runId, run.getOutcome());

@@ -12,10 +12,10 @@ import java.util.List;
 @AllArgsConstructor
 public class TradeDetailResponse {
     private TradeInfo trade;
-    private String fullReasoning;
-    private String researchSources; // JSON string
-    private String historicalContext; // JSON string
-    private String agentContext; // JSON string
+    private String summary; // Simple summary (brief explanation)
+    private String fullReasoning; // Full detailed reasoning
+    private String researchSources; // JSON string array of web sources
+    private String historicalContext; // JSON object with historical insights (past trades, agent context)
     private List<RelatedTrade> relatedTrades;
     private Long runId; // ID of the agent run that created this trade (null if not part of a run)
     private String runSummary; // Summary of the run that created this trade
@@ -33,7 +33,6 @@ public class TradeDetailResponse {
         private Double price;
         private Double totalValue;
         private Instant timestamp;
-        private String rationale;
     }
 
     @Data

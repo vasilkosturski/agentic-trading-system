@@ -20,5 +20,4 @@ public class RecentTradeDto {
     private Double price;
     private Double totalAmount;
     private Instant timestamp;
-    private String rationale;
 }

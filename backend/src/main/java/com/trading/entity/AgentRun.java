@@ -34,23 +34,23 @@ public class AgentRun {
     @Column(nullable = false)
     private String outcome; // TRADED, NO_TRADE, ERROR
 
+    @Column(columnDefinition = "TEXT")
+    private String summary; // Simple summary (brief explanation)
+
     @Column(name = "full_reasoning", columnDefinition = "TEXT")
-    private String fullReasoning;
+    private String fullReasoning; // Full detailed reasoning
 
     @Column(name = "research_sources", columnDefinition = "TEXT")
-    private String researchSources; // JSON string array of research sources
+    private String researchSources; // JSON string array of web sources
 
-    @Column(columnDefinition = "TEXT")
-    private String summary;
+    @Column(name = "historical_context", columnDefinition = "TEXT")
+    private String historicalContext; // JSON object with historical insights (past trades, agent context)
 
     @Column(name = "trade_count")
     private Integer tradeCount = 0;
 
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
-
-    @Column(name = "agent_context", columnDefinition = "TEXT")
-    private String agentContext; // JSON string with portfolio state at run start
 
     @Column(name = "market_conditions", columnDefinition = "TEXT")
     private String marketConditions; // JSON string with market status
@@ -59,31 +59,32 @@ public class AgentRun {
     private Instant createdAt = Instant.now();
 
     // Constructor for starting a run
-    public AgentRun(String agentName, String runType, String agentContext, String marketConditions) {
+    public AgentRun(String agentName, String runType, String marketConditions) {
         this.agentName = agentName;
         this.runType = runType;
         this.startTime = Instant.now();
         this.outcome = "IN_PROGRESS";
-        this.agentContext = agentContext;
         this.marketConditions = marketConditions;
     }
 
     // Business methods
-    public void markAsTraded(String fullReasoning, String researchSources, String summary, Integer tradeCount) {
+    public void markAsTraded(String summary, String fullReasoning, String researchSources, String historicalContext, Integer tradeCount) {
         this.endTime = Instant.now();
         this.outcome = "TRADED";
+        this.summary = summary;
         this.fullReasoning = fullReasoning;
         this.researchSources = researchSources;
-        this.summary = summary;
+        this.historicalContext = historicalContext;
         this.tradeCount = tradeCount;
     }
 
-    public void markAsNoTrade(String fullReasoning, String researchSources, String summary) {
+    public void markAsNoTrade(String summary, String fullReasoning, String researchSources, String historicalContext) {
         this.endTime = Instant.now();
         this.outcome = "NO_TRADE";
+        this.summary = summary;
         this.fullReasoning = fullReasoning;
         this.researchSources = researchSources;
-        this.summary = summary;
+        this.historicalContext = historicalContext;
         this.tradeCount = 0;
     }
 

@@ -228,9 +228,6 @@ const RunDetailPage = () => {
                   <th className="pb-3 text-sm font-medium text-gray-500 dark:text-gray-400">
                     Total
                   </th>
-                  <th className="pb-3 text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Rationale
-                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -263,9 +260,6 @@ const RunDetailPage = () => {
                     </td>
                     <td className="py-3 text-sm font-semibold text-gray-900 dark:text-white">
                       {formatCurrency(trade.totalAmount)}
-                    </td>
-                    <td className="py-3 text-sm text-gray-600 dark:text-gray-400">
-                      {trade.rationale || '-'}
                     </td>
                   </Link>
                 ))}
