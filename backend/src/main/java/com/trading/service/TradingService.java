@@ -1,10 +1,12 @@
 package com.trading.service;
 
 import com.trading.entity.AccountTransaction;
+import com.trading.entity.AgentRun;
 import com.trading.entity.TransactionType;
 import com.trading.entity.TradingAccount;
 import com.trading.entity.TradingAgent;
 import com.trading.repository.AccountTransactionRepository;
+import com.trading.repository.AgentRunRepository;
 import com.trading.repository.TradingAccountRepository;
 import com.trading.repository.TradingAgentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +30,9 @@ public class TradingService {
     @Autowired
     private TradingAgentRepository agentRepository;
     
+    @Autowired
+    private AgentRunRepository agentRunRepository;
+    
     // Constructor - no mock data initialization needed
     public TradingService() {
         // All data now comes from database
@@ -35,20 +40,34 @@ public class TradingService {
     
     /**
      * Record a new trade in the database and update agent statistics
+     * NOTE: This method appears to be legacy/unused. All trades should go through AccountService.buyShares/sellShares
+     * which require runId. If this method is needed, it must provide a runId.
+     * 
+     * @param runId REQUIRED - Every transaction must be linked to an agent run
      */
     @Transactional
     public AccountTransaction recordTrade(String agentName, String symbol, Integer quantity,
-                                        Double price, String rationale) {
+                                        Double price, Long runId) {
+        if (runId == null) {
+            throw new IllegalArgumentException("runId is required - every transaction must be linked to an agent run");
+        }
+        
         // Find the trading account for this agent
         TradingAccount account = accountRepository.findByAgentName(agentName)
             .orElseThrow(() -> new RuntimeException("Trading account not found for agent: " + agentName));
         
         // Create and save the transaction
         AccountTransaction transaction = new AccountTransaction(
-            account, symbol, quantity, price, Instant.now(), rationale
+            account, symbol, quantity, price, Instant.now()
         );
         // Must set transaction type explicitly (not derived from quantity sign)
         transaction.setTransactionType(quantity > 0 ? TransactionType.BUY : TransactionType.SELL);
+        
+        // Link transaction to agent run (REQUIRED)
+        AgentRun agentRun = agentRunRepository.findById(runId)
+            .orElseThrow(() -> new RuntimeException("Agent run not found: " + runId));
+        transaction.setAgentRun(agentRun);
+        
         transaction = transactionRepository.save(transaction);
         
         // Update agent statistics
@@ -198,7 +217,7 @@ public class TradingService {
             transaction.getTransactionType().name(),  // Convert enum to string for API
             Math.abs(transaction.getQuantity()),
             transaction.getPrice(),
-            transaction.getRationale() != null ? transaction.getRationale() : "No rationale provided",
+            null, // Rationale is now stored in AgentRun, not AccountTransaction
             1.0, // Default confidence for database transactions
             transaction.getTimestamp().toString(), // Instant to ISO-8601 string
             "EXECUTED", // All database transactions are considered executed

@@ -19,7 +19,6 @@ async def start_run(
     agent_id: int,
     agent_name: str,
     run_type: str,
-    agent_context: Dict[str, Any],
     market_conditions: Dict[str, Any]
 ) -> Optional[int]:
     """
@@ -29,7 +28,6 @@ async def start_run(
         agent_id: Backend identifier for the agent
         agent_name: Name of the agent (used for logging only)
         run_type: Type of run (TRADING, REBALANCE)
-        agent_context: Dict with portfolio state (cash, holdings, etc.)
         market_conditions: Dict with market status
 
     Returns:
@@ -39,9 +37,7 @@ async def start_run(
 
     payload = {
         "agentId": agent_id,
-        "agentName": agent_name,
         "runType": run_type,
-        "agentContext": json.dumps(agent_context),
         "marketConditions": json.dumps(market_conditions)
     }
 
@@ -67,9 +63,10 @@ async def start_run(
 
 async def end_run(
     run_id: int,
+    summary: str,
     full_reasoning: str,
     research_sources: list,
-    summary: str,
+    historical_context: str,
     trade_count: int = 0
 ) -> bool:
     """
@@ -77,9 +74,10 @@ async def end_run(
 
     Args:
         run_id: The run ID from start_run()
+        summary: Brief summary of what happened (simple summary)
         full_reasoning: Complete reasoning/thinking from the agent
-        research_sources: List of dicts with research source metadata
-        summary: Brief summary of what happened
+        research_sources: List of dicts with research source metadata (web sources)
+        historical_context: JSON string with historical insights (past trades, agent context)
         trade_count: Number of trades executed (0 for NO_TRADE)
 
     Returns:
@@ -89,9 +87,10 @@ async def end_run(
 
     payload = {
         "runId": run_id,
+        "summary": summary,
         "fullReasoning": full_reasoning,
         "researchSources": json.dumps(research_sources),
-        "summary": summary,
+        "historicalContext": historical_context,
         "tradeCount": trade_count
     }
 

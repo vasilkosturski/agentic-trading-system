@@ -30,7 +30,6 @@ public class RecentActivityResponse {
         private String symbol;
         private int quantity;
         private double price;
-        private String rationale;
 
         public String getType() { return type; }
         public void setType(String type) { this.type = type; }
@@ -40,8 +39,6 @@ public class RecentActivityResponse {
         public void setQuantity(int quantity) { this.quantity = quantity; }
         public double getPrice() { return price; }
         public void setPrice(double price) { this.price = price; }
-        public String getRationale() { return rationale; }
-        public void setRationale(String rationale) { this.rationale = rationale; }
     }
 
     public String getAgentName() { return agentName; }

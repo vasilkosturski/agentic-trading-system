@@ -100,11 +100,6 @@ async def buy_shares(
     agent_id: int,
     symbol: str,
     quantity: int,
-    rationale: str,
-    fullReasoning: str = None,
-    researchSources: str = None,
-    historicalContext: str = None,
-    agentContext: str = None,
     runId: int = None,
     agent_name: str | None = None
 ) -> str:
@@ -117,18 +112,7 @@ async def buy_shares(
         agent_id: Backend identifier for the agent
         symbol: The stock symbol (e.g., 'AAPL', 'GOOGL', 'TSLA')
         quantity: The number of shares to buy (must be positive integer)
-        rationale: Brief explanation of the trade (1-2 sentences)
-        fullReasoning: (RECOMMENDED) Detailed explanation including:
-            - Why this stock fits your strategy
-            - Key research findings that informed your decision
-            - Risk assessment and conviction level
-            - How this fits with your existing portfolio
-        researchSources: (RECOMMENDED) JSON string with array of sources consulted.
-            Example: '[{"title": "Article Title", "url": "https://...", "snippet": "key quote"}]'
-        historicalContext: (RECOMMENDED) JSON string with historical insights from past trades.
-            Example: '{"summary": "...", "insights": [{"date": "...", "insight": "..."}]}'
-        agentContext: (RECOMMENDED) JSON string with portfolio state before trade.
-            Example: '{"cashBefore": 50000, "portfolioValue": 100000, "positionCount": 5}'
+        runId: Optional run ID to link this trade to an agent run
 
     Returns:
         Confirmation message with transaction details
@@ -137,28 +121,10 @@ async def buy_shares(
         Exception: If insufficient funds, position limit reached, or invalid symbol
     """
     try:
-        # Capture current portfolio state if not provided
-        if agentContext is None:
-            try:
-                balance = await _get_balance_raw(agent_id)
-                holdings = await _get_holdings_raw(agent_id)
-                agentContext = json.dumps({
-                    "cashBefore": balance,
-                    "positionsBefore": len(holdings),
-                    "holdingsBefore": holdings
-                })
-            except Exception as ctx_err:
-                logger.warning(f"Failed to capture agent context: {ctx_err}")
-
         result = await _call_backend_api("/tools/buy_shares", {
             "agentId": agent_id,
             "symbol": symbol,
             "quantity": quantity,
-            "rationale": rationale,
-            "fullReasoning": fullReasoning,
-            "researchSources": researchSources,
-            "historicalContext": historicalContext,
-            "agentContext": agentContext,
             "runId": runId
         })
         who = agent_name or agent_id
@@ -174,11 +140,6 @@ async def sell_shares(
     agent_id: int,
     symbol: str,
     quantity: int,
-    rationale: str,
-    fullReasoning: str = None,
-    researchSources: str = None,
-    historicalContext: str = None,
-    agentContext: str = None,
     runId: int = None,
     agent_name: str | None = None
 ) -> str:
@@ -188,18 +149,7 @@ async def sell_shares(
         agent_id: Backend identifier for the agent
         symbol: The stock symbol (e.g., 'AAPL', 'GOOGL', 'TSLA')
         quantity: The number of shares to sell (must be positive and ≤ current holdings)
-        rationale: Brief explanation of the trade (1-2 sentences)
-        fullReasoning: (RECOMMENDED) Detailed explanation including:
-            - Why you're exiting/reducing this position
-            - What changed in your thesis or market conditions
-            - Risk assessment and timing rationale
-            - Impact on portfolio allocation
-        researchSources: (RECOMMENDED) JSON string with array of sources consulted.
-            Example: '[{"title": "Article Title", "url": "https://...", "snippet": "key quote"}]'
-        historicalContext: (RECOMMENDED) JSON string with historical insights from past trades.
-            Example: '{"summary": "...", "insights": [{"date": "...", "insight": "..."}]}'
-        agentContext: (RECOMMENDED) JSON string with portfolio state before trade.
-            Example: '{"cashBefore": 50000, "portfolioValue": 100000, "positionCount": 5}'
+        runId: Optional run ID to link this trade to an agent run
 
     Returns:
         Confirmation message with transaction details
@@ -208,28 +158,10 @@ async def sell_shares(
         Exception: If you don't own enough shares or invalid symbol
     """
     try:
-        # Capture current portfolio state if not provided
-        if agentContext is None:
-            try:
-                balance = await _get_balance_raw(agent_id)
-                holdings = await _get_holdings_raw(agent_id)
-                agentContext = json.dumps({
-                    "cashBefore": balance,
-                    "positionsBefore": len(holdings),
-                    "holdingsBefore": holdings
-                })
-            except Exception as ctx_err:
-                logger.warning(f"Failed to capture agent context: {ctx_err}")
-
         result = await _call_backend_api("/tools/sell_shares", {
             "agentId": agent_id,
             "symbol": symbol,
             "quantity": quantity,
-            "rationale": rationale,
-            "fullReasoning": fullReasoning,
-            "researchSources": researchSources,
-            "historicalContext": historicalContext,
-            "agentContext": agentContext,
             "runId": runId
         })
         who = agent_name or agent_id

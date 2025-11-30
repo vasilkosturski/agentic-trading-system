@@ -18,12 +18,12 @@ public class AgentRunDto {
     private Instant startTime;
     private Instant endTime;
     private String outcome;
-    private String fullReasoning;
-    private String researchSources; // JSON string
-    private String summary;
+    private String summary; // Simple summary (brief explanation)
+    private String fullReasoning; // Full detailed reasoning
+    private String researchSources; // JSON string array of web sources
+    private String historicalContext; // JSON object with historical insights (past trades, agent context)
     private Integer tradeCount;
     private String errorMessage;
-    private String agentContext; // JSON string
     private String marketConditions; // JSON string
     private Long durationSeconds;
 
@@ -36,12 +36,12 @@ public class AgentRunDto {
         this.startTime = run.getStartTime();
         this.endTime = run.getEndTime();
         this.outcome = run.getOutcome();
+        this.summary = run.getSummary();
         this.fullReasoning = run.getFullReasoning();
         this.researchSources = run.getResearchSources();
-        this.summary = run.getSummary();
+        this.historicalContext = run.getHistoricalContext();
         this.tradeCount = run.getTradeCount();
         this.errorMessage = run.getErrorMessage();
-        this.agentContext = run.getAgentContext();
         this.marketConditions = run.getMarketConditions();
         this.durationSeconds = run.getDurationSeconds();
     }

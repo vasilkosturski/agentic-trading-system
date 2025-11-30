@@ -54,10 +54,9 @@ public class RunController {
             Long agentId = ((Number) request.get("agentId")).longValue();
             String agentName = agentIdentityService.requireAgentName(agentId);
             String runType = (String) request.get("runType");
-            String agentContext = (String) request.get("agentContext");
             String marketConditions = (String) request.get("marketConditions");
 
-            AgentRun run = runService.startRun(agentName, runType, agentContext, marketConditions);
+            AgentRun run = runService.startRun(agentName, runType, marketConditions);
             return ResponseEntity.status(201).body(ToolResponse.success(run.getId()));
         } catch (IllegalArgumentException e) {
             logger.error("Invalid request to start run", e);
@@ -77,17 +76,18 @@ public class RunController {
     public ResponseEntity<ToolResponse<String>> endRun(@RequestBody Map<String, Object> request) {
         try {
             Long runId = ((Number) request.get("runId")).longValue();
+            String summary = (String) request.get("summary");
             String fullReasoning = (String) request.get("fullReasoning");
             String researchSources = (String) request.get("researchSources");
-            String summary = (String) request.get("summary");
+            String historicalContext = (String) request.get("historicalContext");
             Integer tradeCount = request.get("tradeCount") != null ?
                     ((Number) request.get("tradeCount")).intValue() : 0;
 
             AgentRun run;
             if (tradeCount > 0) {
-                run = runService.endRunWithTrades(runId, fullReasoning, researchSources, summary, tradeCount);
+                run = runService.endRunWithTrades(runId, summary, fullReasoning, researchSources, historicalContext, tradeCount);
             } else {
-                run = runService.endRunWithNoTrade(runId, fullReasoning, researchSources, summary);
+                run = runService.endRunWithNoTrade(runId, summary, fullReasoning, researchSources, historicalContext);
             }
 
             return ResponseEntity.ok(ToolResponse.success(

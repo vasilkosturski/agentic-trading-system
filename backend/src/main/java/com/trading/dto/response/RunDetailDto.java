@@ -23,12 +23,12 @@ public class RunDetailDto {
     private Instant startTime;
     private Instant endTime;
     private String outcome;
-    private String fullReasoning;
-    private String researchSources; // JSON string
-    private String summary;
+    private String summary; // Simple summary (brief explanation)
+    private String fullReasoning; // Full detailed reasoning
+    private String researchSources; // JSON string array of web sources
+    private String historicalContext; // JSON object with historical insights (past trades, agent context)
     private Integer tradeCount;
     private String errorMessage;
-    private String agentContext; // JSON string
     private String marketConditions; // JSON string
     private Long durationSeconds;
     private List<TradeInfo> trades; // List of trades from this run
@@ -44,7 +44,6 @@ public class RunDetailDto {
         private Integer quantity;
         private Double price;
         private Instant timestamp;
-        private String rationale;
         private String transactionType; // BUY or SELL
         private Double totalAmount;
 
@@ -55,7 +54,6 @@ public class RunDetailDto {
                     transaction.getQuantity(),
                     transaction.getPrice(),
                     transaction.getTimestamp(),
-                    transaction.getRationale(),
                     transaction.getTransactionType().name(),  // Convert enum to string
                     transaction.getTotalAmount()
             );
@@ -128,12 +126,12 @@ public class RunDetailDto {
                 run.getStartTime(),
                 run.getEndTime(),
                 run.getOutcome(),
+                run.getSummary(),
                 run.getFullReasoning(),
                 run.getResearchSources(),
-                run.getSummary(),
+                run.getHistoricalContext(),
                 run.getTradeCount(),
                 run.getErrorMessage(),
-                run.getAgentContext(),
                 run.getMarketConditions(),
                 run.getDurationSeconds(),
                 trades,
@@ -166,12 +164,12 @@ public class RunDetailDto {
                 run.getStartTime(),
                 run.getEndTime(),
                 run.getOutcome(),
+                run.getSummary(),
                 run.getFullReasoning(),
                 run.getResearchSources(),
-                run.getSummary(),
+                run.getHistoricalContext(),
                 run.getTradeCount(),
                 run.getErrorMessage(),
-                run.getAgentContext(),
                 run.getMarketConditions(),
                 run.getDurationSeconds(),
                 trades,

@@ -33,24 +33,9 @@ public class AccountTransaction {
     @Column(nullable = false)
     private Instant timestamp;
 
-    @Column(columnDefinition = "TEXT")
-    private String rationale;
-
-    @Column(name = "full_reasoning", columnDefinition = "TEXT")
-    private String fullReasoning;
-
-    @Column(name = "research_sources", columnDefinition = "TEXT")
-    private String researchSources; // JSON array of research sources
-
-    @Column(name = "historical_context", columnDefinition = "TEXT")
-    private String historicalContext; // JSON object with historical insights from past trades
-
-    @Column(name = "agent_context", columnDefinition = "TEXT")
-    private String agentContext; // JSON object with portfolio state before trade
-
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "agent_run_id")
-    private AgentRun agentRun; // Link to the agent run that created this transaction
+    @JoinColumn(name = "agent_run_id", nullable = false)
+    private AgentRun agentRun; // Link to the agent run that created this transaction (REQUIRED)
 
     @Enumerated(EnumType.STRING)
     @Column(name = "transaction_type", nullable = false)
@@ -65,13 +50,12 @@ public class AccountTransaction {
     // Constructor with parameters
     // NOTE: This constructor does NOT set transactionType - it must be set explicitly
     public AccountTransaction(TradingAccount account, String symbol, Integer quantity,
-                            Double price, Instant timestamp, String rationale) {
+                            Double price, Instant timestamp) {
         this.account = account;
         this.symbol = symbol;
         this.quantity = quantity;
         this.price = price;
         this.timestamp = timestamp;
-        this.rationale = rationale;
         // transactionType must be set explicitly after construction
         this.totalAmount = Math.abs(quantity) * price;
     }

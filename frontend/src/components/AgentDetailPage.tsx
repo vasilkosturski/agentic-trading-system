@@ -162,7 +162,6 @@ const AgentDetailPage = () => {
                   <th className="pb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Qty</th>
                   <th className="pb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Price</th>
                   <th className="pb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Total</th>
-                  <th className="pb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Rationale</th>
                 </tr>
               </thead>
               <tbody>
@@ -195,9 +194,6 @@ const AgentDetailPage = () => {
                     </td>
                     <td className="py-3 text-sm font-medium text-gray-900 dark:text-white">
                       {formatCurrency(trade.totalAmount)}
-                    </td>
-                    <td className="py-3 text-sm text-gray-600 dark:text-gray-400 max-w-md truncate">
-                      {trade.rationale}
                     </td>
                   </Link>
                 ))}

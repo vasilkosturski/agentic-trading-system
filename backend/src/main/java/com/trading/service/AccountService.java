@@ -102,10 +102,12 @@ public class AccountService {
 
     /**
      * Buy shares for an agent
+     * @param runId REQUIRED - Every transaction must be linked to an agent run
      */
-    public String buyShares(String agentName, String symbol, Integer quantity, String rationale,
-                           String fullReasoning, String researchSources, String historicalContext,
-                           String agentContext, Long runId) {
+    public String buyShares(String agentName, String symbol, Integer quantity, Long runId) {
+        if (runId == null) {
+            throw new IllegalArgumentException("runId is required - every transaction must be linked to an agent run");
+        }
         TradingAccount account = getAccount(agentName);
 
         // Check position limit BEFORE buying (max 10 positions per agent)
@@ -152,22 +154,15 @@ public class AccountService {
         AccountTransaction transaction = new AccountTransaction();
         transaction.setAccount(account);
         transaction.setSymbol(symbol);
-        transaction.setTransactionType(TransactionType.BUY);  // EXPLICIT enum - never derived!
+        transaction.setTransactionType(TransactionType.BUY);
         transaction.setQuantity(quantity);
         transaction.setPrice(price);
-        transaction.setRationale(rationale);
-        transaction.setFullReasoning(fullReasoning);
-        transaction.setResearchSources(researchSources);
-        transaction.setHistoricalContext(historicalContext);
-        transaction.setAgentContext(agentContext);
         transaction.setTimestamp(Instant.now());
 
-        // Link transaction to agent run if provided
-        if (runId != null) {
-            AgentRun agentRun = agentRunRepository.findById(runId)
-                .orElseThrow(() -> new RuntimeException("Agent run not found: " + runId));
-            transaction.setAgentRun(agentRun);
-        }
+        // Link transaction to agent run (REQUIRED)
+        AgentRun agentRun = agentRunRepository.findById(runId)
+            .orElseThrow(() -> new RuntimeException("Agent run not found: " + runId));
+        transaction.setAgentRun(agentRun);
 
         transactionRepository.save(transaction);
         
@@ -209,10 +204,12 @@ public class AccountService {
 
     /**
      * Sell shares for an agent
+     * @param runId REQUIRED - Every transaction must be linked to an agent run
      */
-    public String sellShares(String agentName, String symbol, Integer quantity, String rationale,
-                            String fullReasoning, String researchSources, String historicalContext,
-                            String agentContext, Long runId) {
+    public String sellShares(String agentName, String symbol, Integer quantity, Long runId) {
+        if (runId == null) {
+            throw new IllegalArgumentException("runId is required - every transaction must be linked to an agent run");
+        }
         TradingAccount account = getAccount(agentName);
 
         // Check if we have enough shares
@@ -242,19 +239,12 @@ public class AccountService {
         transaction.setTransactionType(TransactionType.SELL);  // EXPLICIT enum - never derived!
         transaction.setQuantity(quantity);
         transaction.setPrice(price);
-        transaction.setRationale(rationale);
-        transaction.setFullReasoning(fullReasoning);
-        transaction.setResearchSources(researchSources);
-        transaction.setHistoricalContext(historicalContext);
-        transaction.setAgentContext(agentContext);
         transaction.setTimestamp(Instant.now());
 
-        // Link transaction to agent run if provided
-        if (runId != null) {
-            AgentRun agentRun = agentRunRepository.findById(runId)
-                .orElseThrow(() -> new RuntimeException("Agent run not found: " + runId));
-            transaction.setAgentRun(agentRun);
-        }
+        // Link transaction to agent run (REQUIRED)
+        AgentRun agentRun = agentRunRepository.findById(runId)
+            .orElseThrow(() -> new RuntimeException("Agent run not found: " + runId));
+        transaction.setAgentRun(agentRun);
 
         transactionRepository.save(transaction);
         

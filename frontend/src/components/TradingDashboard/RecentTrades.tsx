@@ -108,17 +108,6 @@ const RecentTrades: React.FC = () => {
     );
   };
 
-  const rationaleBodyTemplate = (rowData: RecentTrade) => {
-    return (
-      <div 
-        className="text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-md border border-blue-100 max-w-xs truncate" 
-        title={rowData.rationale}
-      >
-        {rowData.rationale}
-      </div>
-    );
-  };
-
   const header = (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-4 sm:space-y-0 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-t-lg">
       <div className="flex items-center space-x-3">
@@ -258,21 +247,12 @@ const RecentTrades: React.FC = () => {
             body={totalBodyTemplate}
             style={{ minWidth: '120px', textAlign: 'right' }}
           />
-          <Column 
-            field="timestamp" 
-            header="Time" 
-            sortable 
+          <Column
+            field="timestamp"
+            header="Time"
+            sortable
             body={timeBodyTemplate}
             style={{ minWidth: '140px' }}
-          />
-          <Column 
-            field="rationale" 
-            header="Rationale" 
-            sortable 
-            filter 
-            filterPlaceholder="Filter by rationale"
-            body={rationaleBodyTemplate}
-            style={{ minWidth: '250px' }}
           />
         </DataTable>
       </div>

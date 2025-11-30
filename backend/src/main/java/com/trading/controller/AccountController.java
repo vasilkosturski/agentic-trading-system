@@ -10,6 +10,7 @@ import com.trading.dto.response.TradeDetailResponse;
 import jakarta.validation.Valid;
 import com.trading.entity.AccountPortfolioSnapshot;
 import com.trading.entity.AccountTransaction;
+import com.trading.entity.AgentRun;
 import com.trading.repository.AccountPortfolioSnapshotRepository;
 import com.trading.repository.AccountTransactionRepository;
 import com.trading.repository.AgentReasoningStepRepository;
@@ -111,15 +112,13 @@ public class AccountController {
             String name = resolveAgentName(request.get("agentId"));
             String symbol = (String) request.get("symbol");
             Integer quantity = (Integer) request.get("quantity");
-            String rationale = (String) request.get("rationale");
-            String fullReasoning = (String) request.get("fullReasoning");
-            String researchSources = (String) request.get("researchSources");
-            String historicalContext = (String) request.get("historicalContext");
-            String agentContext = (String) request.get("agentContext");
             Long runId = request.get("runId") != null ? ((Number) request.get("runId")).longValue() : null;
+            
+            if (runId == null) {
+                return ResponseEntity.badRequest().body(ToolResponse.error("runId is required - every transaction must be linked to an agent run"));
+            }
 
-            String result = accountService.buyShares(name, symbol, quantity, rationale,
-                fullReasoning, researchSources, historicalContext, agentContext, runId);
+            String result = accountService.buyShares(name, symbol, quantity, runId);
             return ResponseEntity.status(201).body(ToolResponse.success(result));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
@@ -139,15 +138,13 @@ public class AccountController {
             String name = resolveAgentName(request.get("agentId"));
             String symbol = (String) request.get("symbol");
             Integer quantity = (Integer) request.get("quantity");
-            String rationale = (String) request.get("rationale");
-            String fullReasoning = (String) request.get("fullReasoning");
-            String researchSources = (String) request.get("researchSources");
-            String historicalContext = (String) request.get("historicalContext");
-            String agentContext = (String) request.get("agentContext");
             Long runId = request.get("runId") != null ? ((Number) request.get("runId")).longValue() : null;
+            
+            if (runId == null) {
+                return ResponseEntity.badRequest().body(ToolResponse.error("runId is required - every transaction must be linked to an agent run"));
+            }
 
-            String result = accountService.sellShares(name, symbol, quantity, rationale,
-                fullReasoning, researchSources, historicalContext, agentContext, runId);
+            String result = accountService.sellShares(name, symbol, quantity, runId);
             return ResponseEntity.status(201).body(ToolResponse.success(result));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
@@ -243,8 +240,7 @@ public class AccountController {
                             Math.abs(t.getQuantity()), // Always show positive quantity
                             t.getPrice(),
                             t.getTotalAmount(),
-                            t.getTimestamp(),
-                            t.getRationale()
+                            t.getTimestamp()
                     ))
                     .collect(Collectors.toList());
             
@@ -271,8 +267,7 @@ public class AccountController {
                     Math.abs(transaction.getQuantity()),
                     transaction.getPrice(),
                     transaction.getTotalAmount(),
-                    transaction.getTimestamp(),
-                    transaction.getRationale()
+                    transaction.getTimestamp()
             );
 
             // Get related trades (same agent, same symbol, last 5)
@@ -296,11 +291,20 @@ public class AccountController {
             // Get run info and reasoning steps if available
             Long runId = null;
             String runSummary = null;
+            String summary = null;
+            String fullReasoning = null;
+            String researchSources = null;
+            String historicalContext = null;
             List<RunDetailDto.ReasoningStepInfo> reasoningSteps = null;
             
             if (transaction.getAgentRun() != null) {
-                runId = transaction.getAgentRun().getId();
-                runSummary = transaction.getAgentRun().getSummary();
+                AgentRun run = transaction.getAgentRun();
+                runId = run.getId();
+                runSummary = run.getSummary();
+                summary = run.getSummary();
+                fullReasoning = run.getFullReasoning();
+                researchSources = run.getResearchSources();
+                historicalContext = run.getHistoricalContext();
                 
                 // Fetch reasoning steps from the run
                 reasoningSteps = reasoningStepRepository
@@ -313,10 +317,10 @@ public class AccountController {
             // Build response
             TradeDetailResponse response = new TradeDetailResponse(
                     tradeInfo,
-                    transaction.getFullReasoning(),
-                    transaction.getResearchSources(),
-                    transaction.getHistoricalContext(),
-                    transaction.getAgentContext(),
+                    summary,
+                    fullReasoning,
+                    researchSources,
+                    historicalContext,
                     relatedTrades,
                     runId,
                     runSummary,

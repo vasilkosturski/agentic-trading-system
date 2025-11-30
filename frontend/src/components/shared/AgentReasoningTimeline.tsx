@@ -28,9 +28,9 @@ interface AgentReasoningTimelineProps {
   fallbackReasoning?: string;
 }
 
-const AgentReasoningTimeline: React.FC<AgentReasoningTimelineProps> = ({ 
-  reasoningSteps, 
-  fallbackReasoning 
+const AgentReasoningTimeline: React.FC<AgentReasoningTimelineProps> = ({
+  reasoningSteps,
+  fallbackReasoning
 }) => {
   const hasSteps = reasoningSteps && reasoningSteps.length > 0;
   const hasReasoning = fallbackReasoning && fallbackReasoning.trim().length > 0;
@@ -39,16 +39,39 @@ const AgentReasoningTimeline: React.FC<AgentReasoningTimelineProps> = ({
     return null;
   }
 
+  // Extract decision step for prominent display
+  const decisionStep = reasoningSteps?.find(step => step.stepType === 'decision');
+
+  // Filter out execution step (redundant) and decision step (shown separately)
+  const timelineSteps = reasoningSteps?.filter(step =>
+    step.stepType !== 'execution' && step.stepType !== 'decision'
+  ) || [];
+
   return (
     <div className="space-y-6">
-      {/* Timeline Section */}
-      {hasSteps && (
+      {/* Prominent Decision Rationale Section */}
+      {decisionStep && (
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg shadow-md p-6 border-l-4 border-green-500">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-2xl">💡</span>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              Why This Trade
+            </h2>
+          </div>
+          <p className="text-base text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
+            {decisionStep.reasoningText}
+          </p>
+        </div>
+      )}
+
+      {/* Timeline Section - Research, Analysis, etc. */}
+      {timelineSteps.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-            Reasoning Timeline
+            Research & Analysis
           </h2>
           <div className="space-y-4">
-            {reasoningSteps!.map((step, index) => {
+            {timelineSteps.map((step, index) => {
               // Define colors and icons for each step type
               const stepConfig = {
                 initialization: { 
@@ -95,7 +118,7 @@ const AgentReasoningTimeline: React.FC<AgentReasoningTimelineProps> = ({
                     <div className={`w-10 h-10 rounded-full ${stepConfig.iconBg} flex items-center justify-center text-lg`}>
                       {stepConfig.icon}
                     </div>
-                    {index < reasoningSteps!.length - 1 && (
+                    {index < timelineSteps.length - 1 && (
                       <div className="w-0.5 h-full bg-gray-200 dark:bg-gray-700 mt-2"></div>
                     )}
                   </div>
@@ -117,25 +140,7 @@ const AgentReasoningTimeline: React.FC<AgentReasoningTimelineProps> = ({
                       {step.reasoningText}
                     </p>
 
-                    {/* Historical data context if present */}
-                    {step.dataContext && step.dataContext.length > 0 && (
-                      <div className="mt-3 space-y-2">
-                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 flex items-center">
-                          <i className="pi pi-database mr-1.5 text-[10px]"></i>
-                          Historical Data Accessed:
-                        </p>
-                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-md p-3 space-y-1.5">
-                          {step.dataContext.map((item, idx) => (
-                            <div key={idx} className="text-xs text-gray-700 dark:text-gray-300 flex items-start">
-                              <span className="text-blue-600 dark:text-blue-400 mr-2">•</span>
-                              <span>{item}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Historical insights if present */}
+                    {/* Historical insights from past trades */}
                     {step.historicalInsights && step.historicalInsights.length > 0 && (
                       <div className="mt-3 space-y-2">
                         <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 flex items-center">

@@ -148,12 +148,8 @@ public class MemoryService {
             trade.setQuantity(Math.abs(t.getQuantity()));
             trade.setPrice(Math.round(t.getPrice() * 100.0) / 100.0);
             trade.setTotalAmount(Math.round(Math.abs(t.getTotalAmount()) * 100.0) / 100.0);
-            if (t.getRationale() != null && !t.getRationale().isEmpty()) {
-                trade.setRationale(t.getRationale());
-            }
-            if (t.getFullReasoning() != null && !t.getFullReasoning().isEmpty()) {
-                trade.setFullReasoning(t.getFullReasoning());
-            }
+            // Rationale is now stored in AgentRun, not AccountTransaction
+            // Access it via run detail endpoint if needed
             trades.add(trade);
         }
         response.setTrades(trades);
@@ -212,9 +208,7 @@ public class MemoryService {
                         trade.setSymbol(t.getSymbol());
                         trade.setQuantity(Math.abs(t.getQuantity()));
                         trade.setPrice(Math.round(t.getPrice() * 100.0) / 100.0);
-                        if (t.getRationale() != null && !t.getRationale().isEmpty()) {
-                            trade.setRationale(t.getRationale());
-                        }
+                        // Rationale is now stored in AgentRun, not AccountTransaction
                         trades.add(trade);
                     }
                     runDto.setTrades(trades);

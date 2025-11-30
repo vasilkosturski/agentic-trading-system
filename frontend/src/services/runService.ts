@@ -6,7 +6,7 @@ export interface TradeInfo {
   quantity: number;
   price: number;
   timestamp: string;
-  rationale: string | null;
+  // Note: rationale removed - reasoning is stored on AgentRun, not on individual transactions
   transactionType: string; // BUY or SELL
   totalAmount: number;
 }
@@ -40,12 +40,13 @@ export interface RunDetail {
   startTime: string;
   endTime: string | null;
   outcome: string;
-  fullReasoning: string | null;
-  researchSources: string | null; // JSON string
-  summary: string | null;
+  summary: string | null; // Simple summary (brief explanation)
+  fullReasoning: string | null; // Full detailed reasoning
+  researchSources: string | null; // JSON string array of web sources
+  historicalContext: string | null; // JSON object with historical insights (past trades, agent context)
   tradeCount: number;
   errorMessage: string | null;
-  agentContext: string | null; // JSON string
+  // Note: agentContext removed - merged into historicalContext
   marketConditions: string | null; // JSON string
   durationSeconds: number | null;
   trades: TradeInfo[];

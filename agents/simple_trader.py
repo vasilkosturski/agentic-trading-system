@@ -191,8 +191,11 @@ Available tools:
 **CRITICAL - Decision Workflow:**
 
 1. **Research**: Use the Researcher tool to gather market information
-   - Researcher returns JSON with summary and sources list
-   - Store this result - you'll need to pass it to decide_action
+   - Researcher returns a JSON object with TWO fields: {{"summary": "...", "sources": [...]}}
+   - The "sources" array contains objects like: {{"title": "Article Title", "url": "https://...", "snippet": "..."}}
+   - **CRITICAL**: You MUST pass the COMPLETE JSON from Researcher to decide_action as researchSources
+   - Do NOT just copy the summary - include the ENTIRE JSON with the sources array
+   - Example: researchSources='{{"summary": "Market analysis...", "sources": [{{"title": "...", "url": "..."}}]}}'
 
 2. **Historical Context**: Use query_trading_history(symbol, days) to review your past trades
    - Analyze the fullReasoning from your previous decisions
@@ -209,8 +212,8 @@ Available tools:
        quantity=50,
        rationale="Brief reason",
        fullReasoning="Complete analysis",
-       researchSources='... the JSON string from Researcher ...',
-       historicalContext='... the JSON with your historical insights ...'
+       researchSources='{{"summary": "...", "sources": [...]}}',  # COMPLETE JSON from Researcher including sources!
+       historicalContext='{{"summary": "...", "insights": [...]}}'  # Your historical analysis
      )
 
    To SELL a stock:
@@ -220,8 +223,8 @@ Available tools:
        quantity=50,
        rationale="Brief reason",
        fullReasoning="Complete analysis",
-       researchSources='... the JSON string from Researcher ...',
-       historicalContext='... the JSON with your historical insights ...'
+       researchSources='{{"summary": "...", "sources": [...]}}',  # COMPLETE JSON from Researcher including sources!
+       historicalContext='{{"summary": "...", "insights": [...]}}'  # Your historical analysis
      )
 
    To do nothing:
@@ -533,14 +536,16 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             "cycle_type": cycle_type,
         }
 
-        # Start run tracking
-        run_id = await start_run(self.agent_id, self.name, run_type, agent_context, market_conditions)
+        # Start run tracking (REQUIRED - every transaction must be linked to a run)
+        run_id = await start_run(self.agent_id, self.name, run_type, market_conditions)
         if run_id is None:
-            logger.warning(f"Failed to start run tracking for {self.name}, continuing without tracking")
-        else:
-            self.current_run_id = run_id
-            self.trade_count = 0
-            self.last_decision = None
+            error_msg = f"CRITICAL: Failed to start run tracking for {self.name}. Cannot proceed without runId - every transaction must be linked to a run."
+            logger.error(f"🔴 {error_msg}")
+            raise Exception(error_msg)
+        
+        self.current_run_id = run_id
+        self.trade_count = 0
+        self.last_decision = None
             
         # Initialize tool tracker for transparency
         self.tracker = ToolTracker(run_id)
@@ -676,6 +681,12 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             logger.error(f"🟡 ABOUT TO EXECUTE: decision={decision}")
             
             if decision and decision.get("action") in ("BUY", "SELL"):
+                # Validate runId is set (REQUIRED - every transaction must be linked to a run)
+                if self.current_run_id is None:
+                    error_msg = f"CRITICAL: Cannot execute trade - runId is required but not set. Agent must start a run before trading."
+                    logger.error(f"🔴 {error_msg}")
+                    raise Exception(error_msg)
+                
                 # Extract decision details
                 action = decision["action"]
                 symbol = decision["symbol"]
@@ -701,15 +712,6 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                 # Get research sources and historical context from decision (agent passed them via decide_action)
                 research_sources_json = decision.get("researchSources", "[]")
                 historical_context_json = decision.get("historicalContext", "[]")
-
-                # Prepare agent context before trade
-                portfolio_context = {
-                    "cashBefore": balance,
-                    "positionsBefore": len(holdings),
-                    "holdingsBefore": holdings,
-                    "timestamp": datetime.now().isoformat(),
-                }
-                agent_context_json = json.dumps(portfolio_context)
                 
                 try:
                     if action == "BUY":
@@ -717,11 +719,6 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                             self.agent_id,
                             symbol,
                             quantity,
-                            rationale,
-                            fullReasoning=final_full_reasoning,
-                            researchSources=research_sources_json,
-                            historicalContext=historical_context_json,
-                            agentContext=agent_context_json,
                             runId=self.current_run_id,
                             agent_name=self.name
                         )
@@ -730,11 +727,6 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
                             self.agent_id,
                             symbol,
                             quantity,
-                            rationale,
-                            fullReasoning=final_full_reasoning,
-                            researchSources=research_sources_json,
-                            historicalContext=historical_context_json,
-                            agentContext=agent_context_json,
                             runId=self.current_run_id,
                             agent_name=self.name
                         )
@@ -753,8 +745,31 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
 
             # End run tracking
             if run_id is not None:
-                research_sources = []  # Could extract from researcher tool calls
-                await end_run(run_id, full_reasoning or "Agent execution completed", research_sources, summary or "Completed", self.trade_count)
+                # Extract research sources from decision if available
+                research_sources = []
+                if decision and decision.get("researchSources"):
+                    try:
+                        research_sources = json.loads(decision["researchSources"])
+                    except:
+                        research_sources = []
+                
+                # Get historical context from decision if available (already a JSON string)
+                historical_context = decision.get("historicalContext", "{}") if decision else "{}"
+                
+                # Use summary from decision or fallback
+                run_summary = summary or (rationale if 'rationale' in locals() else "Agent execution completed")
+                
+                # Use fullReasoning from decision or fallback
+                run_full_reasoning = (decision.get("fullReasoning") or "") if decision else (full_reasoning or "Agent execution completed")
+                
+                await end_run(
+                    run_id,
+                    run_summary,
+                    run_full_reasoning,
+                    research_sources,
+                    historical_context,
+                    self.trade_count
+                )
 
             # Broadcast: COMPLETED
             outcome_message = f"Completed - {self.trade_count} trade(s) executed" if self.trade_count > 0 else "Completed - No trades (HOLD decision)"

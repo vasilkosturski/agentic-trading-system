@@ -58,15 +58,14 @@ const TradeDetailPage: React.FC = () => {
     );
   }
 
-  const { trade, fullReasoning, researchSources, historicalContext, agentContext, relatedTrades, runId, runSummary, reasoningSteps } = tradeDetail;
+  const { trade, summary, fullReasoning, researchSources, historicalContext, relatedTrades, runId, runSummary, reasoningSteps } = tradeDetail;
 
   // Parse JSON strings if available
-  let parsedContext: any = null;
   let parsedSources: any[] = [];
   let parsedHistoricalInsights: any[] = [];
+  let parsedAgentContext: any = null;
 
   try {
-    if (agentContext) parsedContext = JSON.parse(agentContext);
     if (researchSources) {
       const parsed = JSON.parse(researchSources);
       // Extract sources array from {summary, sources} structure
@@ -76,6 +75,8 @@ const TradeDetailPage: React.FC = () => {
       const parsed = JSON.parse(historicalContext);
       // Extract insights array from {summary, insights} structure
       parsedHistoricalInsights = parsed.insights || [];
+      // Extract agent context (portfolio state) from historical context
+      parsedAgentContext = parsed.agentContext || null;
     }
   } catch (e) {
     console.error('Failed to parse JSON fields:', e);
@@ -143,7 +144,7 @@ const TradeDetailPage: React.FC = () => {
         id: 1,
         stepType: 'decision',
         stepDescription: `Decided: ${trade.type} ${trade.quantity} shares of ${trade.symbol}`,
-        reasoningText: trade.rationale || 'Investment decision based on analysis.',
+        reasoningText: summary || fullReasoning || 'Investment decision based on analysis.',
         timestamp: trade.timestamp,
         sequenceNumber: 1
       }];
@@ -153,30 +154,23 @@ const TradeDetailPage: React.FC = () => {
     return reasoningSteps.map((step: any) => {
       const { cleanText, dataContext, sources } = parseReasoningText(step.reasoningText);
 
-      // For research steps, inject the parsed sources from backend
+      // For research steps, inject both web sources and historical insights
       const stepSources = step.stepType === 'research' && parsedSources.length > 0
         ? parsedSources
         : (sources.length > 0 ? sources : undefined);
 
-      // For decision steps, inject historical insights
-      const stepHistoricalInsights = step.stepType === 'decision' && parsedHistoricalInsights.length > 0
+      const stepHistoricalInsights = step.stepType === 'research' && parsedHistoricalInsights.length > 0
         ? parsedHistoricalInsights
         : undefined;
 
       if (step.stepType === 'research') {
-        console.log('[DEBUG] Research step sources:', {
+        console.log('[DEBUG] Research step data:', {
           stepType: step.stepType,
           parsedSourcesCount: parsedSources.length,
           textSourcesCount: sources.length,
-          finalSources: stepSources
-        });
-      }
-
-      if (step.stepType === 'decision' && parsedHistoricalInsights.length > 0) {
-        console.log('[DEBUG] Decision step historical insights:', {
-          stepType: step.stepType,
-          insightsCount: parsedHistoricalInsights.length,
-          insights: parsedHistoricalInsights
+          historicalInsightsCount: parsedHistoricalInsights.length,
+          finalSources: stepSources,
+          finalInsights: stepHistoricalInsights
         });
       }
 
@@ -319,36 +313,36 @@ const TradeDetailPage: React.FC = () => {
           )}
 
           {/* Agent Context */}
-          {parsedContext && (
+          {parsedAgentContext && (
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
                 <i className="pi pi-chart-line text-blue-600 mr-2"></i>
                 Agent Context
               </h2>
               <div className="space-y-3">
-                {parsedContext.portfolioValueBefore && (
+                {parsedAgentContext.portfolioValueBefore && (
                   <div>
                     <p className="text-sm text-gray-600">Portfolio Value</p>
-                    <p className="text-lg font-bold text-gray-900">{formatPrice(parsedContext.portfolioValueBefore)}</p>
+                    <p className="text-lg font-bold text-gray-900">{formatPrice(parsedAgentContext.portfolioValueBefore)}</p>
                   </div>
                 )}
-                {parsedContext.cashBefore && (
+                {parsedAgentContext.cashBefore && (
                   <div>
                     <p className="text-sm text-gray-600">Cash Available</p>
-                    <p className="text-lg font-bold text-gray-900">{formatPrice(parsedContext.cashBefore)}</p>
+                    <p className="text-lg font-bold text-gray-900">{formatPrice(parsedAgentContext.cashBefore)}</p>
                   </div>
                 )}
-                {parsedContext.positionsBefore !== undefined && (
+                {parsedAgentContext.positionsBefore !== undefined && (
                   <div>
                     <p className="text-sm text-gray-600">Positions</p>
-                    <p className="text-lg font-bold text-gray-900">{parsedContext.positionsBefore}</p>
+                    <p className="text-lg font-bold text-gray-900">{parsedAgentContext.positionsBefore}</p>
                   </div>
                 )}
-                {parsedContext.recentPerformancePct !== undefined && (
+                {parsedAgentContext.recentPerformancePct !== undefined && (
                   <div>
                     <p className="text-sm text-gray-600">Recent Performance</p>
-                    <p className={`text-lg font-bold ${parsedContext.recentPerformancePct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {parsedContext.recentPerformancePct.toFixed(2)}%
+                    <p className={`text-lg font-bold ${parsedAgentContext.recentPerformancePct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {parsedAgentContext.recentPerformancePct.toFixed(2)}%
                     </p>
                   </div>
                 )}
