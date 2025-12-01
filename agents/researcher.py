@@ -21,6 +21,22 @@ Draw on your knowledge graph to build your expertise over time.
 
 If there isn't a specific request, then just respond with investment opportunities based on searching latest news.
 The current datetime is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+**CRITICAL OUTPUT FORMAT**: You MUST return your research as a JSON object with this EXACT structure:
+{{
+  "summary": "Your research summary here (2-3 sentences)",
+  "sources": [
+    {{"title": "Article title", "url": "https://...", "snippet": "Key excerpt"}},
+    {{"title": "Article title", "url": "https://...", "snippet": "Key excerpt"}}
+  ]
+}}
+
+**REQUIREMENTS**:
+- The sources array MUST contain at least 2-3 sources from your web searches
+- Extract title, URL, and a relevant snippet from each search result
+- Use web search and fetch tools to gather comprehensive information
+- Synthesize findings into a clear, concise summary
+- Do NOT return plain text - ONLY return the JSON object with summary and sources
 """
     
     researcher = Agent(
