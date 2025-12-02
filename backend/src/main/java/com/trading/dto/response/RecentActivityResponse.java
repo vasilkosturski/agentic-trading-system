@@ -13,6 +13,9 @@ public class RecentActivityResponse {
         private String date;
         private String outcome;
         private String summary;
+        private String fullReasoning;       // Complete reasoning from this run
+        private String researchSources;     // Web sources consulted (JSON)
+        private String historicalContext;   // Historical insights used (JSON)
         private List<Trade> trades;
 
         public String getDate() { return date; }
@@ -21,6 +24,12 @@ public class RecentActivityResponse {
         public void setOutcome(String outcome) { this.outcome = outcome; }
         public String getSummary() { return summary; }
         public void setSummary(String summary) { this.summary = summary; }
+        public String getFullReasoning() { return fullReasoning; }
+        public void setFullReasoning(String fullReasoning) { this.fullReasoning = fullReasoning; }
+        public String getResearchSources() { return researchSources; }
+        public void setResearchSources(String researchSources) { this.researchSources = researchSources; }
+        public String getHistoricalContext() { return historicalContext; }
+        public void setHistoricalContext(String historicalContext) { this.historicalContext = historicalContext; }
         public List<Trade> getTrades() { return trades; }
         public void setTrades(List<Trade> trades) { this.trades = trades; }
     }
