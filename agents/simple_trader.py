@@ -188,43 +188,61 @@ Available tools:
   - Use these to remember your past decisions and reasoning about stocks
   - Check your history before making decisions to maintain consistency
 
-**CRITICAL - Decision Workflow:**
+**CRITICAL - Decision Workflow (YOU MUST FOLLOW ALL 3 STEPS):**
 
-1. **Research**: Use the Researcher tool to gather market information
+1. **Historical Context - MANDATORY FIRST STEP**:
+   - **YOU MUST CALL query_trading_history(symbol, days) for ANY stock you're considering**
+   - This is NOT optional - call it even if you think there's no history
+   - Analyze the fullReasoning from your previous decisions
+   - Extract specific insights with symbol, quantity, price, action
+   - Structure as: {{"summary": "Key patterns", "insights": [{{"date": "2025-11-30", "insight": "Bought 50 NVDA at $145 - AI growth thesis"}}]}}
+   - If query returns no data, THEN you can use empty insights: {{"summary": "No prior trades", "insights": []}}
+   - Store this JSON - you'll pass it to decide_action as historicalContext
+
+2. **Research**: Use the Researcher tool to gather market information
    - Researcher returns a JSON object with TWO fields: {{"summary": "...", "sources": [...]}}
    - The "sources" array contains objects like: {{"title": "Article Title", "url": "https://...", "snippet": "..."}}
    - **CRITICAL**: You MUST pass the COMPLETE JSON from Researcher to decide_action as researchSources
    - Do NOT just copy the summary - include the ENTIRE JSON with the sources array
    - Example: researchSources='{{"summary": "Market analysis...", "sources": [{{"title": "...", "url": "..."}}]}}'
 
-2. **Historical Context**: Use query_trading_history(symbol, days) to review your past trades
-   - Analyze the fullReasoning from your previous decisions
-   - Extract key insights and learning in a JSON format
-   - Structure it as: {{"summary": "...", "insights": [{{"date": "...", "insight": "..."}}]}}
-   - Store this JSON - you'll pass it to decide_action as historicalContext
-
 3. **Decide**: Call decide_action() EXACTLY ONCE at the end with your decision, research sources, AND historical context
 
    To BUY a stock:
+     # STEP 1: Query historical context FIRST
+     history = query_trading_history("NVDA", 30)
+     # Build JSON from history data
+     historicalContext = '{{"summary": "Past NVDA trades", "insights": [{{"date": "2025-11-30", "insight": "Bought 100 NVDA at $177"}}]}}'
+
+     # STEP 2: Get research from Researcher tool
+     # (call Researcher tool here)
+
+     # STEP 3: Decide with both research and history
      decide_action(
        action="BUY",
        symbol="NVDA",
        quantity=50,
        rationale="Brief reason",
        fullReasoning="Complete analysis",
-       researchSources='{{"summary": "...", "sources": [...]}}',  # COMPLETE JSON from Researcher including sources!
-       historicalContext='{{"summary": "...", "insights": [...]}}'  # Your historical analysis
+       researchSources='{{"summary": "...", "sources": [...]}}',  # COMPLETE JSON from Researcher
+       historicalContext=historicalContext  # JSON from query_trading_history above
      )
 
    To SELL a stock:
+     # STEP 1: Query historical context FIRST (must call for ANY decision!)
+     history = query_trading_history("NVDA", 30)
+     # Build JSON from history
+     historicalContext = '{{"summary": "...", "insights": [...]}}'
+
+     # STEP 2 & 3: Research + Decide
      decide_action(
        action="SELL",
        symbol="NVDA",
        quantity=50,
        rationale="Brief reason",
        fullReasoning="Complete analysis",
-       researchSources='{{"summary": "...", "sources": [...]}}',  # COMPLETE JSON from Researcher including sources!
-       historicalContext='{{"summary": "...", "insights": [...]}}'  # Your historical analysis
+       researchSources='{{"summary": "...", "sources": [...]}}',  # From Researcher
+       historicalContext=historicalContext  # From query_trading_history
      )
 
    To do nothing:
@@ -294,7 +312,9 @@ CRITICAL - DECISION RULES:
   - **ALWAYS pass historicalContext parameter** with JSON containing your historical insights
     * Query past trades using query_trading_history(symbol, days)
     * Analyze your previous fullReasoning to extract insights
-    * Create JSON: {{"summary": "Key patterns from past trades", "insights": [{{"date": "2025-01-01", "insight": "What you learned"}}]}}
+    * Create JSON with SPECIFIC details: {{"summary": "Key patterns from past trades", "insights": [{{"date": "2025-11-30", "insight": "Bought 50 NVDA at $145 - AI datacenter growth thesis. Holding for value appreciation."}}]}}
+    * **CRITICAL**: Include stock SYMBOL, action (BUY/SELL), quantity, and key reasoning in each insight
+    * Be CONCRETE not vague - say "Bought 50 NVDA" not "entered a position in a tech stock"
     * This ensures transparency - users can see what you learned from history
   - If you decide HOLD, set action=HOLD and omit symbol/quantity.
   - The system will execute the action you decide; do NOT call any trading tools directly.

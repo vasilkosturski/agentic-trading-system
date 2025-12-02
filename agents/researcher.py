@@ -33,10 +33,13 @@ The current datetime is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 **REQUIREMENTS**:
 - The sources array MUST contain at least 2-3 sources from your web searches
+- **CRITICAL**: Extract the ACTUAL URL from each search result - do NOT make up URLs
+- When you use brave_web_search, copy the EXACT url field from each result
 - Extract title, URL, and a relevant snippet from each search result
 - Use web search and fetch tools to gather comprehensive information
 - Synthesize findings into a clear, concise summary
 - Do NOT return plain text - ONLY return the JSON object with summary and sources
+- **NEVER hallucinate or create fake URLs** - only use real URLs from search results
 """
     
     researcher = Agent(
