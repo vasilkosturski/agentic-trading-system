@@ -192,11 +192,21 @@ public class MemoryService {
             RecentActivityResponse.Run runDto = new RecentActivityResponse.Run();
             runDto.setDate(run.getStartTime().toString());
             runDto.setOutcome(run.getOutcome());
-            
+
+            // Set all reasoning fields so agent can learn from past decisions
             if (run.getSummary() != null && !run.getSummary().isEmpty()) {
                 runDto.setSummary(run.getSummary());
             }
-            
+            if (run.getFullReasoning() != null && !run.getFullReasoning().isEmpty()) {
+                runDto.setFullReasoning(run.getFullReasoning());
+            }
+            if (run.getResearchSources() != null && !run.getResearchSources().isEmpty()) {
+                runDto.setResearchSources(run.getResearchSources());
+            }
+            if (run.getHistoricalContext() != null && !run.getHistoricalContext().isEmpty()) {
+                runDto.setHistoricalContext(run.getHistoricalContext());
+            }
+
             // Get trades for this run
             if (run.getTradeCount() != null && run.getTradeCount() > 0) {
                 List<AccountTransaction> runTrades = transactionRepository.findByAgentRunId(run.getId());

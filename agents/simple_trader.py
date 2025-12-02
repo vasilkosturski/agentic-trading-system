@@ -265,12 +265,32 @@ Your investment strategy:
 {self.strategy}
 """
 
-    def get_trade_message(self, strategy: str, account: str) -> str:
-        """Get trading message with updated instructions"""
+    def get_trade_message(self, strategy: str, account: str, historical_context: str = None, research_focus: str = "") -> str:
+        """Get trading message with updated instructions, pre-fetched historical context, and research focus"""
+        historical_section = ""
+        if historical_context:
+            historical_section = f"""
+---
+YOUR TRADING HISTORY (pre-fetched for you):
+{historical_context}
+
+Use this historical context to inform your decisions. Reference specific past trades when making new decisions.
+---
+"""
+
+        research_guidance = ""
+        if research_focus:
+            research_guidance = f"""
+**RESEARCH GUIDANCE**: {research_focus}
+When using the Researcher tool, ask it to research these specific stocks based on your portfolio.
+"""
+
         return f"""You are conducting your regular portfolio review and market analysis.
 
 THIS IS A SIMULATION ENVIRONMENT - Be active and demonstrate your trading strategy!
 Your goal is to build and manage an interesting portfolio that reflects your investment philosophy.
+
+{research_guidance}
 
 YOUR TRADING APPROACH:
 1. Use the Researcher tool to check relevant news and market conditions
@@ -309,10 +329,10 @@ CRITICAL - DECISION RULES:
   - **ALWAYS pass researchSources parameter** with the JSON string from Researcher tool
     * This ensures transparency - users can see what sources you used
     * Pass the complete JSON response from the Researcher tool
-  - **ALWAYS pass historicalContext parameter** with JSON containing your historical insights
-    * Query past trades using query_trading_history(symbol, days)
-    * Analyze your previous fullReasoning to extract insights
-    * Create JSON with SPECIFIC details: {{"summary": "Key patterns from past trades", "insights": [{{"date": "2025-11-30", "insight": "Bought 50 NVDA at $145 - AI datacenter growth thesis. Holding for value appreciation."}}]}}
+  - **ALWAYS pass historicalContext parameter** with JSON containing insights from YOUR TRADING HISTORY section above
+    * Your trading history has been pre-fetched and provided above
+    * Analyze the runs, trades, and reasoning from your history
+    * Create JSON with SPECIFIC details referencing actual past trades: {{"summary": "Key patterns from past trades", "insights": [{{"date": "2025-11-30", "insight": "Bought 50 NVDA at $145 - AI datacenter growth thesis. Holding for value appreciation."}}]}}
     * **CRITICAL**: Include stock SYMBOL, action (BUY/SELL), quantity, and key reasoning in each insight
     * Be CONCRETE not vague - say "Bought 50 NVDA" not "entered a position in a tech stock"
     * This ensures transparency - users can see what you learned from history
@@ -331,6 +351,8 @@ Your investment strategy:
 Here is your current account:
 {account}
 
+{historical_section}
+
 Here is the current datetime:
 {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
@@ -338,12 +360,32 @@ Now, conduct your review, make your decision (which may be to do nothing), and e
 After your review, respond with a brief 2-3 sentence appraisal of your portfolio and its outlook.
 """
 
-    def get_rebalance_message(self, strategy: str, account: str) -> str:
-        """Get rebalancing message"""
+    def get_rebalance_message(self, strategy: str, account: str, historical_context: str = None, research_focus: str = "") -> str:
+        """Get rebalancing message with pre-fetched historical context and research focus"""
+        historical_section = ""
+        if historical_context:
+            historical_section = f"""
+---
+YOUR TRADING HISTORY (pre-fetched for you):
+{historical_context}
+
+Use this to understand your past decisions and maintain consistency in your strategy.
+---
+"""
+
+        research_guidance = ""
+        if research_focus:
+            research_guidance = f"""
+**RESEARCH GUIDANCE**: {research_focus}
+When using the Researcher tool, focus on these stocks from your portfolio.
+"""
+
         return f"""You are conducting a portfolio rebalancing review.
 
 THIS IS A SIMULATION - Actively manage your portfolio to demonstrate your strategy!
 Review your positions and make adjustments to keep your portfolio aligned with your investment thesis.
+
+{research_guidance}
 
 YOUR REBALANCING REVIEW:
 1. Use the research tool to check news affecting your current holdings
@@ -375,6 +417,8 @@ Your investment strategy:
 
 Here is your current account:
 {account}
+
+{historical_section}
 
 Here is the current datetime:
 {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
@@ -590,15 +634,51 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             # Broadcast: RESEARCHING (combined: fetching data, research, analysis)
             broadcast_status(self.agent_id, self.name, PHASE_RESEARCHING, "Researching and analyzing market opportunities", 30)
 
-            # NOTE: Research phase logging will be enhanced after agent completes with actual research data
-            
+            # PRE-FETCH DATA BEFORE AGENT RUNS (more reliable than letting LLM decide to call tools)
+            logger.info(f"📊 Pre-fetching historical context for {self.name}")
+
+            # 1. Call get_recent_activity to get trading history (already implemented in memory_tools.py)
+            from memory_tools import get_recent_activity
+            recent_activity_json = await get_recent_activity(self.name, days=30)
+
+            # 2. Extract stock symbols from recent activity to focus research
+            import json
+            relevant_symbols = []
+            try:
+                if recent_activity_json and recent_activity_json != '{"error": "No recent activity found"}':
+                    activity_data = json.loads(recent_activity_json)
+                    # Extract symbols from trades in the activity data
+                    if isinstance(activity_data, dict) and "runs" in activity_data:
+                        for run in activity_data.get("runs", [])[:5]:  # Last 5 runs
+                            for trade in run.get("trades", []):
+                                symbol = trade.get("symbol")
+                                if symbol and symbol not in relevant_symbols:
+                                    relevant_symbols.append(symbol)
+            except Exception as e:
+                logger.warning(f"Could not parse recent activity for symbols: {e}")
+
+            # Add current holdings to symbols to research
+            if holdings:
+                for holding in holdings:
+                    symbol = holding.get("symbol")
+                    if symbol and symbol not in relevant_symbols:
+                        relevant_symbols.append(symbol)
+
+            # Create research context for agent
+            research_focus = ""
+            if relevant_symbols:
+                research_focus = f"Focus your research on these stocks from your portfolio/history: {', '.join(relevant_symbols[:5])}"
+
+            logger.info(f"📊 Research will focus on: {relevant_symbols[:5] if relevant_symbols else 'general market'}")
+
             # Create agent with direct tools
             self.agent = await self.create_agent(researcher_mcp_servers)
 
+            # Generate message with historical context and research focus pre-injected
             message = (
-                self.get_trade_message(strategy, account)
+                self.get_trade_message(strategy, account, recent_activity_json, research_focus)
                 if self.do_trade
-                else self.get_rebalance_message(strategy, account)
+                else self.get_rebalance_message(strategy, account, recent_activity_json, research_focus)
             )
             
             result = await Runner.run(self.agent, message, max_turns=30)

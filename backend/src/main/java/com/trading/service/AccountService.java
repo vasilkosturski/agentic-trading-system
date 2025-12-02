@@ -40,6 +40,9 @@ public class AccountService {
     @Autowired
     private AgentRunRepository agentRunRepository;
 
+    @Autowired
+    private BuyTradeExecutor buyTradeExecutor;
+
     /**
      * Initialize agent and create trading account - should be called when agent starts
      * @param agentName Name of the agent (validated at controller layer)
@@ -102,104 +105,11 @@ public class AccountService {
 
     /**
      * Buy shares for an agent
+     * Delegates to BuyTradeExecutor for execution
      * @param runId REQUIRED - Every transaction must be linked to an agent run
      */
     public String buyShares(String agentName, String symbol, Integer quantity, Long runId) {
-        if (runId == null) {
-            throw new IllegalArgumentException("runId is required - every transaction must be linked to an agent run");
-        }
-        TradingAccount account = getAccount(agentName);
-
-        // Check position limit BEFORE buying (max 10 positions per agent)
-        List<AccountHolding> currentHoldings = holdingRepository.findActiveHoldingsByAccount(account);
-        long activePositions = currentHoldings.size();
-
-        // Check if adding new position (not adding to existing)
-        boolean isNewPosition = currentHoldings.stream()
-            .noneMatch(h -> h.getSymbol().equals(symbol));
-
-        if (isNewPosition && activePositions >= 10) {
-            // List current holdings in error message to help agent decide what to sell
-            String holdingsList = currentHoldings.stream()
-                .map(h -> h.getSymbol())
-                .collect(Collectors.joining(", "));
-
-            throw new RuntimeException(
-                "❌ POSITION LIMIT REACHED: You currently hold 10 positions (" + holdingsList + "). " +
-                "Maximum allowed is 10 positions per agent. " +
-                "To buy " + symbol + ", you must first sell one of your existing positions. " +
-                "Review your holdings and sell your weakest/lowest-conviction position, then retry this purchase."
-            );
-        }
-
-        // Get current market price from MarketService
-        logger.info("🔍 DEBUGGING: Requesting real market price for {} from MarketService", symbol);
-        MarketService.PriceData priceData = marketService.getSharePrice(symbol);
-        Double price = priceData.getPrice();
-        logger.info("💰 DEBUGGING: Received price for {}: ${} from {} ({})",
-            symbol, price, priceData.getDataSource(), priceData.getDataTier());
-        Double totalCost = price * quantity;
-
-        // Check if sufficient funds
-        if (totalCost > account.getBalance()) {
-            throw new RuntimeException("Insufficient funds to buy " + quantity + " shares of " + symbol +
-                ". Required: $" + String.format("%.2f", totalCost) + ", Available: $" + String.format("%.2f", account.getBalance()));
-        }
-        
-        // Update account balance
-        account.setBalance(account.getBalance() - totalCost);
-        tradingAccountRepository.save(account);
-        
-        // Create transaction record
-        AccountTransaction transaction = new AccountTransaction();
-        transaction.setAccount(account);
-        transaction.setSymbol(symbol);
-        transaction.setTransactionType(TransactionType.BUY);
-        transaction.setQuantity(quantity);
-        transaction.setPrice(price);
-        transaction.setTimestamp(Instant.now());
-
-        // Link transaction to agent run (REQUIRED)
-        AgentRun agentRun = agentRunRepository.findById(runId)
-            .orElseThrow(() -> new RuntimeException("Agent run not found: " + runId));
-        transaction.setAgentRun(agentRun);
-
-        transactionRepository.save(transaction);
-        
-        // Update or create holding
-        AccountHolding holding = holdingRepository.findByAccountAndSymbol(account, symbol);
-
-        if (holding != null) {
-            logger.info("📊 Updating existing holding for {} - {}: current qty={}, adding qty={}",
-                agentName, symbol, holding.getQuantity(), quantity);
-            // Calculate new average cost
-            double currentValue = holding.getQuantity() * holding.getAveragePrice();
-            double newValue = currentValue + totalCost;
-            int newQuantity = holding.getQuantity() + quantity;
-
-            holding.setQuantity(newQuantity);
-            holding.setAveragePrice(newValue / newQuantity);
-        } else {
-            logger.info("🆕 Creating NEW holding for {} - {}: qty={}, avgPrice=${}",
-                agentName, symbol, quantity, price);
-            holding = new AccountHolding();
-            holding.setAccount(account);
-            holding.setSymbol(symbol);
-            holding.setQuantity(quantity);
-            holding.setAveragePrice(price);
-        }
-
-        try {
-            AccountHolding savedHolding = holdingRepository.save(holding);
-            logger.info("✅ Successfully saved holding for {} - {}: id={}, qty={}",
-                agentName, symbol, savedHolding.getId(), savedHolding.getQuantity());
-        } catch (Exception e) {
-            logger.error("❌ CRITICAL: Failed to save holding for {} - {}: {}",
-                agentName, symbol, e.getMessage(), e);
-            throw new RuntimeException("Failed to save holding: " + e.getMessage(), e);
-        }
-
-        return "Successfully bought " + quantity + " shares of " + symbol + " at $" + String.format("%.2f", price) + " each";
+        return buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId);
     }
 
     /**
@@ -353,7 +263,10 @@ public class AccountService {
     /**
      * Get trading account for an agent - expects account to already exist
      */
-    private TradingAccount getAccount(String agentName) {
+    /**
+     * Get account for agent (package-private for use by BuyTradeExecutor)
+     */
+    TradingAccount getAccount(String agentName) {
         return tradingAccountRepository.findByAgentName(agentName)
             .orElseThrow(() -> new RuntimeException("Trading account not found for agent: " + agentName +
                 ". Agent must be initialized before trading operations."));
