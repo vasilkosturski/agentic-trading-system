@@ -56,11 +56,7 @@ public class BuyTradeExecutor {
         validatePositionLimit(account, symbol);
 
         // Get current market price from MarketService
-        logger.info("🔍 DEBUGGING: Requesting real market price for {} from MarketService", symbol);
-        MarketService.PriceData priceData = marketService.getSharePrice(symbol);
-        Double price = priceData.getPrice();
-        logger.info("💰 DEBUGGING: Received price for {}: ${} from {} ({})",
-            symbol, price, priceData.getDataSource(), priceData.getDataTier());
+        Double price = fetchMarketPrice(symbol);
         Double totalCost = price * quantity;
 
         // Check if sufficient funds
@@ -142,28 +138,57 @@ public class BuyTradeExecutor {
         AccountHolding holding = holdingRepository.findByAccountAndSymbol(account, symbol);
 
         if (holding != null) {
-            logger.info("📊 Updating existing holding for {} - {}: current qty={}, adding qty={}",
-                agentName, symbol, holding.getQuantity(), quantity);
-            // Calculate new average cost
-            double currentValue = holding.getQuantity() * holding.getAveragePrice();
-            double newValue = currentValue + totalCost;
-            int newQuantity = holding.getQuantity() + quantity;
-
-            holding.setQuantity(newQuantity);
-            holding.setAveragePrice(newValue / newQuantity);
+            updateExistingHolding(holding, quantity, totalCost, agentName, symbol);
         } else {
-            logger.info("🆕 Creating NEW holding for {} - {}: qty={}, avgPrice=${}",
-                agentName, symbol, quantity, price);
-            holding = new AccountHolding();
-            holding.setAccount(account);
-            holding.setSymbol(symbol);
-            holding.setQuantity(quantity);
-            holding.setAveragePrice(price);
+            holding = createNewHolding(account, symbol, quantity, price, agentName);
         }
 
         AccountHolding savedHolding = holdingRepository.save(holding);
         logger.info("✅ Successfully saved holding for {} - {}: id={}, qty={}",
             agentName, symbol, savedHolding.getId(), savedHolding.getQuantity());
+    }
+
+    /**
+     * Update an existing holding with new shares
+     */
+    private void updateExistingHolding(AccountHolding holding, Integer quantity, Double totalCost, String agentName, String symbol) {
+        logger.info("📊 Updating existing holding for {} - {}: current qty={}, adding qty={}",
+            agentName, symbol, holding.getQuantity(), quantity);
+        
+        double currentValue = holding.getQuantity() * holding.getAveragePrice();
+        double newValue = currentValue + totalCost;
+        int newQuantity = holding.getQuantity() + quantity;
+
+        holding.setQuantity(newQuantity);
+        holding.setAveragePrice(newValue / newQuantity);
+    }
+
+    /**
+     * Create a new holding for this symbol
+     */
+    private AccountHolding createNewHolding(TradingAccount account, String symbol, Integer quantity, Double price, String agentName) {
+        logger.info("🆕 Creating NEW holding for {} - {}: qty={}, avgPrice=${}",
+            agentName, symbol, quantity, price);
+        
+        AccountHolding holding = new AccountHolding();
+        holding.setAccount(account);
+        holding.setSymbol(symbol);
+        holding.setQuantity(quantity);
+        holding.setAveragePrice(price);
+        
+        return holding;
+    }
+
+    /**
+     * Fetch market price for a symbol with debug logging
+     */
+    private Double fetchMarketPrice(String symbol) {
+        logger.info("🔍 DEBUGGING: Requesting real market price for {} from MarketService", symbol);
+        MarketService.PriceData priceData = marketService.getSharePrice(symbol);
+        Double price = priceData.getPrice();
+        logger.info("💰 DEBUGGING: Received price for {}: ${} from {} ({})",
+            symbol, price, priceData.getDataSource(), priceData.getDataTier());
+        return price;
     }
 
     /**

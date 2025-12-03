@@ -95,17 +95,31 @@ in exchange for the potential of exponential returns from revolutionary companie
         logger.info("✅ TradingSystem created with all agent IDs resolved")
         return cls(agents)
     
-    async def run_all_agents(self):
-        """Run all four agents concurrently"""
+    async def run_all_agents(self, force_one_trade=False):
+        """Run all four agents concurrently
+
+        Args:
+            force_one_trade: If True, randomly pick one agent to force a trade
+        """
         logger.info("🚀 Starting all four autonomous trading agents...")
-        
+
         # Print agent summary
         self.print_agent_summary()
-        
-        # Run all agents concurrently
-        tasks = [agent.run() for agent in self.agents]
+
+        # If manual trigger, force one random agent to trade
+        forced_agent = None
+        if force_one_trade:
+            import random
+            forced_agent = random.choice(self.agents).name
+            logger.info(f"🎯 Manual trigger: Forcing {forced_agent} to make a trade this cycle")
+
+        # Run all agents concurrently, passing force flag to the chosen agent
+        tasks = [
+            agent.run(force_trade=(agent.name == forced_agent))
+            for agent in self.agents
+        ]
         await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         logger.info("✅ All agents completed their trading cycle")
     
     def print_agent_summary(self):
@@ -223,17 +237,19 @@ async def run_continuous_trading():
             # Wait for either: scheduled time OR manual trigger event
             sleep_seconds = RUN_EVERY_N_MINUTES * 60
             logger.info(f"💤 Waiting {RUN_EVERY_N_MINUTES} minutes for next cycle (or manual trigger)...")
-            
+
+            is_manual_trigger = False
             try:
                 # Wait for manual trigger with timeout (scheduled interval)
                 await asyncio.wait_for(manual_cycle_event.wait(), timeout=sleep_seconds)
                 # Manual trigger received!
                 logger.info("📣 Manual cycle triggered - starting immediately...")
                 manual_cycle_event.clear()  # Reset for next trigger
+                is_manual_trigger = True
             except asyncio.TimeoutError:
                 # Normal scheduled cycle
                 logger.info("⏰ Scheduled cycle time reached")
-            
+
             # Always run trading cycle (demo system with end-of-day data)
             logger.info("🚀 Starting trading cycle...")
 
@@ -241,7 +257,8 @@ async def run_continuous_trading():
             cycle_running_flag['running'] = True
 
             try:
-                await system.run_all_agents()
+                # Force one agent to trade if manually triggered
+                await system.run_all_agents(force_one_trade=is_manual_trigger)
                 logger.info(f"✅ Trading cycle completed.")
 
                 # Always update activity timestamp on every cycle (shows system is alive)
