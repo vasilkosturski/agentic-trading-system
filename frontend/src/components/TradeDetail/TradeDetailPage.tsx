@@ -33,8 +33,8 @@ const TradeDetailPage: React.FC = () => {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center py-12">
-          <i className="pi pi-spin pi-spinner text-4xl text-blue-600"></i>
-          <p className="text-gray-500 mt-3">Loading trade details...</p>
+          <i className="pi pi-spin pi-spinner text-4xl text-blue-600 dark:text-blue-400"></i>
+          <p className="text-gray-500 dark:text-gray-400 mt-3">Loading trade details...</p>
         </div>
       </div>
     );
@@ -43,13 +43,13 @@ const TradeDetailPage: React.FC = () => {
   if (error || !tradeDetail) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-          <i className="pi pi-exclamation-triangle text-5xl text-red-500 mb-4"></i>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Trade Not Found</h2>
-          <p className="text-gray-600 mb-6">The requested trade could not be found.</p>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 text-center">
+          <i className="pi pi-exclamation-triangle text-5xl text-red-500 dark:text-red-400 mb-4"></i>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Trade Not Found</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">The requested trade could not be found.</p>
           <button
             onClick={() => navigate('/')}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-lg transition-colors"
+            className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white font-medium px-6 py-2 rounded-lg transition-colors"
           >
             Back to Dashboard
           </button>
@@ -195,14 +195,14 @@ const TradeDetailPage: React.FC = () => {
       {/* Back Button */}
       <button
         onClick={() => navigate('/')}
-        className="mb-6 flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+        className="mb-6 flex items-center space-x-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
       >
         <i className="pi pi-arrow-left"></i>
         <span>Back to Dashboard</span>
       </button>
 
       {/* Trade Summary Header */}
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-6">
         <div className="flex items-start justify-between mb-4">
           <div>
             <div className="flex items-center space-x-3 mb-2">
@@ -210,8 +210,8 @@ const TradeDetailPage: React.FC = () => {
                 {trade.agentName.charAt(0)}
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{trade.agentName}'s Trade</h1>
-                <p className="text-gray-500 text-sm">{formatTimestamp(trade.timestamp)}</p>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{trade.agentName}'s Trade</h1>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">{formatTimestamp(trade.timestamp)}</p>
               </div>
             </div>
           </div>
@@ -223,21 +223,21 @@ const TradeDetailPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-sm text-gray-600 mb-1">Symbol</p>
-            <p className="text-2xl font-bold text-gray-900">{trade.symbol}</p>
+          <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Symbol</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{trade.symbol}</p>
           </div>
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-sm text-gray-600 mb-1">Quantity</p>
-            <p className="text-2xl font-bold text-gray-900">{trade.quantity}</p>
+          <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Quantity</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{trade.quantity}</p>
           </div>
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-sm text-gray-600 mb-1">Price per Share</p>
-            <p className="text-2xl font-bold text-gray-900">{formatPrice(trade.price)}</p>
+          <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Price per Share</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatPrice(trade.price)}</p>
           </div>
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-sm text-gray-600 mb-1">Total Value</p>
-            <p className="text-2xl font-bold text-gray-900">{formatPrice(trade.totalValue)}</p>
+          <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Value</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatPrice(trade.totalValue)}</p>
           </div>
         </div>
       </div>
@@ -253,9 +253,9 @@ const TradeDetailPage: React.FC = () => {
 
           {/* Related Trades */}
           {relatedTrades && relatedTrades.length > 0 && (
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <i className="pi pi-history text-blue-600 mr-2"></i>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center">
+                <i className="pi pi-history text-blue-600 dark:text-blue-400 mr-2"></i>
                 Related Trades in {trade.symbol}
               </h2>
               <div className="space-y-2">
@@ -263,7 +263,7 @@ const TradeDetailPage: React.FC = () => {
                   <div
                     key={relatedTrade.id}
                     onClick={() => navigate(`/trades/${relatedTrade.id}`)}
-                    className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                    className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
                   >
                     <div className="flex items-center space-x-3">
                       <Tag
@@ -271,10 +271,10 @@ const TradeDetailPage: React.FC = () => {
                         severity={relatedTrade.type === 'BUY' ? 'success' : 'danger'}
                         className="text-xs"
                       />
-                      <span className="font-medium">{relatedTrade.quantity} shares</span>
-                      <span className="text-gray-600">at {formatPrice(relatedTrade.price)}</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{relatedTrade.quantity} shares</span>
+                      <span className="text-gray-600 dark:text-gray-400">at {formatPrice(relatedTrade.price)}</span>
                     </div>
-                    <span className="text-sm text-gray-500">{formatTimestamp(relatedTrade.timestamp)}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">{formatTimestamp(relatedTrade.timestamp)}</span>
                   </div>
                 ))}
               </div>
@@ -286,25 +286,25 @@ const TradeDetailPage: React.FC = () => {
         <div className="space-y-6">
           {/* Run Link Section */}
           {runId && (
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <i className="pi pi-bolt text-blue-600 mr-2"></i>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center">
+                <i className="pi pi-bolt text-blue-600 dark:text-blue-400 mr-2"></i>
                 Part of Run
               </h2>
               <div
                 onClick={() => navigate(`/runs/${runId}`)}
-                className="border-2 border-blue-200 rounded-lg p-4 hover:bg-blue-50 hover:border-blue-400 cursor-pointer transition-all"
+                className="border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-400 dark:hover:border-blue-600 cursor-pointer transition-all"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600">Run ID</span>
-                  <span className="font-mono text-lg font-bold text-blue-600">#{runId}</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Run ID</span>
+                  <span className="font-mono text-lg font-bold text-blue-600 dark:text-blue-400">#{runId}</span>
                 </div>
                 {runSummary && (
-                  <p className="text-sm text-gray-700 mt-2 line-clamp-2">
+                  <p className="text-sm text-gray-700 dark:text-gray-300 mt-2 line-clamp-2">
                     {runSummary}
                   </p>
                 )}
-                <div className="flex items-center justify-end mt-3 text-blue-600">
+                <div className="flex items-center justify-end mt-3 text-blue-600 dark:text-blue-400">
                   <span className="text-sm font-medium">View run details</span>
                   <i className="pi pi-arrow-right ml-2 text-xs"></i>
                 </div>
@@ -314,34 +314,34 @@ const TradeDetailPage: React.FC = () => {
 
           {/* Agent Context */}
           {parsedAgentContext && (
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <i className="pi pi-chart-line text-blue-600 mr-2"></i>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center">
+                <i className="pi pi-chart-line text-blue-600 dark:text-blue-400 mr-2"></i>
                 Agent Context
               </h2>
               <div className="space-y-3">
                 {parsedAgentContext.portfolioValueBefore && (
                   <div>
-                    <p className="text-sm text-gray-600">Portfolio Value</p>
-                    <p className="text-lg font-bold text-gray-900">{formatPrice(parsedAgentContext.portfolioValueBefore)}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Portfolio Value</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">{formatPrice(parsedAgentContext.portfolioValueBefore)}</p>
                   </div>
                 )}
                 {parsedAgentContext.cashBefore && (
                   <div>
-                    <p className="text-sm text-gray-600">Cash Available</p>
-                    <p className="text-lg font-bold text-gray-900">{formatPrice(parsedAgentContext.cashBefore)}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Cash Available</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">{formatPrice(parsedAgentContext.cashBefore)}</p>
                   </div>
                 )}
                 {parsedAgentContext.positionsBefore !== undefined && (
                   <div>
-                    <p className="text-sm text-gray-600">Positions</p>
-                    <p className="text-lg font-bold text-gray-900">{parsedAgentContext.positionsBefore}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Positions</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">{parsedAgentContext.positionsBefore}</p>
                   </div>
                 )}
                 {parsedAgentContext.recentPerformancePct !== undefined && (
                   <div>
-                    <p className="text-sm text-gray-600">Recent Performance</p>
-                    <p className={`text-lg font-bold ${parsedAgentContext.recentPerformancePct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Recent Performance</p>
+                    <p className={`text-lg font-bold ${parsedAgentContext.recentPerformancePct >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {parsedAgentContext.recentPerformancePct.toFixed(2)}%
                     </p>
                   </div>
@@ -351,20 +351,20 @@ const TradeDetailPage: React.FC = () => {
           )}
 
           {/* Trade Info */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Trade Information</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Trade Information</h2>
             <div className="space-y-3 text-sm">
               <div>
-                <p className="text-gray-600">Trade ID</p>
-                <p className="font-mono text-gray-900">#{trade.id}</p>
+                <p className="text-gray-600 dark:text-gray-400">Trade ID</p>
+                <p className="font-mono text-gray-900 dark:text-white">#{trade.id}</p>
               </div>
               <div>
-                <p className="text-gray-600">Timestamp</p>
-                <p className="text-gray-900">{formatTimestamp(trade.timestamp)}</p>
+                <p className="text-gray-600 dark:text-gray-400">Timestamp</p>
+                <p className="text-gray-900 dark:text-white">{formatTimestamp(trade.timestamp)}</p>
               </div>
               <div>
-                <p className="text-gray-600">Agent</p>
-                <p className="text-gray-900">{trade.agentName}</p>
+                <p className="text-gray-600 dark:text-gray-400">Agent</p>
+                <p className="text-gray-900 dark:text-white">{trade.agentName}</p>
               </div>
             </div>
           </div>
