@@ -265,8 +265,12 @@ Your investment strategy:
 {self.strategy}
 """
 
-    def get_trade_message(self, strategy: str, account: str, historical_context: str = None, research_focus: str = "") -> str:
-        """Get trading message with updated instructions, pre-fetched historical context, and research focus"""
+    def get_trade_message(self, strategy: str, account: str, historical_context: str = None, research_focus: str = "", force_trade: bool = False) -> str:
+        """Get trading message with updated instructions, pre-fetched historical context, and research focus
+
+        Args:
+            force_trade: If True, agent MUST make a BUY or SELL trade (no HOLD allowed)
+        """
         historical_section = ""
         if historical_context:
             historical_section = f"""
@@ -285,7 +289,19 @@ Use this historical context to inform your decisions. Reference specific past tr
 When using the Researcher tool, ask it to research these specific stocks based on your portfolio.
 """
 
-        return f"""You are conducting your regular portfolio review and market analysis.
+        force_trade_instruction = ""
+        if force_trade:
+            force_trade_instruction = """
+🎯 **MANUAL TRIGGER - ACTION REQUIRED**:
+This is a MANUAL trading cycle triggered by the user. You MUST make an actual trade (BUY or SELL) this cycle.
+- HOLD is NOT allowed this time
+- Choose your best opportunity: either BUY a new position or SELL an existing one
+- If all positions look good, consider: taking profits on a winner, rebalancing, or adding to a high-conviction position
+- Make a decisive trade that demonstrates your strategy
+
+"""
+
+        return f"""{force_trade_instruction}You are conducting your regular portfolio review and market analysis.
 
 THIS IS A SIMULATION ENVIRONMENT - Be active and demonstrate your trading strategy!
 Your goal is to build and manage an interesting portfolio that reflects your investment philosophy.
@@ -675,8 +691,10 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             self.agent = await self.create_agent(researcher_mcp_servers)
 
             # Generate message with historical context and research focus pre-injected
+            # force_trade should be passed from run_with_mcp_servers
+            force_trade = getattr(self, '_force_trade', False)
             message = (
-                self.get_trade_message(strategy, account, recent_activity_json, research_focus)
+                self.get_trade_message(strategy, account, recent_activity_json, research_focus, force_trade)
                 if self.do_trade
                 else self.get_rebalance_message(strategy, account, recent_activity_json, research_focus)
             )
@@ -891,8 +909,11 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
             self.last_decision = None
             self.tracker = None  # Clean up tracker
 
-    async def run_with_mcp_servers(self):
+    async def run_with_mcp_servers(self, force_trade=False):
         """Run agent with MCP server context - only for external services (Brave Search, Memory, Fetch)"""
+        # Store force_trade flag so run_agent can access it
+        self._force_trade = force_trade
+
         # Only create MCP servers for external services
         async with AsyncExitStack() as stack:
             researcher_mcp_servers = [
@@ -904,19 +925,25 @@ After your review, respond with a brief 2-3 sentence appraisal of your portfolio
 
             await self.run_agent(researcher_mcp_servers)
 
-    async def run_with_trace(self):
+    async def run_with_trace(self, force_trade=False):
         """Run agent with tracing"""
         trace_name = f"{self.name}-trading" if self.do_trade else f"{self.name}-rebalancing"
         trace_id = f"trace_{self.name.lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
         with trace(trace_name, trace_id=trace_id):
-            await self.run_with_mcp_servers()
+            await self.run_with_mcp_servers(force_trade=force_trade)
 
-    async def run(self):
-        """Main run method"""
+    async def run(self, force_trade=False):
+        """Main run method
+
+        Args:
+            force_trade: If True, agent MUST make a BUY or SELL trade (no HOLD allowed)
+        """
         try:
             logger.info(f"Starting {self.name} agent...")
-            await self.run_with_trace()
+            if force_trade:
+                logger.info(f"🎯 {self.name} must make a trade this cycle (manual trigger)")
+            await self.run_with_trace(force_trade=force_trade)
             logger.info(f"{self.name} agent completed successfully")
         except Exception as e:
             logger.error(f"Error running {self.name} agent: {e}", exc_info=True)
