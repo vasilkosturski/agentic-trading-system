@@ -38,10 +38,10 @@ public class AccountService {
     private MarketService marketService;
 
     @Autowired
-    private AgentRunRepository agentRunRepository;
+    private BuyTradeExecutor buyTradeExecutor;
 
     @Autowired
-    private BuyTradeExecutor buyTradeExecutor;
+    private SellTradeExecutor sellTradeExecutor;
 
     /**
      * Initialize agent and create trading account - should be called when agent starts
@@ -109,65 +109,22 @@ public class AccountService {
      * @param runId REQUIRED - Every transaction must be linked to an agent run
      */
     public String buyShares(String agentName, String symbol, Integer quantity, Long runId) {
-        return buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId);
+        String result = buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId);
+        // Update snapshot immediately so dashboard reflects the new trade
+        createPortfolioSnapshot(agentName);
+        return result;
     }
 
     /**
      * Sell shares for an agent
+     * Delegates to SellTradeExecutor for execution
      * @param runId REQUIRED - Every transaction must be linked to an agent run
      */
     public String sellShares(String agentName, String symbol, Integer quantity, Long runId) {
-        if (runId == null) {
-            throw new IllegalArgumentException("runId is required - every transaction must be linked to an agent run");
-        }
-        TradingAccount account = getAccount(agentName);
-
-        // Check if we have enough shares
-        AccountHolding holding = holdingRepository.findByAccountAndSymbol(account, symbol);
-        if (holding == null || holding.getQuantity() < quantity) {
-            int available = holding != null ? holding.getQuantity() : 0;
-            throw new RuntimeException("Cannot sell " + quantity + " shares of " + symbol + 
-                ". Only have " + available + " shares available");
-        }
-        
-        // Get current market price from MarketService
-        logger.info("🔍 DEBUGGING: Requesting real market price for {} from MarketService", symbol);
-        MarketService.PriceData priceData = marketService.getSharePrice(symbol);
-        Double price = priceData.getPrice();
-        logger.info("💰 DEBUGGING: Received price for {}: ${} from {} ({})",
-            symbol, price, priceData.getDataSource(), priceData.getDataTier());
-        Double totalProceeds = price * quantity;
-        
-        // Update account balance
-        account.setBalance(account.getBalance() + totalProceeds);
-        tradingAccountRepository.save(account);
-        
-        // Create transaction record
-        AccountTransaction transaction = new AccountTransaction();
-        transaction.setAccount(account);
-        transaction.setSymbol(symbol);
-        transaction.setTransactionType(TransactionType.SELL);  // EXPLICIT enum - never derived!
-        transaction.setQuantity(quantity);
-        transaction.setPrice(price);
-        transaction.setTimestamp(Instant.now());
-
-        // Link transaction to agent run (REQUIRED)
-        AgentRun agentRun = agentRunRepository.findById(runId)
-            .orElseThrow(() -> new RuntimeException("Agent run not found: " + runId));
-        transaction.setAgentRun(agentRun);
-
-        transactionRepository.save(transaction);
-        
-        // Update holding
-        holding.setQuantity(holding.getQuantity() - quantity);
-
-        if (holding.getQuantity() == 0) {
-            holdingRepository.delete(holding);
-        } else {
-            holdingRepository.save(holding);
-        }
-
-        return "Successfully sold " + quantity + " shares of " + symbol + " at $" + String.format("%.2f", price) + " each";
+        String result = sellTradeExecutor.executeSell(agentName, symbol, quantity, runId);
+        // Update snapshot immediately so dashboard reflects the new trade
+        createPortfolioSnapshot(agentName);
+        return result;
     }
 
     // changeStrategy method removed - using hardcoded strategies only
