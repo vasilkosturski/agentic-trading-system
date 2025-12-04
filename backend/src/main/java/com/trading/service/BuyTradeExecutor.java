@@ -1,14 +1,13 @@
 package com.trading.service;
 
+import com.trading.dto.response.TradeResult;
 import com.trading.entity.*;
 import com.trading.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -18,25 +17,23 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional
-public class BuyTradeExecutor {
-    
+public class BuyTradeExecutor extends TradeExecutor {
+
     private static final Logger logger = LoggerFactory.getLogger(BuyTradeExecutor.class);
     private static final int MAX_POSITIONS_PER_AGENT = 10;
 
-    @Autowired
-    private TradingAccountRepository tradingAccountRepository;
-    
-    @Autowired
-    private AccountTransactionRepository transactionRepository;
-    
-    @Autowired
-    private AccountHoldingRepository holdingRepository;
-    
-    @Autowired
-    private MarketService marketService;
-
-    @Autowired
-    private AgentRunRepository agentRunRepository;
+    /**
+     * Constructor injection - passes dependencies to base class.
+     * Spring auto-wires this constructor (no @Autowired needed since Spring 4.3+).
+     */
+    public BuyTradeExecutor(
+            TradingAccountRepository tradingAccountRepository,
+            AccountTransactionRepository transactionRepository,
+            AccountHoldingRepository holdingRepository,
+            MarketService marketService,
+            AgentRunRepository agentRunRepository) {
+        super(tradingAccountRepository, transactionRepository, holdingRepository, marketService, agentRunRepository);
+    }
 
     /**
      * Execute a buy trade for an agent
@@ -44,13 +41,13 @@ public class BuyTradeExecutor {
      * @param symbol Stock symbol to buy
      * @param quantity Number of shares to buy
      * @param runId REQUIRED - Every transaction must be linked to an agent run
-     * @return Success message
+     * @return TradeResult with transaction details and updated balance
      */
-    public String executeBuy(String agentName, String symbol, Integer quantity, Long runId) {
+    public TradeResult executeBuy(String agentName, String symbol, Integer quantity, Long runId) {
         if (runId == null) {
             throw new IllegalArgumentException("runId is required - every transaction must be linked to an agent run");
         }
-        
+
         TradingAccount account = getAccount(agentName);
 
         // Check position limit BEFORE buying (max 10 positions per agent)
@@ -62,18 +59,29 @@ public class BuyTradeExecutor {
 
         // Check if sufficient funds
         validateSufficientFunds(account, symbol, quantity, totalCost);
-        
+
         // Update account balance
         account.setBalance(account.getBalance() - totalCost);
-        tradingAccountRepository.save(account);
-        
-        // Create and save transaction
-        createTransaction(account, symbol, quantity, price, runId);
-        
+        TradingAccount savedAccount = tradingAccountRepository.save(account);
+
+        // Create and save transaction (returns saved transaction with ID)
+        AccountTransaction transaction = createTransaction(account, symbol, quantity, price, runId, TransactionType.BUY);
+
         // Update or create holding
         updateHolding(account, symbol, quantity, price, totalCost, agentName);
 
-        return "Successfully bought " + quantity + " shares of " + symbol + " at $" + String.format("%.2f", price) + " each";
+        // Build and return structured result
+        return new TradeResult(
+            transaction.getId(),
+            symbol,
+            quantity,
+            price,
+            totalCost,
+            savedAccount.getBalance(),
+            TransactionType.BUY,
+            transaction.getTimestamp(),
+            TradeResult.formatMessage(TransactionType.BUY, quantity, symbol, price)
+        );
     }
 
     /**
@@ -112,25 +120,6 @@ public class BuyTradeExecutor {
         }
     }
 
-    /**
-     * Create and save the transaction record
-     */
-    private void createTransaction(TradingAccount account, String symbol, Integer quantity, Double price, Long runId) {
-        AccountTransaction transaction = new AccountTransaction();
-        transaction.setAccount(account);
-        transaction.setSymbol(symbol);
-        transaction.setTransactionType(TransactionType.BUY);
-        transaction.setQuantity(quantity);
-        transaction.setPrice(price);
-        transaction.setTimestamp(Instant.now());
-
-        // Link transaction to agent run (REQUIRED)
-        AgentRun agentRun = agentRunRepository.findById(runId)
-            .orElseThrow(() -> new RuntimeException("Agent run not found: " + runId));
-        transaction.setAgentRun(agentRun);
-
-        transactionRepository.save(transaction);
-    }
 
     /**
      * Update or create the holding for this buy trade
@@ -178,27 +167,6 @@ public class BuyTradeExecutor {
         holding.setAveragePrice(price);
         
         return holding;
-    }
-
-    /**
-     * Fetch market price for a symbol with debug logging
-     */
-    private Double fetchMarketPrice(String symbol) {
-        logger.info("🔍 DEBUGGING: Requesting real market price for {} from MarketService", symbol);
-        MarketService.PriceData priceData = marketService.getSharePrice(symbol);
-        Double price = priceData.getPrice();
-        logger.info("💰 DEBUGGING: Received price for {}: ${} from {} ({})",
-            symbol, price, priceData.getDataSource(), priceData.getDataTier());
-        return price;
-    }
-
-    /**
-     * Get trading account for an agent - expects account to already exist
-     */
-    private TradingAccount getAccount(String agentName) {
-        return tradingAccountRepository.findByAgentName(agentName)
-            .orElseThrow(() -> new RuntimeException("Trading account not found for agent: " + agentName +
-                ". Agent must be initialized before trading operations."));
     }
 }
 

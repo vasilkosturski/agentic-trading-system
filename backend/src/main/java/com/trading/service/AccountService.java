@@ -1,6 +1,7 @@
 package com.trading.service;
 
 import com.trading.dto.response.HoldingDto;
+import com.trading.dto.response.TradeResult;
 import com.trading.entity.*;
 import com.trading.repository.*;
 import org.slf4j.Logger;
@@ -107,9 +108,10 @@ public class AccountService {
      * Buy shares for an agent
      * Delegates to BuyTradeExecutor for execution
      * @param runId REQUIRED - Every transaction must be linked to an agent run
+     * @return TradeResult with transaction details and updated balance
      */
-    public String buyShares(String agentName, String symbol, Integer quantity, Long runId) {
-        String result = buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId);
+    public TradeResult buyShares(String agentName, String symbol, Integer quantity, Long runId) {
+        TradeResult result = buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId);
         // Update snapshot immediately so dashboard reflects the new trade
         createPortfolioSnapshot(agentName);
         return result;
@@ -119,9 +121,10 @@ public class AccountService {
      * Sell shares for an agent
      * Delegates to SellTradeExecutor for execution
      * @param runId REQUIRED - Every transaction must be linked to an agent run
+     * @return TradeResult with transaction details and updated balance
      */
-    public String sellShares(String agentName, String symbol, Integer quantity, Long runId) {
-        String result = sellTradeExecutor.executeSell(agentName, symbol, quantity, runId);
+    public TradeResult sellShares(String agentName, String symbol, Integer quantity, Long runId) {
+        TradeResult result = sellTradeExecutor.executeSell(agentName, symbol, quantity, runId);
         // Update snapshot immediately so dashboard reflects the new trade
         createPortfolioSnapshot(agentName);
         return result;
