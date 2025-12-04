@@ -134,4 +134,5 @@ agent_memory/
 agent_logs/
 
 # ConPort database and vector data
-context_portal/
+context_portal/# Test hook - Fri Dec  5 23:38:11 EET 2025
+# Test hook - Fri Dec  5 23:40:01 EET 2025
