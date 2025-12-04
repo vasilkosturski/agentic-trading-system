@@ -33,7 +33,24 @@ public class ScheduledSnapshotService {
     @Scheduled(cron = "0 0 16 * * ?", zone = "America/New_York")
     public void createDailySnapshots() {
         logger.info("Starting daily portfolio snapshot creation at market close");
+        createSnapshotsForAllAgents("daily");
+    }
 
+    /**
+     * Create hourly portfolio snapshots for dashboard performance
+     * Runs every hour to keep portfolio values fresh without live API calls on each request
+     * Cron: "0 0 * * * ?" = At minute 0 of every hour
+     */
+    @Scheduled(cron = "0 0 * * * ?")
+    public void createHourlySnapshots() {
+        logger.info("Starting hourly portfolio snapshot creation for dashboard");
+        createSnapshotsForAllAgents("hourly");
+    }
+
+    /**
+     * Common method to create snapshots for all agents
+     */
+    private void createSnapshotsForAllAgents(String snapshotType) {
         try {
             List<TradingAgent> agents = agentRepository.findAll();
             int successCount = 0;
@@ -43,18 +60,18 @@ public class ScheduledSnapshotService {
                 try {
                     accountService.createPortfolioSnapshot(agent.getName());
                     successCount++;
-                    logger.debug("Created snapshot for agent: {}", agent.getName());
+                    logger.debug("Created {} snapshot for agent: {}", snapshotType, agent.getName());
                 } catch (Exception e) {
                     failCount++;
-                    logger.error("Failed to create snapshot for agent {}: {}",
-                        agent.getName(), e.getMessage());
+                    logger.error("Failed to create {} snapshot for agent {}: {}",
+                        snapshotType, agent.getName(), e.getMessage());
                 }
             }
 
-            logger.info("Daily snapshot creation completed. Success: {}, Failed: {}",
-                successCount, failCount);
+            logger.info("{} snapshot creation completed. Success: {}, Failed: {}",
+                snapshotType, successCount, failCount);
         } catch (Exception e) {
-            logger.error("Error during daily snapshot creation: {}", e.getMessage(), e);
+            logger.error("Error during {} snapshot creation: {}", snapshotType, e.getMessage(), e);
         }
     }
 }

@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 public class BuyTradeExecutor {
     
     private static final Logger logger = LoggerFactory.getLogger(BuyTradeExecutor.class);
+    private static final int MAX_POSITIONS_PER_AGENT = 10;
 
     @Autowired
     private TradingAccountRepository tradingAccountRepository;
@@ -86,15 +87,15 @@ public class BuyTradeExecutor {
         boolean isNewPosition = currentHoldings.stream()
             .noneMatch(h -> h.getSymbol().equals(symbol));
 
-        if (isNewPosition && activePositions >= 10) {
+        if (isNewPosition && activePositions >= MAX_POSITIONS_PER_AGENT) {
             // List current holdings in error message to help agent decide what to sell
             String holdingsList = currentHoldings.stream()
                 .map(h -> h.getSymbol())
                 .collect(Collectors.joining(", "));
 
             throw new RuntimeException(
-                "❌ POSITION LIMIT REACHED: You currently hold 10 positions (" + holdingsList + "). " +
-                "Maximum allowed is 10 positions per agent. " +
+                "❌ POSITION LIMIT REACHED: You currently hold " + MAX_POSITIONS_PER_AGENT + " positions (" + holdingsList + "). " +
+                "Maximum allowed is " + MAX_POSITIONS_PER_AGENT + " positions per agent. " +
                 "To buy " + symbol + ", you must first sell one of your existing positions. " +
                 "Review your holdings and sell your weakest/lowest-conviction position, then retry this purchase."
             );
