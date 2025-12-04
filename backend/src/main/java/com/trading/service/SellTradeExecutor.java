@@ -37,7 +37,7 @@ public class SellTradeExecutor extends TradeExecutor {
      * @param symbol Stock symbol to sell
      * @param quantity Number of shares to sell
      * @param runId REQUIRED - Every transaction must be linked to an agent run
-     * @return TradeResult with transaction details and updated balance
+     * @return TradeResult with symbol, quantity, price, and updated balance
      */
     public TradeResult executeSell(String agentName, String symbol, Integer quantity, Long runId) {
         if (runId == null) {
@@ -57,24 +57,14 @@ public class SellTradeExecutor extends TradeExecutor {
         account.setBalance(account.getBalance() + totalProceeds);
         TradingAccount savedAccount = tradingAccountRepository.save(account);
 
-        // Create and save transaction (returns saved transaction with ID)
-        AccountTransaction transaction = createTransaction(account, symbol, quantity, price, runId, TransactionType.SELL);
+        // Create and save transaction
+        createTransaction(account, symbol, quantity, price, runId, TransactionType.SELL);
 
         // Update holding (reduce quantity or delete if 0)
         updateHolding(holding, quantity, agentName, symbol);
 
-        // Build and return structured result
-        return new TradeResult(
-            transaction.getId(),
-            symbol,
-            quantity,
-            price,
-            totalProceeds,
-            savedAccount.getBalance(),
-            TransactionType.SELL,
-            transaction.getTimestamp(),
-            TradeResult.formatMessage(TransactionType.SELL, quantity, symbol, price)
-        );
+        // Return essential trade details for LLM
+        return new TradeResult(symbol, quantity, price, savedAccount.getBalance());
     }
 
     /**
