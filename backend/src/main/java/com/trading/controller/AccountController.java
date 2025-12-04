@@ -7,6 +7,7 @@ import com.trading.dto.response.RecentTradeDto;
 import com.trading.dto.response.RunDetailDto;
 import com.trading.dto.response.ToolResponse;
 import com.trading.dto.response.TradeDetailResponse;
+import com.trading.dto.response.TradeResult;
 import jakarta.validation.Valid;
 import com.trading.entity.AccountPortfolioSnapshot;
 import com.trading.entity.AccountTransaction;
@@ -107,24 +108,24 @@ public class AccountController {
     }
 
     @PostMapping("/tools/buy_shares")
-    public ResponseEntity<ToolResponse<String>> buyShares(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<ToolResponse<TradeResult>> buyShares(@RequestBody Map<String, Object> request) {
         try {
             String name = resolveAgentName(request.get("agentId"));
             String symbol = (String) request.get("symbol");
             Integer quantity = (Integer) request.get("quantity");
             Long runId = request.get("runId") != null ? ((Number) request.get("runId")).longValue() : null;
-            
+
             if (runId == null) {
                 return ResponseEntity.badRequest().body(ToolResponse.error("runId is required - every transaction must be linked to an agent run"));
             }
 
-            String result = accountService.buyShares(name, symbol, quantity, runId);
+            TradeResult result = accountService.buyShares(name, symbol, quantity, runId);
             return ResponseEntity.status(201).body(ToolResponse.success(result));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
         } catch (RuntimeException e) {
             // Business rule violations (insufficient funds, position limit, etc.)
-            if (e.getMessage() != null && (e.getMessage().contains("Insufficient") || 
+            if (e.getMessage() != null && (e.getMessage().contains("Insufficient") ||
                 e.getMessage().contains("maximum") || e.getMessage().contains("limit"))) {
                 return ResponseEntity.status(409).body(ToolResponse.error(e.getMessage()));
             }
@@ -133,18 +134,18 @@ public class AccountController {
     }
 
     @PostMapping("/tools/sell_shares")
-    public ResponseEntity<ToolResponse<String>> sellShares(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<ToolResponse<TradeResult>> sellShares(@RequestBody Map<String, Object> request) {
         try {
             String name = resolveAgentName(request.get("agentId"));
             String symbol = (String) request.get("symbol");
             Integer quantity = (Integer) request.get("quantity");
             Long runId = request.get("runId") != null ? ((Number) request.get("runId")).longValue() : null;
-            
+
             if (runId == null) {
                 return ResponseEntity.badRequest().body(ToolResponse.error("runId is required - every transaction must be linked to an agent run"));
             }
 
-            String result = accountService.sellShares(name, symbol, quantity, runId);
+            TradeResult result = accountService.sellShares(name, symbol, quantity, runId);
             return ResponseEntity.status(201).body(ToolResponse.success(result));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage()));
