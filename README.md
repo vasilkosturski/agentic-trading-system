@@ -181,4 +181,4 @@ curl http://localhost:8080/api/trading/agents/status
 3. **Explore APIs**: Test different endpoints
 4. **Customize**: Modify agent parameters or add features
 
-For production deployment, use the main deployment script: [`../deploy-to-k3s.sh`](../deploy-to-k3s.sh)
+For production deployment, use the main deployment script: [`../deploy-to-k3s.sh`](../deploy-to-k3s.sh)test
