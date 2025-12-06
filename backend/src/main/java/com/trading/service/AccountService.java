@@ -6,7 +6,6 @@ import com.trading.entity.*;
 import com.trading.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,32 +16,42 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class AccountService {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(AccountService.class);
+    private static final double DEFAULT_INITIAL_BALANCE = 100000.0;
 
-    @Autowired
-    private TradingAccountRepository tradingAccountRepository;
-    
-    @Autowired
-    private AccountTransactionRepository transactionRepository;
-    
-    @Autowired
-    private AccountHoldingRepository holdingRepository;
-    
-    @Autowired
-    private AccountPortfolioSnapshotRepository snapshotRepository;
-    
-    @Autowired
-    private TradingAgentRepository agentRepository;
-    
-    @Autowired
-    private MarketService marketService;
+    private final TradingAccountRepository tradingAccountRepository;
+    private final AccountTransactionRepository transactionRepository;
+    private final AccountHoldingRepository holdingRepository;
+    private final AccountPortfolioSnapshotRepository snapshotRepository;
+    private final TradingAgentRepository agentRepository;
+    private final MarketService marketService;
+    private final BuyTradeExecutor buyTradeExecutor;
+    private final SellTradeExecutor sellTradeExecutor;
 
-    @Autowired
-    private BuyTradeExecutor buyTradeExecutor;
-
-    @Autowired
-    private SellTradeExecutor sellTradeExecutor;
+    /**
+     * Constructor injection for all dependencies.
+     * Ensures immutability and makes dependencies explicit.
+     * Spring auto-wires this constructor (no @Autowired needed since Spring 4.3+).
+     */
+    public AccountService(
+            TradingAccountRepository tradingAccountRepository,
+            AccountTransactionRepository transactionRepository,
+            AccountHoldingRepository holdingRepository,
+            AccountPortfolioSnapshotRepository snapshotRepository,
+            TradingAgentRepository agentRepository,
+            MarketService marketService,
+            BuyTradeExecutor buyTradeExecutor,
+            SellTradeExecutor sellTradeExecutor) {
+        this.tradingAccountRepository = tradingAccountRepository;
+        this.transactionRepository = transactionRepository;
+        this.holdingRepository = holdingRepository;
+        this.snapshotRepository = snapshotRepository;
+        this.agentRepository = agentRepository;
+        this.marketService = marketService;
+        this.buyTradeExecutor = buyTradeExecutor;
+        this.sellTradeExecutor = sellTradeExecutor;
+    }
 
     /**
      * Initialize agent and create trading account - should be called when agent starts
@@ -159,9 +168,9 @@ public class AccountService {
             report.put("balance", account.getBalance());
             report.put("holdingsValue", holdingsValue);
             report.put("totalPortfolioValue", totalValue);
-            report.put("initialBalance", 100000.0); // Default initial balance
-            report.put("totalProfitLoss", totalValue - 100000.0);
-            report.put("profitLossPercent", ((totalValue - 100000.0) / 100000.0) * 100);
+            report.put("initialBalance", DEFAULT_INITIAL_BALANCE);
+            report.put("totalProfitLoss", totalValue - DEFAULT_INITIAL_BALANCE);
+            report.put("profitLossPercent", ((totalValue - DEFAULT_INITIAL_BALANCE) / DEFAULT_INITIAL_BALANCE) * 100);
             report.put("lastUpdated", account.getUpdatedAt());
             report.put("holdingsCount", holdings.size());
             report.put("transactionCount", transactionRepository.countByAccount(account));
@@ -251,7 +260,7 @@ public class AccountService {
         AccountPortfolioSnapshot previousSnapshot = snapshotRepository
             .findTopByAccountOrderByTimestampDesc(account);
         if (previousSnapshot != null) {
-            snapshot.calculateMetrics(100000.0, previousSnapshot.getTotalValue()); // Assume 100k initial
+            snapshot.calculateMetrics(DEFAULT_INITIAL_BALANCE, previousSnapshot.getTotalValue());
         }
 
         snapshotRepository.save(snapshot);
