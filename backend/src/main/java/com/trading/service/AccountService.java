@@ -1,5 +1,6 @@
 package com.trading.service;
 
+import com.trading.dto.response.AccountReportDto;
 import com.trading.dto.response.HoldingDto;
 import com.trading.dto.response.TradeResult;
 import com.trading.entity.*;
@@ -11,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -142,42 +142,35 @@ public class AccountService {
     // changeStrategy method removed - using hardcoded strategies only
 
     /**
-     * Get account report for an agent
+     * Get account report for an agent.
+     * Returns DTO that Spring auto-serializes to JSON for MCP resource endpoint.
+     * Used by Python agents to provide context to AI for trading decisions.
      */
-    public String getAccountReport(String agentName) {
+    public AccountReportDto getAccountReport(String agentName) {
         try {
             TradingAccount account = getAccount(agentName);
-            
+
             // Get current holdings and calculate their value
             List<AccountHolding> holdings = holdingRepository.findByAccount(account);
             Double holdingsValue = calculateHoldingsValue(holdings);
-            
+
             // Calculate total portfolio value
             Double totalValue = account.getBalance() + holdingsValue;
-            
-            // Get recent transactions
-            List<AccountTransaction> recentTransactions = transactionRepository
-                .findByAccountOrderByTimestampDesc(account)
-                .stream()
-                .limit(10)
-                .collect(Collectors.toList());
-            
-            // Build report
-            Map<String, Object> report = new HashMap<>();
-            report.put("agentName", agentName);
-            report.put("balance", account.getBalance());
-            report.put("holdingsValue", holdingsValue);
-            report.put("totalPortfolioValue", totalValue);
-            report.put("initialBalance", DEFAULT_INITIAL_BALANCE);
-            report.put("totalProfitLoss", totalValue - DEFAULT_INITIAL_BALANCE);
-            report.put("profitLossPercent", ((totalValue - DEFAULT_INITIAL_BALANCE) / DEFAULT_INITIAL_BALANCE) * 100);
-            report.put("lastUpdated", account.getUpdatedAt());
-            report.put("holdingsCount", holdings.size());
-            report.put("transactionCount", transactionRepository.countByAccount(account));
-            
-            // Convert to JSON-like string (simplified)
-            return buildReportString(report);
-            
+
+            // Build and return DTO (Spring will serialize to JSON)
+            return new AccountReportDto(
+                agentName,
+                account.getBalance(),
+                holdingsValue,
+                totalValue,
+                DEFAULT_INITIAL_BALANCE,
+                totalValue - DEFAULT_INITIAL_BALANCE,
+                ((totalValue - DEFAULT_INITIAL_BALANCE) / DEFAULT_INITIAL_BALANCE) * 100,
+                account.getUpdatedAt(),
+                holdings.size(),
+                transactionRepository.countByAccount(account)
+            );
+
         } catch (Exception e) {
             throw new RuntimeException("Error getting account report for " + agentName + ": " + e.getMessage());
         }
@@ -285,25 +278,4 @@ public class AccountService {
             .sum();
     }
 
-    /**
-     * Build report string from map
-     */
-    private String buildReportString(Map<String, Object> report) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("{\n");
-        for (Map.Entry<String, Object> entry : report.entrySet()) {
-            sb.append("  \"").append(entry.getKey()).append("\": ");
-            if (entry.getValue() instanceof String) {
-                sb.append("\"").append(entry.getValue()).append("\"");
-            } else {
-                sb.append(entry.getValue());
-            }
-            sb.append(",\n");
-        }
-        if (sb.length() > 2) {
-            sb.setLength(sb.length() - 2); // Remove last comma
-        }
-        sb.append("\n}");
-        return sb.toString();
-    }
 }

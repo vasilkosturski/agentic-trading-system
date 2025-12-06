@@ -1,6 +1,7 @@
 package com.trading.controller;
 
 import com.trading.dto.request.InitializeAgentRequest;
+import com.trading.dto.response.AccountReportDto;
 import com.trading.dto.response.HoldingDto;
 import com.trading.dto.response.PortfolioHistoryPoint;
 import com.trading.dto.response.RecentTradeDto;
@@ -178,13 +179,13 @@ public class AccountController {
 
     // MCP Resource endpoints
     @GetMapping("/resources/accounts/{agentId}")
-    public ResponseEntity<String> getAccountResource(@PathVariable Long agentId) {
+    public ResponseEntity<AccountReportDto> getAccountResource(@PathVariable Long agentId) {
         try {
             String name = agentIdentityService.requireAgentName(agentId);
-            String accountReport = accountService.getAccountReport(name);
+            AccountReportDto accountReport = accountService.getAccountReport(name);
             return ResponseEntity.ok(accountReport);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+            throw new RuntimeException("Error getting account resource: " + e.getMessage());
         }
     }
 
