@@ -96,9 +96,9 @@ class BuyTradeExecutorTest {
         when(holdingRepository.findByAccountAndSymbol(testAccount, symbol))
             .thenReturn(null); // New holding
 
-        AccountHolding savedHolding = new AccountHolding(testAccount, symbol, quantity, price);
+        AccountHolding newHolding = new AccountHolding(testAccount, symbol, quantity, price);
         when(holdingRepository.save(any(AccountHolding.class)))
-            .thenReturn(savedHolding);
+            .thenReturn(newHolding);
 
         // Act
         TradeResult result = buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId);
@@ -114,11 +114,32 @@ class BuyTradeExecutorTest {
         verify(tradingAccountRepository).save(testAccount);
         assertEquals(expectedBalance, testAccount.getBalance());
 
-        // Verify transaction was created
-        verify(transactionRepository).save(any(AccountTransaction.class));
+        // Verify transaction was created with correct business logic
+        ArgumentCaptor<AccountTransaction> transactionCaptor = ArgumentCaptor.forClass(AccountTransaction.class);
+        verify(transactionRepository).save(transactionCaptor.capture());
 
-        // Verify holding was created
-        verify(holdingRepository).save(any(AccountHolding.class));
+        AccountTransaction savedTransaction = transactionCaptor.getValue();
+        assertAll("Transaction should have correct business logic fields",
+            () -> assertEquals(testAccount, savedTransaction.getAccount(), "Account should match"),
+            () -> assertEquals(symbol, savedTransaction.getSymbol(), "Symbol should match"),
+            () -> assertEquals(TransactionType.BUY, savedTransaction.getTransactionType(), "Transaction type should be BUY"),
+            () -> assertEquals(quantity, savedTransaction.getQuantity(), "Quantity should match"),
+            () -> assertEquals(price, savedTransaction.getPrice(), "Price should match"),
+            () -> assertNotNull(savedTransaction.getTimestamp(), "Timestamp should be set"),
+            () -> assertEquals(testRun, savedTransaction.getAgentRun(), "AgentRun should be linked")
+        );
+
+        // Verify holding was created with correct business logic
+        ArgumentCaptor<AccountHolding> holdingCaptor = ArgumentCaptor.forClass(AccountHolding.class);
+        verify(holdingRepository).save(holdingCaptor.capture());
+
+        AccountHolding savedHolding = holdingCaptor.getValue();
+        assertAll("Holding should have correct business logic fields",
+            () -> assertEquals(testAccount, savedHolding.getAccount(), "Account should match"),
+            () -> assertEquals(symbol, savedHolding.getSymbol(), "Symbol should match"),
+            () -> assertEquals(quantity, savedHolding.getQuantity(), "Quantity should match"),
+            () -> assertEquals(price, savedHolding.getAveragePrice(), "Average price should equal purchase price for new holding")
+        );
     }
 
     @Test
@@ -483,6 +504,31 @@ class BuyTradeExecutorTest {
 
         // Verify account was saved with new balance
         verify(tradingAccountRepository).save(testAccount);
+
+        // Verify transaction was created with correct data
+        ArgumentCaptor<AccountTransaction> transactionCaptor = ArgumentCaptor.forClass(AccountTransaction.class);
+        verify(transactionRepository).save(transactionCaptor.capture());
+
+        AccountTransaction savedTransaction = transactionCaptor.getValue();
+        assertAll("Transaction should have correct fields for balance calculation test",
+            () -> assertEquals(testAccount, savedTransaction.getAccount()),
+            () -> assertEquals("AAPL", savedTransaction.getSymbol()),
+            () -> assertEquals(TransactionType.BUY, savedTransaction.getTransactionType()),
+            () -> assertEquals(quantity, savedTransaction.getQuantity()),
+            () -> assertEquals(price, savedTransaction.getPrice())
+        );
+
+        // Verify holding was created with correct data
+        ArgumentCaptor<AccountHolding> holdingCaptor = ArgumentCaptor.forClass(AccountHolding.class);
+        verify(holdingRepository).save(holdingCaptor.capture());
+
+        AccountHolding savedHolding = holdingCaptor.getValue();
+        assertAll("Holding should have correct fields for balance calculation test",
+            () -> assertEquals(testAccount, savedHolding.getAccount()),
+            () -> assertEquals("AAPL", savedHolding.getSymbol()),
+            () -> assertEquals(quantity, savedHolding.getQuantity()),
+            () -> assertEquals(price, savedHolding.getAveragePrice())
+        );
     }
 
     @Test
@@ -590,6 +636,31 @@ class BuyTradeExecutorTest {
 
         // Verify price was used correctly
         assertEquals(expectedPrice, result.price());
+
+        // Verify transaction was created with fetched price
+        ArgumentCaptor<AccountTransaction> transactionCaptor = ArgumentCaptor.forClass(AccountTransaction.class);
+        verify(transactionRepository).save(transactionCaptor.capture());
+
+        AccountTransaction savedTransaction = transactionCaptor.getValue();
+        assertAll("Transaction should use market price from MarketService",
+            () -> assertEquals(testAccount, savedTransaction.getAccount()),
+            () -> assertEquals(symbol, savedTransaction.getSymbol()),
+            () -> assertEquals(TransactionType.BUY, savedTransaction.getTransactionType()),
+            () -> assertEquals(10, savedTransaction.getQuantity()),
+            () -> assertEquals(expectedPrice, savedTransaction.getPrice(), "Price should match market price")
+        );
+
+        // Verify holding was created with fetched price
+        ArgumentCaptor<AccountHolding> holdingCaptor = ArgumentCaptor.forClass(AccountHolding.class);
+        verify(holdingRepository).save(holdingCaptor.capture());
+
+        AccountHolding savedHolding = holdingCaptor.getValue();
+        assertAll("Holding should use market price from MarketService",
+            () -> assertEquals(testAccount, savedHolding.getAccount()),
+            () -> assertEquals(symbol, savedHolding.getSymbol()),
+            () -> assertEquals(10, savedHolding.getQuantity()),
+            () -> assertEquals(expectedPrice, savedHolding.getAveragePrice(), "Average price should match market price")
+        );
     }
 
     // ========== EDGE CASES ==========
@@ -628,6 +699,31 @@ class BuyTradeExecutorTest {
         assertNotNull(result);
         assertEquals(0.0, result.newBalance());
         assertEquals(0.0, testAccount.getBalance());
+
+        // Verify transaction was created with correct data
+        ArgumentCaptor<AccountTransaction> transactionCaptor = ArgumentCaptor.forClass(AccountTransaction.class);
+        verify(transactionRepository).save(transactionCaptor.capture());
+
+        AccountTransaction savedTransaction = transactionCaptor.getValue();
+        assertAll("Transaction should have correct fields for exact balance depletion",
+            () -> assertEquals(testAccount, savedTransaction.getAccount()),
+            () -> assertEquals("AAPL", savedTransaction.getSymbol()),
+            () -> assertEquals(TransactionType.BUY, savedTransaction.getTransactionType()),
+            () -> assertEquals(quantity, savedTransaction.getQuantity()),
+            () -> assertEquals(price, savedTransaction.getPrice())
+        );
+
+        // Verify holding was created with correct data
+        ArgumentCaptor<AccountHolding> holdingCaptor = ArgumentCaptor.forClass(AccountHolding.class);
+        verify(holdingRepository).save(holdingCaptor.capture());
+
+        AccountHolding savedHolding = holdingCaptor.getValue();
+        assertAll("Holding should have correct fields for exact balance depletion",
+            () -> assertEquals(testAccount, savedHolding.getAccount()),
+            () -> assertEquals("AAPL", savedHolding.getSymbol()),
+            () -> assertEquals(quantity, savedHolding.getQuantity()),
+            () -> assertEquals(price, savedHolding.getAveragePrice())
+        );
     }
 
     @Test
@@ -664,5 +760,30 @@ class BuyTradeExecutorTest {
         // Assert - Verify fractional amounts handled correctly
         assertEquals(expectedBalance, result.newBalance(), 0.01);
         assertEquals(expectedBalance, testAccount.getBalance(), 0.01);
+
+        // Verify transaction was created with correct fractional data
+        ArgumentCaptor<AccountTransaction> transactionCaptor = ArgumentCaptor.forClass(AccountTransaction.class);
+        verify(transactionRepository).save(transactionCaptor.capture());
+
+        AccountTransaction savedTransaction = transactionCaptor.getValue();
+        assertAll("Transaction should have correct fields for fractional dollars",
+            () -> assertEquals(testAccount, savedTransaction.getAccount()),
+            () -> assertEquals("AAPL", savedTransaction.getSymbol()),
+            () -> assertEquals(TransactionType.BUY, savedTransaction.getTransactionType()),
+            () -> assertEquals(quantity, savedTransaction.getQuantity()),
+            () -> assertEquals(price, savedTransaction.getPrice(), 0.01, "Price should match fractional value")
+        );
+
+        // Verify holding was created with correct fractional data
+        ArgumentCaptor<AccountHolding> holdingCaptor = ArgumentCaptor.forClass(AccountHolding.class);
+        verify(holdingRepository).save(holdingCaptor.capture());
+
+        AccountHolding savedHolding = holdingCaptor.getValue();
+        assertAll("Holding should have correct fields for fractional dollars",
+            () -> assertEquals(testAccount, savedHolding.getAccount()),
+            () -> assertEquals("AAPL", savedHolding.getSymbol()),
+            () -> assertEquals(quantity, savedHolding.getQuantity()),
+            () -> assertEquals(price, savedHolding.getAveragePrice(), 0.01, "Average price should match fractional value")
+        );
     }
 }
