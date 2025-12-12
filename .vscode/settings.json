@@ -39,6 +39,21 @@
         "**/.gradle": true,
         "**/node_modules": true,
         "**/.git": true,
-        "**/.DS_Store": true
-    }
+        "**/.DS_Store": true,
+        "**/__pycache__": true,
+        "**/.pytest_cache": true,
+        "**/*.pyc": true
+    },
+    // Python configuration for agents
+    "python.defaultInterpreterPath": "${workspaceFolder}/agents/venv/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestArgs": [
+        "agents/tests",
+        "-v",
+        "--tb=short"
+    ],
+    "python.testing.cwd": "${workspaceFolder}/agents",
+    "python.testing.autoTestDiscoverOnSaveEnabled": true
 }
