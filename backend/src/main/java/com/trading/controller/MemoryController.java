@@ -31,6 +31,11 @@ public class MemoryController {
             @RequestParam(defaultValue = "30") int days) {
         try {
             TradingHistoryResponse history = memoryService.getTradingHistory(agentName, symbol, days);
+            if (history == null) {
+                return ResponseEntity.status(404).body(
+                    Map.of("error", "No trading history found for " + symbol + " in the last " + days + " days")
+                );
+            }
             return ResponseEntity.ok(history);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -51,6 +56,11 @@ public class MemoryController {
             @RequestParam(defaultValue = "7") int days) {
         try {
             RecentActivityResponse activity = memoryService.getRecentActivity(agentName, days);
+            if (activity == null) {
+                return ResponseEntity.status(404).body(
+                    Map.of("error", "No recent activity found for " + agentName + " in the last " + days + " days")
+                );
+            }
             return ResponseEntity.ok(activity);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

@@ -66,6 +66,11 @@ public class MemoryService {
                 .filter(t -> t.getTimestamp().isAfter(since))
                 .collect(Collectors.toList());
 
+        // Return 404 if no trading history found
+        if (transactions.isEmpty()) {
+            return null;  // Controller will convert to 404
+        }
+
         // Build response DTO
         return buildTradingHistoryResponse(agentName, symbol, days, transactions, account);
     }
@@ -91,6 +96,11 @@ public class MemoryService {
                 .filter(r -> r.getStartTime().isAfter(since))
                 .limit(20)  // Limit to last 20 runs
                 .collect(Collectors.toList());
+
+        // Return 404 if no recent activity found
+        if (recentRuns.isEmpty()) {
+            return null;  // Controller will convert to 404
+        }
 
         // Build response DTO
         return buildRecentActivityResponse(agentName, days, recentRuns);
