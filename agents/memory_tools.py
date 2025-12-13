@@ -12,9 +12,11 @@ Data sources:
 """
 
 import logging
-import aiohttp
 from typing import Optional
 from config import BACKEND_BASE_URL
+
+# Import unified HTTP client
+from http_client import call_backend, BackendAPIError
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +27,12 @@ async def get_trading_history(agent_name: str, symbol: str, days: int = 30) -> s
     - All trades (BUY/SELL) with reasoning
     - Run context (market conditions, overall strategy)
     - Non-trades (considered but didn't act)
-    
+
     Args:
         agent_name: Name of the agent (e.g., "Warren")
         symbol: Stock symbol (e.g., "NVDA")
         days: How many days back to look (default 30)
-    
+
     Returns:
         Natural language summary of trading history
     """
@@ -41,35 +43,28 @@ async def get_trading_history(agent_name: str, symbol: str, days: int = 30) -> s
             "symbol": symbol,
             "days": days
         }
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                if response.status == 200:
-                    # Return JSON as string - LLM will parse it
-                    return await response.text()
-                elif response.status == 404:
-                    return '{"error": "No trading history found"}'
-                else:
-                    logger.error(f"HTTP {response.status} getting trading history for {symbol}")
-                    return f'{{"error": "Unable to retrieve trading history (HTTP {response.status})"}}'
-                    
-    except aiohttp.ClientError as e:
-        logger.error(f"Network error getting trading history: {e}")
-        return f"Network error retrieving trading history: {str(e)}"
-    except Exception as e:
-        logger.error(f"Unexpected error getting trading history: {e}", exc_info=True)
-        return f"Unexpected error retrieving trading history: {str(e)}"
+
+        response = await call_backend("GET", url, params=params, timeout=10)
+        return response.text()  # Returns JSON string as-is
+
+    except BackendAPIError as e:
+        # Convert HTTP errors to JSON strings (for LLM)
+        if e.status_code == 404:
+            return '{"error": "No trading history found"}'
+
+        # Log already done by http_client, just return error JSON
+        return f'{{"error": "{str(e)}"}}'
 
 
 async def get_recent_activity(agent_name: str, days: int = 7) -> str:
     """
     Get recent trading activity across all stocks, organized by run.
     Shows what the agent has been doing, thinking, and considering.
-    
+
     Args:
         agent_name: Name of the agent (e.g., "Warren")
         days: How many days back to look (default 7)
-    
+
     Returns:
         Natural language summary of recent activity
     """
@@ -79,24 +74,17 @@ async def get_recent_activity(agent_name: str, days: int = 7) -> str:
             "agentName": agent_name,
             "days": days
         }
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                if response.status == 200:
-                    # Return JSON as string - LLM will parse it
-                    return await response.text()
-                elif response.status == 404:
-                    return '{"error": "No recent activity found"}'
-                else:
-                    logger.error(f"HTTP {response.status} getting recent activity")
-                    return f'{{"error": "Unable to retrieve recent activity (HTTP {response.status})"}}'
-                    
-    except aiohttp.ClientError as e:
-        logger.error(f"Network error getting recent activity: {e}")
-        return f"Network error retrieving recent activity: {str(e)}"
-    except Exception as e:
-        logger.error(f"Unexpected error getting recent activity: {e}", exc_info=True)
-        return f"Unexpected error retrieving recent activity: {str(e)}"
+
+        response = await call_backend("GET", url, params=params, timeout=10)
+        return response.text()  # Returns JSON string as-is
+
+    except BackendAPIError as e:
+        # Convert HTTP errors to JSON strings (for LLM)
+        if e.status_code == 404:
+            return '{"error": "No recent activity found"}'
+
+        # Log already done by http_client, just return error JSON
+        return f'{{"error": "{str(e)}"}}'
 
 
 # Tool metadata for OpenAI Agents SDK
