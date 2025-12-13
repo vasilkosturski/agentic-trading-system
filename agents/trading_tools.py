@@ -4,7 +4,6 @@ Direct HTTP trading tools - replaces accounts_server.py MCP proxy
 Uses OpenAI Agents SDK @function_tool decorator for automatic schema generation
 """
 
-import aiohttp
 import asyncio
 import json
 import logging
@@ -14,6 +13,9 @@ from typing import Dict, List, Any
 # Import centralized configuration
 from config import BACKEND_API_ACCOUNTS, BACKEND_BASE_URL
 
+# Import unified HTTP client
+from http_client import call_backend, BackendAPIError
+
 logger = logging.getLogger(__name__)
 
 # Use centralized configuration
@@ -22,44 +24,27 @@ BACKEND_URL = BACKEND_API_ACCOUNTS
 async def _call_backend_api(endpoint: str, data: dict = None) -> any:
     """Helper to call Java backend API"""
     url = f"{BACKEND_URL}{endpoint}"
-    timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout
+    method = "POST" if data else "GET"
 
     try:
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            if data:
-                logger.debug(f"POST {url} with data: {data}")
-                async with session.post(url, json=data) as response:
-                    response_text = await response.text()
-                    logger.debug(f"Response status: {response.status}, body: {response_text}")
+        response = await call_backend(method, url, json_data=data)
 
-                    try:
-                        result = json.loads(response_text)
-                    except json.JSONDecodeError as e:
-                        logger.error(f"Failed to parse JSON response from {url}: {response_text}")
-                        raise Exception(f"Invalid JSON response from API: {str(e)}")
-
-                    # Accept both 200 (OK) and 201 (Created) as success
-                    if response.status in [200, 201] and result.get("success"):
-                        return result.get("data")
-                    else:
-                        error_msg = result.get("error") or f"HTTP {response.status}"
-                        logger.error(f"API call failed: {error_msg}, response: {result}")
-                        raise Exception(f"API call failed: {error_msg}")
+        if method == "POST":
+            # POST endpoints return {"success": true, "data": {...}}
+            result = response.json()
+            if result.get("success"):
+                return result.get("data")
             else:
-                logger.debug(f"GET {url}")
-                async with session.get(url) as response:
-                    if response.status == 200:
-                        return await response.text()
-                    else:
-                        response_text = await response.text()
-                        logger.error(f"GET failed with status {response.status}: {response_text}")
-                        raise Exception(f"API call failed with status {response.status}")
-    except aiohttp.ClientError as e:
-        logger.error(f"Network error calling {url}: {type(e).__name__}: {str(e)}")
-        raise Exception(f"Network error: {str(e)}")
-    except asyncio.TimeoutError:
-        logger.error(f"Timeout calling {url} after 30 seconds")
-        raise Exception(f"Request timeout after 30 seconds")
+                # Shouldn't happen (backend returns 4xx/5xx on error)
+                error_msg = result.get("error", "Unknown error")
+                raise Exception(f"API call failed: {error_msg}")
+        else:
+            # GET endpoints return plain text
+            return response.text()
+
+    except BackendAPIError as e:
+        # Already logged by http_client
+        raise Exception(str(e)) from e
 
 @function_tool
 async def get_balance(agent_id: int) -> float:
@@ -217,29 +202,21 @@ async def get_account_report(agent_id: int) -> str:
     """Get detailed account report - called by system, not exposed as agent tool"""
     try:
         url = f"{BACKEND_BASE_URL}/api/accounts/resources/accounts/{agent_id}"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                if response.status == 200:
-                    return await response.text()
-                else:
-                    raise Exception(f"Failed to get account report: status {response.status}")
-    except Exception as e:
+        response = await call_backend("GET", url)
+        return response.text()
+    except BackendAPIError as e:
         logger.error(f"Failed to get account report for agent {agent_id}: {e}")
-        raise
+        raise Exception(str(e)) from e
 
 async def get_strategy(name: str) -> str:
     """Get agent strategy - called by system, not exposed as agent tool"""
     try:
         url = f"{BACKEND_BASE_URL}/api/accounts/resources/strategy/{name}"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                if response.status == 200:
-                    return await response.text()
-                else:
-                    raise Exception(f"Failed to get strategy: status {response.status}")
-    except Exception as e:
+        response = await call_backend("GET", url)
+        return response.text()
+    except BackendAPIError as e:
         logger.error(f"Failed to get strategy for {name}: {e}")
-        raise
+        raise Exception(str(e)) from e
 
 # No model-visible trading tools are exported. Account context is provided explicitly
 # by the orchestrator; trading actions are dispatched by code, not by the model.

@@ -4,13 +4,15 @@ Direct HTTP market data tools - replaces market_server.py MCP proxy
 Uses OpenAI Agents SDK @function_tool decorator for automatic schema generation
 """
 
-import aiohttp
 import logging
 from agents import function_tool
 from typing import Dict, List, Any
 
 # Import centralized configuration
 from config import BACKEND_API_MARKET
+
+# Import unified HTTP client
+from http_client import call_backend, BackendAPIError
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +23,20 @@ async def _call_backend_api(endpoint: str) -> any:
     """Helper to call Java backend API"""
     url = f"{BACKEND_URL}{endpoint}"
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            result = await response.json()
-            if response.status == 200 and result.get("success"):
-                return result.get("data")
-            else:
-                error_msg = result.get("error", "Unknown error")
-                raise Exception(f"API call failed: {error_msg}")
+    try:
+        response = await call_backend("GET", url)
+        result = response.json()
+
+        if result.get("success"):
+            return result.get("data")
+        else:
+            # Shouldn't happen (backend returns 4xx/5xx on error)
+            error_msg = result.get("error", "Unknown error")
+            raise Exception(f"API call failed: {error_msg}")
+
+    except BackendAPIError as e:
+        # Already logged by http_client
+        raise Exception(str(e)) from e
 
 @function_tool
 async def lookup_share_price(symbol: str) -> float:
