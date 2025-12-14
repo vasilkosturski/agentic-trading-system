@@ -142,23 +142,19 @@ class TestAgentExecutorPhase2PrepareContext:
     """Test Phase 2: Prepare context."""
 
     @patch("agent_executor.get_recent_activity")
-    @patch("agent_executor._get_holdings_raw")
     @patch("agent_executor.broadcast_status")
     async def test_phase2_prepare_context_with_history(
         self,
         mock_broadcast,
-        mock_get_holdings,
         mock_get_recent_activity,
         sample_agent_id,
         sample_agent_name,
         sample_strategy,
         sample_recent_activity,
-        sample_holdings,
     ):
-        """Test Phase 2 prepares context with historical data."""
+        """Test Phase 2 prepares baseline context without steering."""
         # Setup mocks
         mock_get_recent_activity.return_value = sample_recent_activity
-        mock_get_holdings.return_value = sample_holdings
 
         # Create executor
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_strategy)
@@ -166,25 +162,20 @@ class TestAgentExecutorPhase2PrepareContext:
         # Execute Phase 2
         context = await executor._phase2_prepare_context()
 
-        # Verify results
+        # Verify results - only baseline context, no steering
         assert "historical_context" in context
-        assert "research_focus" in context
+        assert "research_focus" not in context  # Removed - no longer steering
         assert context["historical_context"] == sample_recent_activity
-        assert "NVDA" in context["research_focus"]  # From sample_recent_activity
-        assert "AAPL" in context["research_focus"]  # From sample_holdings
 
-        # Verify API calls
+        # Verify API calls - only recent activity, no holdings
         mock_get_recent_activity.assert_called_once_with(sample_agent_name, days=30)
-        mock_get_holdings.assert_called_once_with(sample_agent_id)
         mock_broadcast.assert_called_once()
 
     @patch("agent_executor.get_recent_activity")
-    @patch("agent_executor._get_holdings_raw")
     @patch("agent_executor.broadcast_status")
     async def test_phase2_prepare_context_no_history(
         self,
         mock_broadcast,
-        mock_get_holdings,
         mock_get_recent_activity,
         sample_agent_id,
         sample_agent_name,
@@ -193,7 +184,6 @@ class TestAgentExecutorPhase2PrepareContext:
         """Test Phase 2 handles no historical data gracefully."""
         # Setup mocks - no history
         mock_get_recent_activity.return_value = '{"error": "No recent activity found"}'
-        mock_get_holdings.return_value = []
 
         # Create executor
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_strategy)
@@ -201,10 +191,10 @@ class TestAgentExecutorPhase2PrepareContext:
         # Execute Phase 2
         context = await executor._phase2_prepare_context()
 
-        # Verify results
+        # Verify results - only baseline context (even if empty)
         assert "historical_context" in context
-        assert "research_focus" in context
-        assert context["research_focus"] == ""  # No symbols to research
+        assert "research_focus" not in context  # Removed - no longer steering
+        assert context["historical_context"] == '{"error": "No recent activity found"}'
 
 
 @pytest.mark.asyncio
@@ -249,7 +239,6 @@ class TestAgentExecutorPhase4RunAgent:
 
         context = {
             "historical_context": "{}",
-            "research_focus": "Focus on AAPL",
         }
 
         # Create executor
@@ -263,7 +252,7 @@ class TestAgentExecutorPhase4RunAgent:
         # Verify results
         assert result == mock_result
         mock_message_builder.build_message.assert_called_once_with(
-            "{}", "Focus on AAPL", False
+            "{}", False
         )
         mock_runner_class.run.assert_called_once_with(
             mock_agent, "Test message", max_turns=30

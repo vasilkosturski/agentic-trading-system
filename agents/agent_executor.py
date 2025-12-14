@@ -220,64 +220,30 @@ class AgentExecutor:
         return run_id
 
     async def _phase2_prepare_context(self) -> Dict[str, Any]:
-        """Phase 2: Pre-fetch historical context and research focus.
+        """Phase 2: Prepare baseline context (recent activity) without steering agent.
+
+        Provides agent with recent trading history as context, but lets agent
+        autonomously decide what to research and focus on.
 
         Returns:
-            Dict with historical_context and research_focus
+            Dict with historical_context (baseline recent activity)
         """
-        # Broadcast: RESEARCHING (combined: fetching data, research, analysis)
+        # Broadcast: RESEARCHING
         broadcast_status(
             self.agent_id,
             self.name,
             PHASE_RESEARCHING,
-            "Researching and analyzing market opportunities",
-            30,
+            "Preparing context",
+            20,
         )
 
-        # PRE-FETCH DATA BEFORE AGENT RUNS (more reliable than letting LLM decide to call tools)
-        logger.info(f"📊 Pre-fetching historical context for {self.name}")
-
-        # 1. Call get_recent_activity to get trading history
+        # Fetch recent activity (last 30 days) as baseline context
         recent_activity_json = await get_recent_activity(self.name, days=30)
 
-        # 2. Extract stock symbols from recent activity to focus research
-        relevant_symbols = []
-        try:
-            if (
-                recent_activity_json
-                and recent_activity_json != '{"error": "No recent activity found"}'
-            ):
-                activity_data = json.loads(recent_activity_json)
-                # Extract symbols from trades in the activity data
-                if isinstance(activity_data, dict) and "runs" in activity_data:
-                    for run in activity_data.get("runs", [])[:5]:  # Last 5 runs
-                        for trade in run.get("trades", []):
-                            symbol = trade.get("symbol")
-                            if symbol and symbol not in relevant_symbols:
-                                relevant_symbols.append(symbol)
-        except Exception as e:
-            logger.warning(f"Could not parse recent activity for symbols: {e}")
-
-        # Add current holdings to symbols to research
-        holdings = await _get_holdings_raw(self.agent_id)
-        if holdings:
-            for holding in holdings:
-                symbol = holding.get("symbol")
-                if symbol and symbol not in relevant_symbols:
-                    relevant_symbols.append(symbol)
-
-        # Create research context for agent
-        research_focus = ""
-        if relevant_symbols:
-            research_focus = f"Focus your research on these stocks from your portfolio/history: {', '.join(relevant_symbols[:5])}"
-
-        logger.info(
-            f"📊 Research will focus on: {relevant_symbols[:5] if relevant_symbols else 'general market'}"
-        )
+        logger.info(f"📊 Baseline context prepared: recent activity (30 days)")
 
         return {
             "historical_context": recent_activity_json,
-            "research_focus": research_focus,
         }
 
     async def _phase3_create_agent(self, tool_factory) -> Agent:
@@ -306,15 +272,15 @@ class AgentExecutor:
         Args:
             agent: Agent instance to run
             message_builder: Object that builds agent messages
-            context: Dict with historical_context and research_focus
+            context: Dict with historical_context (baseline recent activity)
             force_trade: If True, agent must make BUY/SELL (no HOLD)
 
         Returns:
             Agent result object
         """
-        # Generate message with historical context and research focus pre-injected
+        # Generate message with baseline historical context
         message = message_builder.build_message(
-            context["historical_context"], context["research_focus"], force_trade
+            context["historical_context"], force_trade
         )
 
         result = await Runner.run(agent, message, max_turns=30)
