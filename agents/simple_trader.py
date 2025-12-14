@@ -41,13 +41,12 @@ class MessageBuilder:
         self.trader = simple_trader
 
     def build_message(
-        self, historical_context: str, research_focus: str, force_trade: bool
+        self, historical_context: str, force_trade: bool
     ) -> str:
         """Build agent message for portfolio review cycle.
 
         Args:
-            historical_context: Pre-fetched trading history JSON
-            research_focus: Research guidance string
+            historical_context: Pre-fetched trading history JSON (baseline context)
             force_trade: If True, agent must make BUY/SELL (no HOLD)
 
         Returns:
@@ -57,7 +56,7 @@ class MessageBuilder:
         account = "Account info loaded"  # Placeholder - actual loading handled in executor
 
         return self.trader.get_portfolio_review_message(
-            strategy, account, historical_context, research_focus, force_trade
+            strategy, account, historical_context, force_trade
         )
 
 
@@ -400,14 +399,13 @@ Your investment strategy:
 {self.strategy}
 """
 
-    def get_portfolio_review_message(self, strategy: str, account: str, historical_context: str = None, research_focus: str = "", force_trade: bool = False) -> str:
+    def get_portfolio_review_message(self, strategy: str, account: str, historical_context: str = None, force_trade: bool = False) -> str:
         """Get unified portfolio review message that supports proactive trading and prudent risk management.
 
         Args:
             strategy: Investment strategy description
             account: Account information
             historical_context: Pre-fetched trading history JSON
-            research_focus: Research guidance string
             force_trade: If True, agent MUST make a BUY or SELL trade (no HOLD allowed)
         """
         historical_section = ""
@@ -419,13 +417,6 @@ YOUR TRADING HISTORY (pre-fetched for you):
 
 Use this historical context to inform your decisions. Reference specific past trades when making new decisions.
 ---
-"""
-
-        research_guidance = ""
-        if research_focus:
-            research_guidance = f"""
-**RESEARCH GUIDANCE**: {research_focus}
-When using the Researcher tool, ask it to research these specific stocks based on your portfolio.
 """
 
         force_trade_instruction = ""
@@ -444,8 +435,6 @@ This is a MANUAL trading cycle triggered by the user. You MUST make an actual tr
 
 THIS IS A SIMULATION ENVIRONMENT - Be active and demonstrate your trading strategy!
 Your goal is to build and manage an interesting portfolio that reflects your investment philosophy.
-
-{research_guidance}
 
 YOUR PORTFOLIO REVIEW APPROACH:
 1. Use the Researcher tool to check relevant news and market conditions
