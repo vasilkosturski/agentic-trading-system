@@ -10,7 +10,6 @@ from agents import Agent, Runner
 
 # Import direct function tools
 from trading_tools import (
-    get_account_report,
     initialize_agent,
     buy_shares,
     sell_shares,
@@ -167,10 +166,6 @@ class AgentExecutor:
         broadcast_status(
             self.agent_id, self.name, PHASE_INITIALIZING, "Starting trading cycle", 0
         )
-
-        # Get account report (direct API call)
-        account = await get_account_report(self.agent_id)
-        strategy = self.strategy
 
         # Fetch balance and holdings for logging and run tracking
         balance = await _get_balance_raw(self.agent_id)
