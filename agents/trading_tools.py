@@ -8,7 +8,7 @@ import asyncio
 import json
 import logging
 from agents import function_tool
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 # Import centralized configuration
 from config import BACKEND_API_ACCOUNTS, BACKEND_BASE_URL
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # Use centralized configuration
 BACKEND_URL = BACKEND_API_ACCOUNTS
 
-async def _call_backend_api(endpoint: str, data: dict = None) -> any:
+async def _call_backend_api(endpoint: str, data: Optional[Dict[str, Any]] = None) -> Any:
     """Helper to call Java backend API"""
     url = f"{BACKEND_URL}{endpoint}"
     method = "POST" if data else "GET"
@@ -40,7 +40,7 @@ async def _call_backend_api(endpoint: str, data: dict = None) -> any:
                 raise Exception(f"API call failed: {error_msg}")
         else:
             # GET endpoints return plain text
-            return response.text()
+            return response.text
 
     except BackendAPIError as e:
         # Already logged by http_client
@@ -85,8 +85,8 @@ async def buy_shares(
     agent_id: int,
     symbol: str,
     quantity: int,
-    runId: int = None,
-    agent_name: str | None = None
+    runId: Optional[int] = None,
+    agent_name: Optional[str] = None
 ) -> str:
     """Buy shares of a stock.
 
@@ -125,8 +125,8 @@ async def sell_shares(
     agent_id: int,
     symbol: str,
     quantity: int,
-    runId: int = None,
-    agent_name: str | None = None
+    runId: Optional[int] = None,
+    agent_name: Optional[str] = None
 ) -> str:
     """Sell shares of a stock.
 
@@ -203,7 +203,7 @@ async def get_account_report(agent_id: int) -> str:
     try:
         url = f"{BACKEND_BASE_URL}/api/accounts/resources/accounts/{agent_id}"
         response = await call_backend("GET", url)
-        return response.text()
+        return response.text
     except BackendAPIError as e:
         logger.error(f"Failed to get account report for agent {agent_id}: {e}")
         raise Exception(str(e)) from e
@@ -213,7 +213,7 @@ async def get_strategy(name: str) -> str:
     try:
         url = f"{BACKEND_BASE_URL}/api/accounts/resources/strategy/{name}"
         response = await call_backend("GET", url)
-        return response.text()
+        return response.text
     except BackendAPIError as e:
         logger.error(f"Failed to get strategy for {name}: {e}")
         raise Exception(str(e)) from e

@@ -14,12 +14,15 @@ from config import BACKEND_API_MARKET
 # Import unified HTTP client
 from http_client import call_backend, BackendAPIError
 
+# Import type-safe models
+from models import PriceMetadata, HistoricalPrice, MarketIndicators
+
 logger = logging.getLogger(__name__)
 
 # Use centralized configuration
 BACKEND_URL = BACKEND_API_MARKET
 
-async def _call_backend_api(endpoint: str) -> any:
+async def _call_backend_api(endpoint: str) -> Any:
     """Helper to call Java backend API"""
     url = f"{BACKEND_URL}{endpoint}"
 
@@ -62,7 +65,7 @@ async def lookup_share_price(symbol: str) -> float:
         raise Exception(f"Failed to get price for {symbol}: {str(e)}")
 
 @function_tool
-async def get_price_with_metadata(symbol: str) -> Dict[str, Any]:
+async def get_price_with_metadata(symbol: str) -> PriceMetadata:
     """Get stock price with data quality metadata.
 
     Provides full context about data freshness and source for informed decision-making.
@@ -71,28 +74,23 @@ async def get_price_with_metadata(symbol: str) -> Dict[str, Any]:
         symbol: The stock symbol (e.g., 'AAPL', 'GOOGL', 'TSLA')
 
     Returns:
-        Dictionary with:
+        PriceMetadata model with validated data:
         - price: Current price (float)
-        - data_tier: 'REAL' (Polygon.io), 'MOCK' (simulated), or 'CACHED' (from cache)
+        - dataTier: 'REAL' (Polygon.io), 'MOCK' (simulated), or 'CACHED' (from cache)
         - timestamp: When data was retrieved (ISO format)
-        - data_source: 'Polygon.io API' or 'Mock Data'
-        - data_age_minutes: How old the data is
+        - dataSource: 'Polygon.io API' or 'Mock Data'
+        - dataAgeMinutes: How old the data is
     """
     try:
         result = await _call_backend_api(f"/price/{symbol}")
-        return {
-            "price": result["price"],
-            "data_tier": result["dataTier"],
-            "timestamp": result["timestamp"],
-            "data_source": result["dataSource"],
-            "data_age_minutes": result["dataAgeMinutes"]
-        }
+        # Validate API response with Pydantic
+        return PriceMetadata(**result)
     except Exception as e:
         logger.error(f"Failed to get price metadata for {symbol}: {e}")
         raise Exception(f"Failed to get price metadata for {symbol}: {str(e)}")
 
 @function_tool
-async def get_historical_prices(symbol: str, days: int = 30) -> List[Dict[str, Any]]:
+async def get_historical_prices(symbol: str, days: int = 30) -> List[HistoricalPrice]:
     """Get historical stock prices.
 
     Args:
@@ -100,18 +98,19 @@ async def get_historical_prices(symbol: str, days: int = 30) -> List[Dict[str, A
         days: Number of days of history to retrieve (default: 30, max: 365)
 
     Returns:
-        List of dictionaries with date and price:
-        [{"date": "2025-01-15", "price": 150.25}, ...]
+        List of HistoricalPrice models with validated data:
+        [HistoricalPrice(date="2025-01-15", price=150.25), ...]
     """
     try:
         result = await _call_backend_api(f"/historical/{symbol}/prices?days={days}")
-        return result
+        # Validate API response with Pydantic
+        return [HistoricalPrice(**item) for item in result]
     except Exception as e:
         logger.error(f"Failed to get historical prices for {symbol}: {e}")
         raise Exception(f"Failed to get historical prices for {symbol}: {str(e)}")
 
 @function_tool
-async def get_market_indicators(symbol: str) -> Dict[str, float]:
+async def get_market_indicators(symbol: str) -> MarketIndicators:
     """Get technical market indicators for a stock.
 
     Includes moving averages and volatility metrics useful for analysis.
@@ -120,18 +119,15 @@ async def get_market_indicators(symbol: str) -> Dict[str, float]:
         symbol: The stock symbol (e.g., 'AAPL', 'GOOGL', 'TSLA')
 
     Returns:
-        Dictionary with:
+        MarketIndicators model with validated data:
         - sma5: 5-day simple moving average
         - sma20: 20-day simple moving average
         - volatility: Price volatility measure
     """
     try:
         result = await _call_backend_api(f"/indicators/{symbol}/values")
-        return {
-            "sma5": result["sma5"],
-            "sma20": result["sma20"],
-            "volatility": result["volatility"]
-        }
+        # Validate API response with Pydantic
+        return MarketIndicators(**result)
     except Exception as e:
         logger.error(f"Failed to get market indicators for {symbol}: {e}")
         raise Exception(f"Failed to get market indicators for {symbol}: {str(e)}")

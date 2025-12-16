@@ -63,7 +63,7 @@ async def call_backend(
         # Memory tool (wants to return JSON string)
         try:
             response = await call_backend("GET", url, params=params)
-            return response.text()
+            return response.text
         except BackendAPIError as e:
             if e.status_code == 404:
                 return '{"error": "Not found"}'
@@ -94,7 +94,7 @@ async def call_backend(
             error_body = e.response.json()
             error_msg = error_body.get("error", str(error_body))
         except Exception:
-            error_msg = e.response.text()
+            error_msg = e.response.text
 
         logger.error(f"HTTP {status} {method} {url}: {error_msg}")
         raise BackendAPIError(f"HTTP {status}: {error_msg}", status_code=status) from e

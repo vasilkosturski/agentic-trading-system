@@ -10,7 +10,7 @@ import json
 import logging
 from contextlib import AsyncExitStack
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Literal, cast
 
 import aiohttp
 
@@ -86,12 +86,12 @@ class ToolFactory:
         @function_tool
         async def decide_action(
             action: str,
-            symbol: str = None,
-            quantity: int = None,
-            rationale: str = None,
-            fullReasoning: str = None,
-            researchSources: str = None,
-            historicalContext: str = None,
+            symbol: Optional[str] = None,
+            quantity: Optional[int] = None,
+            rationale: Optional[str] = None,
+            fullReasoning: Optional[str] = None,
+            researchSources: Optional[str] = None,
+            historicalContext: Optional[str] = None,
         ) -> str:
             """Record your trading decision with research sources and historical context."""
             act = (action or "").upper()
@@ -109,12 +109,14 @@ class ToolFactory:
                 reasoning_lower = reasoning_text.lower()
 
                 if act == "BUY" and ("sell" in reasoning_lower or "selling" in reasoning_lower):
-                    error_msg = f"CRITICAL ERROR: action=BUY but reasoning mentions 'sell'. Reasoning: {rationale[:100]}"
+                    rationale_excerpt = (rationale or "")[:100]
+                    error_msg = f"CRITICAL ERROR: action=BUY but reasoning mentions 'sell'. Reasoning: {rationale_excerpt}"
                     logger.error(f"🚨 {error_msg}")
                     raise ValueError(error_msg)
 
                 if act == "SELL" and ("buy" in reasoning_lower or "buying" in reasoning_lower):
-                    error_msg = f"CRITICAL ERROR: action=SELL but reasoning mentions 'buy'. Reasoning: {rationale[:100]}"
+                    rationale_excerpt = (rationale or "")[:100]
+                    error_msg = f"CRITICAL ERROR: action=SELL but reasoning mentions 'buy'. Reasoning: {rationale_excerpt}"
                     logger.error(f"🚨 {error_msg}")
                     raise ValueError(error_msg)
             else:
@@ -123,8 +125,9 @@ class ToolFactory:
                 quantity = quantity or 0
 
             # Store decision in executor
+            # Cast to Literal since we've validated act is BUY/SELL/HOLD above
             executor.store_decision(
-                action=act,
+                action=cast(Literal["BUY", "SELL", "HOLD"], act),
                 symbol=symbol,
                 quantity=quantity,
                 rationale=rationale or "",
@@ -283,15 +286,26 @@ Your JSON response must have this exact structure:
 {{
   "summary": "Brief 2-3 sentence summary of key findings",
   "sources": [
-    {{"title": "Article Title", "url": "https://full-url-used.com"}}
+    {{"title": "Article Title", "url": "https://full-url-used.com"}},
+    {{"title": "Another Source", "url": "https://another-url.com"}}
   ]
 }}
 
-IMPORTANT:
-- Only include sources you ACTUALLY USED and found relevant for your findings
-- Do NOT include sources you didn't find useful or didn't use
-- The summary should synthesize what you learned from ALL the sources combined
-- If you didn't find any useful sources, return empty sources array: []
+**MANDATORY SOURCE REQUIREMENTS:**
+- You MUST include at least 2-3 sources in your response (if available)
+- Each source must have both "title" and "url" fields
+- Only include sources you ACTUALLY READ and used in your analysis
+- Do NOT include sources you searched but found irrelevant
+- The "title" should be the article/page title, not a generic description
+- The "url" must be the full URL (starting with https://)
+- The summary should reference key points from each source
+
+**If no useful sources found:**
+- Return empty sources array: {{"summary": "No relevant information found", "sources": []}}
+
+**CITATION FORMAT IN SUMMARY:**
+When writing your summary, reference sources by their titles to show which facts came from which source.
+Example: "According to TechCrunch, NVIDIA reported strong Q4 earnings. MarketWatch notes increasing AI chip demand."
 
 Focus on finding relevant news, market conditions, and company information to support trading decisions.
 The current datetime is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
@@ -335,10 +349,12 @@ Available tools:
 
 2. **Research**: Use the Researcher tool to gather market information
    - Researcher returns a JSON object with TWO fields: {{"summary": "...", "sources": [...]}}
-   - The "sources" array contains objects like: {{"title": "Article Title", "url": "https://...", "snippet": "..."}}
+   - The "sources" array contains objects like: {{"title": "Article Title", "url": "https://..."}}
    - **CRITICAL**: You MUST pass the COMPLETE JSON from Researcher to decide_action as researchSources
    - Do NOT just copy the summary - include the ENTIRE JSON with the sources array
    - Example: researchSources='{{"summary": "Market analysis...", "sources": [{{"title": "...", "url": "..."}}]}}'
+   - **CITE SOURCES**: In your fullReasoning, cite key sources by title to show which facts support your decision
+   - Example: "According to TechCrunch, NVIDIA's AI chip demand is surging, which supports a BUY decision."
 
 3. **Decide**: Call decide_action() EXACTLY ONCE at the end with your decision, research sources, AND historical context
 
@@ -399,7 +415,7 @@ Your investment strategy:
 {self.strategy}
 """
 
-    def get_portfolio_review_message(self, strategy: str, account: str, historical_context: str = None, force_trade: bool = False) -> str:
+    def get_portfolio_review_message(self, strategy: str, account: str, historical_context: Optional[str] = None, force_trade: bool = False) -> str:
         """Get unified portfolio review message that supports proactive trading and prudent risk management.
 
         Args:
@@ -471,7 +487,7 @@ CRITICAL - DECISION RULES:
   - At the end of your analysis, call decide_action exactly once.
   - If you decide BUY or SELL, include symbol and positive integer quantity.
   - Provide a brief rationale (1-2 sentences) and a comprehensive fullReasoning (2-5 paragraphs) explaining:
-    * Your research findings and data sources
+    * Your research findings - CITE specific sources by title (e.g., "According to TechCrunch...")
     * Market conditions and context
     * Why this aligns with your investment strategy
     * Risk considerations and position sizing rationale

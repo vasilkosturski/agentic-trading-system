@@ -8,10 +8,11 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List, Dict, Any
 import aiohttp
 
 from config import BACKEND_API_RUNS
+from models import ToolCallRecord, ResearchQueryRecord, DataAccessRecord
 
 logger = logging.getLogger(__name__)
 
@@ -22,22 +23,23 @@ class ToolTracker:
     def __init__(self, run_id: Optional[int]):
         self.run_id = run_id
         self.sequence = 0
-        # Track data sources for transparency
-        self.tool_calls = []  # List of tool call records
-        self.research_queries = []  # Brave Search queries
-        self.data_accessed = []  # Database/market data accessed
+        # Track data sources for transparency (using dataclass models)
+        self.tool_calls: List[ToolCallRecord] = []  # List of tool call records
+        self.research_queries: List[ResearchQueryRecord] = []  # Brave Search queries
+        self.data_accessed: List[DataAccessRecord] = []  # Database/market data accessed
 
     def log_tool_call(self, tool_name: str, inputs: dict, output: str):
         """Record a tool call for transparency."""
-        self.tool_calls.append({
-            "tool": tool_name,
-            "inputs": inputs,
-            "output": output[:500] if output else "",  # Truncate long outputs
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
+        record = ToolCallRecord(
+            tool=tool_name,
+            inputs=inputs,
+            output=output[:500] if output else "",  # Truncate long outputs
+            timestamp=datetime.now(timezone.utc).isoformat()
+        )
+        self.tool_calls.append(record)
         logger.debug(f"Tracked tool call: {tool_name} with inputs {inputs}")
 
-    def log_research_query(self, query: str, results_summary: str, sources: list = None):
+    def log_research_query(self, query: str, results_summary: str, sources: Optional[List[Dict[str, str]]] = None):
         """Record a research/search query with sources.
 
         Args:
@@ -45,20 +47,22 @@ class ToolTracker:
             results_summary: Summary of findings
             sources: List of dicts with 'title' and 'url' keys
         """
-        self.research_queries.append({
-            "query": query,
-            "summary": results_summary[:300],  # Truncate
-            "sources": sources or [],
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
+        record = ResearchQueryRecord(
+            query=query,
+            summary=results_summary[:300],  # Truncate
+            sources=sources or [],
+            timestamp=datetime.now(timezone.utc).isoformat()
+        )
+        self.research_queries.append(record)
 
     def log_data_access(self, data_type: str, details: str):
         """Record database or market data access."""
-        self.data_accessed.append({
-            "type": data_type,
-            "details": details[:200],  # Truncate
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
+        record = DataAccessRecord(
+            type=data_type,
+            details=details[:200],  # Truncate
+            timestamp=datetime.now(timezone.utc).isoformat()
+        )
+        self.data_accessed.append(record)
 
     def build_reasoning_with_sources(self, base_reasoning: str) -> str:
         """Build rich reasoning text with data sources included."""
@@ -67,23 +71,23 @@ class ToolTracker:
         # Add data accessed section (only for research phase)
         if self.data_accessed:
             parts.append("\n\n📊 Data Context:")
-            for item in self.data_accessed:  # All items
-                parts.append(f"{item['details']}")
+            for data_record in self.data_accessed:  # All items
+                parts.append(f"{data_record.details}")
 
         # Add research section with cleaner format
         if self.research_queries:
             parts.append("\n\n🌐 Market Research:")
-            for item in self.research_queries[-2:]:  # Last 2 queries
+            for query_record in self.research_queries[-2:]:  # Last 2 queries
                 # Show summary without the query text
-                if item.get('summary'):
+                if query_record.summary:
                     # Clean up the summary - remove any "Research completed" generic text
-                    summary = item['summary']
+                    summary = query_record.summary
                     if not summary.startswith('Research completed'):
                         parts.append(summary)
 
-                if item.get('sources'):
+                if query_record.sources:
                     parts.append("\nSources:")
-                    for source in item['sources'][:5]:  # Top 5 sources
+                    for source in query_record.sources[:5]:  # Top 5 sources
                         title = source.get('title', 'Article')
                         url = source.get('url', '')
                         if url:
