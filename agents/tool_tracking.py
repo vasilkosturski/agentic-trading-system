@@ -28,7 +28,7 @@ class ToolTracker:
         self.research_queries: List[ResearchQueryRecord] = []  # Brave Search queries
         self.data_accessed: List[DataAccessRecord] = []  # Database/market data accessed
 
-    def log_tool_call(self, tool_name: str, inputs: dict, output: str):
+    def log_tool_call(self, tool_name: str, inputs: Dict[str, Any], output: str):
         """Record a tool call for transparency."""
         record = ToolCallRecord(
             tool=tool_name,
@@ -123,7 +123,7 @@ class ToolTracker:
             self.research_queries = []
             self.data_accessed = []
     
-    async def _send(self, endpoint: str, data: dict):
+    async def _send(self, endpoint: str, data: Dict[str, Any]):
         """Send to backend (internal use only)."""
         try:
             url = f"{BACKEND_API_RUNS}/{endpoint}"

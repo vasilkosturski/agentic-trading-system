@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING, Literal
 from agents import Agent, Runner
 
 # Import type-safe models
-from models import TradingDecision
+from models import TradingDecision, MarketConditions
 
 # Avoid circular import - only import types for type hints
 if TYPE_CHECKING:
@@ -179,10 +179,10 @@ class AgentExecutor:
         holdings = await _get_holdings_raw(self.agent_id)
 
         # Market conditions (simplified - could be enhanced)
-        market_conditions = {
-            "timestamp": datetime.now().isoformat(),
-            "cycle_type": cycle_type,
-        }
+        market_conditions = MarketConditions(
+            timestamp=datetime.now().isoformat(),
+            cycle_type=cycle_type,
+        )
 
         # Start run tracking (REQUIRED - every transaction must be linked to a run)
         run_id = await start_run(self.agent_id, self.name, run_type, market_conditions)
@@ -356,6 +356,11 @@ class AgentExecutor:
                         if 'call_id' in raw_item:
                             call_id = raw_item['call_id']
                             logger.info(f"  🔍 DEBUG - raw_item['call_id'] = {repr(call_id)}")
+
+                # Also check for call_id directly on item (not just raw_item)
+                if not call_id and hasattr(item, 'call_id'):
+                    call_id = getattr(item, 'call_id')
+                    logger.info(f"  🔍 DEBUG - item.call_id = {repr(call_id)}")
 
                 # PRIORITY 2: Try common attribute names for tool name
                 if not tool_name:

@@ -13,6 +13,7 @@ from .internal_state import (
     ToolCallRecord,
     ResearchQueryRecord,
     DataAccessRecord,
+    MarketConditions,
 )
 
 __all__ = [
@@ -29,4 +30,5 @@ __all__ = [
     "ToolCallRecord",
     "ResearchQueryRecord",
     "DataAccessRecord",
+    "MarketConditions",
 ]
