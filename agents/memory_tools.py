@@ -45,7 +45,7 @@ async def get_trading_history(agent_name: str, symbol: str, days: int = 30) -> s
         }
 
         response = await call_backend("GET", url, params=params, timeout=10)
-        return response.text()  # Returns JSON string as-is
+        return response.text  # Returns JSON string as-is
 
     except BackendAPIError as e:
         # Convert HTTP errors to JSON strings (for LLM)
@@ -76,7 +76,7 @@ async def get_recent_activity(agent_name: str, days: int = 7) -> str:
         }
 
         response = await call_backend("GET", url, params=params, timeout=10)
-        return response.text()  # Returns JSON string as-is
+        return response.text  # Returns JSON string as-is
 
     except BackendAPIError as e:
         # Convert HTTP errors to JSON strings (for LLM)

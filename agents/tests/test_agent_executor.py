@@ -36,7 +36,6 @@ class TestAgentExecutorPhase1Initialize:
     """Test Phase 1: Initialize cycle."""
 
     @patch("agent_executor.initialize_agent")
-    @patch("agent_executor.get_account_report")
     @patch("agent_executor._get_balance_raw")
     @patch("agent_executor._get_holdings_raw")
     @patch("agent_executor.start_run")
@@ -49,7 +48,6 @@ class TestAgentExecutorPhase1Initialize:
         mock_start_run,
         mock_get_holdings,
         mock_get_balance,
-        mock_get_account,
         mock_initialize,
         sample_agent_id,
         sample_agent_name,
@@ -60,7 +58,6 @@ class TestAgentExecutorPhase1Initialize:
         """Test Phase 1 initializes tracking and broadcasts status."""
         # Setup mocks
         mock_initialize.return_value = None
-        mock_get_account.return_value = "Account report"
         mock_get_balance.return_value = sample_balance
         mock_get_holdings.return_value = sample_holdings
         mock_start_run.return_value = 123  # Sample run ID
@@ -82,7 +79,6 @@ class TestAgentExecutorPhase1Initialize:
 
         # Verify API calls
         mock_initialize.assert_called_once_with(sample_agent_name)
-        mock_get_account.assert_called_once_with(sample_agent_id)
         mock_get_balance.assert_called_once_with(sample_agent_id)
         mock_get_holdings.assert_called_once_with(sample_agent_id)
 
@@ -106,10 +102,8 @@ class TestAgentExecutorPhase1Initialize:
     @patch("agent_executor.broadcast_status")
     @patch("agent_executor._get_balance_raw")
     @patch("agent_executor._get_holdings_raw")
-    @patch("agent_executor.get_account_report")
     async def test_phase1_initialize_fails_without_run_id(
         self,
-        mock_get_account,
         mock_get_holdings,
         mock_get_balance,
         mock_broadcast,
@@ -122,7 +116,6 @@ class TestAgentExecutorPhase1Initialize:
         """Test Phase 1 raises error if run tracking fails."""
         # Setup mocks
         mock_initialize.return_value = None
-        mock_get_account.return_value = "Account report"
         mock_get_balance.return_value = 100000.0
         mock_get_holdings.return_value = []
         mock_start_run.return_value = None  # Simulate failure
@@ -267,31 +260,33 @@ class TestAgentExecutorPhase5ParseResults:
         self, sample_agent_id, sample_agent_name, sample_strategy
     ):
         """Test Phase 5 parses Researcher tool usage and extracts sources."""
-        # Create mock result with Researcher tool call
+        # Create mock result with Researcher tool call (OpenAI Agents SDK v0.2+ format)
         mock_result = MagicMock()
 
-        # Create mock tool message (Researcher tool result)
-        tool_msg = MagicMock()
-        tool_msg.role = "tool"
-        tool_msg.name = "Researcher"
-        tool_msg.content = """NVDA shows strong growth. [SOURCE: TechNews](https://example.com/nvda)"""
-
-        # Create mock assistant message (tool call request)
-        assistant_msg = MagicMock()
-        assistant_msg.role = "assistant"
-        assistant_msg.content = "Analyzing NVDA..."
-        assistant_msg.tool_calls = [MagicMock()]
-        assistant_msg.tool_calls[0].function = MagicMock()
-        assistant_msg.tool_calls[0].function.arguments = json.dumps(
+        # Create mock tool call request item
+        tool_call_item = MagicMock()
+        tool_call_item.tool_calls = [MagicMock()]
+        tool_call_item.tool_calls[0].name = "Researcher"
+        tool_call_item.tool_calls[0].arguments = json.dumps(
             {"query": "Research NVDA AI chip market"}
         )
 
-        # Create final assistant message
-        final_msg = MagicMock()
-        final_msg.role = "assistant"
-        final_msg.content = "Based on my research, NVDA looks strong."
+        # Create mock tool output item (Researcher tool result)
+        tool_output_item = MagicMock()
+        tool_output_item.tool_name = "Researcher"
+        tool_output_item.output = json.dumps({
+            "summary": "NVDA shows strong AI growth potential",
+            "sources": [
+                {"title": "TechNews", "url": "https://example.com/nvda"},
+                {"title": "MarketWatch", "url": "https://example.com/market"}
+            ]
+        })
 
-        mock_result.messages = [assistant_msg, tool_msg, final_msg]
+        # Create final assistant message item
+        final_item = MagicMock()
+        final_item.tool_name = None  # Not a tool call
+
+        mock_result.new_items = [tool_call_item, tool_output_item, final_item]
 
         # Create executor with tracker
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_strategy)
@@ -311,12 +306,11 @@ class TestAgentExecutorPhase5ParseResults:
         self, sample_agent_id, sample_agent_name, sample_strategy
     ):
         """Test Phase 5 handles results with no tool usage."""
-        # Create mock result with only assistant messages
+        # Create mock result with only assistant items (no tool calls)
         mock_result = MagicMock()
-        assistant_msg = MagicMock()
-        assistant_msg.role = "assistant"
-        assistant_msg.content = "I decide to HOLD."
-        mock_result.messages = [assistant_msg]
+        assistant_item = MagicMock()
+        assistant_item.tool_name = None  # No tool call
+        mock_result.new_items = [assistant_item]
 
         # Create executor with tracker
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_strategy)
@@ -385,15 +379,16 @@ class TestAgentExecutorPhase6ExecuteDecision:
         mock_sell.return_value = None
 
         # Create SELL decision
-        sell_decision = {
-            "action": "SELL",
-            "symbol": "AAPL",
-            "quantity": 25,
-            "rationale": "Taking profits",
-            "fullReasoning": "AAPL has reached target price.",
-            "researchSources": "[]",
-            "historicalContext": "[]",
-        }
+        from models import TradingDecision
+        sell_decision = TradingDecision(
+            action="SELL",
+            symbol="AAPL",
+            quantity=25,
+            rationale="Taking profits",
+            fullReasoning="AAPL has reached target price.",
+            researchSources="[]",
+            historicalContext="[]",
+        )
 
         # Create executor with decision
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_strategy)
@@ -416,15 +411,16 @@ class TestAgentExecutorPhase6ExecuteDecision:
     ):
         """Test Phase 6 handles HOLD decision."""
         # Create HOLD decision
-        hold_decision = {
-            "action": "HOLD",
-            "symbol": "",
-            "quantity": 0,
-            "rationale": "Portfolio looks good",
-            "fullReasoning": "No changes needed.",
-            "researchSources": "[]",
-            "historicalContext": "[]",
-        }
+        from models import TradingDecision
+        hold_decision = TradingDecision(
+            action="HOLD",
+            symbol="",
+            quantity=0,
+            rationale="Portfolio looks good",
+            fullReasoning="No changes needed.",
+            researchSources="[]",
+            historicalContext="[]",
+        )
 
         # Create executor with decision
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_strategy)
@@ -529,14 +525,17 @@ class TestAgentExecutorPhase7Finalize:
         mock_end_run.return_value = None
 
         # Create executor with HOLD decision
+        from models import TradingDecision
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_strategy)
-        executor.last_decision = {
-            "action": "HOLD",
-            "rationale": "Portfolio unchanged",
-            "fullReasoning": "No trades needed.",
-            "researchSources": "[]",
-            "historicalContext": "[]",
-        }
+        executor.last_decision = TradingDecision(
+            action="HOLD",
+            symbol="",
+            quantity=0,
+            rationale="Portfolio unchanged",
+            fullReasoning="No trades needed.",
+            researchSources="[]",
+            historicalContext="[]",
+        )
         executor.trade_count = 0
 
         # Execute Phase 7
@@ -593,7 +592,6 @@ class TestAgentExecutorFullCycle:
     """Test full execution cycle integration."""
 
     @patch("agent_executor.initialize_agent")
-    @patch("agent_executor.get_account_report")
     @patch("agent_executor._get_balance_raw")
     @patch("agent_executor._get_holdings_raw")
     @patch("agent_executor.start_run")
@@ -614,7 +612,6 @@ class TestAgentExecutorFullCycle:
         mock_start_run,
         mock_get_holdings,
         mock_get_balance,
-        mock_get_account,
         mock_initialize,
         sample_agent_id,
         sample_agent_name,
@@ -627,7 +624,6 @@ class TestAgentExecutorFullCycle:
         """Test full execution cycle with BUY decision."""
         # Setup mocks
         mock_initialize.return_value = None
-        mock_get_account.return_value = "Account report"
         mock_get_balance.return_value = sample_balance
         mock_get_holdings.return_value = sample_holdings
         mock_start_run.return_value = 123
@@ -675,7 +671,7 @@ class TestAgentExecutorFullCycle:
         )
 
         # Verify result
-        assert result["decision"]["action"] == "BUY"
+        assert result["decision"].action == "BUY"
         assert result["trade_count"] == 1
         assert result["run_id"] == 123
 
@@ -699,12 +695,10 @@ class TestAgentExecutorFullCycle:
     @patch("agent_executor.broadcast_status")
     @patch("agent_executor._get_balance_raw")
     @patch("agent_executor._get_holdings_raw")
-    @patch("agent_executor.get_account_report")
     @patch("agent_executor.ToolTracker")
     async def test_execute_cycle_handles_error(
         self,
         mock_tracker_class,
-        mock_get_account,
         mock_get_holdings,
         mock_get_balance,
         mock_broadcast,
@@ -718,7 +712,6 @@ class TestAgentExecutorFullCycle:
         """Test full cycle handles errors and cleans up."""
         # Setup mocks
         mock_initialize.return_value = None
-        mock_get_account.return_value = "Account report"
         mock_get_balance.return_value = 100000.0
         mock_get_holdings.return_value = []
         mock_start_run.return_value = 123
@@ -829,7 +822,7 @@ class TestAgentExecutorHelperMethods:
         )
 
         assert executor.last_decision is not None
-        assert executor.last_decision["action"] == "BUY"
-        assert executor.last_decision["symbol"] == "AAPL"
-        assert executor.last_decision["quantity"] == 100
-        assert executor.last_decision["researchSources"] == '{"summary": "test"}'
+        assert executor.last_decision.action == "BUY"
+        assert executor.last_decision.symbol == "AAPL"
+        assert executor.last_decision.quantity == 100
+        assert executor.last_decision.researchSources == '{"summary": "test"}'

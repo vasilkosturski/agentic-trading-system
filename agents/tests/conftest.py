@@ -18,6 +18,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aioresponses import aioresponses
 
+# Import models for fixtures
+from models import TradingDecision
+
 
 @pytest.fixture
 def event_loop():
@@ -104,23 +107,23 @@ def sample_recent_activity() -> str:
 
 
 @pytest.fixture
-def sample_decision() -> Dict:
+def sample_decision() -> TradingDecision:
     """Sample trading decision for testing."""
-    return {
-        "action": "BUY",
-        "symbol": "NVDA",
-        "quantity": 50,
-        "rationale": "Strong AI growth potential",
-        "fullReasoning": "NVDA shows strong fundamentals with AI datacenter growth. P/E ratio is reasonable at 40x forward earnings.",
-        "researchSources": json.dumps({
+    return TradingDecision(
+        action="BUY",
+        symbol="NVDA",
+        quantity=50,
+        rationale="Strong AI growth potential",
+        fullReasoning="NVDA shows strong fundamentals with AI datacenter growth. P/E ratio is reasonable at 40x forward earnings.",
+        researchSources=json.dumps({
             "summary": "NVDA leading in AI chips",
             "sources": [{"title": "NVDA Analysis", "url": "https://example.com/nvda"}]
         }),
-        "historicalContext": json.dumps({
+        historicalContext=json.dumps({
             "summary": "No prior NVDA trades",
             "insights": []
         })
-    }
+    )
 
 
 @pytest.fixture
