@@ -3,11 +3,12 @@ Helper functions for tracking agent runs via backend API.
 """
 import json
 import httpx
-from typing import Optional, Dict, Any
+from typing import Optional
 import logging
 
 # Import centralized configuration
 from config import BACKEND_API_RUNS
+from models import MarketConditions
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ async def start_run(
     agent_id: int,
     agent_name: str,
     run_type: str,
-    market_conditions: Dict[str, Any]
+    market_conditions: MarketConditions
 ) -> Optional[int]:
     """
     Start a new agent run and return the run ID.
@@ -28,7 +29,7 @@ async def start_run(
         agent_id: Backend identifier for the agent
         agent_name: Name of the agent (used for logging only)
         run_type: Type of run (TRADING, REBALANCE)
-        market_conditions: Dict with market status
+        market_conditions: MarketConditions with market status
 
     Returns:
         Run ID if successful, None if failed
@@ -38,7 +39,10 @@ async def start_run(
     payload = {
         "agentId": agent_id,
         "runType": run_type,
-        "marketConditions": json.dumps(market_conditions)
+        "marketConditions": json.dumps({
+            "timestamp": market_conditions.timestamp,
+            "cycle_type": market_conditions.cycle_type
+        })
     }
 
     try:

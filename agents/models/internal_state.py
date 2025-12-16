@@ -47,3 +47,11 @@ class DataAccessRecord:
     type: str  # e.g., "Portfolio", "Trading History"
     details: str  # Truncated to 200 chars
     timestamp: str
+
+
+@dataclass
+class MarketConditions:
+    """Market conditions captured at the start of a trading run."""
+
+    timestamp: str  # ISO format timestamp
+    cycle_type: str  # e.g., "TRADING", "REBALANCE"
