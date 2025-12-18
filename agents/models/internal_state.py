@@ -54,4 +54,3 @@ class MarketConditions:
     """Market conditions captured at the start of a trading run."""
 
     timestamp: str  # ISO format timestamp
-    cycle_type: str  # e.g., "TRADING", "REBALANCE"

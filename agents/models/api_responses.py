@@ -30,3 +30,14 @@ class MarketIndicators(BaseModel):
     sma5: float = Field(description="5-day simple moving average")
     sma20: float = Field(description="20-day simple moving average")
     volatility: float = Field(ge=0, description="Price volatility measure")
+
+
+class Holding(BaseModel):
+    """Stock holding from backend API.
+
+    Validated at API boundary for type safety.
+    """
+
+    symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
+    quantity: int = Field(gt=0, description="Number of shares held")
+    averagePrice: float = Field(gt=0, description="Average purchase price per share")

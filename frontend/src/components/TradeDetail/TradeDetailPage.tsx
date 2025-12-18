@@ -62,13 +62,15 @@ const TradeDetailPage: React.FC = () => {
 
   // Parse JSON strings if available
   let parsedSources: any[] = [];
+  let parsedResearchSummary: string | null = null;
   let parsedHistoricalInsights: any[] = [];
   let parsedAgentContext: any = null;
 
   try {
     if (researchSources) {
       const parsed = JSON.parse(researchSources);
-      // Extract sources array from {summary, sources} structure
+      // Extract both summary and sources from {summary, sources} structure
+      parsedResearchSummary = parsed.summary || null;
       parsedSources = parsed.sources || [];
     }
     if (historicalContext) {
@@ -83,6 +85,29 @@ const TradeDetailPage: React.FC = () => {
   }
 
   /**
+   * Helper to extract summary from JSON string if present.
+   * Sometimes reasoningText contains stringified JSON like: '{"summary": "...", "sources": [...]}'
+   */
+  const extractSummaryFromJson = (text: string): string | null => {
+    if (!text) return null;
+
+    // Check if text looks like JSON (starts with { or contains "summary":)
+    const trimmed = text.trim();
+    if (trimmed.startsWith('{') || trimmed.includes('"summary"')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed.summary && typeof parsed.summary === 'string') {
+          return parsed.summary;
+        }
+      } catch (e) {
+        // Not valid JSON, continue with original text
+      }
+    }
+
+    return null;
+  };
+
+  /**
    * Parse reasoning text to extract structured data context and sources.
    * The reasoning text contains special markers:
    * - "📊 Data Context:" for historical database access
@@ -91,6 +116,12 @@ const TradeDetailPage: React.FC = () => {
    */
   const parseReasoningText = (text: string) => {
     if (!text) return { cleanText: '', dataContext: [], sources: [] };
+
+    // First check if the text is a JSON string with a summary
+    const jsonSummary = extractSummaryFromJson(text);
+    if (jsonSummary) {
+      return { cleanText: jsonSummary, dataContext: [], sources: [] };
+    }
 
     const lines = text.split('\n');
     let cleanText = '';
@@ -154,6 +185,12 @@ const TradeDetailPage: React.FC = () => {
     return reasoningSteps.map((step: any) => {
       const { cleanText, dataContext, sources } = parseReasoningText(step.reasoningText);
 
+      // For research steps, use the parsed research summary as the reasoning text
+      let displayText = cleanText || step.reasoningText;
+      if (step.stepType === 'research' && parsedResearchSummary) {
+        displayText = parsedResearchSummary;
+      }
+
       // For research steps, inject both web sources and historical insights
       const stepSources = step.stepType === 'research' && parsedSources.length > 0
         ? parsedSources
@@ -169,6 +206,7 @@ const TradeDetailPage: React.FC = () => {
           parsedSourcesCount: parsedSources.length,
           textSourcesCount: sources.length,
           historicalInsightsCount: parsedHistoricalInsights.length,
+          hasParsedSummary: !!parsedResearchSummary,
           finalSources: stepSources,
           finalInsights: stepHistoricalInsights
         });
@@ -178,7 +216,7 @@ const TradeDetailPage: React.FC = () => {
         id: step.id,
         stepType: step.stepType,
         stepDescription: step.stepDescription,
-        reasoningText: cleanText || step.reasoningText,
+        reasoningText: displayText,
         timestamp: step.timestamp,
         sequenceNumber: step.sequenceNumber,
         sources: stepSources,

@@ -7,7 +7,7 @@ Follows Pydantic best practices:
 """
 
 from .llm_output import TradingDecision, ResearchSource, HistoricalInsight
-from .api_responses import PriceMetadata, HistoricalPrice, MarketIndicators
+from .api_responses import PriceMetadata, HistoricalPrice, MarketIndicators, Holding
 from .internal_state import (
     ExecutorState,
     ToolCallRecord,
@@ -25,6 +25,7 @@ __all__ = [
     "PriceMetadata",
     "HistoricalPrice",
     "MarketIndicators",
+    "Holding",
     # Internal State Models
     "ExecutorState",
     "ToolCallRecord",
