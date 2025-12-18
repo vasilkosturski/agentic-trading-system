@@ -13,6 +13,9 @@ from typing import Dict, List, Any, Optional
 # Import centralized configuration
 from config import BACKEND_API_ACCOUNTS, BACKEND_BASE_URL
 
+# Import type-safe models
+from models import Holding
+
 # Import unified HTTP client
 from http_client import call_backend, BackendAPIError
 
@@ -189,14 +192,15 @@ async def _get_balance_raw(agent_id: int) -> float:
     result = await _call_backend_api("/tools/get_balance", {"agentId": agent_id})
     return float(result)
 
-async def _get_holdings_raw(agent_id: int) -> List[Dict[str, Any]]:
-    """Raw holdings getter - for system use, not exposed to agents
+async def _get_holdings_raw(agent_id: int) -> List[Holding]:
+    """Raw holdings getter - for system use, not exposed to agents.
 
     Returns:
-        List of holdings: [{"symbol": "AAPL", "quantity": 10, "averagePrice": 150.0}, ...]
+        List of Holding objects with symbol, quantity, averagePrice
     """
     result = await _call_backend_api("/tools/get_holdings", {"agentId": agent_id})
-    return result
+    # Validate at API boundary using Pydantic
+    return [Holding(**item) for item in result]
 
 async def get_account_report(agent_id: int) -> str:
     """Get detailed account report - called by system, not exposed as agent tool"""

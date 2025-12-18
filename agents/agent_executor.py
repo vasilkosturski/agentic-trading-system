@@ -101,18 +101,16 @@ class AgentExecutor:
         6. Execute decision: Perform BUY/SELL/HOLD
         7. Finalize: End tracking, broadcast completion
         """
-        # Keep "TRADING" for backwards compatibility with backend
-        cycle_type = "portfolio review"
-        run_type = "TRADING"
+        run_type = "TRADING"  # Backend expects this for run categorization
         run_id = None
 
         print(
-            f"🤖 {self.name} starting {cycle_type} cycle at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            f"🤖 {self.name} starting portfolio review at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
 
         try:
             # Phase 1: Initialize cycle
-            run_id = await self._phase1_initialize(run_type, cycle_type)
+            run_id = await self._phase1_initialize(run_type)
 
             # Phase 2: Prepare context (pre-fetch data)
             context = await self._phase2_prepare_context()
@@ -135,7 +133,7 @@ class AgentExecutor:
             await self._phase7_finalize(run_id)
 
             print(
-                f"✅ {self.name} completed {cycle_type} cycle at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                f"✅ {self.name} completed portfolio review at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             )
 
             return {
@@ -151,12 +149,11 @@ class AgentExecutor:
         finally:
             self._cleanup()
 
-    async def _phase1_initialize(self, run_type: str, cycle_type: str) -> int:
+    async def _phase1_initialize(self, run_type: str) -> int:
         """Phase 1: Initialize agent account, tracking, and broadcasts.
 
         Args:
-            run_type: "TRADING" or "REBALANCE"
-            cycle_type: "trading" or "rebalancing"
+            run_type: "TRADING" (sent to backend for run categorization)
 
         Returns:
             run_id for tracking this cycle
@@ -178,10 +175,9 @@ class AgentExecutor:
         balance = await _get_balance_raw(self.agent_id)
         holdings = await _get_holdings_raw(self.agent_id)
 
-        # Market conditions (simplified - could be enhanced)
+        # Market conditions (timestamp for run tracking)
         market_conditions = MarketConditions(
             timestamp=datetime.now().isoformat(),
-            cycle_type=cycle_type,
         )
 
         # Start run tracking (REQUIRED - every transaction must be linked to a run)
@@ -202,8 +198,8 @@ class AgentExecutor:
         # Log initial data access for transparency
         portfolio_info = f"Balance: ${balance:.2f}"
         if holdings:
-            # holdings is a List[Dict] with {symbol, quantity, averagePrice}
-            symbols = [h["symbol"] for h in holdings[:5]]  # First 5 symbols
+            # holdings is List[Holding] with typed attributes
+            symbols = [h.symbol for h in holdings[:5]]  # First 5 symbols
             positions_str = ", ".join(symbols) + ("..." if len(holdings) > 5 else "")
             portfolio_info += (
                 f", Holdings: {len(holdings)} position(s) ({positions_str})"
@@ -214,9 +210,9 @@ class AgentExecutor:
         self.tracker.log_data_access("Portfolio", portfolio_info)
 
         # Log initialization
-        init_text = f"Starting {cycle_type} cycle. Balance: ${balance:.2f}, Positions: {len(holdings)}"
+        init_text = f"Starting portfolio review. Balance: ${balance:.2f}, Positions: {len(holdings)}"
         self.tracker.log_reasoning(
-            "initialization", f"Started {cycle_type} cycle", init_text
+            "initialization", "Started portfolio review", init_text
         )
 
         return run_id
@@ -292,195 +288,81 @@ class AgentExecutor:
         """Phase 5: Parse agent output and track tool usage.
 
         Args:
-            result: Agent result object with new_items (OpenAI Agents SDK v0.2+)
+            result: Agent result object with new_items (OpenAI Agents SDK v0.2.4)
 
         Updates:
             self.tracker with tool calls and research queries
+
+        Note:
+            Tool parsing relies on SDK v0.2.4 structure. If SDK is updated,
+            this method may need adjustment. See requirements.txt for pinned version.
         """
         research_conducted = False
-        # Track tool names by call_id for matching outputs
+        # Track tool names by call_id for matching outputs to their tool calls
         tool_name_by_call_id: Dict[str, str] = {}
 
-        logger.info(f"🔍 Agent result type: {type(result)}")
-        logger.info(
-            f"🔍 Has new_items attr? {hasattr(result, 'new_items') if result else 'result is None'}"
-        )
-        if result:
-            logger.info(f"🔍 Result attributes: {dir(result)}")
+        if not result or not hasattr(result, "new_items"):
+            logger.warning("No new_items in agent result - skipping tool parsing")
+            return
 
-        if result and hasattr(result, "new_items"):
-            # Parse new_items to extract tool usage (OpenAI Agents SDK v0.2+)
-            logger.info(f"📋 Parsing {len(result.new_items)} items from agent result")
-            for i, item in enumerate(result.new_items):
-                item_type = type(item).__name__
-                logger.info(f"  Item #{i}: type={item_type}")
+        logger.info(f"📋 Parsing {len(result.new_items)} items from agent result")
 
-                # DEBUG: Print ALL attributes of this item
-                logger.info(f"  🔍 DEBUG - All attributes of {item_type}:")
-                for attr in dir(item):
-                    if not attr.startswith('_'):  # Skip private attributes
-                        try:
-                            value = getattr(item, attr)
-                            # Skip methods
-                            if not callable(value):
-                                logger.info(f"    {attr} = {repr(value)[:200]}")
-                        except Exception as e:
-                            logger.info(f"    {attr} = <error: {e}>")
+        for i, item in enumerate(result.new_items):
+            item_type = type(item).__name__
+            tool_name = None
+            call_id = None
 
-                # Check if this is a tool call output item
-                # Items can have tool_name attribute or be ToolCallOutputItem
-                # Try multiple possible attribute names
-                tool_name = None
-                call_id = None
+            # Extract tool name and call_id from raw_item (SDK v0.2.4 structure)
+            if hasattr(item, 'raw_item') and item.raw_item is not None:
+                raw_item = item.raw_item
 
-                # PRIORITY 1: Check raw_item.name (this is where tool name actually is)
-                if hasattr(item, 'raw_item') and item.raw_item is not None:
-                    raw_item = item.raw_item
-                    logger.info(f"  🔍 DEBUG - Found raw_item: {type(raw_item)}")
+                # Tool name is in raw_item.name
+                if hasattr(raw_item, 'name'):
+                    name = getattr(raw_item, 'name')
+                    if name and isinstance(name, str):
+                        tool_name = name
 
-                    # Check for name in raw_item
-                    if hasattr(raw_item, 'name'):
-                        potential_name = getattr(raw_item, 'name')
-                        logger.info(f"  🔍 DEBUG - raw_item.name = {repr(potential_name)}")
-                        if potential_name and isinstance(potential_name, str):
-                            tool_name = potential_name
-                            logger.info(f"  ✅ Using tool_name from raw_item.name: {tool_name}")
+                # Call ID for matching tool calls to outputs
+                if hasattr(raw_item, 'call_id'):
+                    call_id = getattr(raw_item, 'call_id')
 
-                    # Check for call_id in raw_item
-                    if hasattr(raw_item, 'call_id'):
-                        call_id = getattr(raw_item, 'call_id')
-                        logger.info(f"  🔍 DEBUG - raw_item.call_id = {repr(call_id)}")
+            # Fallback: call_id directly on item
+            if not call_id and hasattr(item, 'call_id'):
+                call_id = getattr(item, 'call_id')
 
-                    # For ToolCallOutputItem, raw_item might be a dict
-                    if isinstance(raw_item, dict):
-                        if 'call_id' in raw_item:
-                            call_id = raw_item['call_id']
-                            logger.info(f"  🔍 DEBUG - raw_item['call_id'] = {repr(call_id)}")
+            # Build call_id -> tool_name mapping for output items
+            if tool_name and call_id:
+                tool_name_by_call_id[call_id] = tool_name
 
-                # Also check for call_id directly on item (not just raw_item)
-                if not call_id and hasattr(item, 'call_id'):
-                    call_id = getattr(item, 'call_id')
-                    logger.info(f"  🔍 DEBUG - item.call_id = {repr(call_id)}")
+            # If we have call_id but no tool_name, look up from mapping
+            if not tool_name and call_id and call_id in tool_name_by_call_id:
+                tool_name = tool_name_by_call_id[call_id]
 
-                # PRIORITY 2: Try common attribute names for tool name
-                if not tool_name:
-                    for attr_name in ['tool_name', 'name', 'function_name', 'tool', 'function']:
-                        if hasattr(item, attr_name):
-                            potential_name = getattr(item, attr_name)
-                            logger.info(f"  🔍 DEBUG - Found attribute '{attr_name}' = {repr(potential_name)}")
-                            if potential_name and isinstance(potential_name, str):
-                                tool_name = potential_name
-                                logger.info(f"  ✅ Using tool_name from attribute '{attr_name}': {tool_name}")
-                                break
+            if not tool_name:
+                # Not a tool call item (e.g., message item) - skip silently
+                continue
 
-                # PRIORITY 3: If item has 'tool_call' attribute, check inside it
-                if not tool_name and hasattr(item, 'tool_call'):
-                    tool_call_obj = getattr(item, 'tool_call')
-                    logger.info(f"  🔍 DEBUG - Found tool_call object: {type(tool_call_obj)}")
-                    for attr_name in ['name', 'function_name', 'tool_name']:
-                        if hasattr(tool_call_obj, attr_name):
-                            potential_name = getattr(tool_call_obj, attr_name)
-                            logger.info(f"  🔍 DEBUG - tool_call.{attr_name} = {repr(potential_name)}")
-                            if potential_name and isinstance(potential_name, str):
-                                tool_name = potential_name
-                                logger.info(f"  ✅ Using tool_name from tool_call.{attr_name}: {tool_name}")
-                                break
+            logger.info(f"  🔧 Tool call: {tool_name}")
 
-                # Store tool name by call_id for later matching
-                if tool_name and call_id:
-                    tool_name_by_call_id[call_id] = tool_name
-                    logger.info(f"  📌 Stored mapping: call_id={call_id} -> tool_name={tool_name}")
+            # Extract tool output
+            tool_result_full = ""
+            if hasattr(item, "output"):
+                tool_result_full = str(item.output)
+            elif hasattr(item, "content"):
+                tool_result_full = str(item.content)
 
-                # If no tool_name but we have call_id, try to look it up
-                if not tool_name and call_id and call_id in tool_name_by_call_id:
-                    tool_name = tool_name_by_call_id[call_id]
-                    logger.info(f"  🔗 Matched call_id={call_id} to tool_name={tool_name}")
+            # Log tool call for audit trail
+            if self.tracker:
+                self.tracker.log_tool_call(tool_name, {}, tool_result_full[:300])
 
-                if tool_name:
-                    logger.info(f"  ✅ Found tool call: {tool_name}")
+            # Special handling for Researcher tool - extract sources
+            if tool_name == "Researcher":
+                research_conducted = True
+                self._process_researcher_output(
+                    tool_result_full, result.new_items, i
+                )
 
-                    # Get tool output - try multiple attributes
-                    tool_result_full = ""
-                    if hasattr(item, "output"):
-                        tool_result_full = str(item.output)
-                        logger.info(f"  📤 Got output from 'output' attribute ({len(tool_result_full)} chars)")
-                    elif hasattr(item, "content"):
-                        tool_result_full = str(item.content)
-                        logger.info(f"  📤 Got output from 'content' attribute ({len(tool_result_full)} chars)")
-                    elif hasattr(item, "result"):
-                        tool_result_full = str(item.result)
-                        logger.info(f"  📤 Got output from 'result' attribute ({len(tool_result_full)} chars)")
-                    else:
-                        logger.warning(f"  ⚠️ No output/content/result attribute found on {item_type}")
-
-                    tool_result = tool_result_full[:300]  # Truncate for logging
-                    if self.tracker:
-                        self.tracker.log_tool_call(tool_name, {}, tool_result)
-
-                    # Special handling for Researcher tool
-                    if tool_name == "Researcher":
-                        logger.info(f"  🔍 RESEARCHER TOOL DETECTED!")
-                        research_conducted = True
-
-                        # Try to parse JSON response from Researcher
-                        sources = []
-                        query = "Market research"
-                        result_summary = "Research completed"
-
-                        try:
-                            # Researcher should return JSON with {"summary": "...", "sources": [...]}
-                            research_json = json.loads(tool_result_full)
-                            if isinstance(research_json, dict):
-                                # Extract sources from JSON
-                                if "sources" in research_json and isinstance(research_json["sources"], list):
-                                    sources = research_json["sources"]
-                                    logger.info(f"  📎 Extracted {len(sources)} sources from Researcher JSON")
-
-                                # Extract summary from JSON
-                                if "summary" in research_json:
-                                    result_summary = str(research_json["summary"])
-                        except json.JSONDecodeError:
-                            # Fallback: Try to extract URLs from text if JSON parsing fails
-                            logger.info("  ⚠️ Researcher output is not JSON, falling back to URL extraction")
-                            sources = self._extract_urls_from_text(tool_result_full)
-                            result_summary = self._parse_research_summary(tool_result_full, sources)
-
-                        if sources:
-                            logger.info(f"  📎 Found {len(sources)} source URLs")
-                            for src in sources[:3]:  # Log first 3
-                                logger.info(
-                                    f"    - {src.get('title', 'No title')}: {src.get('url', 'No URL')}"
-                                )
-
-                        # Try to find the query from previous items
-                        # Look backwards for tool call request
-                        if i > 0:
-                            for j in range(i - 1, max(0, i - 5), -1):  # Check up to 5 items back
-                                prev_item = result.new_items[j]
-                                # Check if previous item has tool call arguments
-                                if hasattr(prev_item, "tool_calls") and prev_item.tool_calls:
-                                    for tool_call in prev_item.tool_calls:
-                                        if hasattr(tool_call, "name") and tool_call.name == "Researcher":
-                                            if hasattr(tool_call, "arguments"):
-                                                try:
-                                                    args = json.loads(tool_call.arguments) if isinstance(tool_call.arguments, str) else tool_call.arguments
-                                                    query = args.get("query", args.get("request", args.get("message", query)))
-                                                    if isinstance(query, str):
-                                                        query = query[:150]
-                                                    break
-                                                except:
-                                                    pass
-
-                        logger.info(f"  💾 Logging research query with {len(sources)} sources")
-                        logger.info(f"    Query: {query[:100]}")
-                        logger.info(f"    Summary: {result_summary[:150]}")
-                        if self.tracker:
-                            self.tracker.log_research_query(query, result_summary, sources)
-                else:
-                    # No tool_name found
-                    logger.warning(f"  ⚠️ No tool_name found for {item_type} - this item will be skipped")
-
-        # Log research phase with actual data
+        # Log research phase completion
         research_text = "Completed market research and analysis"
         if research_conducted:
             research_text += ". Used Researcher tool to gather current market information."
@@ -669,6 +551,56 @@ class AgentExecutor:
         self.trade_count = 0
         self.last_decision = None
         self.tracker = None
+
+    def _process_researcher_output(
+        self, tool_result: str, items: list, current_index: int
+    ) -> None:
+        """Process Researcher tool output - extract sources and log research query.
+
+        Args:
+            tool_result: Full output from Researcher tool
+            items: List of all items from agent result (for query extraction)
+            current_index: Index of current item in items list
+        """
+        sources = []
+        query = "Market research"
+        result_summary = "Research completed"
+
+        # Try to parse JSON response from Researcher
+        try:
+            research_json = json.loads(tool_result)
+            if isinstance(research_json, dict):
+                if "sources" in research_json and isinstance(research_json["sources"], list):
+                    sources = research_json["sources"]
+                if "summary" in research_json:
+                    result_summary = str(research_json["summary"])
+        except json.JSONDecodeError:
+            # Fallback: Extract URLs from text if not JSON
+            sources = self._extract_urls_from_text(tool_result)
+            result_summary = self._parse_research_summary(tool_result, sources)
+
+        # Try to find the original query from previous items
+        if current_index > 0:
+            for j in range(current_index - 1, max(0, current_index - 5), -1):
+                prev_item = items[j]
+                if hasattr(prev_item, "tool_calls") and prev_item.tool_calls:
+                    for tool_call in prev_item.tool_calls:
+                        if hasattr(tool_call, "name") and tool_call.name == "Researcher":
+                            if hasattr(tool_call, "arguments"):
+                                try:
+                                    args = json.loads(tool_call.arguments) if isinstance(tool_call.arguments, str) else tool_call.arguments
+                                    query = args.get("query", args.get("request", args.get("message", query)))
+                                    if isinstance(query, str):
+                                        query = query[:150]
+                                    break
+                                except (json.JSONDecodeError, TypeError):
+                                    pass
+
+        if sources:
+            logger.info(f"  📎 Research: {len(sources)} sources, query: {query[:50]}...")
+
+        if self.tracker:
+            self.tracker.log_research_query(query, result_summary, sources)
 
     def _extract_urls_from_text(self, text: str) -> List[Dict[str, str]]:
         """Extract URLs and titles from Researcher's SOURCE citations.

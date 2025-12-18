@@ -68,13 +68,12 @@ class TestAgentExecutorPhase1Initialize:
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_strategy)
 
         # Execute Phase 1
-        run_id = await executor._phase1_initialize("TRADING", "trading")
+        run_id = await executor._phase1_initialize("TRADING")
 
         # Verify results
         assert run_id == 123
         assert executor.current_run_id == 123
         assert executor.trade_count == 0
-        assert executor.last_decision is None
         assert executor.tracker is not None
 
         # Verify API calls
@@ -125,7 +124,7 @@ class TestAgentExecutorPhase1Initialize:
 
         # Execute Phase 1 - should raise exception
         with pytest.raises(Exception) as exc_info:
-            await executor._phase1_initialize("TRADING", "trading")
+            await executor._phase1_initialize("TRADING")
 
         assert "Failed to start run tracking" in str(exc_info.value)
 
@@ -272,8 +271,11 @@ class TestAgentExecutorPhase5ParseResults:
         )
 
         # Create mock tool output item (Researcher tool result)
+        # SDK v0.2.4 structure: tool name is in raw_item.name
         tool_output_item = MagicMock()
-        tool_output_item.tool_name = "Researcher"
+        tool_output_item.raw_item = MagicMock()
+        tool_output_item.raw_item.name = "Researcher"
+        tool_output_item.raw_item.call_id = "call_123"
         tool_output_item.output = json.dumps({
             "summary": "NVDA shows strong AI growth potential",
             "sources": [
@@ -282,9 +284,9 @@ class TestAgentExecutorPhase5ParseResults:
             ]
         })
 
-        # Create final assistant message item
+        # Create final assistant message item (no raw_item.name)
         final_item = MagicMock()
-        final_item.tool_name = None  # Not a tool call
+        final_item.raw_item = None  # Not a tool call
 
         mock_result.new_items = [tool_call_item, tool_output_item, final_item]
 
@@ -307,9 +309,10 @@ class TestAgentExecutorPhase5ParseResults:
     ):
         """Test Phase 5 handles results with no tool usage."""
         # Create mock result with only assistant items (no tool calls)
+        # SDK v0.2.4 structure: no raw_item.name means not a tool call
         mock_result = MagicMock()
         assistant_item = MagicMock()
-        assistant_item.tool_name = None  # No tool call
+        assistant_item.raw_item = None  # No tool call
         mock_result.new_items = [assistant_item]
 
         # Create executor with tracker

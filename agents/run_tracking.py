@@ -40,8 +40,7 @@ async def start_run(
         "agentId": agent_id,
         "runType": run_type,
         "marketConditions": json.dumps({
-            "timestamp": market_conditions.timestamp,
-            "cycle_type": market_conditions.cycle_type
+            "timestamp": market_conditions.timestamp
         })
     }
 

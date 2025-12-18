@@ -1,5 +1,6 @@
 # OpenAI Agents SDK - Core dependency for agent framework
-openai-agents>=0.2.4
+# PINNED: Tool parsing relies on SDK v0.2.4 structure (raw_item.name)
+openai-agents==0.2.4
 
 # OpenAI API client
 openai>=1.0.0

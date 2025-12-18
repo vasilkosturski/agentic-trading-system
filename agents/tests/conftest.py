@@ -19,7 +19,7 @@ import pytest
 from aioresponses import aioresponses
 
 # Import models for fixtures
-from models import TradingDecision
+from models import TradingDecision, Holding
 
 
 @pytest.fixture
@@ -66,11 +66,11 @@ def sample_balance() -> float:
 
 
 @pytest.fixture
-def sample_holdings() -> List[Dict]:
-    """Sample holdings for testing."""
+def sample_holdings() -> List[Holding]:
+    """Sample holdings for testing (as Holding objects)."""
     return [
-        {"symbol": "AAPL", "quantity": 100, "averagePrice": 150.0},
-        {"symbol": "MSFT", "quantity": 50, "averagePrice": 300.0},
+        Holding(symbol="AAPL", quantity=100, averagePrice=150.0),
+        Holding(symbol="MSFT", quantity=50, averagePrice=300.0),
     ]
 
 
@@ -78,7 +78,7 @@ def sample_holdings() -> List[Dict]:
 def sample_account_report(sample_balance, sample_holdings) -> str:
     """Sample account report for testing."""
     holdings_text = "\n".join([
-        f"- {h['symbol']}: {h['quantity']} shares @ ${h['averagePrice']:.2f} avg"
+        f"- {h.symbol}: {h.quantity} shares @ ${h.averagePrice:.2f} avg"
         for h in sample_holdings
     ])
     return f"""Account: Warren

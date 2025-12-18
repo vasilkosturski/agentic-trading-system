@@ -56,15 +56,67 @@ const RunDetailPage = () => {
     return `${minutes}m ${remainingSeconds}s`;
   };
 
+  /**
+   * Helper to extract summary from JSON string if present.
+   * Sometimes reasoningText contains stringified JSON like: '{"summary": "...", "sources": [...]}'
+   */
+  const extractSummaryFromJson = (text: string): string | null => {
+    if (!text) return null;
+
+    // Check if text looks like JSON (starts with { or contains "summary":)
+    const trimmed = text.trim();
+    if (trimmed.startsWith('{') || trimmed.includes('"summary"')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed.summary && typeof parsed.summary === 'string') {
+          return parsed.summary;
+        }
+      } catch (e) {
+        // Not valid JSON, continue with original text
+      }
+    }
+
+    return null;
+  };
+
   // Parse research sources if available
   let researchSources: any[] = [];
+  let researchSummary: string | null = null;
   if (runDetail.researchSources) {
     try {
-      researchSources = JSON.parse(runDetail.researchSources);
+      const parsed = JSON.parse(runDetail.researchSources);
+      // Extract both summary and sources from {summary, sources} structure
+      researchSummary = parsed.summary || null;
+      researchSources = parsed.sources || [];
     } catch (e) {
       console.error('Failed to parse research sources:', e);
     }
   }
+
+  // Enhance reasoning steps with research data
+  const enhancedReasoningSteps = runDetail.reasoningSteps?.map((step) => {
+    // Check if reasoningText itself contains JSON that needs parsing
+    const jsonSummary = extractSummaryFromJson(step.reasoningText);
+
+    // For research steps, inject the parsed research summary and sources
+    if (step.stepType === 'research') {
+      return {
+        ...step,
+        reasoningText: researchSummary || jsonSummary || step.reasoningText,
+        sources: researchSources.length > 0 ? researchSources : undefined
+      };
+    }
+
+    // For other step types, still check for JSON in reasoningText
+    if (jsonSummary) {
+      return {
+        ...step,
+        reasoningText: jsonSummary
+      };
+    }
+
+    return step;
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -162,7 +214,7 @@ const RunDetailPage = () => {
 
       {/* Agent Reasoning Timeline */}
       <AgentReasoningTimeline
-        reasoningSteps={runDetail.reasoningSteps}
+        reasoningSteps={enhancedReasoningSteps}
         fallbackReasoning={runDetail.fullReasoning || undefined}
       />
 
