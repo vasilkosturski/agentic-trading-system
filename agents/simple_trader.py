@@ -27,6 +27,9 @@ from memory_tools import get_trading_history, get_recent_activity
 # Import MCP params only for external services (Brave Search, Memory, Fetch)
 from mcp_params import researcher_mcp_server_params
 
+# Import researcher from new centralized module
+from researcher import get_researcher_tool
+
 # Import agent executor for orchestration
 from agent_executor import AgentExecutor
 
@@ -77,9 +80,10 @@ class ToolFactory:
         Returns:
             Agent instance ready to run
         """
-        # Create researcher tool from MCP servers
-        researcher_tool = await self.trader.get_researcher_tool(
-            self.researcher_mcp_servers
+        # Create researcher tool from centralized researcher module
+        researcher_tool = await get_researcher_tool(
+            self.researcher_mcp_servers,
+            self.trader.model_name
         )
 
         # Create decide_action tool that stores decision in executor
@@ -93,7 +97,20 @@ class ToolFactory:
             researchSources: Optional[str] = None,
             historicalContext: Optional[str] = None,
         ) -> str:
-            """Record your trading decision with research sources and historical context."""
+            """Record your trading decision with research sources and historical context.
+
+            ⚠️ CRITICAL: You MUST call Researcher before calling this function.
+            """
+
+            # ENFORCEMENT: Check if research was conducted
+            if not executor.tracker or not executor.tracker.research_queries:
+                raise ValueError(
+                    "❌ RESEARCH REQUIRED: You must call Researcher at least once before making decisions.\n"
+                    "Markets change constantly - always gather current information first.\n"
+                    "Call researcher() with your portfolio context before deciding.\n\n"
+                    "Example: researcher('I am Warren. Review my holdings and check for news on each position')"
+                )
+
             act = (action or "").upper()
 
             # CRITICAL DEBUG: Log what agent is passing
@@ -259,73 +276,12 @@ class SimpleTrader:
 
         return summary_text if summary_text else "Research completed"
 
-    async def get_researcher_tool(self, researcher_mcp_servers) -> Tool:
-        """Create researcher tool from external MCP servers (Brave Search, Fetch)
-
-        These are legitimate MCPs - we don't control Brave Search services
-        Memory is now stored directly in PostgreSQL via trading_tools.py fields
-        """
-        researcher_instructions = f"""You are a financial researcher. You help with research and analysis for trading decisions.
-Based on the request, you carry out necessary research and respond with your findings.
-
-Available tools:
-- Brave Search: Search the web for news, information, and analysis
-- Web fetch tool: Can retrieve content from specific URLs
-- Knowledge graph: Store and recall information about companies, websites, and market conditions
-
-Important: making use of your knowledge graph to retrieve and store information on companies, websites and market conditions:
-
-Make use of your knowledge graph tools to store and recall entity information; use it to retrieve information that
-you have worked on previously, and store new information about companies, stocks and market conditions.
-Also use it to store web addresses that you find interesting so you can check them later.
-Draw on your knowledge graph to build your expertise over time.
-
-**CRITICAL: You MUST return your findings as a JSON object.**
-
-Your JSON response must have this exact structure:
-{{
-  "summary": "Brief 2-3 sentence summary of key findings",
-  "sources": [
-    {{"title": "Article Title", "url": "https://full-url-used.com"}},
-    {{"title": "Another Source", "url": "https://another-url.com"}}
-  ]
-}}
-
-**MANDATORY SOURCE REQUIREMENTS:**
-- You MUST include at least 2-3 sources in your response (if available)
-- Each source must have both "title" and "url" fields
-- Only include sources you ACTUALLY READ and used in your analysis
-- Do NOT include sources you searched but found irrelevant
-- The "title" should be the article/page title, not a generic description
-- The "url" must be the full URL (starting with https://)
-- The summary should reference key points from each source
-
-**If no useful sources found:**
-- Return empty sources array: {{"summary": "No relevant information found", "sources": []}}
-
-**CITATION FORMAT IN SUMMARY:**
-When writing your summary, reference sources by their titles to show which facts came from which source.
-Example: "According to TechCrunch, NVIDIA reported strong Q4 earnings. MarketWatch notes increasing AI chip demand."
-
-Focus on finding relevant news, market conditions, and company information to support trading decisions.
-The current datetime is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-"""
-
-        researcher = Agent(
-            name="Researcher",
-            instructions=researcher_instructions,
-            model=self.model_name,
-            mcp_servers=researcher_mcp_servers,  # External MCPs - OK to use!
-        )
-
-        return researcher.as_tool(
-            tool_name="Researcher",
-            tool_description="This tool researches online for news and opportunities, either based on your specific request to look into a certain stock, or generally for notable financial news and opportunities. Describe what kind of research you're looking for."
-        )
-
     def get_trader_instructions(self) -> str:
         """Get trader instructions"""
         return f"""
+⚠️ MANDATORY: You MUST call Researcher at least once per cycle before making decisions.
+If you try to call decide_action without researching first, you will get an error.
+
 You are {self.name}, a trader on the stock market. Your account is under your name, {self.name}.
 You actively manage your portfolio according to your strategy.
 
@@ -335,6 +291,38 @@ Available tools:
 - Memory tools: query_trading_history(symbol, days), query_recent_activity(days)
   - Use these to remember your past decisions and reasoning about stocks
   - Check your history before making decisions to maintain consistency
+
+**USING THE RESEARCHER TOOL EFFECTIVELY**:
+
+You can (and should) call Researcher MULTIPLE TIMES per cycle for different purposes:
+
+Example uses:
+1. **Portfolio Review**: researcher("I am {self.name}. Review my current holdings and find news on each position")
+2. **Opportunity Search**: researcher("I am {self.name} focusing on my strategy. Find opportunities that match my investment approach")
+3. **Sector Analysis**: researcher("Analyze the financial sector outlook and identify risks")
+4. **Stock Deep Dive**: researcher("I hold 150 NVDA bought at $145 for AI thesis. Research latest earnings, outlook, and competitive position")
+
+**ENRICHING RESEARCH REQUESTS**:
+
+Provide context about what you're looking for:
+
+❌ Bad: researcher("research stocks")
+✅ Good: researcher("I'm {self.name} focusing on my strategy. Review my holdings and find opportunities")
+
+❌ Bad: researcher("what about NVDA")
+✅ Good: researcher("I hold 150 NVDA bought at $145 for AI thesis. Check latest earnings and sentiment")
+
+The Researcher has access to your portfolio and history - it will automatically query
+your holdings and past decisions when you mention your name.
+
+**MULTIPLE CALLS**:
+
+Example cycle:
+1. researcher("I am {self.name}. Review my holdings - any red flags?")
+2. researcher("Find 2-3 new opportunities matching my investment strategy")
+3. researcher("I'm considering selling AAPL. Deep dive on recent performance and outlook")
+
+Each call is tracked and sources are saved for transparency.
 
 **CRITICAL - Decision Workflow (YOU MUST FOLLOW ALL 3 STEPS):**
 
