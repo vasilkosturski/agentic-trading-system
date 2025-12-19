@@ -1,6 +1,5 @@
 package com.trading.service;
 
-import com.trading.dto.response.AgentStatusResponse;
 import com.trading.dto.response.AgentTradeResponse;
 import com.trading.dto.response.PortfolioPerformanceResponse;
 import com.trading.dto.response.RiskMetricsResponse;
@@ -14,7 +13,6 @@ import com.trading.repository.AccountTransactionRepository;
 import com.trading.repository.AgentRunRepository;
 import com.trading.repository.TradingAccountRepository;
 import com.trading.repository.TradingAgentRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
@@ -24,21 +22,20 @@ import java.util.stream.Collectors;
 @Service
 public class TradingService {
     
-    @Autowired
-    private AccountTransactionRepository transactionRepository;
+    private final AccountTransactionRepository transactionRepository;
+    private final TradingAccountRepository accountRepository;
+    private final TradingAgentRepository agentRepository;
+    private final AgentRunRepository agentRunRepository;
     
-    @Autowired
-    private TradingAccountRepository accountRepository;
-    
-    @Autowired
-    private TradingAgentRepository agentRepository;
-    
-    @Autowired
-    private AgentRunRepository agentRunRepository;
-    
-    // Constructor - no mock data initialization needed
-    public TradingService() {
-        // All data now comes from database
+    public TradingService(
+            AccountTransactionRepository transactionRepository,
+            TradingAccountRepository accountRepository,
+            TradingAgentRepository agentRepository,
+            AgentRunRepository agentRunRepository) {
+        this.transactionRepository = transactionRepository;
+        this.accountRepository = accountRepository;
+        this.agentRepository = agentRepository;
+        this.agentRunRepository = agentRunRepository;
     }
     
     /**

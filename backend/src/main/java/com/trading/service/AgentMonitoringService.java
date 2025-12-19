@@ -5,7 +5,6 @@ import com.trading.entity.TradingAgent;
 import com.trading.entity.AccountPortfolioSnapshot;
 import com.trading.repository.TradingAgentRepository;
 import com.trading.repository.AccountPortfolioSnapshotRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -16,17 +15,21 @@ import java.util.Optional;
 @Service
 public class AgentMonitoringService {
     
-    @Autowired
-    private TradingAgentRepository agentRepository;
+    private final TradingAgentRepository agentRepository;
+    private final AccountPortfolioSnapshotRepository snapshotRepository;
+    private final AccountService accountService;
+    private final TradingService tradingService;
     
-    @Autowired
-    private AccountPortfolioSnapshotRepository snapshotRepository;
-    
-    @Autowired
-    private AccountService accountService;
-    
-    @Autowired
-    private TradingService tradingService;
+    public AgentMonitoringService(
+            TradingAgentRepository agentRepository,
+            AccountPortfolioSnapshotRepository snapshotRepository,
+            AccountService accountService,
+            TradingService tradingService) {
+        this.agentRepository = agentRepository;
+        this.snapshotRepository = snapshotRepository;
+        this.accountService = accountService;
+        this.tradingService = tradingService;
+    }
     
     /**
      * Get real agent statuses from PostgreSQL database
