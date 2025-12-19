@@ -1,5 +1,10 @@
 package com.trading.service;
 
+import com.trading.dto.response.AgentStatusResponse;
+import com.trading.dto.response.AgentTradeResponse;
+import com.trading.dto.response.PortfolioPerformanceResponse;
+import com.trading.dto.response.RiskMetricsResponse;
+import com.trading.dto.response.TradingStatsResponse;
 import com.trading.entity.AccountTransaction;
 import com.trading.entity.AgentRun;
 import com.trading.entity.TransactionType;
@@ -13,8 +18,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -191,20 +194,6 @@ public class TradingService {
         return new RiskMetricsResponse(85000.0, 0.15, 1.2, 0.18, 1.05, 5000.0, 7500.0);
     }
     
-    // Helper methods
-    private AgentStatusResponse convertToAgentStatus(AgentData agent) {
-        return new AgentStatusResponse(
-            null,
-            agent.getAgentName(), agent.isActive(),
-            agent.getLastActivity().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-            agent.getTotalTrades(), agent.getTotalReturnPercent(), agent.getPortfolioValue(),
-            agent.getDayPnL(), agent.getDayPnLPercent(), agent.getCurrentPositions(),
-            1800 // Default cycle interval: 30 minutes = 1800 seconds
-        );
-    }
-    
-    // convertToOrderResponse method removed - no longer needed without mock orders
-    
     /**
      * Convert AccountTransaction to AgentTradeResponse for API responses
      */
@@ -224,163 +213,4 @@ public class TradingService {
             "N/A" // Order ID not tracked in current schema
         );
     }
-    
-    // Data classes
-    private static class AgentData {
-        private String agentName;
-        private boolean isActive;
-        private LocalDateTime lastActivity;
-        private int totalTrades;
-        private double totalReturnPercent;
-        private double portfolioValue;
-        private double dayPnL;
-        private double dayPnLPercent;
-        private int currentPositions;
-
-        public AgentData(String agentName, boolean isActive, LocalDateTime lastActivity, int totalTrades,
-                        double totalReturnPercent, double portfolioValue, double dayPnL, double dayPnLPercent, int currentPositions) {
-            this.agentName = agentName;
-            this.isActive = isActive;
-            this.lastActivity = lastActivity;
-            this.totalTrades = totalTrades;
-            this.totalReturnPercent = totalReturnPercent;
-            this.portfolioValue = portfolioValue;
-            this.dayPnL = dayPnL;
-            this.dayPnLPercent = dayPnLPercent;
-            this.currentPositions = currentPositions;
-        }
-
-        // Getters
-        public String getAgentName() { return agentName; }
-        public boolean isActive() { return isActive; }
-        public LocalDateTime getLastActivity() { return lastActivity; }
-        public int getTotalTrades() { return totalTrades; }
-        public double getTotalReturnPercent() { return totalReturnPercent; }
-        public double getPortfolioValue() { return portfolioValue; }
-        public double getDayPnL() { return dayPnL; }
-        public double getDayPnLPercent() { return dayPnLPercent; }
-        public int getCurrentPositions() { return currentPositions; }
-    }
-    
-    // AgentTradeData class removed - now using real AccountTransaction entities from database
-    
-    // TradeOrderData class removed - no longer needed without mock orders
-    
-    // Response classes
-    public static class AgentStatusResponse {
-        private Long agentId;
-        private String agentName, lastActivity;
-        private boolean isActive;
-        private int totalTrades, currentPositions, cycleIntervalSeconds;
-        private double totalReturnPercent, portfolioValue, dayPnL, dayPnLPercent;
-
-        public AgentStatusResponse(Long agentId, String agentName, boolean isActive, String lastActivity, int totalTrades,
-                                  double totalReturnPercent, double portfolioValue, double dayPnL, double dayPnLPercent,
-                                  int currentPositions, int cycleIntervalSeconds) {
-            this.agentId = agentId;
-            this.agentName = agentName; this.isActive = isActive; this.lastActivity = lastActivity;
-            this.totalTrades = totalTrades; this.totalReturnPercent = totalReturnPercent; this.portfolioValue = portfolioValue;
-            this.dayPnL = dayPnL; this.dayPnLPercent = dayPnLPercent; this.currentPositions = currentPositions;
-            this.cycleIntervalSeconds = cycleIntervalSeconds;
-        }
-
-        // Getters
-        public Long getAgentId() { return agentId; }
-        public String getAgentName() { return agentName; }
-        public boolean isActive() { return isActive; }
-        public String getLastActivity() { return lastActivity; }
-        public int getTotalTrades() { return totalTrades; }
-        public double getTotalReturnPercent() { return totalReturnPercent; }
-        public double getPortfolioValue() { return portfolioValue; }
-        public double getDayPnL() { return dayPnL; }
-        public double getDayPnLPercent() { return dayPnLPercent; }
-        public int getCurrentPositions() { return currentPositions; }
-        public int getCycleIntervalSeconds() { return cycleIntervalSeconds; }
-    }
-    
-    // TradeOrderResponse class removed - no longer needed without mock orders
-    
-    public static class AgentTradeResponse {
-        private String id, agentName, accountId, symbol, type, reasoning, timestamp, status, orderId;
-        private int quantity;
-        private double price, confidence;
-        
-        public AgentTradeResponse(String id, String agentName, String accountId, String symbol, String type,
-                                 int quantity, double price, String reasoning, double confidence, 
-                                 String timestamp, String status, String orderId) {
-            this.id = id; this.agentName = agentName; this.accountId = accountId; this.symbol = symbol;
-            this.type = type; this.quantity = quantity; this.price = price; this.reasoning = reasoning;
-            this.confidence = confidence; this.timestamp = timestamp; this.status = status; this.orderId = orderId;
-        }
-        
-        // Getters
-        public String getId() { return id; }
-        public String getAgentName() { return agentName; }
-        public String getAccountId() { return accountId; }
-        public String getSymbol() { return symbol; }
-        public String getType() { return type; }
-        public int getQuantity() { return quantity; }
-        public double getPrice() { return price; }
-        public String getReasoning() { return reasoning; }
-        public double getConfidence() { return confidence; }
-        public String getTimestamp() { return timestamp; }
-        public String getStatus() { return status; }
-        public String getOrderId() { return orderId; }
-    }
-    
-    public static class TradingStatsResponse {
-        private int totalTrades;
-        private double totalVolume, totalPnL, averageTradeSize, largestWin, largestLoss;
-
-        public TradingStatsResponse(int totalTrades, double totalVolume,
-                                   double totalPnL, double averageTradeSize, double largestWin, double largestLoss) {
-            this.totalTrades = totalTrades;
-            this.totalVolume = totalVolume; this.totalPnL = totalPnL;
-            this.averageTradeSize = averageTradeSize; this.largestWin = largestWin; this.largestLoss = largestLoss;
-        }
-
-        // Getters
-        public int getTotalTrades() { return totalTrades; }
-        public double getTotalVolume() { return totalVolume; }
-        public double getTotalPnL() { return totalPnL; }
-        public double getAverageTradeSize() { return averageTradeSize; }
-        public double getLargestWin() { return largestWin; }
-        public double getLargestLoss() { return largestLoss; }
-    }
-    
-    public static class PortfolioPerformanceResponse {
-        private List<String> timestamps;
-        private List<Double> values, returns, benchmark;
-        
-        public PortfolioPerformanceResponse(List<String> timestamps, List<Double> values, List<Double> returns, List<Double> benchmark) {
-            this.timestamps = timestamps; this.values = values; this.returns = returns; this.benchmark = benchmark;
-        }
-        
-        // Getters
-        public List<String> getTimestamps() { return timestamps; }
-        public List<Double> getValues() { return values; }
-        public List<Double> getReturns() { return returns; }
-        public List<Double> getBenchmark() { return benchmark; }
-    }
-    
-    public static class RiskMetricsResponse {
-        private double totalExposure, maxDrawdown, sharpeRatio, volatility, beta, var95, expectedShortfall;
-        
-        public RiskMetricsResponse(double totalExposure, double maxDrawdown, double sharpeRatio, double volatility,
-                                  double beta, double var95, double expectedShortfall) {
-            this.totalExposure = totalExposure; this.maxDrawdown = maxDrawdown; this.sharpeRatio = sharpeRatio;
-            this.volatility = volatility; this.beta = beta; this.var95 = var95; this.expectedShortfall = expectedShortfall;
-        }
-        
-        // Getters
-        public double getTotalExposure() { return totalExposure; }
-        public double getMaxDrawdown() { return maxDrawdown; }
-        public double getSharpeRatio() { return sharpeRatio; }
-        public double getVolatility() { return volatility; }
-        public double getBeta() { return beta; }
-        public double getVar95() { return var95; }
-        public double getExpectedShortfall() { return expectedShortfall; }
-    }
-    
-    // CreateOrderRequest class removed - no longer needed without mock orders
 }

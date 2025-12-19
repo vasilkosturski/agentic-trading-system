@@ -1,6 +1,6 @@
 package com.trading.controller;
 
-import com.trading.dto.HoldingDto;
+import com.trading.dto.response.HoldingDto;
 import com.trading.dto.response.RecentActivityResponse;
 import com.trading.dto.response.TradingHistoryResponse;
 import com.trading.service.AccountService;

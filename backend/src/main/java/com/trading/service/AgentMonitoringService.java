@@ -1,5 +1,6 @@
 package com.trading.service;
 
+import com.trading.dto.response.AgentStatusResponse;
 import com.trading.entity.TradingAgent;
 import com.trading.entity.AccountPortfolioSnapshot;
 import com.trading.repository.TradingAgentRepository;
@@ -30,12 +31,12 @@ public class AgentMonitoringService {
     /**
      * Get real agent statuses from PostgreSQL database
      */
-    public List<TradingService.AgentStatusResponse> getRealAgentStatuses() {
+    public List<AgentStatusResponse> getRealAgentStatuses() {
         List<TradingAgent> agents = agentRepository.findAll();
-        List<TradingService.AgentStatusResponse> statuses = new ArrayList<>();
+        List<AgentStatusResponse> statuses = new ArrayList<>();
         
         for (TradingAgent agent : agents) {
-            TradingService.AgentStatusResponse status = buildAgentStatusFromEntity(agent);
+            AgentStatusResponse status = buildAgentStatusFromEntity(agent);
             statuses.add(status);
         }
         
@@ -45,7 +46,7 @@ public class AgentMonitoringService {
     /**
      * Get real agent status for a specific agent
      */
-    public TradingService.AgentStatusResponse getRealAgentStatus(Long agentId) {
+    public AgentStatusResponse getRealAgentStatus(Long agentId) {
         Optional<TradingAgent> agentOpt = agentRepository.findById(agentId);
         if (agentOpt.isEmpty()) {
             throw new RuntimeException("Agent not found: " + agentId);
@@ -59,7 +60,7 @@ public class AgentMonitoringService {
      * This avoids expensive live API calls to Polygon.io on every dashboard load.
      * Snapshots are created hourly by ScheduledSnapshotService.
      */
-    private TradingService.AgentStatusResponse buildAgentStatusFromEntity(TradingAgent agent) {
+    private AgentStatusResponse buildAgentStatusFromEntity(TradingAgent agent) {
         String agentName = agent.getName();
         boolean isActive = agent.getIsActive() != null ? agent.getIsActive() : false;
 
@@ -99,7 +100,7 @@ public class AgentMonitoringService {
         // Cycle interval (30 minutes = 1800 seconds)
         int cycleIntervalSeconds = 1800;
 
-        return new TradingService.AgentStatusResponse(
+        return new AgentStatusResponse(
             agent.getId(),
             agentName,
             isActive,
