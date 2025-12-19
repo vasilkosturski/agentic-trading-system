@@ -1,8 +1,12 @@
 package com.trading.controller;
 
+import com.trading.dto.response.AgentStatusResponse;
+import com.trading.dto.response.AgentTradeResponse;
+import com.trading.dto.response.PortfolioPerformanceResponse;
+import com.trading.dto.response.RiskMetricsResponse;
 import com.trading.dto.response.ToolResponse;
+import com.trading.dto.response.TradingStatsResponse;
 import com.trading.service.TradingService;
-import com.trading.service.TradingService.*;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.AgentMonitoringService;
 import org.springframework.beans.factory.annotation.Autowired;
