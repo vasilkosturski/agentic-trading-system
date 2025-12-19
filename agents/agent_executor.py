@@ -109,8 +109,8 @@ class AgentExecutor:
         )
 
         try:
-            # Phase 1: Initialize cycle
-            run_id = await self._phase1_initialize(run_type)
+            # Phase 1: Start run tracking and setup
+            run_id = await self._phase1_start_run(run_type)
 
             # Phase 2: Prepare context (pre-fetch data)
             context = await self._phase2_prepare_context()
@@ -149,14 +149,21 @@ class AgentExecutor:
         finally:
             self._cleanup()
 
-    async def _phase1_initialize(self, run_type: str) -> int:
-        """Phase 1: Initialize agent account, tracking, and broadcasts.
+    async def _phase1_start_run(self, run_type: str) -> int:
+        """Phase 1: Start a tracked run and initialize agent state.
+
+        Initializes agent account, starts backend run tracking, and sets up
+        tool tracking for transparency. Every trade must be linked to a run.
 
         Args:
             run_type: "TRADING" (sent to backend for run categorization)
 
         Returns:
             run_id for tracking this cycle
+
+        Raises:
+            RuntimeError: If agent_id is not set
+            Exception: If run tracking fails to start
         """
         # Initialize agent account (direct function call, not through agent)
         await initialize_agent(self.name)
@@ -363,9 +370,15 @@ class AgentExecutor:
                 )
 
         # Log research phase completion
-        research_text = "Completed market research and analysis"
         if research_conducted:
-            research_text += ". Used Researcher tool to gather current market information."
+            research_count = len(self.tracker.research_queries) if self.tracker else 0
+            if research_count > 1:
+                research_text = f"Completed market research - conducted {research_count} research queries to gather comprehensive information."
+            else:
+                research_text = "Completed market research and analysis. Used Researcher tool to gather current market information."
+        else:
+            research_text = "Completed analysis without external research."
+
         if self.tracker:
             self.tracker.log_reasoning("research", "Research completed", research_text)
 

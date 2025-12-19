@@ -32,7 +32,7 @@ class TestAgentExecutorInitialization:
 
 
 @pytest.mark.asyncio
-class TestAgentExecutorPhase1Initialize:
+class TestAgentExecutorPhase1StartRun:
     """Test Phase 1: Initialize cycle."""
 
     @patch("agent_executor.initialize_agent")
@@ -41,7 +41,7 @@ class TestAgentExecutorPhase1Initialize:
     @patch("agent_executor.start_run")
     @patch("agent_executor.broadcast_status")
     @patch("agent_executor.ToolTracker")
-    async def test_phase1_initialize_success(
+    async def test_phase1_start_run_success(
         self,
         mock_tracker_class,
         mock_broadcast,
@@ -68,7 +68,7 @@ class TestAgentExecutorPhase1Initialize:
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_strategy)
 
         # Execute Phase 1
-        run_id = await executor._phase1_initialize("TRADING")
+        run_id = await executor._phase1_start_run("TRADING")
 
         # Verify results
         assert run_id == 123
@@ -101,7 +101,7 @@ class TestAgentExecutorPhase1Initialize:
     @patch("agent_executor.broadcast_status")
     @patch("agent_executor._get_balance_raw")
     @patch("agent_executor._get_holdings_raw")
-    async def test_phase1_initialize_fails_without_run_id(
+    async def test_phase1_start_run_fails_without_run_id(
         self,
         mock_get_holdings,
         mock_get_balance,
@@ -124,7 +124,7 @@ class TestAgentExecutorPhase1Initialize:
 
         # Execute Phase 1 - should raise exception
         with pytest.raises(Exception) as exc_info:
-            await executor._phase1_initialize("TRADING")
+            await executor._phase1_start_run("TRADING")
 
         assert "Failed to start run tracking" in str(exc_info.value)
 

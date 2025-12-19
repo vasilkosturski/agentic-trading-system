@@ -28,6 +28,11 @@ class ToolTracker:
         self.research_queries: List[ResearchQueryRecord] = []  # Brave Search queries
         self.data_accessed: List[DataAccessRecord] = []  # Database/market data accessed
 
+    @property
+    def research_conducted(self) -> bool:
+        """Check if any research queries have been logged."""
+        return len(self.research_queries) > 0
+
     def log_tool_call(self, tool_name: str, inputs: Dict[str, Any], output: str):
         """Record a tool call for transparency."""
         record = ToolCallRecord(
