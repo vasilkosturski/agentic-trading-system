@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
+"""
+Researcher Agent - Financial research with database and web capabilities.
 
-from agents import Agent, Tool, function_tool
+Structure:
+- get_researcher_instructions() → System prompt
+- build_research_message(query) → Invocation context
+- create_researcher_agent(...) → Create agent instance
+- run_researcher(query, ...) → Execute and return response
+
+To use as a tool from another agent:
+    researcher = await create_researcher_agent(mcp_servers, model)
+    tool = researcher.as_tool(tool_name="Researcher", tool_description="...")
+"""
+
+from agents import Agent, Runner, function_tool
 from datetime import datetime
 from typing import Optional
 import json
@@ -8,6 +21,10 @@ from base_agent import get_model
 from config import BACKEND_BASE_URL
 from http_client import call_backend, BackendAPIError
 
+
+# ============================================================================
+# Database query functions (tools for the researcher)
+# ============================================================================
 
 async def query_agent_holdings(agent_name: str) -> str:
     """Get current holdings and positions for a trading agent.
@@ -46,11 +63,9 @@ async def query_trade_history(
     """
     try:
         if symbol:
-            # Use existing endpoint for specific stock
             url = f"{BACKEND_BASE_URL}/api/memory/trading-history"
             params = {"agentName": agent_name, "symbol": symbol, "days": days}
         else:
-            # Use recent activity for all trades
             url = f"{BACKEND_BASE_URL}/api/memory/recent-activity"
             params = {"agentName": agent_name, "days": days}
 
@@ -69,12 +84,6 @@ async def query_past_decisions(
 ) -> str:
     """Get past decisions (BUY/SELL/HOLD) with full reasoning.
 
-    This queries agent_runs table which includes:
-    - All decisions (BUY, SELL, HOLD)
-    - Full reasoning and rationale
-    - Research sources used
-    - Historical context
-
     Args:
         agent_name: Agent name (Warren, George, Ray, Cathie)
         symbol: Optional stock symbol to filter by
@@ -85,11 +94,9 @@ async def query_past_decisions(
     """
     try:
         if symbol:
-            # Use trading history which includes run context
             url = f"{BACKEND_BASE_URL}/api/memory/trading-history"
             params = {"agentName": agent_name, "symbol": symbol, "days": days}
         else:
-            # Use recent activity which includes all decisions
             url = f"{BACKEND_BASE_URL}/api/memory/recent-activity"
             params = {"agentName": agent_name, "days": days}
 
@@ -103,8 +110,6 @@ async def query_past_decisions(
 
 async def lookup_price_json(symbol: str) -> str:
     """Get current market price for a stock (JSON format).
-
-    Wraps market_tools.lookup_share_price in JSON for consistency.
 
     Args:
         symbol: Stock symbol (e.g., AAPL, NVDA)
@@ -124,31 +129,17 @@ async def lookup_price_json(symbol: str) -> str:
         return json.dumps({"error": str(e), "symbol": symbol})
 
 
-async def get_researcher(mcp_servers, model_name) -> Agent:
-    """Create researcher agent with database query capabilities"""
+# ============================================================================
+# Agent structure (matches simple_trader.py pattern)
+# ============================================================================
 
-    # Wrap async functions as tools
-    @function_tool
-    async def query_holdings_tool(agent_name: str) -> str:
-        """Get current holdings for a trading agent"""
-        return await query_agent_holdings(agent_name)
-
-    @function_tool
-    async def query_trades_tool(agent_name: str, symbol: str = None, days: int = 30) -> str:
-        """Get trade history for a trading agent"""
-        return await query_trade_history(agent_name, symbol, days)
-
-    @function_tool
-    async def query_decisions_tool(agent_name: str, symbol: str = None, days: int = 30) -> str:
-        """Get past decisions with full reasoning"""
-        return await query_past_decisions(agent_name, symbol, days)
-
-    @function_tool
-    async def lookup_price_tool(symbol: str) -> str:
-        """Get current market price for a stock"""
-        return await lookup_price_json(symbol)
-
-    instructions = f"""You are a financial researcher with access to both historical data and current market information.
+def get_researcher_instructions() -> str:
+    """Get researcher system prompt - defines identity, tools, and rules.
+    
+    Returns:
+        System prompt for the researcher agent
+    """
+    return """You are a financial researcher with access to both historical data and current market information.
 
 **DATABASE TOOLS** (understand agent context):
 - query_holdings_tool(agent_name) - See what the agent currently owns
@@ -175,44 +166,68 @@ When conducting research (if agent_name is mentioned in the request):
    - Synthesize both into context-aware research
 
 3. **Return JSON Response** (MANDATORY):
-   {{
+   {
      "summary": "Research findings referencing both historical context and current news",
      "sources": [
-       {{"title": "Article Title", "url": "https://..."}}
+       {"title": "Article Title", "url": "https://..."}
      ]
-   }}
-
-**EXAMPLE RESEARCH FLOW**:
-
-Request: "Research NVDA for Warren - considering buying more"
-
-Step 1: query_holdings_tool("Warren")
-→ See if Warren owns NVDA (e.g., 150 shares at avg $145)
-
-Step 2: query_decisions_tool("Warren", "NVDA", 30)
-→ Understand Warren's thesis: "Bought for AI datacenter growth, long-term hold"
-
-Step 3: Brave Search "NVDA latest earnings AI chip demand 2025"
-→ Get current news and analysis
-
-Step 4: Synthesize
-→ "Warren currently holds 150 NVDA (bought at $145 for AI growth thesis).
-   Recent Q4 earnings beat expectations by 8% (TechCrunch), AI chip demand
-   surging with datacenter expansion (Reuters). Current price $178 (+22.7% gain).
-   Original thesis remains valid with strong fundamentals."
+   }
 
 **IMPORTANT**:
-- Make use of your knowledge graph to store and recall entity information
-- Store information about companies, stocks, and market conditions
-- Store web addresses for interesting sources
-- Draw on your knowledge graph to build expertise over time
+- Use your knowledge graph to store and recall entity information
 - ALWAYS include at least 2-3 sources with actual URLs from your searches
 - DO NOT make up or hallucinate URLs
-
-The current datetime is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 """
 
-    # Create list of database tools
+
+def build_research_message(query: str) -> str:
+    """Build user message for this research request.
+    
+    Args:
+        query: The research query/request
+        
+    Returns:
+        User message for this invocation
+    """
+    return f"""Current time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+Research request: {query}
+
+Conduct your research and return a JSON response with summary and sources.
+"""
+
+
+async def create_researcher_agent(mcp_servers, model_name: str) -> Agent:
+    """Create researcher agent with all tools.
+    
+    Args:
+        mcp_servers: MCP servers for web research (Brave, etc.)
+        model_name: Model to use
+        
+    Returns:
+        Agent instance ready to run
+    """
+    # Wrap database functions as tools
+    @function_tool
+    async def query_holdings_tool(agent_name: str) -> str:
+        """Get current holdings for a trading agent"""
+        return await query_agent_holdings(agent_name)
+
+    @function_tool
+    async def query_trades_tool(agent_name: str, symbol: str = None, days: int = 30) -> str:
+        """Get trade history for a trading agent"""
+        return await query_trade_history(agent_name, symbol, days)
+
+    @function_tool
+    async def query_decisions_tool(agent_name: str, symbol: str = None, days: int = 30) -> str:
+        """Get past decisions with full reasoning"""
+        return await query_past_decisions(agent_name, symbol, days)
+
+    @function_tool
+    async def lookup_price_tool(symbol: str) -> str:
+        """Get current market price for a stock"""
+        return await lookup_price_json(symbol)
+
     db_tools = [
         query_holdings_tool,
         query_trades_tool,
@@ -220,22 +235,40 @@ The current datetime is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
         lookup_price_tool,
     ]
 
-    researcher = Agent(
+    return Agent(
         name="Researcher",
-        instructions=instructions,
+        instructions=get_researcher_instructions(),
         model=get_model(model_name),
         mcp_servers=mcp_servers,
-        tools=db_tools,  # Add database tools
+        tools=db_tools,
     )
-    return researcher
 
-async def get_researcher_tool(mcp_servers, model_name) -> Tool:
-    """Create researcher tool following source project pattern exactly"""
-    researcher = await get_researcher(mcp_servers, model_name)
-    return researcher.as_tool(
-        tool_name="Researcher", 
-        tool_description="This tool researches online for news and opportunities, \
-either based on your specific request to look into a certain stock, \
-or generally for notable financial news and opportunities. \
-Describe what kind of research you're looking for."
-    )
+
+async def run_researcher(
+    query: str,
+    mcp_servers,
+    model_name: str = "gpt-4o-mini"
+) -> str:
+    """Run researcher agent independently and return response.
+    
+    This is the main entry point for standalone use or testing.
+    
+    Args:
+        query: Research request
+        mcp_servers: MCP servers for web research
+        model_name: Model to use
+        
+    Returns:
+        Research response (JSON string with summary and sources)
+    """
+    agent = await create_researcher_agent(mcp_servers, model_name)
+    message = build_research_message(query)
+    
+    result = await Runner.run(agent, message)
+    
+    # Extract final response
+    if result and hasattr(result, 'final_output'):
+        return result.final_output
+    return json.dumps({"error": "No response from researcher"})
+
+

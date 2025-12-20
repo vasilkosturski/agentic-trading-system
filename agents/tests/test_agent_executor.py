@@ -196,21 +196,20 @@ class TestAgentExecutorPhase3CreateAgent:
     async def test_phase3_create_agent(
         self, sample_agent_id, sample_agent_name, sample_strategy
     ):
-        """Test Phase 3 delegates agent creation to tool factory."""
-        # Create mock tool factory
-        mock_tool_factory = MagicMock()
+        """Test Phase 3 delegates agent creation to callable."""
+        # Create mock agent and callable
         mock_agent = MagicMock()
-        mock_tool_factory.create_agent = AsyncMock(return_value=mock_agent)
+        mock_create_agent_fn = AsyncMock(return_value=mock_agent)
 
         # Create executor
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_strategy)
 
         # Execute Phase 3
-        agent = await executor._phase3_create_agent(mock_tool_factory)
+        agent = await executor._phase3_create_agent(mock_create_agent_fn)
 
         # Verify results
         assert agent == mock_agent
-        mock_tool_factory.create_agent.assert_called_once_with(executor)
+        mock_create_agent_fn.assert_called_once_with(executor)
 
 
 @pytest.mark.asyncio
@@ -224,8 +223,7 @@ class TestAgentExecutorPhase4RunAgent:
         """Test Phase 4 runs agent with generated message."""
         # Setup mocks
         mock_agent = MagicMock()
-        mock_message_builder = MagicMock()
-        mock_message_builder.build_message.return_value = "Test message"
+        mock_build_message_fn = MagicMock(return_value="Test message")
         mock_result = MagicMock()
         mock_runner_class.run = AsyncMock(return_value=mock_result)
 
@@ -238,14 +236,12 @@ class TestAgentExecutorPhase4RunAgent:
 
         # Execute Phase 4
         result = await executor._phase4_run_agent(
-            mock_agent, mock_message_builder, context, force_trade=False
+            mock_agent, mock_build_message_fn, context, force_trade=False
         )
 
         # Verify results
         assert result == mock_result
-        mock_message_builder.build_message.assert_called_once_with(
-            "{}", False
-        )
+        mock_build_message_fn.assert_called_once_with("{}", False)
         mock_runner_class.run.assert_called_once_with(
             mock_agent, "Test message", max_turns=30
         )
@@ -646,13 +642,10 @@ class TestAgentExecutorFullCycle:
         mock_result.messages = [final_msg]
         mock_runner_class.run = AsyncMock(return_value=mock_result)
 
-        # Create mock tool factory and message builder
-        mock_tool_factory = MagicMock()
+        # Create mock callables for agent creation and message building
         mock_agent = MagicMock()
-        mock_tool_factory.create_agent = AsyncMock(return_value=mock_agent)
-
-        mock_message_builder = MagicMock()
-        mock_message_builder.build_message.return_value = "Execute trading cycle"
+        mock_create_agent_fn = AsyncMock(return_value=mock_agent)
+        mock_build_message_fn = MagicMock(return_value="Execute trading cycle")
 
         # Create executor and store decision manually (simulating decide_action call)
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_strategy)
@@ -668,8 +661,8 @@ class TestAgentExecutorFullCycle:
 
         # Execute full cycle
         result = await executor.execute_cycle(
-            message_builder=mock_message_builder,
-            tool_factory=mock_tool_factory,
+            build_message_fn=mock_build_message_fn,
+            create_agent_fn=mock_create_agent_fn,
             force_trade=False,
         )
 
@@ -681,7 +674,7 @@ class TestAgentExecutorFullCycle:
         # Verify all phases executed
         mock_initialize.assert_called_once()
         mock_get_recent_activity.assert_called_once()
-        mock_tool_factory.create_agent.assert_called_once()
+        mock_create_agent_fn.assert_called_once()
         mock_runner_class.run.assert_called_once()
         mock_buy.assert_called_once()
         mock_end_run.assert_called_once()
@@ -724,13 +717,11 @@ class TestAgentExecutorFullCycle:
         mock_tracker_instance = MagicMock()
         mock_tracker_class.return_value = mock_tracker_instance
 
-        # Create mock tool factory that raises error
-        mock_tool_factory = MagicMock()
-        mock_tool_factory.create_agent = AsyncMock(
+        # Create mock callable that raises error
+        mock_create_agent_fn = AsyncMock(
             side_effect=Exception("Tool creation failed")
         )
-
-        mock_message_builder = MagicMock()
+        mock_build_message_fn = MagicMock()
 
         # Create executor
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_strategy)
@@ -738,8 +729,8 @@ class TestAgentExecutorFullCycle:
         # Execute cycle - should raise error
         with pytest.raises(Exception) as exc_info:
             await executor.execute_cycle(
-                message_builder=mock_message_builder,
-                tool_factory=mock_tool_factory,
+                build_message_fn=mock_build_message_fn,
+                create_agent_fn=mock_create_agent_fn,
                 force_trade=False,
             )
 
