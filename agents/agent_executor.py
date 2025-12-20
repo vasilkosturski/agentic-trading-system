@@ -4,16 +4,16 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Literal
+from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional
 
 from agents import Agent, Runner
 
 # Import type-safe models
 from models import TradingDecision, MarketConditions
 
-# Avoid circular import - only import types for type hints
-if TYPE_CHECKING:
-    from simple_trader import MessageBuilder, ToolFactory
+# Type aliases for callable interfaces
+BuildMessageFn = Callable[[str, bool], str]  # (historical_context, force_trade) -> message
+CreateAgentFn = Callable[['AgentExecutor'], Awaitable[Agent]]  # (executor) -> Agent
 
 # Import direct function tools
 from trading_tools import (
@@ -78,15 +78,15 @@ class AgentExecutor:
 
     async def execute_cycle(
         self,
-        message_builder: "MessageBuilder",
-        tool_factory: "ToolFactory",
+        build_message_fn: BuildMessageFn,
+        create_agent_fn: CreateAgentFn,
         force_trade: bool = False,
     ) -> Dict[str, Any]:
         """Execute one complete portfolio review cycle with clear phases.
 
         Args:
-            message_builder: Object that builds agent messages
-            tool_factory: Object that creates agent tools
+            build_message_fn: Function that builds agent message (historical_context, force_trade) -> str
+            create_agent_fn: Async function that creates agent (executor) -> Agent
             force_trade: If True, agent must make BUY/SELL (no HOLD)
 
         Returns:
@@ -116,11 +116,11 @@ class AgentExecutor:
             context = await self._phase2_prepare_context()
 
             # Phase 3: Create agent with tools
-            agent = await self._phase3_create_agent(tool_factory)
+            agent = await self._phase3_create_agent(create_agent_fn)
 
             # Phase 4: Run agent
             result = await self._phase4_run_agent(
-                agent, message_builder, context, force_trade
+                agent, build_message_fn, context, force_trade
             )
 
             # Phase 5: Parse results and tool usage
@@ -251,24 +251,24 @@ class AgentExecutor:
             "historical_context": recent_activity_json,
         }
 
-    async def _phase3_create_agent(self, tool_factory: "ToolFactory") -> Agent:
+    async def _phase3_create_agent(self, create_agent_fn: CreateAgentFn) -> Agent:
         """Phase 3: Create agent with tools.
 
         Args:
-            tool_factory: Object that creates agent tools and researcher
+            create_agent_fn: Async function that creates agent with tools
 
         Returns:
             Agent instance ready to run
         """
-        # Delegate to tool_factory to create agent with tools
+        # Delegate to create_agent_fn to create agent with tools
         # This keeps the executor focused on orchestration, not tool creation
-        agent = await tool_factory.create_agent(self)
+        agent = await create_agent_fn(self)
         return agent
 
     async def _phase4_run_agent(
         self,
         agent: Agent,
-        message_builder: "MessageBuilder",
+        build_message_fn: BuildMessageFn,
         context: Dict[str, Any],
         force_trade: bool,
     ) -> Any:
@@ -276,7 +276,7 @@ class AgentExecutor:
 
         Args:
             agent: Agent instance to run
-            message_builder: Object that builds agent messages
+            build_message_fn: Function that builds agent message
             context: Dict with historical_context (baseline recent activity)
             force_trade: If True, agent must make BUY/SELL (no HOLD)
 
@@ -284,7 +284,7 @@ class AgentExecutor:
             Agent result object
         """
         # Generate message with baseline historical context
-        message = message_builder.build_message(
+        message = build_message_fn(
             context["historical_context"], force_trade
         )
 
