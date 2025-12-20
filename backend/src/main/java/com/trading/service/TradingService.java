@@ -1,8 +1,6 @@
 package com.trading.service;
 
 import com.trading.dto.response.AgentTradeResponse;
-import com.trading.dto.response.PortfolioPerformanceResponse;
-import com.trading.dto.response.RiskMetricsResponse;
 import com.trading.dto.response.TradingStatsResponse;
 import com.trading.entity.AccountTransaction;
 import com.trading.entity.AgentRun;
@@ -108,17 +106,6 @@ public class TradingService {
         }
     }
     
-    
-    // Agent Status Operations - REMOVED: Now handled by PostgreSQLAgentMonitoringService
-    // These methods have been moved to use real database data instead of mock data
-    
-    // Agent control operations - REMOVED: These should be handled by PostgreSQLAgentMonitoringService
-    // or moved to a dedicated agent management service that updates the database directly
-    
-    // Order Operations - REMOVED: Mock order system eliminated
-    // Orders are not needed for current functionality as UI only shows completed trades
-    // If order management is needed in future, implement with database persistence
-    
     // Agent Trades Operations - Now using real database data
     public List<AgentTradeResponse> getAgentTrades(String agentName) {
         List<AccountTransaction> transactions;
@@ -171,24 +158,6 @@ public class TradingService {
 
         return new TradingStatsResponse(totalTrades, totalVolume,
             totalPnL, averageTradeSize, largestWin, largestLoss);
-    }
-    
-    // Portfolio Performance
-    public PortfolioPerformanceResponse getPortfolioPerformance(String accountId, String period) {
-        // Mock performance data
-        List<String> timestamps = Arrays.asList(
-            "2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z", "2024-01-03T00:00:00Z"
-        );
-        List<Double> values = Arrays.asList(100000.0, 102000.0, 105000.0);
-        List<Double> returns = Arrays.asList(0.0, 0.02, 0.0294);
-        List<Double> benchmark = Arrays.asList(100000.0, 101500.0, 103000.0);
-        
-        return new PortfolioPerformanceResponse(timestamps, values, returns, benchmark);
-    }
-    
-    // Risk Metrics
-    public RiskMetricsResponse getRiskMetrics(String accountId) {
-        return new RiskMetricsResponse(85000.0, 0.15, 1.2, 0.18, 1.05, 5000.0, 7500.0);
     }
     
     /**
