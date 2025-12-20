@@ -2,8 +2,6 @@ package com.trading.controller;
 
 import com.trading.dto.response.AgentStatusResponse;
 import com.trading.dto.response.AgentTradeResponse;
-import com.trading.dto.response.PortfolioPerformanceResponse;
-import com.trading.dto.response.RiskMetricsResponse;
 import com.trading.dto.response.ToolResponse;
 import com.trading.dto.response.TradingStatsResponse;
 import com.trading.service.TradingService;
@@ -99,16 +97,6 @@ public class TradingController {
         }
     }
     
-    // Order Management Endpoints - REMOVED
-    // Mock order endpoints eliminated as UI only shows completed trades
-    // The following endpoints were removed:
-    // - GET /api/trading/orders (returned mock order data)
-    // - GET /api/trading/orders/{orderId} (returned specific mock order)
-    // - POST /api/trading/orders (created mock orders)
-    // - DELETE /api/trading/orders/{orderId} (cancelled mock orders)
-    //
-    // If order management is needed in future, implement with database persistence
-    
     // Agent Trades Endpoints
     @GetMapping("/agent-trades")
     public ResponseEntity<ToolResponse<List<AgentTradeResponse>>> getAgentTrades(@RequestParam(required = false) Long agentId) {
@@ -140,30 +128,6 @@ public class TradingController {
             String agentName = agentId != null ? agentIdentityService.requireAgentName(agentId) : null;
             TradingStatsResponse stats = tradingService.getTradingStats(accountId, agentName);
             return ResponseEntity.ok(ToolResponse.success(stats));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
-    }
-    
-    // Portfolio Performance Endpoints
-    @GetMapping("/performance/{accountId}")
-    public ResponseEntity<ToolResponse<PortfolioPerformanceResponse>> getPortfolioPerformance(
-            @PathVariable String accountId,
-            @RequestParam(defaultValue = "1m") String period) {
-        try {
-            PortfolioPerformanceResponse performance = tradingService.getPortfolioPerformance(accountId, period);
-            return ResponseEntity.ok(ToolResponse.success(performance));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
-    }
-    
-    // Risk Metrics Endpoints
-    @GetMapping("/risk/{accountId}")
-    public ResponseEntity<ToolResponse<RiskMetricsResponse>> getRiskMetrics(@PathVariable String accountId) {
-        try {
-            RiskMetricsResponse riskMetrics = tradingService.getRiskMetrics(accountId);
-            return ResponseEntity.ok(ToolResponse.success(riskMetrics));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
         }
