@@ -4,6 +4,7 @@ import com.trading.dto.response.AgentStatusResponse;
 import com.trading.dto.response.AgentTradeResponse;
 import com.trading.dto.response.ToolResponse;
 import com.trading.dto.response.TradingStatsResponse;
+import com.trading.dto.response.TriggerCycleResponse;
 import com.trading.service.TradingService;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.AgentMonitoringService;
@@ -20,7 +21,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/trading")
@@ -165,82 +165,26 @@ public class TradingController {
     }
     
     @PostMapping("/run-cycle")
-    public ResponseEntity<ToolResponse<Map<String, Object>>> triggerManualCycle() {
+    public ResponseEntity<ToolResponse<TriggerCycleResponse>> triggerManualCycle() {
+        logger.info("Manual trading cycle requested via API");
+        String url = agentsApiUrl + "/api/trigger-cycle";
+        
         try {
-            logger.info("Manual trading cycle requested via API");
+            ResponseEntity<TriggerCycleResponse> response = restTemplate.postForEntity(
+                url, null, TriggerCycleResponse.class
+            );
+            logger.info("Manual cycle triggered successfully");
+            return ResponseEntity.accepted().body(ToolResponse.success(response.getBody()));
             
-            // Call the Python agents API to trigger a cycle
-            String url = agentsApiUrl + "/api/trigger-cycle";
-            logger.info("Attempting to connect to agents service at: {}", url);
-            
-            try {
-                ResponseEntity<Map> responseEntity = restTemplate.postForEntity(url, null, Map.class);
-                Map<String, Object> response = responseEntity.getBody();
-
-                if (response == null) {
-                    logger.error("Received null response from agents service");
-                    return ResponseEntity.status(503).body(
-                        ToolResponse.error("Agents service returned invalid response")
-                    );
-                }
-
-                // Check HTTP status code from agents service
-                int statusCode = responseEntity.getStatusCodeValue();
-
-                if (statusCode == 202) {
-                    // Success - cycle triggered
-                    logger.info("Manual cycle triggered successfully");
-                    String message = (String) response.get("message");
-                    Map<String, Object> result = new HashMap<>();
-                    result.put("message", message != null ? message : "Trading cycle triggered successfully");
-                    result.put("timestamp", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-                    return ResponseEntity.accepted().body(ToolResponse.success(result));
-                } else if (statusCode == 409) {
-                    // Conflict - cycle already running
-                    String message = (String) response.get("message");
-                    logger.info("Manual cycle not triggered: {}", message);
-                    return ResponseEntity.status(409).body(ToolResponse.error(message != null ? message : "Trading cycle is already in progress"));
-                } else {
-                    // Other error
-                    String error = (String) response.get("error");
-                    logger.warn("Manual cycle failed with status {}: {}", statusCode, error);
-                    return ResponseEntity.status(statusCode).body(ToolResponse.error(error != null ? error : "Failed to trigger cycle"));
-                }
-            } catch (org.springframework.web.client.HttpClientErrorException e) {
-                // Handle 4xx errors (including 409) from agents service
-                if (e.getStatusCode().value() == 409) {
-                    logger.info("Manual cycle not triggered: cycle already running");
-                    // Parse the response body to get the message
-                    try {
-                        String responseBody = e.getResponseBodyAsString();
-                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> errorResponse = (Map<String, Object>) mapper.readValue(responseBody, Map.class);
-                        String message = (String) errorResponse.get("message");
-                        return ResponseEntity.status(409).body(
-                            ToolResponse.error(message != null ? message : "A trading cycle is already in progress. Please wait for it to complete.")
-                        );
-                    } catch (Exception parseError) {
-                        return ResponseEntity.status(409).body(
-                            ToolResponse.error("A trading cycle is already in progress. Please wait for it to complete.")
-                        );
-                    }
-                } else {
-                    logger.error("Client error from agents service: {}", e.getMessage());
-                    return ResponseEntity.status(e.getStatusCode().value()).body(
-                        ToolResponse.error("Agents service error: " + e.getMessage())
-                    );
-                }
-            } catch (RestClientException e) {
-                logger.error("Failed to connect to agents service: {}", e.getMessage());
-                return ResponseEntity.status(503).body(
-                    ToolResponse.error("Agents service unavailable. Please ensure the trading system is running.")
-                );
-            }
-        } catch (Exception e) {
-            logger.error("Error triggering manual cycle", e);
-            return ResponseEntity.status(500).body(
-                ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Internal server error")
+        } catch (org.springframework.web.client.HttpClientErrorException.Conflict e) {
+            logger.info("Manual cycle not triggered: cycle already running");
+            return ResponseEntity.status(409).body(
+                ToolResponse.error("A trading cycle is already in progress. Please wait for it to complete.")
+            );
+        } catch (RestClientException e) {
+            logger.error("Failed to connect to agents service at {}: {}", url, e.getMessage());
+            return ResponseEntity.status(503).body(
+                ToolResponse.error("Agents service unavailable. Please ensure the trading system is running.")
             );
         }
     }
