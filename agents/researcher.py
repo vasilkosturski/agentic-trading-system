@@ -15,9 +15,8 @@ To use as a tool from another agent:
 
 from agents import Agent, Runner, function_tool
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 import json
-from base_agent import get_model
 from config import BACKEND_BASE_URL
 from http_client import call_backend, BackendAPIError
 
@@ -46,65 +45,46 @@ async def query_agent_holdings(agent_name: str) -> str:
         return json.dumps({"error": str(e), "holdings": []})
 
 
-async def query_trade_history(
-    agent_name: str,
-    symbol: Optional[str] = None,
-    days: int = 30
-) -> str:
-    """Get trade history for a trading agent.
+async def query_recent_activity(agent_name: str, days: int = 30) -> str:
+    """Get recent trading activity across ALL stocks for an agent.
 
     Args:
         agent_name: Agent name (Warren, George, Ray, Cathie)
-        symbol: Optional stock symbol to filter by
         days: How many days back to look (default 30)
 
     Returns:
-        JSON string with trade history
+        JSON string with recent activity (trades, decisions, reasoning)
     """
     try:
-        if symbol:
-            url = f"{BACKEND_BASE_URL}/api/memory/trading-history"
-            params = {"agentName": agent_name, "symbol": symbol, "days": days}
-        else:
-            url = f"{BACKEND_BASE_URL}/api/memory/recent-activity"
-            params = {"agentName": agent_name, "days": days}
-
+        url = f"{BACKEND_BASE_URL}/api/memory/recent-activity"
+        params = {"agentName": agent_name, "days": days}
         response = await call_backend("GET", url, params=params, timeout=10)
         return response.text
     except BackendAPIError as e:
         if e.status_code == 404:
-            return json.dumps({"error": "No trade history found"})
+            return json.dumps({"error": "No recent activity found"})
         return json.dumps({"error": str(e)})
 
 
-async def query_past_decisions(
-    agent_name: str,
-    symbol: Optional[str] = None,
-    days: int = 30
-) -> str:
-    """Get past decisions (BUY/SELL/HOLD) with full reasoning.
+async def query_symbol_history(agent_name: str, symbol: str, days: int = 30) -> str:
+    """Get trading history for a SPECIFIC stock.
 
     Args:
         agent_name: Agent name (Warren, George, Ray, Cathie)
-        symbol: Optional stock symbol to filter by
+        symbol: Stock symbol to look up (e.g., AAPL, NVDA)
         days: How many days back to look (default 30)
 
     Returns:
-        JSON string with past decisions and reasoning
+        JSON string with trading history for this symbol
     """
     try:
-        if symbol:
-            url = f"{BACKEND_BASE_URL}/api/memory/trading-history"
-            params = {"agentName": agent_name, "symbol": symbol, "days": days}
-        else:
-            url = f"{BACKEND_BASE_URL}/api/memory/recent-activity"
-            params = {"agentName": agent_name, "days": days}
-
+        url = f"{BACKEND_BASE_URL}/api/memory/trading-history"
+        params = {"agentName": agent_name, "symbol": symbol, "days": days}
         response = await call_backend("GET", url, params=params, timeout=10)
         return response.text
     except BackendAPIError as e:
         if e.status_code == 404:
-            return json.dumps({"error": "No past decisions found"})
+            return json.dumps({"error": f"No history found for {symbol}"})
         return json.dumps({"error": str(e)})
 
 
@@ -143,8 +123,8 @@ def get_researcher_instructions() -> str:
 
 **DATABASE TOOLS** (understand agent context):
 - query_holdings_tool(agent_name) - See what the agent currently owns
-- query_trades_tool(agent_name, symbol, days) - See their trade history
-- query_decisions_tool(agent_name, symbol, days) - See past decisions with full reasoning
+- query_recent_activity_tool(agent_name, days) - Recent activity across ALL stocks
+- query_symbol_history_tool(agent_name, symbol, days) - History for a SPECIFIC stock
 - lookup_price_tool(symbol) - Get current market price
 
 **WEB RESEARCH TOOLS** (gather current information):
@@ -157,8 +137,8 @@ def get_researcher_instructions() -> str:
 When conducting research (if agent_name is mentioned in the request):
 1. **Understand Context First**:
    - Query their holdings to see current positions
-   - Review trade history for relevant stocks
-   - Check past decisions to understand their investment thesis
+   - Use query_recent_activity_tool for general overview
+   - Use query_symbol_history_tool for specific stock details
 
 2. **Combine Historical + Current**:
    - Use database to understand WHAT they hold and WHY
@@ -214,14 +194,14 @@ async def create_researcher_agent(mcp_servers, model_name: str) -> Agent:
         return await query_agent_holdings(agent_name)
 
     @function_tool
-    async def query_trades_tool(agent_name: str, symbol: str = None, days: int = 30) -> str:
-        """Get trade history for a trading agent"""
-        return await query_trade_history(agent_name, symbol, days)
+    async def query_recent_activity_tool(agent_name: str, days: int = 30) -> str:
+        """Get recent activity across ALL stocks for an agent"""
+        return await query_recent_activity(agent_name, days)
 
     @function_tool
-    async def query_decisions_tool(agent_name: str, symbol: str = None, days: int = 30) -> str:
-        """Get past decisions with full reasoning"""
-        return await query_past_decisions(agent_name, symbol, days)
+    async def query_symbol_history_tool(agent_name: str, symbol: str, days: int = 30) -> str:
+        """Get trading history for a SPECIFIC stock"""
+        return await query_symbol_history(agent_name, symbol, days)
 
     @function_tool
     async def lookup_price_tool(symbol: str) -> str:
@@ -230,15 +210,15 @@ async def create_researcher_agent(mcp_servers, model_name: str) -> Agent:
 
     db_tools = [
         query_holdings_tool,
-        query_trades_tool,
-        query_decisions_tool,
+        query_recent_activity_tool,
+        query_symbol_history_tool,
         lookup_price_tool,
     ]
 
     return Agent[Any](
         name="Researcher",
         instructions=get_researcher_instructions(),
-        model=get_model(model_name),
+        model=model_name,
         mcp_servers=mcp_servers,
         tools=db_tools,
     )
