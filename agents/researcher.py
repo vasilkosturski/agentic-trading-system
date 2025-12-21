@@ -15,7 +15,7 @@ To use as a tool from another agent:
 
 from agents import Agent, Runner, function_tool
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 import json
 from base_agent import get_model
 from config import BACKEND_BASE_URL
@@ -235,7 +235,7 @@ async def create_researcher_agent(mcp_servers, model_name: str) -> Agent:
         lookup_price_tool,
     ]
 
-    return Agent(
+    return Agent[Any](
         name="Researcher",
         instructions=get_researcher_instructions(),
         model=get_model(model_name),
