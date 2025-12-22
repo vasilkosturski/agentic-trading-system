@@ -26,6 +26,19 @@ class HistoricalInsight(BaseModel):
     )
 
 
+class ResearchResponse(BaseModel):
+    """Researcher agent's structured output.
+
+    This is the response from the Researcher agent containing
+    research findings and cited sources.
+    """
+
+    summary: str = Field(min_length=1, description="Research findings and analysis")
+    sources: list[ResearchSource] = Field(
+        default_factory=list, description="List of cited web sources"
+    )
+
+
 class TradingDecision(BaseModel):
     """Agent's trading decision (validated LLM output).
 

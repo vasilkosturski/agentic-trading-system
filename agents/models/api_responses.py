@@ -4,8 +4,13 @@ These use Pydantic BaseModel because they validate data from external APIs
 (Java backend), which is an external boundary that needs validation.
 """
 
+from typing import Optional
 from pydantic import BaseModel, Field
 
+
+# =============================================================================
+# Market Data Models
+# =============================================================================
 
 class PriceMetadata(BaseModel):
     """Stock price with data quality metadata (from backend API)."""
@@ -41,3 +46,92 @@ class Holding(BaseModel):
     symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
     quantity: int = Field(gt=0, description="Number of shares held")
     averagePrice: float = Field(gt=0, description="Average purchase price per share")
+
+
+# =============================================================================
+# Memory API Response Models (for /api/memory/* endpoints)
+# =============================================================================
+
+class HoldingsResponse(BaseModel):
+    """Response from /api/memory/holdings endpoint."""
+
+    agentName: str = Field(description="Name of the trading agent")
+    balance: float = Field(ge=0, description="Cash balance in USD")
+    holdings: list[Holding] = Field(default_factory=list, description="List of stock holdings")
+    positionCount: int = Field(ge=0, description="Number of positions held")
+
+
+class ActivityTrade(BaseModel):
+    """A trade within an activity run."""
+
+    type: str = Field(description="Trade type: BUY or SELL")
+    symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
+    quantity: int = Field(gt=0, description="Number of shares")
+    price: float = Field(gt=0, description="Price per share")
+
+
+class ActivityRun(BaseModel):
+    """A single trading run in recent activity."""
+
+    date: str = Field(description="Date of the run (ISO format)")
+    outcome: str = Field(description="Run outcome: COMPLETED, ERROR, etc.")
+    summary: str = Field(default="", description="Brief summary of the run")
+    fullReasoning: Optional[str] = Field(default=None, description="Complete reasoning")
+    researchSources: Optional[str] = Field(default=None, description="JSON string of web sources")
+    historicalContext: Optional[str] = Field(default=None, description="JSON string of historical insights")
+    trades: list[ActivityTrade] = Field(default_factory=list, description="Trades made in this run")
+
+
+class RecentActivityResponse(BaseModel):
+    """Response from /api/memory/recent-activity endpoint."""
+
+    agentName: str = Field(description="Name of the trading agent")
+    days: int = Field(gt=0, description="Number of days of activity")
+    runs: list[ActivityRun] = Field(default_factory=list, description="List of trading runs")
+    totalRuns: int = Field(ge=0, description="Total number of runs")
+    totalTrades: int = Field(ge=0, description="Total number of trades")
+
+
+class SymbolPosition(BaseModel):
+    """Current position for a specific symbol."""
+
+    shares: int = Field(ge=0, description="Number of shares held")
+    averageCost: float = Field(ge=0, description="Average cost per share")
+
+
+class SymbolTrade(BaseModel):
+    """A trade for a specific symbol."""
+
+    date: str = Field(description="Date of the trade")
+    type: str = Field(description="Trade type: BUY or SELL")
+    quantity: int = Field(gt=0, description="Number of shares")
+    price: float = Field(gt=0, description="Price per share")
+    totalAmount: float = Field(description="Total trade amount")
+
+
+class TradingSummary(BaseModel):
+    """Summary of trading activity for a symbol."""
+
+    totalTrades: int = Field(ge=0, description="Total number of trades")
+    buys: int = Field(ge=0, description="Number of buy trades")
+    sells: int = Field(ge=0, description="Number of sell trades")
+    pattern: str = Field(default="", description="Detected trading pattern")
+
+
+class SymbolHistoryResponse(BaseModel):
+    """Response from /api/memory/trading-history endpoint."""
+
+    symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
+    agentName: str = Field(description="Name of the trading agent")
+    days: int = Field(gt=0, description="Number of days of history")
+    currentPosition: Optional[SymbolPosition] = Field(default=None, description="Current position if any")
+    trades: list[SymbolTrade] = Field(default_factory=list, description="List of trades")
+    summary: Optional[TradingSummary] = Field(default=None, description="Trading summary")
+
+
+class PriceLookupResponse(BaseModel):
+    """Response from price lookup (internal, not backend API)."""
+
+    symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
+    price: float = Field(gt=0, description="Current price in USD")
+    timestamp: str = Field(description="ISO format timestamp of lookup")
