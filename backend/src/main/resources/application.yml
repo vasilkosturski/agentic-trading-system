@@ -1,9 +1,15 @@
 spring:
   application:
     name: agentic-trading-system
-  
+
   profiles:
     active: postgresql  # Default to PostgreSQL
+
+  # Enable Virtual Threads (Java 21 Project Loom)
+  # Provides async performance with synchronous code simplicity
+  threads:
+    virtual:
+      enabled: true
 
 server:
   port: 8080
@@ -53,3 +59,5 @@ notifications:
 agents:
   api:
     url: ${AGENTS_API_URL:http://agents-service:8000}
+    connect-timeout: 30000  # 30 seconds
+    read-timeout: 60000     # 60 seconds
