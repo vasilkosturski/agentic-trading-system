@@ -4,7 +4,6 @@ import com.trading.config.AgentsClient;
 import com.trading.dto.response.AgentStatusResponse;
 import com.trading.dto.response.AgentTradeResponse;
 import com.trading.dto.response.ToolResponse;
-import com.trading.dto.response.TradingStatsResponse;
 import com.trading.dto.response.TriggerCycleResponse;
 import com.trading.service.TradingService;
 import com.trading.service.AgentIdentityService;
@@ -15,10 +14,7 @@ import org.springframework.web.client.RestClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/trading")
@@ -64,27 +60,6 @@ public class TradingController {
     }
 
 
-    @GetMapping("/agents/{agentId}/status")
-    public ResponseEntity<ToolResponse<AgentStatusResponse>> getAgentStatus(@PathVariable Long agentId) {
-        AgentStatusResponse status = agentMonitoringService.getRealAgentStatus(agentId);
-        return ResponseEntity.ok(ToolResponse.success(status));
-    }
-
-
-    @PostMapping("/agents/{agentId}/start")
-    public ResponseEntity<ToolResponse<String>> startAgent(@PathVariable Long agentId) {
-        String agentName = agentIdentityService.requireAgentName(agentId);
-        agentMonitoringService.startAgent(agentName);
-        return ResponseEntity.ok(ToolResponse.success("Agent " + agentName + " started successfully"));
-    }
-
-    @PostMapping("/agents/{agentId}/stop")
-    public ResponseEntity<ToolResponse<String>> stopAgent(@PathVariable Long agentId) {
-        String agentName = agentIdentityService.requireAgentName(agentId);
-        agentMonitoringService.stopAgent(agentName);
-        return ResponseEntity.ok(ToolResponse.success("Agent " + agentName + " stopped successfully"));
-    }
-
     // Agent Trades Endpoints
     @GetMapping("/agent-trades")
     public ResponseEntity<ToolResponse<List<AgentTradeResponse>>> getAgentTrades(@RequestParam(required = false) Long agentId) {
@@ -93,45 +68,6 @@ public class TradingController {
         return ResponseEntity.ok(ToolResponse.success(trades));
     }
 
-    @GetMapping("/activity")
-    public ResponseEntity<ToolResponse<List<AgentTradeResponse>>> getRecentActivity(@RequestParam(defaultValue = "50") int limit) {
-        List<AgentTradeResponse> activity = tradingService.getRecentActivity(limit);
-        return ResponseEntity.ok(ToolResponse.success(activity));
-    }
-
-    // Trading Statistics Endpoints
-    @GetMapping("/stats")
-    public ResponseEntity<ToolResponse<TradingStatsResponse>> getTradingStats(
-            @RequestParam(required = false) String accountId,
-            @RequestParam(required = false) Long agentId) {
-        String agentName = agentId != null ? agentIdentityService.requireAgentName(agentId) : null;
-        TradingStatsResponse stats = tradingService.getTradingStats(accountId, agentName);
-        return ResponseEntity.ok(ToolResponse.success(stats));
-    }
-
-    // Real Data Monitoring Endpoints - Temporarily disabled due to missing service
-    @GetMapping("/agents/{agentId}/logs")
-    public ResponseEntity<ToolResponse<List<String>>> getAgentLogs(
-            @PathVariable Long agentId,
-            @RequestParam(defaultValue = "10") int limit) {
-        // Verify agent exists
-        agentIdentityService.requireAgentName(agentId);
-        // List<String> logs = agentMonitoringService.getAgentLogs(agentName, limit);
-        // Fallback until PostgreSQLAgentMonitoringService is implemented
-        List<String> logs = List.of("Log functionality temporarily unavailable");
-        return ResponseEntity.ok(ToolResponse.success(logs));
-    }
-
-    @GetMapping("/system/status")
-    public ResponseEntity<ToolResponse<Map<String, Object>>> getSystemStatus() {
-        Map<String, Object> status = Map.of(
-            "pythonTradingSystemActive", false, // agentMonitoringService.isPythonTradingSystemActive(),
-            "timestamp", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-            "databaseConnected", true // Could add actual database health check
-        );
-        return ResponseEntity.ok(ToolResponse.success(status));
-    }
-    
     /**
      * Triggers a manual trading cycle via the agents service.
      *
