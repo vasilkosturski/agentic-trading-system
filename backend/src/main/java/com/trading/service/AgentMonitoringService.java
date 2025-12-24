@@ -47,18 +47,6 @@ public class AgentMonitoringService {
     }
     
     /**
-     * Get real agent status for a specific agent
-     */
-    public AgentStatusResponse getRealAgentStatus(Long agentId) {
-        Optional<TradingAgent> agentOpt = agentRepository.findById(agentId);
-        if (agentOpt.isEmpty()) {
-            throw new RuntimeException("Agent not found: " + agentId);
-        }
-        
-        return buildAgentStatusFromEntity(agentOpt.get());
-    }
-    
-    /**
      * Build AgentStatusResponse from TradingAgent entity using CACHED snapshot data.
      * This avoids expensive live API calls to Polygon.io on every dashboard load.
      * Snapshots are created hourly by ScheduledSnapshotService.
@@ -129,36 +117,6 @@ public class AgentMonitoringService {
         } catch (Exception e) {
             return 0;
         }
-    }
-    
-    /**
-     * Start an agent (update database to set active status)
-     */
-    public void startAgent(String agentName) {
-        Optional<TradingAgent> agentOpt = agentRepository.findByName(agentName);
-        if (agentOpt.isEmpty()) {
-            throw new RuntimeException("Agent not found: " + agentName);
-        }
-        
-        TradingAgent agent = agentOpt.get();
-        agent.setIsActive(true);
-        agent.updateActivity();
-        agentRepository.save(agent);
-    }
-    
-    /**
-     * Stop an agent (update database to set inactive status)
-     */
-    public void stopAgent(String agentName) {
-        Optional<TradingAgent> agentOpt = agentRepository.findByName(agentName);
-        if (agentOpt.isEmpty()) {
-            throw new RuntimeException("Agent not found: " + agentName);
-        }
-        
-        TradingAgent agent = agentOpt.get();
-        agent.setIsActive(false);
-        agent.updateActivity();
-        agentRepository.save(agent);
     }
     
 }

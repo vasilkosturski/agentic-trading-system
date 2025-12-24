@@ -1,7 +1,6 @@
 package com.trading.service;
 
 import com.trading.dto.response.AgentTradeResponse;
-import com.trading.dto.response.TradingStatsResponse;
 import com.trading.entity.AccountTransaction;
 import com.trading.entity.AgentRun;
 import com.trading.entity.TransactionType;
@@ -119,45 +118,6 @@ public class TradingService {
         return transactions.stream()
             .map(this::convertTransactionToTradeResponse)
             .collect(Collectors.toList());
-    }
-    
-    public List<AgentTradeResponse> getRecentActivity(int limit) {
-        List<AccountTransaction> transactions = transactionRepository.findAll();
-        return transactions.stream()
-            .sorted((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()))
-            .limit(limit)
-            .map(this::convertTransactionToTradeResponse)
-            .collect(Collectors.toList());
-    }
-    
-    // Trading Statistics - Now using real database data
-    public TradingStatsResponse getTradingStats(String accountId, String agentName) {
-        List<AccountTransaction> transactions;
-        
-        if (agentName != null) {
-            transactions = transactionRepository.findByAgentNameOrderByTransactionDateDesc(agentName);
-        } else if (accountId != null) {
-            TradingAccount account = accountRepository.findByAgentName(accountId)
-                .orElseThrow(() -> new RuntimeException("Account not found: " + accountId));
-            transactions = transactionRepository.findByAccountOrderByTimestampDesc(account);
-        } else {
-            transactions = transactionRepository.findAll();
-        }
-        
-        int totalTrades = transactions.size();
-        double totalVolume = transactions.stream()
-            .mapToDouble(t -> Math.abs(t.getQuantity()) * t.getPrice())
-            .sum();
-
-        double averageTradeSize = totalTrades > 0 ? totalVolume / totalTrades : 0.0;
-
-        // Calculate P&L (simplified - would need more complex logic for real P&L calculation)
-        double totalPnL = 0.0; // This would require market data and position tracking
-        double largestWin = 0.0;
-        double largestLoss = 0.0;
-
-        return new TradingStatsResponse(totalTrades, totalVolume,
-            totalPnL, averageTradeSize, largestWin, largestLoss);
     }
     
     /**
