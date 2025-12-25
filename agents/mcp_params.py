@@ -15,7 +15,9 @@ Push notifications server kept as separate process (could also be refactored but
 """
 
 import os
+from typing import Dict
 from dotenv import load_dotenv
+from mcp_types import MCPName
 
 load_dotenv(override=True)
 
@@ -23,35 +25,41 @@ load_dotenv(override=True)
 brave_api_key = os.getenv("BRAVE_API_KEY")
 brave_env = {"BRAVE_API_KEY": brave_api_key} if brave_api_key else {}
 
-# researcher_mcp_server_params - External MCPs for web research
+# MCP server parameters - External MCPs for web research
 # These are legitimate MCPs - we don't control these services
-def researcher_mcp_server_params(name: str):
+def get_mcp_server_params() -> Dict[MCPName, dict]:
     """
-    MCP servers for researcher tool - EXTERNAL services only
+    Get MCP server parameters as a dict keyed by MCPName.
 
-    - mcp-server-fetch: Standard web content retrieval
-    - Brave Search: Third-party web search API
+    Returns dict with configuration for each available MCP server:
+    - FETCH: Standard web content retrieval
+    - BRAVE_SEARCH: Third-party web search API
 
     NOTE: Memory is now stored in PostgreSQL directly via trading_tools.py
     No separate MCP needed - use PostgreSQL fields (full_reasoning, research_sources, agent_context)
 
-    Args:
-        name: Agent name (for reference, not used for memory)
-
     Returns:
-        List of MCP server parameter dicts
+        Dict[MCPName, dict] - MCP server configuration by name
     """
-    return [
-        # Fetch - Standard web content retrieval
-        {"command": "uvx", "args": ["mcp-server-fetch"]},
-
-        # Brave Search - Third-party web search (legitimate MCP use case)
-        {
+    return {
+        MCPName.FETCH: {
+            "command": "uvx",
+            "args": ["mcp-server-fetch"]
+        },
+        MCPName.BRAVE_SEARCH: {
             "command": "npx",
             "args": ["-y", "@modelcontextprotocol/server-brave-search"],
             "env": brave_env,
         },
+    }
 
-        # Memory removed - use PostgreSQL instead via trading_tools.py
-        # This simplifies architecture and prevents data loss on pod restart
-    ]
+
+# Backwards compatibility - deprecated
+def researcher_mcp_server_params(name: str):
+    """
+    DEPRECATED: Use get_mcp_server_params() instead.
+
+    Returns list of MCP server parameter dicts (old format).
+    """
+    params_dict = get_mcp_server_params()
+    return list(params_dict.values())

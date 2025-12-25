@@ -212,15 +212,5 @@ async def get_account_report(agent_id: int) -> str:
         logger.error(f"Failed to get account report for agent {agent_id}: {e}")
         raise Exception(str(e)) from e
 
-async def get_strategy(name: str) -> str:
-    """Get agent strategy - called by system, not exposed as agent tool"""
-    try:
-        url = f"{BACKEND_BASE_URL}/api/accounts/resources/strategy/{name}"
-        response = await call_backend("GET", url)
-        return response.text
-    except BackendAPIError as e:
-        logger.error(f"Failed to get strategy for {name}: {e}")
-        raise Exception(str(e)) from e
-
 # No model-visible trading tools are exported. Account context is provided explicitly
 # by the orchestrator; trading actions are dispatched by code, not by the model.

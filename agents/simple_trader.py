@@ -7,22 +7,29 @@ with a run() interface for TradingSystem compatibility.
 """
 
 import logging
-from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import datetime
+from textwrap import dedent
 from typing import Dict, Optional, Literal, cast
 
 from agents import Agent, trace
-from agents.mcp import MCPServerStdio
 from agents import function_tool
 
 from market_tools import MARKET_TOOLS
 from memory_tools import get_trading_history, get_recent_activity
-from mcp_params import researcher_mcp_server_params
-from researcher import create_researcher_agent
+from researcher import create_researcher_agent, REQUIRED_MCPS as RESEARCHER_MCPS
 from agent_executor import AgentExecutor
+from mcp_types import MCPName, MCPPool
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# MCP Requirements - Declare what this agent needs
+# =============================================================================
+
+# SimpleTrader uses Researcher, which needs these MCPs
+REQUIRED_MCPS = RESEARCHER_MCPS
 
 
 # ============================================================================
@@ -86,29 +93,27 @@ def build_trading_message(
     force_trade: bool
 ) -> str:
     """Build user message for this trading cycle.
-    
+
     Args:
         trader: SimpleTrader config
         historical_context: Pre-fetched trading history JSON
         force_trade: If True, agent must make BUY/SELL (no HOLD)
-        
+
     Returns:
         User message for this cycle
     """
     force_instruction = ""
     if force_trade:
-        force_instruction = """🎯 **MANUAL TRIGGER - ACTION REQUIRED**
-You MUST make a trade (BUY or SELL) this cycle. HOLD is NOT allowed.
-Choose your best opportunity - either buy a new position or sell an existing one.
+        force_instruction = dedent("""
+            🎯 **MANUAL TRIGGER - ACTION REQUIRED**
+            You MUST make a trade (BUY or SELL) this cycle. HOLD is NOT allowed.
+            Choose your best opportunity - either buy a new position or sell an existing one.
 
-"""
+        """)
 
     history_section = ""
     if historical_context:
-        history_section = f"""
-**YOUR RECENT TRADING HISTORY:**
-{historical_context}
-"""
+        history_section = f"\n**YOUR RECENT TRADING HISTORY:**\n{historical_context}\n"
 
     return f"""{force_instruction}Conduct your portfolio review.
 
@@ -120,21 +125,21 @@ Review your holdings, research opportunities, and make your decision.
 
 async def create_trader_agent(
     trader: 'SimpleTrader',
-    researcher_mcp_servers,
+    mcp_pool: MCPPool,
     executor: AgentExecutor
 ) -> Agent:
     """Create agent with all tools.
-    
+
     Args:
         trader: SimpleTrader config with name, strategy, model_name
-        researcher_mcp_servers: MCP servers for researcher tool
+        mcp_pool: MCP pool - passed to researcher
         executor: AgentExecutor instance for decision storage
-        
+
     Returns:
         Agent instance ready to run
     """
     # Create researcher agent and wrap as tool
-    researcher_agent = await create_researcher_agent(researcher_mcp_servers, trader.model_name)
+    researcher_agent = await create_researcher_agent(mcp_pool, trader.model_name)
     researcher_tool = researcher_agent.as_tool(
         tool_name="Researcher",
         tool_description="Research online for news and opportunities. "
@@ -246,14 +251,12 @@ async def create_trader_agent(
     )
 
 
-async def run_trader_cycle(trader: 'SimpleTrader', force_trade: bool = False):
+async def run_trader_cycle(trader: 'SimpleTrader', mcp_pool: MCPPool, force_trade: bool = False):
     """Run a complete trading cycle for an agent.
-    
-    This is the main entry point - sets up MCP servers, tracing, executor,
-    and runs the agent through AgentExecutor.
-    
+
     Args:
         trader: SimpleTrader config
+        mcp_pool: MCP pool - agent selects servers from REQUIRED_MCPS
         force_trade: If True, agent MUST make a BUY or SELL trade (no HOLD)
     """
     try:
@@ -266,31 +269,22 @@ async def run_trader_cycle(trader: 'SimpleTrader', force_trade: bool = False):
         trace_id = f"trace_{trader.name.lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
         with trace(trace_name, trace_id=trace_id):
-            # Setup MCP servers for external services (Brave Search, etc.)
-            async with AsyncExitStack() as stack:
-                researcher_mcp_servers = [
-                    await stack.enter_async_context(
-                        MCPServerStdio(params, client_session_timeout_seconds=120)
-                    )
-                    for params in researcher_mcp_server_params(trader.name.lower())
-                ]
+            # Create executor for this cycle
+            executor = AgentExecutor(trader.agent_id, trader.name, trader.strategy)
 
-                # Create executor for this cycle
-                executor = AgentExecutor(trader.agent_id, trader.name, trader.strategy)
+            # Create callable wrappers for executor
+            def build_message_fn(historical_context: str, force_trade_flag: bool) -> str:
+                return build_trading_message(trader, historical_context, force_trade_flag)
 
-                # Create callable wrappers for executor
-                def build_message_fn(historical_context: str, force_trade_flag: bool) -> str:
-                    return build_trading_message(trader, historical_context, force_trade_flag)
+            async def create_agent_fn(exec: AgentExecutor) -> Agent:
+                return await create_trader_agent(trader, mcp_pool, exec)
 
-                async def create_agent_fn(exec: AgentExecutor) -> Agent:
-                    return await create_trader_agent(trader, researcher_mcp_servers, exec)
-
-                # Execute the trading cycle
-                await executor.execute_cycle(
-                    build_message_fn=build_message_fn,
-                    create_agent_fn=create_agent_fn,
-                    force_trade=force_trade,
-                )
+            # Execute the trading cycle
+            await executor.execute_cycle(
+                build_message_fn=build_message_fn,
+                create_agent_fn=create_agent_fn,
+                force_trade=force_trade,
+            )
 
         logger.info(f"{trader.name} agent completed successfully")
 
@@ -305,7 +299,7 @@ async def run_trader_cycle(trader: 'SimpleTrader', force_trade: bool = False):
 @dataclass
 class SimpleTrader:
     """Config holder with run interface for TradingSystem compatibility.
-    
+
     This is intentionally minimal - all logic lives in module-level functions
     to match the researcher.py pattern.
     """
@@ -314,6 +308,11 @@ class SimpleTrader:
     model_name: str = "gpt-4o-mini"
     agent_id: Optional[int] = None
 
-    async def run(self, force_trade: bool = False):
-        """Run a trading cycle. Delegates to module-level function."""
-        await run_trader_cycle(self, force_trade)
+    async def run(self, mcp_pool: MCPPool, force_trade: bool = False):
+        """Run a trading cycle. Delegates to module-level function.
+
+        Args:
+            mcp_pool: MCP pool with servers this agent needs
+            force_trade: If True, agent MUST make a trade (no HOLD)
+        """
+        await run_trader_cycle(self, mcp_pool, force_trade)

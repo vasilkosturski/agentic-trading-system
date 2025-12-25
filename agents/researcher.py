@@ -18,8 +18,9 @@ To use as a tool from another agent:
 
 from agents import Agent, Runner, function_tool
 from datetime import datetime
-from typing import Any
-import json
+from textwrap import dedent
+from typing import Union
+from pydantic import ValidationError
 from config import BACKEND_BASE_URL
 from http_client import call_backend, BackendAPIError
 from models import (
@@ -28,7 +29,16 @@ from models import (
     RecentActivityResponse,
     SymbolHistoryResponse,
     PriceLookupResponse,
+    ToolError,
 )
+from mcp_types import MCPName, MCPPool
+
+
+# =============================================================================
+# MCP Requirements - Declare what this agent needs
+# =============================================================================
+
+REQUIRED_MCPS = [MCPName.BRAVE_SEARCH, MCPName.FETCH]
 
 
 # =============================================================================
@@ -134,15 +144,15 @@ def get_researcher_instructions() -> str:
 **WEB RESEARCH TOOLS** (gather current information):
 - Brave Search - Search for news, analysis, market data
 - Web fetch - Retrieve specific URLs
-- Knowledge graph - Store/recall company information
 
 **RESEARCH WORKFLOW**:
 
-When conducting research (if agent_name is mentioned in the request):
+When conducting research (agent_name is required in every request):
 1. **Understand Context First**:
    - Query their holdings to see current positions
    - Use query_recent_activity_tool for general overview
    - Use query_symbol_history_tool for specific stock details
+   - Use lookup_price_tool for current market prices
 
 2. **Combine Historical + Current**:
    - Use database to understand WHAT they hold and WHY
@@ -150,100 +160,168 @@ When conducting research (if agent_name is mentioned in the request):
    - Synthesize both into context-aware research
 
 **IMPORTANT**:
-- Use your knowledge graph to store and recall entity information
 - ALWAYS include at least 2-3 sources with actual URLs from your searches
 - DO NOT make up or hallucinate URLs
 """
 
 
-def build_research_message(query: str) -> str:
-    """Build user message for this research request.
-    
+def _build_research_message(query: str) -> str:
+    """Build user message for this research request (internal helper).
+
     Args:
         query: The research query/request
-        
+
     Returns:
         User message for this invocation
     """
-    return f"""Current time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+    return dedent(f"""
+        Current time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
-Research request: {query}
-"""
+        Research request: {query}
+    """).strip()
 
 
-async def create_researcher_agent(mcp_servers, model_name: str) -> Agent[Any]:
+async def create_researcher_agent(mcp_pool: MCPPool, model_name: str) -> Agent[ResearchResponse]:
     """Create researcher agent with typed output.
-    
+
     The researcher is stateless - agent names come from the query.
     Uses output_type=ResearchResponse to enforce structured output from LLM.
-    
+
     Args:
-        mcp_servers: MCP servers for web research (Brave, etc.)
+        mcp_pool: MCP pool - agent selects servers from REQUIRED_MCPS
         model_name: Model to use
-        
+
     Returns:
         Agent configured for typed ResearchResponse output
     """
+    # Select only the MCPs this agent needs
+    mcp_servers = [mcp_pool[mcp_name] for mcp_name in REQUIRED_MCPS if mcp_name in mcp_pool]
     @function_tool
-    async def query_holdings_tool(agent_name: str) -> str:
+    async def query_holdings_tool(agent_name: str) -> Union[HoldingsResponse, ToolError]:
         """Get current holdings for a trading agent.
-        
+
         Args:
             agent_name: Agent name (Warren, George, Ray, Cathie)
         """
         try:
-            result = await _fetch_holdings(agent_name)
-            return result.model_dump_json()
+            return await _fetch_holdings(agent_name)
         except BackendAPIError as e:
             if e.status_code == 404:
-                return json.dumps({"error": "Agent not found", "holdings": []})
-            return json.dumps({"error": str(e), "holdings": []})
+                return ToolError(
+                    error="Agent not found",
+                    error_type="not_found",
+                    context={"agent_name": agent_name}
+                )
+            return ToolError(
+                error=str(e),
+                error_type="api_error",
+                context={"agent_name": agent_name}
+            )
+        except ValidationError as e:
+            return ToolError(
+                error=f"Invalid data from backend: {e}",
+                error_type="validation",
+                context={"agent_name": agent_name}
+            )
+        except Exception as e:
+            return ToolError(
+                error=f"Unexpected error: {e}",
+                error_type="unknown",
+                context={"agent_name": agent_name}
+            )
 
     @function_tool
-    async def query_recent_activity_tool(agent_name: str, days: int = 30) -> str:
+    async def query_recent_activity_tool(agent_name: str, days: int = 30) -> Union[RecentActivityResponse, ToolError]:
         """Get recent activity across ALL stocks for an agent.
-        
+
         Args:
             agent_name: Agent name (Warren, George, Ray, Cathie)
             days: How many days back to look
         """
         try:
-            result = await _fetch_recent_activity(agent_name, days)
-            return result.model_dump_json()
+            return await _fetch_recent_activity(agent_name, days)
         except BackendAPIError as e:
             if e.status_code == 404:
-                return json.dumps({"error": "No recent activity found"})
-            return json.dumps({"error": str(e)})
+                return ToolError(
+                    error="No recent activity found",
+                    error_type="not_found",
+                    context={"agent_name": agent_name, "days": days}
+                )
+            return ToolError(
+                error=str(e),
+                error_type="api_error",
+                context={"agent_name": agent_name, "days": days}
+            )
+        except ValidationError as e:
+            return ToolError(
+                error=f"Invalid data from backend: {e}",
+                error_type="validation",
+                context={"agent_name": agent_name, "days": days}
+            )
+        except Exception as e:
+            return ToolError(
+                error=f"Unexpected error: {e}",
+                error_type="unknown",
+                context={"agent_name": agent_name, "days": days}
+            )
 
     @function_tool
-    async def query_symbol_history_tool(agent_name: str, symbol: str, days: int = 30) -> str:
+    async def query_symbol_history_tool(agent_name: str, symbol: str, days: int = 30) -> Union[SymbolHistoryResponse, ToolError]:
         """Get trading history for a SPECIFIC stock.
-        
+
         Args:
             agent_name: Agent name (Warren, George, Ray, Cathie)
             symbol: Stock symbol (e.g., AAPL, NVDA)
             days: How many days back to look
         """
         try:
-            result = await _fetch_symbol_history(agent_name, symbol, days)
-            return result.model_dump_json()
+            return await _fetch_symbol_history(agent_name, symbol, days)
         except BackendAPIError as e:
             if e.status_code == 404:
-                return json.dumps({"error": f"No history found for {symbol}"})
-            return json.dumps({"error": str(e)})
+                return ToolError(
+                    error=f"No history found for {symbol}",
+                    error_type="not_found",
+                    context={"agent_name": agent_name, "symbol": symbol, "days": days}
+                )
+            return ToolError(
+                error=str(e),
+                error_type="api_error",
+                context={"agent_name": agent_name, "symbol": symbol, "days": days}
+            )
+        except ValidationError as e:
+            return ToolError(
+                error=f"Invalid data from backend: {e}",
+                error_type="validation",
+                context={"agent_name": agent_name, "symbol": symbol, "days": days}
+            )
+        except Exception as e:
+            return ToolError(
+                error=f"Unexpected error: {e}",
+                error_type="unknown",
+                context={"agent_name": agent_name, "symbol": symbol, "days": days}
+            )
 
     @function_tool
-    async def lookup_price_tool(symbol: str) -> str:
+    async def lookup_price_tool(symbol: str) -> Union[PriceLookupResponse, ToolError]:
         """Get current market price for a stock.
         
         Args:
             symbol: Stock symbol (e.g., AAPL, NVDA)
         """
         try:
-            result = await _fetch_price(symbol)
-            return result.model_dump_json()
+            return await _fetch_price(symbol)
+        except ValidationError as e:
+            return ToolError(
+                error=f"Invalid price data: {e}",
+                error_type="validation",
+                context={"symbol": symbol}
+            )
         except Exception as e:
-            return json.dumps({"error": str(e), "symbol": symbol})
+            return ToolError(
+                error=str(e),
+                error_type="api_error",
+                context={"symbol": symbol}
+            )
 
     db_tools = [
         query_holdings_tool,
@@ -252,7 +330,7 @@ async def create_researcher_agent(mcp_servers, model_name: str) -> Agent[Any]:
         lookup_price_tool,
     ]
 
-    return Agent[Any](
+    return Agent[ResearchResponse](
         name="Researcher",
         instructions=get_researcher_instructions(),
         model=model_name,
@@ -264,43 +342,43 @@ async def create_researcher_agent(mcp_servers, model_name: str) -> Agent[Any]:
 
 async def run_researcher(
     query: str,
-    mcp_servers,
+    mcp_pool: MCPPool,
     model_name: str = "gpt-4o-mini",
 ) -> ResearchResponse:
     """Run researcher agent independently and return typed response.
-    
+
     This is the main entry point for standalone use or testing.
     The query should contain all necessary context (agent names, etc).
-    
+
     Args:
         query: Research request (include agent name if querying agent data)
-        mcp_servers: MCP servers for web research
+        mcp_pool: MCP pool - agent selects servers from REQUIRED_MCPS
         model_name: Model to use
-        
+
     Returns:
         ResearchResponse with validated summary and sources
-        
+
     Raises:
         AgentError: If the agent fails to produce valid output
-        
+
     Example:
         # Research for a specific agent
         response = await run_researcher(
             "I am Warren. Review my holdings and check for news on each position.",
-            mcp_servers
+            mcp_pool
         )
-        
+
         # General research
         response = await run_researcher(
             "What's the latest news on NVDA?",
-            mcp_servers
+            mcp_pool
         )
     """
-    agent = await create_researcher_agent(mcp_servers, model_name)
-    message = build_research_message(query)
-    
+    agent = await create_researcher_agent(mcp_pool, model_name)
+    message = _build_research_message(query)
+
     result = await Runner.run(agent, message)
-    
+
     # With output_type set, final_output is already a validated ResearchResponse
     return result.final_output
 
