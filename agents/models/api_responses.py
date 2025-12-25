@@ -135,3 +135,19 @@ class PriceLookupResponse(BaseModel):
     symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
     price: float = Field(gt=0, description="Current price in USD")
     timestamp: str = Field(description="ISO format timestamp of lookup")
+
+
+# =============================================================================
+# Tool Error Model (for standardized error responses from LLM tools)
+# =============================================================================
+
+class ToolError(BaseModel):
+    """Standardized error response for LLM tools.
+    
+    Used when a tool cannot return its normal response due to an error.
+    The LLM receives this as a structured response it can interpret.
+    """
+
+    error: str = Field(min_length=1, description="Human-readable error message")
+    error_type: str = Field(default="unknown", description="Error category: not_found, validation, api_error")
+    context: dict = Field(default_factory=dict, description="Additional context (symbol, agent_name, etc.)")

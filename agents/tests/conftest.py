@@ -214,3 +214,59 @@ def mock_tool_tracker(mocker):
     mock_instance = MagicMock()
     mock_class.return_value = mock_instance
     return mock_instance
+
+
+# =============================================================================
+# Researcher Test Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def mock_backend_response():
+    """Factory fixture for creating mock backend HTTP responses.
+    
+    Usage:
+        response = mock_backend_response({"key": "value"})
+        # response.text is the JSON-encoded data
+    """
+    def _create(data: dict) -> MagicMock:
+        mock = MagicMock()
+        mock.text = json.dumps(data)
+        return mock
+    return _create
+
+
+@pytest.fixture
+def valid_holdings_data():
+    """Valid holdings response data for researcher tests."""
+    return {
+        "agentName": "Warren",
+        "balance": 10000.0,
+        "holdings": [],
+        "positionCount": 0
+    }
+
+
+@pytest.fixture
+def valid_recent_activity_data():
+    """Valid recent activity response data for researcher tests."""
+    return {
+        "agentName": "Warren",
+        "days": 30,
+        "runs": [],
+        "totalRuns": 0,
+        "totalTrades": 0
+    }
+
+
+@pytest.fixture
+def valid_symbol_history_data():
+    """Valid symbol history response data for researcher tests."""
+    return {
+        "symbol": "AAPL",
+        "agentName": "Warren",
+        "days": 30,
+        "currentPosition": None,
+        "trades": [],
+        "summary": None
+    }

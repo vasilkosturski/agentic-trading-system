@@ -4,12 +4,16 @@ import asyncio
 import aiohttp
 import logging
 import os
+from contextlib import AsyncExitStack
 from typing import List
 from dotenv import load_dotenv
 
+from agents.mcp import MCPServerStdio
 from simple_trader import SimpleTrader
 from config import BACKEND_API_AGENTS
 from api_server import TradingAPIServer
+from mcp_types import MCPName, MCPPool
+from mcp_params import get_mcp_server_params
 
 # Load environment variables
 load_dotenv(override=True)
@@ -113,12 +117,27 @@ in exchange for the potential of exponential returns from revolutionary companie
             forced_agent = random.choice(self.agents).name
             logger.info(f"🎯 Manual trigger: Forcing {forced_agent} to make a trade this cycle")
 
-        # Run all agents concurrently, passing force flag to the chosen agent
-        tasks = [
-            agent.run(force_trade=(agent.name == forced_agent))
-            for agent in self.agents
-        ]
-        await asyncio.gather(*tasks, return_exceptions=True)
+        # Create MCP pool for this trading cycle
+        async with AsyncExitStack() as stack:
+            # Get MCP server configurations
+            mcp_params = get_mcp_server_params()
+
+            # Create pool: MCPName -> ServerSession
+            mcp_pool: MCPPool = {}
+            for mcp_name, params in mcp_params.items():
+                server = await stack.enter_async_context(
+                    MCPServerStdio(params, client_session_timeout_seconds=120)
+                )
+                mcp_pool[mcp_name] = server
+
+            logger.info(f"✅ MCP pool created with {len(mcp_pool)} servers: {list(mcp_pool.keys())}")
+
+            # Run all agents concurrently with shared MCP pool
+            tasks = [
+                agent.run(mcp_pool, force_trade=(agent.name == forced_agent))
+                for agent in self.agents
+            ]
+            await asyncio.gather(*tasks, return_exceptions=True)
 
         logger.info("✅ All agents completed their trading cycle")
     

@@ -22,6 +22,8 @@ from .api_responses import (
     TradingSummary,
     SymbolHistoryResponse,
     PriceLookupResponse,
+    # Tool error model
+    ToolError,
 )
 from .internal_state import (
     ExecutorState,
@@ -52,6 +54,8 @@ __all__ = [
     "TradingSummary",
     "SymbolHistoryResponse",
     "PriceLookupResponse",
+    # Tool Error Model
+    "ToolError",
     # Internal State Models
     "ExecutorState",
     "ToolCallRecord",
