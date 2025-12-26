@@ -422,7 +422,7 @@ class BuyTradeExecutorTest {
             .thenReturn(Optional.empty());
 
         // Act & Assert
-        BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> {
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
             buyTradeExecutor.executeBuy(agentName, symbol, quantity, 1L);
         });
 
@@ -456,11 +456,11 @@ class BuyTradeExecutorTest {
             .thenReturn(Optional.empty()); // Run doesn't exist
 
         // Act & Assert
-        BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> {
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
             buyTradeExecutor.executeBuy(agentName, symbol, quantity, invalidRunId);
         });
 
-        assertEquals("Agent run not found: " + invalidRunId, exception.getMessage());
+        assertEquals("Agent run with id " + invalidRunId + " not found", exception.getMessage());
 
         // Verify agentRunRepository was called
         verify(agentRunRepository).findById(invalidRunId);
