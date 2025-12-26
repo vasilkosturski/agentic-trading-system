@@ -7,6 +7,7 @@ import com.trading.entity.*;
 import com.trading.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.trading.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -172,7 +173,8 @@ public class AccountService {
             );
 
         } catch (Exception e) {
-            throw new RuntimeException("Error getting account report for " + agentName + ": " + e.getMessage());
+            throw new RuntimeException(
+                "Error getting account report for " + agentName + ": " + e.getMessage(), e);
         }
     }
 
@@ -211,7 +213,8 @@ public class AccountService {
      */
     TradingAccount getAccount(String agentName) {
         return tradingAccountRepository.findByAgentName(agentName)
-            .orElseThrow(() -> new RuntimeException("Trading account not found for agent: " + agentName +
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Trading account not found for agent: " + agentName +
                 ". Agent must be initialized before trading operations."));
     }
 
@@ -228,7 +231,7 @@ public class AccountService {
             agentRepository.save(agent);
             logger.debug("Updated activity timestamp for agent: {}", agentName);
         } else {
-            throw new RuntimeException("Agent not found: " + agentName);
+            throw new ResourceNotFoundException("Agent not found: " + agentName);
         }
     }
 

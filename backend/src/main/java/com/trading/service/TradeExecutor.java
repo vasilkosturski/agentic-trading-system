@@ -4,7 +4,9 @@ import com.trading.entity.*;
 import com.trading.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 
@@ -46,7 +48,8 @@ public abstract class TradeExecutor {
      */
     protected TradingAccount getAccount(String agentName) {
         return tradingAccountRepository.findByAgentName(agentName)
-            .orElseThrow(() -> new RuntimeException("Trading account not found for agent: " + agentName +
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                "Trading account not found for agent: " + agentName +
                 ". Agent must be initialized before trading operations."));
     }
 
@@ -79,7 +82,8 @@ public abstract class TradeExecutor {
 
         // Link transaction to agent run (REQUIRED)
         AgentRun agentRun = agentRunRepository.findById(runId)
-            .orElseThrow(() -> new RuntimeException("Agent run not found: " + runId));
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                "Agent run not found: " + runId));
         transaction.setAgentRun(agentRun);
 
         return transactionRepository.save(transaction);
