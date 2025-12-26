@@ -15,7 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.server.ResponseStatusException;
+import com.trading.exception.ResourceNotFoundException;
 
 import java.util.*;
 
@@ -219,12 +219,12 @@ class AccountServiceTest {
             .thenReturn(Optional.empty());
 
         // Act & Assert
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
             accountService.getBalance(agentName);
         });
 
         assertEquals("Trading account not found for agent: " + agentName +
-            ". Agent must be initialized before trading operations.", exception.getReason());
+            ". Agent must be initialized before trading operations.", exception.getMessage());
     }
 
     @Test
@@ -268,12 +268,12 @@ class AccountServiceTest {
             .thenReturn(Optional.empty());
 
         // Act & Assert
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
             accountService.getHoldings(agentName);
         });
 
         assertEquals("Trading account not found for agent: " + agentName +
-            ". Agent must be initialized before trading operations.", exception.getReason());
+            ". Agent must be initialized before trading operations.", exception.getMessage());
         verify(holdingRepository, never()).findByAccount(any()); // Ensure holdingRepository is not called
     }
 }
