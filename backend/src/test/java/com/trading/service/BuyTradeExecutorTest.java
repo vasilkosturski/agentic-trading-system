@@ -11,6 +11,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.trading.exception.BusinessRuleException;
+import com.trading.exception.ResourceNotFoundException;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -342,7 +344,7 @@ class BuyTradeExecutorTest {
             .thenReturn(testPriceData);
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+        BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> {
             buyTradeExecutor.executeBuy(agentName, symbol, quantity, 1L);
         });
 
@@ -385,7 +387,7 @@ class BuyTradeExecutorTest {
             .thenReturn(tenHoldings);
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+        BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> {
             buyTradeExecutor.executeBuy(agentName, symbol, 10, 1L);
         });
 
@@ -420,7 +422,7 @@ class BuyTradeExecutorTest {
             .thenReturn(Optional.empty());
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+        BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> {
             buyTradeExecutor.executeBuy(agentName, symbol, quantity, 1L);
         });
 
@@ -454,7 +456,7 @@ class BuyTradeExecutorTest {
             .thenReturn(Optional.empty()); // Run doesn't exist
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+        BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> {
             buyTradeExecutor.executeBuy(agentName, symbol, quantity, invalidRunId);
         });
 

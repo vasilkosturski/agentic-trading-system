@@ -2,6 +2,7 @@ package com.trading.service;
 
 import com.trading.dto.response.TradeResult;
 import com.trading.entity.*;
+import com.trading.exception.BusinessRuleException;
 import com.trading.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,7 +76,8 @@ public class SellTradeExecutor extends TradeExecutor {
         AccountHolding holding = holdingRepository.findByAccountAndSymbol(account, symbol);
         if (holding == null || holding.getQuantity() < quantity) {
             int available = holding != null ? holding.getQuantity() : 0;
-            throw new RuntimeException("Cannot sell " + quantity + " shares of " + symbol +
+            throw new BusinessRuleException(
+                "Cannot sell " + quantity + " shares of " + symbol +
                 ". Only have " + available + " shares available");
         }
         return holding;

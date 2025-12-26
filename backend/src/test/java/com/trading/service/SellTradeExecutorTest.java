@@ -11,6 +11,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.trading.exception.BusinessRuleException;
+import com.trading.exception.ResourceNotFoundException;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -231,7 +233,7 @@ class SellTradeExecutorTest {
     // ========== VALIDATION TESTS ==========
 
     @Test
-    @DisplayName("Should throw RuntimeException when no holding exists")
+    @DisplayName("Should throw BusinessRuleException when no holding exists")
     void testExecuteSell_NoHolding_ThrowsException() {
         // Arrange
         String agentName = "Warren";
@@ -244,7 +246,7 @@ class SellTradeExecutorTest {
             .thenReturn(null); // No holding exists
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+        BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> {
             sellTradeExecutor.executeSell(agentName, symbol, quantity, 1L);
         });
 
@@ -276,7 +278,7 @@ class SellTradeExecutorTest {
             .thenReturn(existingHolding);
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+        BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> {
             sellTradeExecutor.executeSell(agentName, symbol, sellQuantity, 1L);
         });
 
@@ -303,7 +305,7 @@ class SellTradeExecutorTest {
             .thenReturn(Optional.empty());
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+        BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> {
             sellTradeExecutor.executeSell(agentName, symbol, quantity, 1L);
         });
 
@@ -368,7 +370,7 @@ class SellTradeExecutorTest {
             .thenReturn(Optional.empty()); // Run doesn't exist
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+        BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> {
             sellTradeExecutor.executeSell(agentName, symbol, quantity, invalidRunId);
         });
 

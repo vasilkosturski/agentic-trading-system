@@ -95,4 +95,28 @@ public interface AccountTransactionRepository extends JpaRepository<AccountTrans
      */
     @Query("SELECT at FROM AccountTransaction at WHERE at.account.id = :accountId AND at.symbol = :symbol ORDER BY at.timestamp DESC")
     List<AccountTransaction> findByAccountIdAndSymbolOrderByTimestampDesc(@Param("accountId") Long accountId, @Param("symbol") String symbol);
+
+    /**
+     * Find recent transactions across all agents (for trade log)
+     * Replaces findAll() to avoid loading all records into memory.
+     * Sorting and limiting happens at database level for performance.
+     */
+    @Query(value = "SELECT * FROM trading.account_transactions ORDER BY timestamp DESC LIMIT :limit",
+           nativeQuery = true)
+    List<AccountTransaction> findRecentTransactions(@Param("limit") int limit);
+
+    /**
+     * Find related trades for a specific transaction (same agent, same symbol, excluding current trade)
+     * Used for showing trade history context in trade detail view.
+     */
+    @Query("SELECT at FROM AccountTransaction at " +
+           "WHERE at.account.id = :accountId " +
+           "AND at.symbol = :symbol " +
+           "AND at.id != :excludeId " +
+           "ORDER BY at.timestamp DESC")
+    List<AccountTransaction> findRelatedTrades(
+        @Param("accountId") Long accountId,
+        @Param("symbol") String symbol,
+        @Param("excludeId") Long excludeId
+    );
 }

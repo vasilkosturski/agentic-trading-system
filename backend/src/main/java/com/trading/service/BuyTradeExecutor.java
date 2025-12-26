@@ -2,6 +2,7 @@ package com.trading.service;
 
 import com.trading.dto.response.TradeResult;
 import com.trading.entity.*;
+import com.trading.exception.BusinessRuleException;
 import com.trading.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,7 +92,7 @@ public class BuyTradeExecutor extends TradeExecutor {
                 .map(h -> h.getSymbol())
                 .collect(Collectors.joining(", "));
 
-            throw new RuntimeException(
+            throw new BusinessRuleException(
                 "❌ POSITION LIMIT REACHED: You currently hold " + MAX_POSITIONS_PER_AGENT + " positions (" + holdingsList + "). " +
                 "Maximum allowed is " + MAX_POSITIONS_PER_AGENT + " positions per agent. " +
                 "To buy " + symbol + ", you must first sell one of your existing positions. " +
@@ -105,7 +106,8 @@ public class BuyTradeExecutor extends TradeExecutor {
      */
     private void validateSufficientFunds(TradingAccount account, String symbol, Integer quantity, Double totalCost) {
         if (totalCost > account.getBalance()) {
-            throw new RuntimeException("Insufficient funds to buy " + quantity + " shares of " + symbol +
+            throw new BusinessRuleException(
+                "Insufficient funds to buy " + quantity + " shares of " + symbol +
                 ". Required: $" + String.format("%.2f", totalCost) + ", Available: $" + String.format("%.2f", account.getBalance()));
         }
     }
