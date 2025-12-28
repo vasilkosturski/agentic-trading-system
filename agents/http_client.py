@@ -40,8 +40,8 @@ async def call_backend(
     This is the ONLY HTTP client function. All tools use this.
 
     Args:
-        method: HTTP method (GET, POST, etc.)
-        url: Full URL (e.g., f"{BACKEND_URL}/tools/get_balance")
+        method: HTTP method (GET, POST, PUT, etc.)
+        url: Full URL (e.g., f"{BACKEND_URL}/{agent_id}/balance")
         params: URL query parameters (for GET requests)
         json_data: JSON request body (for POST requests)
         timeout: Request timeout in seconds (default: 30)

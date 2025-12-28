@@ -1,10 +1,16 @@
 """Common pytest fixtures for trading agent tests."""
 
 import os
+from pathlib import Path
 from unittest.mock import patch
+from dotenv import load_dotenv
 
-# CRITICAL: Mock environment variables BEFORE any other imports
-# This prevents config.py from failing during test collection
+# CRITICAL: Load parent .env FIRST (has real API keys for integration tests)
+parent_env = Path(__file__).parent.parent.parent / ".env"
+if parent_env.exists():
+    load_dotenv(parent_env, override=False)  # Don't override if already set in environment
+
+# THEN set defaults for unit tests (only if not already set by parent .env)
 os.environ.setdefault("OPENAI_API_KEY", "test-key-for-unit-tests")
 os.environ.setdefault("BACKEND_BASE_URL", "http://localhost:8080")
 os.environ.setdefault("BACKEND_API_ACCOUNTS", "http://localhost:8080")
@@ -127,36 +133,43 @@ def sample_decision() -> TradingDecision:
 
 
 @pytest.fixture
-def mock_backend_api(mock_aiohttp, sample_balance, sample_holdings, sample_account_report):
-    """Mock backend API responses."""
+def mock_backend_api(mock_aiohttp, sample_balance, sample_holdings, sample_account_report, sample_agent_id):
+    """Mock backend API responses using new REST endpoints."""
     # Mock common API endpoints
     backend_url = "http://localhost:8080"
 
-    # Balance endpoint
-    mock_aiohttp.post(
-        f"{backend_url}/tools/get_balance",
+    # Balance endpoint - GET /{agentId}/balance
+    mock_aiohttp.get(
+        f"{backend_url}/{sample_agent_id}/balance",
         payload=sample_balance,
         repeat=True
     )
 
-    # Holdings endpoint
-    mock_aiohttp.post(
-        f"{backend_url}/tools/get_holdings",
-        payload=sample_holdings,
+    # Holdings endpoint - GET /{agentId}/holdings
+    mock_aiohttp.get(
+        f"{backend_url}/{sample_agent_id}/holdings",
+        payload=[h.dict() for h in sample_holdings],  # Convert Holding objects to dicts
         repeat=True
     )
 
-    # Account report endpoint
-    mock_aiohttp.post(
-        f"{backend_url}/tools/get_account_report",
+    # Account report endpoint - GET /resources/accounts/{agentId}
+    mock_aiohttp.get(
+        f"{backend_url}/resources/accounts/{sample_agent_id}",
         payload=sample_account_report,
         repeat=True
     )
 
-    # Initialize agent endpoint
+    # Initialize agent endpoint - POST /
     mock_aiohttp.post(
-        f"{backend_url}/tools/initialize_agent",
-        payload="Agent initialized",
+        f"{backend_url}/",
+        payload={"id": sample_agent_id, "name": "Warren", "balance": sample_balance},
+        repeat=True
+    )
+
+    # Buy/sell trades endpoint - POST /{agentId}/trades
+    mock_aiohttp.post(
+        f"{backend_url}/{sample_agent_id}/trades",
+        payload="Trade executed successfully",
         repeat=True
     )
 

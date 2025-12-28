@@ -3,8 +3,8 @@
 Researcher Agent - Financial research with database and web capabilities.
 
 Structure:
-- get_researcher_instructions() → System prompt
-- build_research_message(query) → Invocation context  
+- _get_researcher_instructions() → System prompt (private)
+- _build_research_message(query) → Invocation context (private)
 - create_researcher_agent(...) → Create agent with typed output
 - run_researcher(query, ...) → Execute and return ResearchResponse
 
@@ -16,7 +16,7 @@ To use as a tool from another agent:
     tool = researcher.as_tool(tool_name="Researcher", tool_description="...")
 """
 
-from agents import Agent, Runner, function_tool
+from agents import Agent, Runner, function_tool, Model
 from datetime import datetime
 from textwrap import dedent
 from typing import Union
@@ -127,9 +127,9 @@ async def _fetch_price(symbol: str) -> PriceLookupResponse:
 # Agent structure (matches simple_trader.py pattern)
 # ============================================================================
 
-def get_researcher_instructions() -> str:
-    """Get researcher system prompt - defines identity, tools, and rules.
-    
+def _get_researcher_instructions() -> str:
+    """Get researcher system prompt - defines identity, tools, and rules (private).
+
     Returns:
         System prompt for the researcher agent
     """
@@ -181,7 +181,7 @@ def _build_research_message(query: str) -> str:
     """).strip()
 
 
-async def create_researcher_agent(mcp_pool: MCPPool, model_name: str) -> Agent[ResearchResponse]:
+async def create_researcher_agent(mcp_pool: MCPPool, model: Union[str, Model]) -> Agent[ResearchResponse]:
     """Create researcher agent with typed output.
 
     The researcher is stateless - agent names come from the query.
@@ -189,7 +189,7 @@ async def create_researcher_agent(mcp_pool: MCPPool, model_name: str) -> Agent[R
 
     Args:
         mcp_pool: MCP pool - agent selects servers from REQUIRED_MCPS
-        model_name: Model to use
+        model: Model to use (string like "gpt-4o-mini" or Model/ModelProvider object)
 
     Returns:
         Agent configured for typed ResearchResponse output
@@ -332,8 +332,8 @@ async def create_researcher_agent(mcp_pool: MCPPool, model_name: str) -> Agent[R
 
     return Agent[ResearchResponse](
         name="Researcher",
-        instructions=get_researcher_instructions(),
-        model=model_name,
+        instructions=_get_researcher_instructions(),
+        model=model,
         mcp_servers=mcp_servers,
         tools=db_tools,
         output_type=ResearchResponse,  # Enforces typed output
@@ -343,7 +343,7 @@ async def create_researcher_agent(mcp_pool: MCPPool, model_name: str) -> Agent[R
 async def run_researcher(
     query: str,
     mcp_pool: MCPPool,
-    model_name: str = "gpt-4o-mini",
+    model: Union[str, Model] = "gpt-4o-mini",
 ) -> ResearchResponse:
     """Run researcher agent independently and return typed response.
 
@@ -353,7 +353,7 @@ async def run_researcher(
     Args:
         query: Research request (include agent name if querying agent data)
         mcp_pool: MCP pool - agent selects servers from REQUIRED_MCPS
-        model_name: Model to use
+        model: Model to use (string like "gpt-4o-mini" or Model/ModelProvider object)
 
     Returns:
         ResearchResponse with validated summary and sources
@@ -374,7 +374,7 @@ async def run_researcher(
             mcp_pool
         )
     """
-    agent = await create_researcher_agent(mcp_pool, model_name)
+    agent = await create_researcher_agent(mcp_pool, model)
     message = _build_research_message(query)
 
     result = await Runner.run(agent, message)

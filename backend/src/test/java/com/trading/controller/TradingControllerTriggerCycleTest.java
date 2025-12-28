@@ -75,9 +75,8 @@ class TradingControllerTriggerCycleTest {
         // Act & Assert
         mockMvc.perform(post("/api/trading/run-cycle"))
                 .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.message").value("Trading cycle triggered successfully."))
-                .andExpect(jsonPath("$.data.status").value("TRIGGERED"));
+                .andExpect(jsonPath("$.message").value("Trading cycle triggered successfully."))
+                .andExpect(jsonPath("$.status").value("TRIGGERED"));
     }
 
     @Test
@@ -99,11 +98,11 @@ class TradingControllerTriggerCycleTest {
                         null
                 ));
 
-        // Act & Assert
+        // Act & Assert: Expect ProblemDetail response
         mockMvc.perform(post("/api/trading/run-cycle"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error").value("A trading cycle is already in progress. Please wait for it to complete."));
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.detail").value("A trading cycle is already in progress. Please wait for it to complete."));
     }
 
     @Test
@@ -117,11 +116,11 @@ class TradingControllerTriggerCycleTest {
         when(requestBodyUriSpec.retrieve())
                 .thenThrow(new org.springframework.web.client.RestClientException("Connection refused"));
 
-        // Act & Assert
+        // Act & Assert: Expect ProblemDetail response
         mockMvc.perform(post("/api/trading/run-cycle"))
                 .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error").value("Agents service unavailable. Please ensure the trading system is running."));
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.detail").value("Agents service unavailable. Please ensure the trading system is running."));
     }
 
 }

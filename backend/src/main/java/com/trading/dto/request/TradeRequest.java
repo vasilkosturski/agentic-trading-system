@@ -8,21 +8,22 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Request DTO for selling shares.
+ * Unified request DTO for trading operations (buy/sell).
+ * Used with REST endpoint POST /api/accounts/{agentId}/trades
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class SellSharesRequest {
-    @NotNull(message = "Agent ID is required")
-    private Long agentId;
-
+public class TradeRequest {
     @NotBlank(message = "Stock symbol is required")
     private String symbol;
 
     @NotNull(message = "Quantity is required")
     @Positive(message = "Quantity must be positive")
     private Integer quantity;
+
+    @NotNull(message = "Trade type is required (BUY or SELL)")
+    private TradeType type;
 
     @NotNull(message = "Run ID is required - every transaction must be linked to an agent run")
     private Long runId;

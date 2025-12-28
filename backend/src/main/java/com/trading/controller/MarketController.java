@@ -1,6 +1,5 @@
 package com.trading.controller;
 
-import com.trading.dto.response.ToolResponse;
 import com.trading.service.MarketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -8,90 +7,112 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * REST controller for market data operations.
+ * Returns data directly without ToolResponse wrapper.
+ * Exceptions are handled by GlobalExceptionHandler.
+ */
 @RestController
 @RequestMapping("/api/market")
 public class MarketController {
-    
+
     @Autowired
     private MarketService marketService;
-    
+
+    /**
+     * Get current price data for a symbol.
+     *
+     * @param symbol stock symbol
+     * @return PriceData with current price and metadata
+     */
     @GetMapping("/price/{symbol}")
-    public ResponseEntity<ToolResponse<MarketService.PriceData>> getSharePrice(@PathVariable String symbol) {
-        try {
-            MarketService.PriceData priceData = marketService.getSharePrice(symbol);
-            return ResponseEntity.ok(ToolResponse.success(priceData));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
+    public ResponseEntity<MarketService.PriceData> getSharePrice(@PathVariable String symbol) {
+        MarketService.PriceData priceData = marketService.getSharePrice(symbol);
+        return ResponseEntity.ok(priceData);
     }
-    
-    // Backward compatibility endpoint - returns just the price value
+
+    /**
+     * Backward compatibility endpoint - returns just the price value.
+     *
+     * @param symbol stock symbol
+     * @return current price as Double
+     */
     @GetMapping("/price/{symbol}/value")
-    public ResponseEntity<ToolResponse<Double>> getSharePriceValue(@PathVariable String symbol) {
-        try {
-            MarketService.PriceData priceData = marketService.getSharePrice(symbol);
-            return ResponseEntity.ok(ToolResponse.success(priceData.getPrice()));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
+    public ResponseEntity<Double> getSharePriceValue(@PathVariable String symbol) {
+        MarketService.PriceData priceData = marketService.getSharePrice(symbol);
+        return ResponseEntity.ok(priceData.getPrice());
     }
-    
+
+    /**
+     * Get historical price data for a symbol.
+     *
+     * @param symbol stock symbol
+     * @param days   number of days of historical data (default 30)
+     * @return HistoricalPriceData with price history
+     */
     @GetMapping("/historical/{symbol}")
-    public ResponseEntity<ToolResponse<MarketService.HistoricalPriceData>> getHistoricalPrices(
+    public ResponseEntity<MarketService.HistoricalPriceData> getHistoricalPrices(
             @PathVariable String symbol,
             @RequestParam(defaultValue = "30") int days) {
-        try {
-            MarketService.HistoricalPriceData historicalData = marketService.getHistoricalPrices(symbol, days);
-            return ResponseEntity.ok(ToolResponse.success(historicalData));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
+        MarketService.HistoricalPriceData historicalData = marketService.getHistoricalPrices(symbol, days);
+        return ResponseEntity.ok(historicalData);
     }
-    
-    // Backward compatibility endpoint - returns just the price list
+
+    /**
+     * Backward compatibility endpoint - returns just the price list.
+     *
+     * @param symbol stock symbol
+     * @param days   number of days of historical data (default 30)
+     * @return List of HistoricalPrice
+     */
     @GetMapping("/historical/{symbol}/prices")
-    public ResponseEntity<ToolResponse<List<MarketService.HistoricalPrice>>> getHistoricalPricesList(
+    public ResponseEntity<List<MarketService.HistoricalPrice>> getHistoricalPricesList(
             @PathVariable String symbol,
             @RequestParam(defaultValue = "30") int days) {
-        try {
-            MarketService.HistoricalPriceData historicalData = marketService.getHistoricalPrices(symbol, days);
-            return ResponseEntity.ok(ToolResponse.success(historicalData.getPrices()));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
+        MarketService.HistoricalPriceData historicalData = marketService.getHistoricalPrices(symbol, days);
+        return ResponseEntity.ok(historicalData.getPrices());
     }
-    
+
+    /**
+     * Get market indicators for a symbol.
+     *
+     * @param symbol stock symbol
+     * @return MarketIndicatorsData with technical indicators
+     */
     @GetMapping("/indicators/{symbol}")
-    public ResponseEntity<ToolResponse<MarketService.MarketIndicatorsData>> getMarketIndicators(@PathVariable String symbol) {
-        try {
-            MarketService.MarketIndicatorsData indicatorsData = marketService.getMarketIndicators(symbol);
-            return ResponseEntity.ok(ToolResponse.success(indicatorsData));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
+    public ResponseEntity<MarketService.MarketIndicatorsData> getMarketIndicators(@PathVariable String symbol) {
+        MarketService.MarketIndicatorsData indicatorsData = marketService.getMarketIndicators(symbol);
+        return ResponseEntity.ok(indicatorsData);
     }
-    
-    // Backward compatibility endpoint - returns just the indicators
+
+    /**
+     * Backward compatibility endpoint - returns just the indicators.
+     *
+     * @param symbol stock symbol
+     * @return MarketIndicators with technical indicators
+     */
     @GetMapping("/indicators/{symbol}/values")
-    public ResponseEntity<ToolResponse<MarketService.MarketIndicators>> getMarketIndicatorsValues(@PathVariable String symbol) {
-        try {
-            MarketService.MarketIndicatorsData indicatorsData = marketService.getMarketIndicators(symbol);
-            return ResponseEntity.ok(ToolResponse.success(indicatorsData.getIndicators()));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
+    public ResponseEntity<MarketService.MarketIndicators> getMarketIndicatorsValues(@PathVariable String symbol) {
+        MarketService.MarketIndicatorsData indicatorsData = marketService.getMarketIndicators(symbol);
+        return ResponseEntity.ok(indicatorsData.getIndicators());
     }
-    
+
+    /**
+     * Clear the market data cache.
+     *
+     * @return success message
+     */
     @PostMapping("/cache/clear")
-    public ResponseEntity<ToolResponse<String>> clearCache() {
-        try {
-            marketService.clearCache();
-            return ResponseEntity.ok(ToolResponse.success("Cache cleared successfully"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ToolResponse.error(e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
+    public ResponseEntity<String> clearCache() {
+        marketService.clearCache();
+        return ResponseEntity.ok("Cache cleared successfully");
     }
-    
+
+    /**
+     * Health check endpoint.
+     *
+     * @return health status message
+     */
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("Market service is running");

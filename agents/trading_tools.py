@@ -24,26 +24,17 @@ logger = logging.getLogger(__name__)
 # Use centralized configuration
 BACKEND_URL = BACKEND_API_ACCOUNTS
 
-async def _call_backend_api(endpoint: str, data: Optional[Dict[str, Any]] = None) -> Any:
-    """Helper to call Java backend API"""
+async def _call_backend_api(method: str, endpoint: str, data: Optional[Dict[str, Any]] = None) -> Any:
+    """Helper to call Java backend API with new REST endpoints.
+
+    New REST endpoints return direct values without ToolResponse wrapper.
+    """
     url = f"{BACKEND_URL}{endpoint}"
-    method = "POST" if data else "GET"
 
     try:
         response = await call_backend(method, url, json_data=data)
-
-        if method == "POST":
-            # POST endpoints return {"success": true, "data": {...}}
-            result = response.json()
-            if result.get("success"):
-                return result.get("data")
-            else:
-                # Shouldn't happen (backend returns 4xx/5xx on error)
-                error_msg = result.get("error", "Unknown error")
-                raise Exception(f"API call failed: {error_msg}")
-        else:
-            # GET endpoints return plain text
-            return response.text
+        # New REST endpoints return direct JSON values
+        return response.json()
 
     except BackendAPIError as e:
         # Already logged by http_client
@@ -60,7 +51,7 @@ async def get_balance(agent_id: int) -> float:
         Current cash balance in USD as a float
     """
     try:
-        result = await _call_backend_api("/tools/get_balance", {"agentId": agent_id})
+        result = await _call_backend_api("GET", f"/{agent_id}/balance")
         return float(result)
     except Exception as e:
         logger.error(f"Failed to get balance for agent {agent_id}: {e}")
@@ -78,7 +69,7 @@ async def get_holdings(agent_id: int) -> Dict[str, int]:
         Example: {'AAPL': 10, 'GOOGL': 5, 'TSLA': 3}
     """
     try:
-        result = await _call_backend_api("/tools/get_holdings", {"agentId": agent_id})
+        result = await _call_backend_api("GET", f"/{agent_id}/holdings")
         return result
     except Exception as e:
         logger.error(f"Failed to get holdings for agent {agent_id}: {e}")
@@ -109,8 +100,8 @@ async def buy_shares(
         Exception: If insufficient funds, position limit reached, or invalid symbol
     """
     try:
-        result = await _call_backend_api("/tools/buy_shares", {
-            "agentId": agent_id,
+        result = await _call_backend_api("POST", f"/{agent_id}/trades", {
+            "type": "BUY",
             "symbol": symbol,
             "quantity": quantity,
             "runId": runId
@@ -146,8 +137,8 @@ async def sell_shares(
         Exception: If you don't own enough shares or invalid symbol
     """
     try:
-        result = await _call_backend_api("/tools/sell_shares", {
-            "agentId": agent_id,
+        result = await _call_backend_api("POST", f"/{agent_id}/trades", {
+            "type": "SELL",
             "symbol": symbol,
             "quantity": quantity,
             "runId": runId
@@ -175,8 +166,8 @@ async def initialize_agent(name: str, initial_balance: float = 100000.0) -> str:
         Confirmation message
     """
     try:
-        result = await _call_backend_api("/tools/initialize_agent", {
-            "name": name,
+        result = await _call_backend_api("POST", "", {
+            "agentName": name,
             "initialBalance": initial_balance
         })
         logger.info(f"Agent {name} initialized with ${initial_balance:,.2f}")
@@ -189,7 +180,7 @@ async def initialize_agent(name: str, initial_balance: float = 100000.0) -> str:
 
 async def _get_balance_raw(agent_id: int) -> float:
     """Raw balance getter - for system use, not exposed to agents"""
-    result = await _call_backend_api("/tools/get_balance", {"agentId": agent_id})
+    result = await _call_backend_api("GET", f"/{agent_id}/balance")
     return float(result)
 
 async def _get_holdings_raw(agent_id: int) -> List[Holding]:
@@ -198,7 +189,7 @@ async def _get_holdings_raw(agent_id: int) -> List[Holding]:
     Returns:
         List of Holding objects with symbol, quantity, averagePrice
     """
-    result = await _call_backend_api("/tools/get_holdings", {"agentId": agent_id})
+    result = await _call_backend_api("GET", f"/{agent_id}/holdings")
     # Validate at API boundary using Pydantic
     return [Holding(**item) for item in result]
 
