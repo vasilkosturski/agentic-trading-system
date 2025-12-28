@@ -16,6 +16,10 @@ server:
   error:
     include-message: always  # Required for Spring Boot 2.3+ to include error messages in responses
 
+spring.mvc:
+  problemdetails:
+    enabled: true  # Enable RFC 7807 ProblemDetail support
+
 logging:
   level:
     com.trading: DEBUG

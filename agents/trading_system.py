@@ -191,7 +191,6 @@ async def update_all_agents_activity():
     """Update lastActivity for all agents (called on every cycle, even when market closed)"""
     agent_names = ["Warren", "George", "Ray", "Cathie"]
     from config import BACKEND_API_ACCOUNTS, BACKEND_API_AGENTS
-    update_url = f"{BACKEND_API_ACCOUNTS}/tools/update_activity"
 
     try:
         async with aiohttp.ClientSession() as session:
@@ -214,8 +213,10 @@ async def update_all_agents_activity():
                     continue
 
                 try:
-                    async with session.post(update_url, json={"agentId": agent_id}) as response:
-                        if response.status == 200:
+                    # Use new REST endpoint: PUT /api/accounts/{agentId}/activity
+                    update_url = f"{BACKEND_API_ACCOUNTS}/{agent_id}/activity"
+                    async with session.put(update_url) as response:
+                        if response.status == 204:
                             logger.debug(f"✓ Updated activity for {agent_name} (id={agent_id})")
                         else:
                             logger.warning(f"Failed to update activity for {agent_name} (id={agent_id}): {response.status}")

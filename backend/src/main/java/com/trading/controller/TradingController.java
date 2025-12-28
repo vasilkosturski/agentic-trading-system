@@ -3,19 +3,28 @@ package com.trading.controller;
 import com.trading.config.AgentsClient;
 import com.trading.dto.response.AgentStatusResponse;
 import com.trading.dto.response.AgentTradeResponse;
-import com.trading.dto.response.ToolResponse;
 import com.trading.dto.response.TriggerCycleResponse;
+import com.trading.exception.ProblemDetailFactory;
 import com.trading.service.TradingService;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.AgentMonitoringService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
 import java.util.List;
 
+/**
+ * REST controller for trading operations.
+ * Returns data directly without ToolResponse wrapper.
+ * Generic exceptions are handled by GlobalExceptionHandler.
+ * Endpoint-specific exceptions are handled inline with ProblemDetail responses.
+ */
 @RestController
 @RequestMapping("/api/trading")
 public class TradingController {
@@ -50,22 +59,30 @@ public class TradingController {
         this.agentIdentityService = agentIdentityService;
         this.agentsRestClient = agentsRestClient;
     }
-    
-    
-    // Agent Status Endpoints (Real Data from PostgreSQL)
+
+
+    /**
+     * Get status for all agents.
+     *
+     * @return List of agent statuses from PostgreSQL
+     */
     @GetMapping("/agents/status")
-    public ResponseEntity<ToolResponse<List<AgentStatusResponse>>> getAllAgentsStatus() {
+    public ResponseEntity<List<AgentStatusResponse>> getAllAgentsStatus() {
         List<AgentStatusResponse> statuses = agentMonitoringService.getRealAgentStatuses();
-        return ResponseEntity.ok(ToolResponse.success(statuses));
+        return ResponseEntity.ok(statuses);
     }
 
-
-    // Agent Trades Endpoints
+    /**
+     * Get trades for a specific agent or all agents.
+     *
+     * @param agentId optional agent ID to filter by
+     * @return List of agent trades
+     */
     @GetMapping("/agent-trades")
-    public ResponseEntity<ToolResponse<List<AgentTradeResponse>>> getAgentTrades(@RequestParam(required = false) Long agentId) {
+    public ResponseEntity<List<AgentTradeResponse>> getAgentTrades(@RequestParam(required = false) Long agentId) {
         String agentName = agentId != null ? agentIdentityService.requireAgentName(agentId) : null;
         List<AgentTradeResponse> trades = tradingService.getAgentTrades(agentName);
-        return ResponseEntity.ok(ToolResponse.success(trades));
+        return ResponseEntity.ok(trades);
     }
 
     /**
@@ -82,7 +99,7 @@ public class TradingController {
      * @return 202 Accepted if cycle triggered, 409 if already running, 503 if service unavailable
      */
     @PostMapping("/run-cycle")
-    public ResponseEntity<ToolResponse<TriggerCycleResponse>> triggerManualCycle() {
+    public ResponseEntity<?> triggerManualCycle() {
         logger.info("Manual trading cycle requested via API");
 
         try {
@@ -94,24 +111,35 @@ public class TradingController {
                     .body(TriggerCycleResponse.class);
 
             logger.info("Manual cycle triggered successfully");
-            return ResponseEntity.accepted().body(ToolResponse.success(response));
+            return ResponseEntity.accepted().body(response);
 
         } catch (org.springframework.web.client.HttpClientErrorException.Conflict e) {
             // Endpoint-specific business logic: cycle already running
             logger.info("Manual cycle not triggered: cycle already running");
-            return ResponseEntity.status(409).body(
-                ToolResponse.error("A trading cycle is already in progress. Please wait for it to complete.")
+            ProblemDetail problem = ProblemDetailFactory.businessRuleViolation(
+                "A trading cycle is already in progress. Please wait for it to complete.",
+                "/api/trading/run-cycle"
             );
+            return ResponseEntity.status(409).body(problem);
+
         } catch (org.springframework.web.client.RestClientException e) {
             // Endpoint-specific error message for agents service
             logger.error("Failed to connect to agents service: {}", e.getMessage());
-            return ResponseEntity.status(503).body(
-                ToolResponse.error("Agents service unavailable. Please ensure the trading system is running.")
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Agents service unavailable. Please ensure the trading system is running."
             );
+            problem.setTitle("Service Unavailable");
+            problem.setInstance(URI.create("/api/trading/run-cycle"));
+            return ResponseEntity.status(503).body(problem);
         }
     }
-    
-    // Health Check Endpoint
+
+    /**
+     * Health check endpoint.
+     *
+     * @return health status message
+     */
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("Trading service is running");

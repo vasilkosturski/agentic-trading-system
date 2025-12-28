@@ -3,7 +3,6 @@ package com.trading.controller;
 import com.trading.dto.request.*;
 import com.trading.dto.response.AgentRunDto;
 import com.trading.dto.response.RunDetailDto;
-import com.trading.dto.response.ToolResponse;
 import com.trading.entity.AccountTransaction;
 import com.trading.entity.AgentRun;
 import com.trading.entity.AgentToolCall;
@@ -23,6 +22,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * REST controller for agent run tracking and management.
+ * Returns data directly without ToolResponse wrapper.
+ * Exceptions are handled by RunControllerAdvice and GlobalExceptionHandler.
+ */
 @RestController
 @RequestMapping("/api/runs")
 public class RunController {
@@ -45,26 +49,30 @@ public class RunController {
     private AgentIdentityService agentIdentityService;
 
     /**
-     * Start a new agent run
-     * POST /api/runs/start
+     * Start a new agent run.
+     *
+     * @param request StartRunRequest with agent ID, run type, and market conditions
+     * @return run ID (Long) with 201 Created
      */
     @PostMapping("/start")
-    public ResponseEntity<ToolResponse<Long>> startRun(@Valid @RequestBody StartRunRequest request) {
+    public ResponseEntity<Long> startRun(@Valid @RequestBody StartRunRequest request) {
         String agentName = agentIdentityService.requireAgentName(request.getAgentId());
         AgentRun run = runService.startRun(
             agentName,
             request.getRunType(),
             request.getMarketConditions()
         );
-        return ResponseEntity.status(201).body(ToolResponse.success(run.getId()));
+        return ResponseEntity.status(201).body(run.getId());
     }
 
     /**
-     * End an agent run
-     * POST /api/runs/end
+     * End an agent run.
+     *
+     * @param request EndRunRequest with run ID, summary, reasoning, sources, and trade count
+     * @return success message with run outcome
      */
     @PostMapping("/end")
-    public ResponseEntity<ToolResponse<String>> endRun(@Valid @RequestBody EndRunRequest request) {
+    public ResponseEntity<String> endRun(@Valid @RequestBody EndRunRequest request) {
         Integer tradeCount = request.getTradeCount() != null ? request.getTradeCount() : 0;
 
         AgentRun run;
@@ -87,26 +95,30 @@ public class RunController {
             );
         }
 
-        return ResponseEntity.ok(ToolResponse.success(
-            "Run " + request.getRunId() + " ended with outcome: " + run.getOutcome()));
+        return ResponseEntity.ok("Run " + request.getRunId() + " ended with outcome: " + run.getOutcome());
     }
 
     /**
-     * Mark a run as error
-     * POST /api/runs/error
+     * Mark a run as error.
+     *
+     * @param request MarkRunAsErrorRequest with run ID and error message
+     * @return success message
      */
     @PostMapping("/error")
-    public ResponseEntity<ToolResponse<String>> markRunAsError(@Valid @RequestBody MarkRunAsErrorRequest request) {
+    public ResponseEntity<String> markRunAsError(@Valid @RequestBody MarkRunAsErrorRequest request) {
         runService.markRunAsError(request.getRunId(), request.getErrorMessage());
-        return ResponseEntity.ok(ToolResponse.success("Run " + request.getRunId() + " marked as error"));
+        return ResponseEntity.ok("Run " + request.getRunId() + " marked as error");
     }
 
     /**
-     * Log a tool call for a run
-     * POST /api/runs/{runId}/tool-call
+     * Log a tool call for a run.
+     *
+     * @param runId   the run ID
+     * @param request LogToolCallRequest with tool call details
+     * @return tool call ID (Long) with 201 Created
      */
     @PostMapping("/{runId}/tool-call")
-    public ResponseEntity<ToolResponse<Long>> logToolCall(
+    public ResponseEntity<Long> logToolCall(
             @PathVariable Long runId,
             @Valid @RequestBody LogToolCallRequest request) {
 
@@ -127,15 +139,18 @@ public class RunController {
         );
         AgentToolCall saved = toolCallRepository.save(toolCall);
 
-        return ResponseEntity.status(201).body(ToolResponse.success(saved.getId()));
+        return ResponseEntity.status(201).body(saved.getId());
     }
 
     /**
-     * Log a reasoning step for a run
-     * POST /api/runs/{runId}/reasoning-step
+     * Log a reasoning step for a run.
+     *
+     * @param runId   the run ID
+     * @param request LogReasoningStepRequest with reasoning step details
+     * @return reasoning step ID (Long) with 201 Created
      */
     @PostMapping("/{runId}/reasoning-step")
-    public ResponseEntity<ToolResponse<Long>> logReasoningStep(
+    public ResponseEntity<Long> logReasoningStep(
             @PathVariable Long runId,
             @Valid @RequestBody LogReasoningStepRequest request) {
 
@@ -151,7 +166,7 @@ public class RunController {
         );
         AgentReasoningStep saved = reasoningStepRepository.save(reasoningStep);
 
-        return ResponseEntity.status(201).body(ToolResponse.success(saved.getId()));
+        return ResponseEntity.status(201).body(saved.getId());
     }
 
     /**

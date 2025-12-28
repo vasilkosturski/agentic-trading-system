@@ -87,12 +87,12 @@ You actively manage your portfolio according to your strategy.
 """
 
 
-def build_trading_message(
+def _build_trading_message(
     trader: 'SimpleTrader',
     historical_context: str,
     force_trade: bool
 ) -> str:
-    """Build user message for this trading cycle.
+    """Build user message for this trading cycle (internal helper).
 
     Args:
         trader: SimpleTrader config
@@ -274,7 +274,7 @@ async def run_trader_cycle(trader: 'SimpleTrader', mcp_pool: MCPPool, force_trad
 
             # Create callable wrappers for executor
             def build_message_fn(historical_context: str, force_trade_flag: bool) -> str:
-                return build_trading_message(trader, historical_context, force_trade_flag)
+                return _build_trading_message(trader, historical_context, force_trade_flag)
 
             async def create_agent_fn(exec: AgentExecutor) -> Agent:
                 return await create_trader_agent(trader, mcp_pool, exec)

@@ -1,9 +1,10 @@
 package com.trading.exception;
 
-import com.trading.dto.response.ToolResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -20,6 +21,8 @@ import java.util.NoSuchElementException;
  *
  * Uses @RestControllerAdvice to automatically handle exceptions thrown from
  * any @RestController in the application.
+ *
+ * Returns RFC 7807 ProblemDetail responses for consistent error formatting.
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -31,10 +34,10 @@ public class GlobalExceptionHandler {
      * Returns 400 Bad Request.
      */
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ToolResponse<Void>> handleIllegalArgument(IllegalArgumentException ex) {
+    public ResponseEntity<ProblemDetail> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
         logger.warn("Invalid argument: {}", ex.getMessage());
-        return ResponseEntity.badRequest()
-                .body(ToolResponse.error(ex.getMessage()));
+        ProblemDetail problem = ProblemDetailFactory.invalidRequest(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.badRequest().body(problem);
     }
 
     /**
@@ -42,10 +45,10 @@ public class GlobalExceptionHandler {
      * Returns 404 Not Found.
      */
     @ExceptionHandler(NoSuchElementException.class)
-    public ResponseEntity<ToolResponse<Void>> handleNotFound(NoSuchElementException ex) {
+    public ResponseEntity<ProblemDetail> handleNotFound(NoSuchElementException ex, HttpServletRequest request) {
         logger.warn("Resource not found: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ToolResponse.error(ex.getMessage()));
+        ProblemDetail problem = ProblemDetailFactory.resourceNotFound(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem);
     }
 
     /**
@@ -56,10 +59,15 @@ public class GlobalExceptionHandler {
      * by catching the exception in the controller before it reaches here.
      */
     @ExceptionHandler(RestClientException.class)
-    public ResponseEntity<ToolResponse<Void>> handleRestClientException(RestClientException ex) {
+    public ResponseEntity<ProblemDetail> handleRestClientException(RestClientException ex, HttpServletRequest request) {
         logger.error("External service call failed: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(ToolResponse.error("External service unavailable: " + ex.getMessage()));
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "External service unavailable: " + ex.getMessage()
+        );
+        problem.setTitle("Service Unavailable");
+        problem.setInstance(java.net.URI.create(request.getRequestURI()));
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem);
     }
 
     /**
@@ -69,9 +77,10 @@ public class GlobalExceptionHandler {
      * This should catch any exceptions not handled by more specific handlers.
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ToolResponse<Void>> handleGenericException(Exception ex) {
+    public ResponseEntity<ProblemDetail> handleGenericException(Exception ex, HttpServletRequest request) {
         logger.error("Unexpected error occurred: {}", ex.getMessage(), ex);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ToolResponse.error(ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred"));
+        String message = ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred";
+        ProblemDetail problem = ProblemDetailFactory.internalError(message, request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(problem);
     }
 }

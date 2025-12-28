@@ -6,7 +6,6 @@ import com.trading.dto.response.HoldingDto;
 import com.trading.dto.response.PortfolioHistoryPoint;
 import com.trading.dto.response.RecentTradeDto;
 import com.trading.dto.response.RunDetailDto;
-import com.trading.dto.response.ToolResponse;
 import com.trading.dto.response.TradeDetailResponse;
 import com.trading.dto.response.TradeResult;
 import com.trading.exception.ResourceNotFoundException;
@@ -27,6 +26,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * REST controller for account operations.
+ * All endpoints follow REST conventions with direct response types.
+ * Exceptions are handled by AccountControllerAdvice and GlobalExceptionHandler.
+ */
 @RestController
 @RequestMapping("/api/accounts")
 public class AccountController {
@@ -46,61 +50,86 @@ public class AccountController {
     @Autowired
     private AgentIdentityService agentIdentityService;
 
-    // Agent initialization endpoint
-    @PostMapping("/tools/initialize_agent")
-    public ResponseEntity<ToolResponse<String>> initializeAgent(@Valid @RequestBody InitializeAgentRequest request) {
+    // ==================== NEW REST ENDPOINTS ====================
+
+    /**
+     * Initialize a new agent account (REST endpoint).
+     * POST /api/accounts
+     *
+     * @param request InitializeAgentRequest with agent name and initial balance
+     * @return success message with 201 Created
+     */
+    @PostMapping
+    public ResponseEntity<String> createAccount(@Valid @RequestBody InitializeAgentRequest request) {
         accountService.initializeAgent(request.getName(), request.getInitialBalance());
-        return ResponseEntity.status(201).body(ToolResponse.success(
-            "Successfully initialized agent " + request.getName()));
+        return ResponseEntity.status(201).body("Successfully initialized agent " + request.getName());
     }
 
-    // MCP Tool endpoints
-    @PostMapping("/tools/get_balance")
-    public ResponseEntity<ToolResponse<Double>> getBalance(@Valid @RequestBody GetBalanceRequest request) {
-        String name = agentIdentityService.requireAgentName(request.getAgentId());
+    /**
+     * Get agent balance (REST endpoint).
+     * GET /api/accounts/{agentId}/balance
+     *
+     * @param agentId agent ID from path
+     * @return balance as Double
+     */
+    @GetMapping("/{agentId}/balance")
+    public ResponseEntity<Double> getBalanceRest(@PathVariable Long agentId) {
+        String name = agentIdentityService.requireAgentName(agentId);
         Double balance = accountService.getBalance(name);
-        return ResponseEntity.ok(ToolResponse.success(balance));
+        return ResponseEntity.ok(balance);
     }
 
-    @PostMapping("/tools/get_holdings")
-    public ResponseEntity<ToolResponse<List<HoldingDto>>> getHoldings(@Valid @RequestBody GetHoldingsRequest request) {
-        String name = agentIdentityService.requireAgentName(request.getAgentId());
+    /**
+     * Get agent holdings (REST endpoint).
+     * GET /api/accounts/{agentId}/holdings
+     *
+     * @param agentId agent ID from path
+     * @return List of HoldingDto
+     */
+    @GetMapping("/{agentId}/holdings")
+    public ResponseEntity<List<HoldingDto>> getHoldingsRest(@PathVariable Long agentId) {
+        String name = agentIdentityService.requireAgentName(agentId);
         List<HoldingDto> holdings = accountService.getHoldings(name);
-        return ResponseEntity.ok(ToolResponse.success(holdings));
+        return ResponseEntity.ok(holdings);
     }
 
-    @PostMapping("/tools/buy_shares")
-    public ResponseEntity<ToolResponse<TradeResult>> buyShares(@Valid @RequestBody BuySharesRequest request) {
-        String name = agentIdentityService.requireAgentName(request.getAgentId());
-        TradeResult result = accountService.buyShares(
-            name,
-            request.getSymbol(),
-            request.getQuantity(),
-            request.getRunId()
-        );
-        return ResponseEntity.status(201).body(ToolResponse.success(result));
+    /**
+     * Execute a trade (buy or sell) for an agent (REST endpoint).
+     * POST /api/accounts/{agentId}/trades
+     *
+     * @param agentId agent ID from path
+     * @param request TradeRequest with symbol, quantity, type, and run ID
+     * @return TradeResult with 201 Created
+     */
+    @PostMapping("/{agentId}/trades")
+    public ResponseEntity<TradeResult> executeTrade(
+            @PathVariable Long agentId,
+            @Valid @RequestBody TradeRequest request) {
+        String name = agentIdentityService.requireAgentName(agentId);
+        TradeResult result;
+
+        if (request.getType() == TradeType.BUY) {
+            result = accountService.buyShares(name, request.getSymbol(), request.getQuantity(), request.getRunId());
+        } else {
+            result = accountService.sellShares(name, request.getSymbol(), request.getQuantity(), request.getRunId());
+        }
+
+        return ResponseEntity.status(201).body(result);
     }
 
-    @PostMapping("/tools/sell_shares")
-    public ResponseEntity<ToolResponse<TradeResult>> sellShares(@Valid @RequestBody SellSharesRequest request) {
-        String name = agentIdentityService.requireAgentName(request.getAgentId());
-        TradeResult result = accountService.sellShares(
-            name,
-            request.getSymbol(),
-            request.getQuantity(),
-            request.getRunId()
-        );
-        return ResponseEntity.status(201).body(ToolResponse.success(result));
-    }
-
-    @PostMapping("/tools/update_activity")
-    public ResponseEntity<Void> updateActivity(@Valid @RequestBody UpdateActivityRequest request) {
-        String name = agentIdentityService.requireAgentName(request.getAgentId());
+    /**
+     * Update agent activity timestamp (REST endpoint).
+     * PUT /api/accounts/{agentId}/activity
+     *
+     * @param agentId agent ID from path
+     * @return 204 No Content
+     */
+    @PutMapping("/{agentId}/activity")
+    public ResponseEntity<Void> updateActivityRest(@PathVariable Long agentId) {
+        String name = agentIdentityService.requireAgentName(agentId);
         accountService.updateAgentActivity(name);
-        return ResponseEntity.noContent().build();  // 204 No Content
+        return ResponseEntity.noContent().build();
     }
-
-    // change_strategy endpoint removed - using hardcoded strategies only
 
     // MCP Resource endpoints
     @GetMapping("/resources/accounts/{agentId}")

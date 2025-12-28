@@ -1,6 +1,5 @@
 package com.trading.controller;
 
-import com.trading.dto.response.ToolResponse;
 import com.trading.model.AgentStatusUpdate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,40 +17,34 @@ import java.time.Instant;
 @RequestMapping("/api/agents")
 @CrossOrigin(originPatterns = "*", allowCredentials = "false")
 public class AgentStatusController {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(AgentStatusController.class);
-    
+
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
-    
+
     /**
-     * Receive status update from agent and broadcast to all WebSocket subscribers
+     * Receive status update from agent and broadcast to all WebSocket subscribers.
+     * Returns 204 No Content on success.
+     * Exceptions are handled by GlobalExceptionHandler.
      */
     @PostMapping("/status")
-    public ResponseEntity<ToolResponse<String>> updateStatus(@RequestBody AgentStatusUpdate update) {
-        try {
-            // Set timestamp if not provided
-            if (update.getTimestamp() == null) {
-                update.setTimestamp(Instant.now());
-            }
-            
-            logger.info("Agent status update: {} - {} - {} ({}%)", 
-                    update.getAgentName(), 
-                    update.getPhase(), 
-                    update.getMessage(),
-                    update.getProgress());
-            
-            // Broadcast to all WebSocket subscribers on /topic/agent-status
-            messagingTemplate.convertAndSend("/topic/agent-status", update);
-            
-            return ResponseEntity.noContent().build(); // 204 No Content
-            
-        } catch (Exception e) {
-            logger.error("Error broadcasting agent status", e);
-            return ResponseEntity.status(500).body(
-                ToolResponse.error("Failed to broadcast status: " + e.getMessage())
-            );
+    public ResponseEntity<Void> updateStatus(@RequestBody AgentStatusUpdate update) {
+        // Set timestamp if not provided
+        if (update.getTimestamp() == null) {
+            update.setTimestamp(Instant.now());
         }
+
+        logger.info("Agent status update: {} - {} - {} ({}%)",
+                update.getAgentName(),
+                update.getPhase(),
+                update.getMessage(),
+                update.getProgress());
+
+        // Broadcast to all WebSocket subscribers on /topic/agent-status
+        messagingTemplate.convertAndSend("/topic/agent-status", update);
+
+        return ResponseEntity.noContent().build(); // 204 No Content
     }
 }
 
