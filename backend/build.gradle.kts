@@ -33,6 +33,9 @@ dependencies {
     implementation("org.postgresql:postgresql:42.7.1")
     implementation("org.hibernate.orm:hibernate-community-dialects:6.3.1.Final")
     
+    // JSONB support for Hibernate (for trading runs phase tables)
+    implementation("io.hypersistence:hypersistence-utils-hibernate-63:3.7.0")
+    
     // JSON processing
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
