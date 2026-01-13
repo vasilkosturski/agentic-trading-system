@@ -39,9 +39,11 @@ public class DecisionPhase {
 
     /**
      * Trading decision: BUY, SELL, or HOLD
+     * Uses enum with EnumType.STRING for type safety and DB readability.
      */
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
-    private String decision;
+    private TradeDecision decision;
 
     /**
      * Symbol for BUY/SELL decisions (null for HOLD)
@@ -96,21 +98,20 @@ public class DecisionPhase {
         this.run = run;
     }
 
-    // Business methods
+    // Business methods - now use enum comparison (type-safe)
     public boolean isBuy() {
-        return "BUY".equals(decision);
+        return decision == TradeDecision.BUY;
     }
 
     public boolean isSell() {
-        return "SELL".equals(decision);
+        return decision == TradeDecision.SELL;
     }
 
     public boolean isHold() {
-        return "HOLD".equals(decision);
+        return decision == TradeDecision.HOLD;
     }
 
     public boolean requiresExecution() {
         return isBuy() || isSell();
     }
 }
-

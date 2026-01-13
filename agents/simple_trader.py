@@ -270,6 +270,9 @@ async def run_trader_cycle(trader: 'SimpleTrader', mcp_pool: MCPPool, force_trad
 
         with trace(trace_name, trace_id=trace_id):
             # Create executor for this cycle
+            # agent_id should be set by TradingSystem before calling run_trader_cycle
+            if trader.agent_id is None:
+                raise ValueError(f"Agent {trader.name} has no agent_id - must be set before running cycle")
             executor = AgentExecutor(trader.agent_id, trader.name, trader.strategy)
 
             # Create callable wrappers for executor

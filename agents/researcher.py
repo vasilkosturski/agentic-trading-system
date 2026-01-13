@@ -115,7 +115,7 @@ async def _fetch_price(symbol: str) -> PriceLookupResponse:
         Exception: If price lookup fails
     """
     from market_tools import lookup_share_price
-    price = await lookup_share_price(symbol)
+    price = await lookup_share_price(symbol)  # type: ignore[operator]
     return PriceLookupResponse(
         symbol=symbol,
         price=price,
@@ -334,8 +334,8 @@ async def create_researcher_agent(mcp_pool: MCPPool, model: Union[str, Model]) -
         name="Researcher",
         instructions=_get_researcher_instructions(),
         model=model,
-        mcp_servers=mcp_servers,
-        tools=db_tools,
+        mcp_servers=mcp_servers,  # type: ignore[arg-type]
+        tools=db_tools,  # type: ignore[arg-type]
         output_type=ResearchResponse,  # Enforces typed output
     )
 
