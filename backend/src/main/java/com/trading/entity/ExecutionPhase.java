@@ -1,5 +1,6 @@
 package com.trading.entity;
 
+import com.trading.enums.PhaseStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -46,13 +47,14 @@ public class ExecutionPhase {
     private AccountTransaction trade;
 
     /**
-     * Execution status: executed, failed, skipped
-     * - executed: Trade completed successfully
-     * - failed: Trade validation failed (insufficient funds, etc.)
-     * - skipped: HOLD decision, no trade needed
+     * Execution status: COMPLETED, FAILED, SKIPPED
+     * - COMPLETED: Trade executed successfully
+     * - FAILED: Trade validation failed (insufficient funds, etc.)
+     * - SKIPPED: HOLD decision, no trade needed
      */
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private String status;
+    private PhaseStatus status;
 
     /**
      * Error details for failed executions.
@@ -69,35 +71,35 @@ public class ExecutionPhase {
         this.run = run;
         this.decision = decision;
         this.trade = trade;
-        this.status = "executed";
+        this.status = PhaseStatus.COMPLETED;
     }
 
     // Constructor for failed execution
     public ExecutionPhase(TradingRun run, DecisionPhase decision, String errorDetails) {
         this.run = run;
         this.decision = decision;
-        this.status = "failed";
+        this.status = PhaseStatus.FAILED;
         this.errorDetails = errorDetails;
     }
 
     // Constructor for skipped execution (HOLD decision)
     public ExecutionPhase(TradingRun run) {
         this.run = run;
-        this.status = "skipped";
-        this.errorDetails = "HOLD decision";
+        this.status = PhaseStatus.SKIPPED;
+        // Note: errorDetails is null for HOLD - it's not an error, it's a valid decision
     }
 
     // Business methods
     public boolean isExecuted() {
-        return "executed".equals(status);
+        return status == PhaseStatus.COMPLETED;
     }
 
     public boolean isFailed() {
-        return "failed".equals(status);
+        return status == PhaseStatus.FAILED;
     }
 
     public boolean isSkipped() {
-        return "skipped".equals(status);
+        return status == PhaseStatus.SKIPPED;
     }
 }
 
