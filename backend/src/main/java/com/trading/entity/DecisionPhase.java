@@ -3,6 +3,7 @@ package com.trading.entity;
 import com.trading.dto.jsonb.DecisionToolCallDto;
 import com.trading.dto.jsonb.ReasoningDto;
 import com.trading.dto.jsonb.SourceDto;
+import com.trading.enums.TradeDecision;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.Getter;
