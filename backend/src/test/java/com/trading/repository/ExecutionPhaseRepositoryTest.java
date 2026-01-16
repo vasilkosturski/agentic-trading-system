@@ -2,6 +2,7 @@ package com.trading.repository;
 
 import com.trading.entity.*;
 import com.trading.enums.PhaseStatus;
+import com.trading.enums.TradeDecision;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
