@@ -4,7 +4,7 @@ import com.trading.dto.jsonb.DecisionToolCallDto;
 import com.trading.dto.jsonb.ReasoningDto;
 import com.trading.dto.jsonb.SourceDto;
 import com.trading.entity.DecisionPhase;
-import com.trading.entity.TradeDecision;
+import com.trading.enums.TradeDecision;
 import com.trading.entity.TradingAgent;
 import com.trading.entity.TradingRun;
 import org.junit.jupiter.api.BeforeEach;

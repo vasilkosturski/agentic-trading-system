@@ -1,9 +1,9 @@
 package com.trading.repository;
 
 import com.trading.entity.TradingRun;
-import com.trading.enums.RunPhase;
 import com.trading.enums.RunStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -16,7 +16,7 @@ import java.util.Optional;
  * Per design doc: trading.trading_runs table.
  */
 @Repository
-public interface TradingRunRepository extends JpaRepository<TradingRun, Long> {
+public interface TradingRunRepository extends JpaRepository<TradingRun, Long>, JpaSpecificationExecutor<TradingRun> {
 
     /**
      * Find all runs for a specific agent, ordered by start time descending.
