@@ -52,6 +52,17 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles ResourceNotFoundException (custom not found exception).
+     * Returns 404 Not Found.
+     */
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ProblemDetail> handleResourceNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
+        logger.warn("Resource not found: {}", ex.getMessage());
+        ProblemDetail problem = ProblemDetailFactory.resourceNotFound(ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem);
+    }
+
+    /**
      * Handles REST client exceptions (external service calls).
      * Returns 503 Service Unavailable.
      *
