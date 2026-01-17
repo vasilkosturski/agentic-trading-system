@@ -1,6 +1,7 @@
 package com.trading.dto.websocket;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.trading.enums.WebSocketMessageType;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -12,7 +13,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class PhaseUpdateMessage {
 
-    private final String type = "phase_update";
+    private final WebSocketMessageType type = WebSocketMessageType.PHASE_UPDATE;
 
     @JsonProperty("agent_id")
     private Long agentId;
