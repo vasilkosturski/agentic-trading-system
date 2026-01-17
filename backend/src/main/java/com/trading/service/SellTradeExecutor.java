@@ -2,6 +2,7 @@ package com.trading.service;
 
 import com.trading.dto.response.TradeResult;
 import com.trading.entity.*;
+import com.trading.enums.TradeRejectionType;
 import com.trading.exception.BusinessRuleException;
 import com.trading.repository.*;
 import org.slf4j.Logger;
@@ -77,6 +78,7 @@ public class SellTradeExecutor extends TradeExecutor {
         if (holding == null || holding.getQuantity() < quantity) {
             int available = holding != null ? holding.getQuantity() : 0;
             throw new BusinessRuleException(
+                TradeRejectionType.INSUFFICIENT_SHARES,
                 "Cannot sell " + quantity + " shares of " + symbol +
                 ". Only have " + available + " shares available");
         }

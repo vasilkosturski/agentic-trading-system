@@ -3,11 +3,15 @@ package com.trading.service;
 import com.trading.dto.response.AccountReportDto;
 import com.trading.dto.response.HoldingDto;
 import com.trading.dto.response.TradeResult;
+import com.trading.dto.websocket.TradeExecutedMessage;
+import com.trading.dto.websocket.TradeRejectedMessage;
 import com.trading.entity.*;
+import com.trading.exception.BusinessRuleException;
 import com.trading.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.trading.exception.ResourceNotFoundException;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,15 +24,18 @@ public class AccountService {
 
     private static final Logger logger = LoggerFactory.getLogger(AccountService.class);
     private static final double DEFAULT_INITIAL_BALANCE = 100000.0;
+    private static final String TOPIC_TRADES = "/topic/runs/trades";
 
     private final TradingAccountRepository tradingAccountRepository;
     private final AccountTransactionRepository transactionRepository;
     private final AccountHoldingRepository holdingRepository;
     private final AccountPortfolioSnapshotRepository snapshotRepository;
     private final TradingAgentRepository agentRepository;
+    private final TradingRunRepository tradingRunRepository;
     private final MarketService marketService;
     private final BuyTradeExecutor buyTradeExecutor;
     private final SellTradeExecutor sellTradeExecutor;
+    private final SimpMessagingTemplate messagingTemplate;
 
     /**
      * Constructor injection for all dependencies.
@@ -41,17 +48,21 @@ public class AccountService {
             AccountHoldingRepository holdingRepository,
             AccountPortfolioSnapshotRepository snapshotRepository,
             TradingAgentRepository agentRepository,
+            TradingRunRepository tradingRunRepository,
             MarketService marketService,
             BuyTradeExecutor buyTradeExecutor,
-            SellTradeExecutor sellTradeExecutor) {
+            SellTradeExecutor sellTradeExecutor,
+            SimpMessagingTemplate messagingTemplate) {
         this.tradingAccountRepository = tradingAccountRepository;
         this.transactionRepository = transactionRepository;
         this.holdingRepository = holdingRepository;
         this.snapshotRepository = snapshotRepository;
         this.agentRepository = agentRepository;
+        this.tradingRunRepository = tradingRunRepository;
         this.marketService = marketService;
         this.buyTradeExecutor = buyTradeExecutor;
         this.sellTradeExecutor = sellTradeExecutor;
+        this.messagingTemplate = messagingTemplate;
     }
 
     /**
@@ -121,10 +132,19 @@ public class AccountService {
      * @return TradeResult with transaction details and updated balance
      */
     public TradeResult buyShares(String agentName, String symbol, Integer quantity, Long runId) {
-        TradeResult result = buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId);
-        // Update snapshot immediately so dashboard reflects the new trade
-        createPortfolioSnapshot(agentName);
-        return result;
+        Long agentId = getAgentIdFromRun(runId);
+        try {
+            TradeResult result = buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId);
+            // Update snapshot immediately so dashboard reflects the new trade
+            createPortfolioSnapshot(agentName);
+            // Broadcast successful trade
+            broadcastTradeExecuted(agentId, runId, "buy", result);
+            return result;
+        } catch (BusinessRuleException e) {
+            // Broadcast trade rejection
+            broadcastTradeRejected(agentId, runId, e);
+            throw e;
+        }
     }
 
     /**
@@ -134,10 +154,19 @@ public class AccountService {
      * @return TradeResult with transaction details and updated balance
      */
     public TradeResult sellShares(String agentName, String symbol, Integer quantity, Long runId) {
-        TradeResult result = sellTradeExecutor.executeSell(agentName, symbol, quantity, runId);
-        // Update snapshot immediately so dashboard reflects the new trade
-        createPortfolioSnapshot(agentName);
-        return result;
+        Long agentId = getAgentIdFromRun(runId);
+        try {
+            TradeResult result = sellTradeExecutor.executeSell(agentName, symbol, quantity, runId);
+            // Update snapshot immediately so dashboard reflects the new trade
+            createPortfolioSnapshot(agentName);
+            // Broadcast successful trade
+            broadcastTradeExecuted(agentId, runId, "sell", result);
+            return result;
+        } catch (BusinessRuleException e) {
+            // Broadcast trade rejection
+            broadcastTradeRejected(agentId, runId, e);
+            throw e;
+        }
     }
 
     // changeStrategy method removed - using hardcoded strategies only
@@ -281,4 +310,47 @@ public class AccountService {
             .sum();
     }
 
+    // ========== WebSocket Broadcast Methods ==========
+
+    /**
+     * Get agent ID from a trading run.
+     */
+    private Long getAgentIdFromRun(Long runId) {
+        return tradingRunRepository.findById(runId)
+            .map(run -> run.getAgent().getId())
+            .orElse(null);
+    }
+
+    /**
+     * Broadcast trade_executed message via WebSocket.
+     */
+    private void broadcastTradeExecuted(Long agentId, Long runId, String side, TradeResult result) {
+        TradeExecutedMessage.TradeDetails tradeDetails = new TradeExecutedMessage.TradeDetails(
+            side,
+            result.symbol(),
+            result.quantity(),
+            result.price()
+        );
+
+        TradeExecutedMessage message = new TradeExecutedMessage(agentId, runId, tradeDetails);
+        messagingTemplate.convertAndSend(TOPIC_TRADES, message);
+        logger.debug("Broadcast trade_executed for run {}: {} {} @ {}",
+            runId, side, result.symbol(), result.price());
+    }
+
+    /**
+     * Broadcast trade_rejected message via WebSocket.
+     */
+    private void broadcastTradeRejected(Long agentId, Long runId, BusinessRuleException e) {
+        TradeRejectedMessage message = new TradeRejectedMessage(
+            agentId,
+            runId,
+            e.getRejectionType(),
+            e.getMessage()
+        );
+
+        messagingTemplate.convertAndSend(TOPIC_TRADES, message);
+        logger.debug("Broadcast trade_rejected for run {}: {} - {}",
+            runId, e.getRejectionType(), e.getMessage());
+    }
 }

@@ -1,20 +1,27 @@
 package com.trading.service;
 
 import com.trading.dto.response.HoldingDto;
+import com.trading.dto.response.TradeResult;
+import com.trading.dto.websocket.TradeExecutedMessage;
+import com.trading.dto.websocket.TradeRejectedMessage;
 import com.trading.entity.AccountHolding;
 import com.trading.entity.TradingAccount;
 import com.trading.entity.TradingAgent;
-import com.trading.repository.AccountHoldingRepository;
-import com.trading.repository.TradingAccountRepository;
-import com.trading.repository.TradingAgentRepository;
+import com.trading.entity.TradingRun;
+import com.trading.enums.TradeRejectionType;
+import com.trading.enums.WebSocketMessageType;
+import com.trading.exception.BusinessRuleException;
+import com.trading.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import com.trading.exception.ResourceNotFoundException;
 
 import java.util.*;
@@ -23,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AccountService.initializeAgent Tests")
+@DisplayName("AccountService Tests")
 @SuppressWarnings("null")
 class AccountServiceTest {
 
@@ -35,6 +42,27 @@ class AccountServiceTest {
 
     @Mock
     private AccountHoldingRepository holdingRepository;
+
+    @Mock
+    private AccountTransactionRepository transactionRepository;
+
+    @Mock
+    private AccountPortfolioSnapshotRepository snapshotRepository;
+
+    @Mock
+    private TradingRunRepository tradingRunRepository;
+
+    @Mock
+    private MarketService marketService;
+
+    @Mock
+    private BuyTradeExecutor buyTradeExecutor;
+
+    @Mock
+    private SellTradeExecutor sellTradeExecutor;
+
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     @InjectMocks
     private AccountService accountService;
@@ -275,6 +303,160 @@ class AccountServiceTest {
         assertEquals("Trading account not found for agent: " + agentName +
             ". Agent must be initialized before trading operations.", exception.getMessage());
         verify(holdingRepository, never()).findByAccount(any()); // Ensure holdingRepository is not called
+    }
+
+    // ==================== WebSocket Broadcast Tests ====================
+
+    @Nested
+    @DisplayName("buyShares WebSocket Broadcasts")
+    class BuySharesBroadcastTests {
+
+        private TradingRun testRun;
+
+        @BeforeEach
+        void setUp() {
+            testRun = new TradingRun();
+            testRun.setId(100L);
+            testRun.setAgent(testAgent);
+        }
+
+        @Test
+        @DisplayName("Successful buy broadcasts trade_executed message")
+        void buyShares_Success_BroadcastsTradeExecuted() {
+            // Arrange
+            String agentName = "TestAgent";
+            String symbol = "AAPL";
+            Integer quantity = 10;
+            Long runId = 100L;
+            TradeResult tradeResult = new TradeResult(symbol, quantity, 150.0, 98500.0);
+
+            when(tradingRunRepository.findById(runId)).thenReturn(Optional.of(testRun));
+            when(buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId)).thenReturn(tradeResult);
+            when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
+            when(holdingRepository.findByAccount(testAccount)).thenReturn(Collections.emptyList());
+
+            // Act
+            accountService.buyShares(agentName, symbol, quantity, runId);
+
+            // Assert - verify broadcast was sent
+            ArgumentCaptor<TradeExecutedMessage> messageCaptor = ArgumentCaptor.forClass(TradeExecutedMessage.class);
+            verify(messagingTemplate).convertAndSend(eq("/topic/runs/trades"), messageCaptor.capture());
+
+            TradeExecutedMessage message = messageCaptor.getValue();
+            assertEquals(WebSocketMessageType.TRADE_EXECUTED, message.getType());
+            assertEquals(testAgent.getId(), message.getAgentId());
+            assertEquals(runId, message.getRunId());
+            assertEquals("buy", message.getTrade().getSide());
+            assertEquals(symbol, message.getTrade().getSymbol());
+            assertEquals(quantity, message.getTrade().getQuantity());
+            assertEquals(150.0, message.getTrade().getPrice());
+        }
+
+        @Test
+        @DisplayName("Failed buy (insufficient funds) broadcasts trade_rejected message")
+        void buyShares_InsufficientFunds_BroadcastsTradeRejected() {
+            // Arrange
+            String agentName = "TestAgent";
+            String symbol = "AAPL";
+            Integer quantity = 1000;
+            Long runId = 100L;
+
+            when(tradingRunRepository.findById(runId)).thenReturn(Optional.of(testRun));
+            when(buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId))
+                .thenThrow(new BusinessRuleException(TradeRejectionType.INSUFFICIENT_FUNDS, "Insufficient funds to buy 1000 shares of AAPL"));
+
+            // Act & Assert
+            assertThrows(BusinessRuleException.class, () -> {
+                accountService.buyShares(agentName, symbol, quantity, runId);
+            });
+
+            // Verify broadcast was sent
+            ArgumentCaptor<TradeRejectedMessage> messageCaptor = ArgumentCaptor.forClass(TradeRejectedMessage.class);
+            verify(messagingTemplate).convertAndSend(eq("/topic/runs/trades"), messageCaptor.capture());
+
+            TradeRejectedMessage message = messageCaptor.getValue();
+            assertEquals(WebSocketMessageType.TRADE_REJECTED, message.getType());
+            assertEquals(testAgent.getId(), message.getAgentId());
+            assertEquals(runId, message.getRunId());
+            assertEquals(TradeRejectionType.INSUFFICIENT_FUNDS, message.getRejectionType());
+            assertTrue(message.getRejectionMessage().contains("Insufficient funds"));
+        }
+    }
+
+    @Nested
+    @DisplayName("sellShares WebSocket Broadcasts")
+    class SellSharesBroadcastTests {
+
+        private TradingRun testRun;
+
+        @BeforeEach
+        void setUp() {
+            testRun = new TradingRun();
+            testRun.setId(100L);
+            testRun.setAgent(testAgent);
+        }
+
+        @Test
+        @DisplayName("Successful sell broadcasts trade_executed message")
+        void sellShares_Success_BroadcastsTradeExecuted() {
+            // Arrange
+            String agentName = "TestAgent";
+            String symbol = "AAPL";
+            Integer quantity = 5;
+            Long runId = 100L;
+            TradeResult tradeResult = new TradeResult(symbol, quantity, 155.0, 100775.0);
+
+            when(tradingRunRepository.findById(runId)).thenReturn(Optional.of(testRun));
+            when(sellTradeExecutor.executeSell(agentName, symbol, quantity, runId)).thenReturn(tradeResult);
+            when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
+            when(holdingRepository.findByAccount(testAccount)).thenReturn(Collections.emptyList());
+
+            // Act
+            accountService.sellShares(agentName, symbol, quantity, runId);
+
+            // Assert - verify broadcast was sent
+            ArgumentCaptor<TradeExecutedMessage> messageCaptor = ArgumentCaptor.forClass(TradeExecutedMessage.class);
+            verify(messagingTemplate).convertAndSend(eq("/topic/runs/trades"), messageCaptor.capture());
+
+            TradeExecutedMessage message = messageCaptor.getValue();
+            assertEquals(WebSocketMessageType.TRADE_EXECUTED, message.getType());
+            assertEquals(testAgent.getId(), message.getAgentId());
+            assertEquals(runId, message.getRunId());
+            assertEquals("sell", message.getTrade().getSide());
+            assertEquals(symbol, message.getTrade().getSymbol());
+            assertEquals(quantity, message.getTrade().getQuantity());
+            assertEquals(155.0, message.getTrade().getPrice());
+        }
+
+        @Test
+        @DisplayName("Failed sell (insufficient shares) broadcasts trade_rejected message")
+        void sellShares_InsufficientShares_BroadcastsTradeRejected() {
+            // Arrange
+            String agentName = "TestAgent";
+            String symbol = "AAPL";
+            Integer quantity = 100;
+            Long runId = 100L;
+
+            when(tradingRunRepository.findById(runId)).thenReturn(Optional.of(testRun));
+            when(sellTradeExecutor.executeSell(agentName, symbol, quantity, runId))
+                .thenThrow(new BusinessRuleException(TradeRejectionType.INSUFFICIENT_SHARES, "Insufficient shares to sell 100 of AAPL"));
+
+            // Act & Assert
+            assertThrows(BusinessRuleException.class, () -> {
+                accountService.sellShares(agentName, symbol, quantity, runId);
+            });
+
+            // Verify broadcast was sent
+            ArgumentCaptor<TradeRejectedMessage> messageCaptor = ArgumentCaptor.forClass(TradeRejectedMessage.class);
+            verify(messagingTemplate).convertAndSend(eq("/topic/runs/trades"), messageCaptor.capture());
+
+            TradeRejectedMessage message = messageCaptor.getValue();
+            assertEquals(WebSocketMessageType.TRADE_REJECTED, message.getType());
+            assertEquals(testAgent.getId(), message.getAgentId());
+            assertEquals(runId, message.getRunId());
+            assertEquals(TradeRejectionType.INSUFFICIENT_SHARES, message.getRejectionType());
+            assertTrue(message.getRejectionMessage().contains("Insufficient shares"));
+        }
     }
 }
 

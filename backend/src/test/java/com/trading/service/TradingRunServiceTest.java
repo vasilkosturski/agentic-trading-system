@@ -10,6 +10,7 @@ import com.trading.enums.PhaseStatus;
 import com.trading.enums.RunPhase;
 import com.trading.enums.RunStatus;
 import com.trading.enums.TradeDecision;
+import com.trading.enums.WebSocketMessageType;
 import com.trading.exception.ResourceNotFoundException;
 import com.trading.repository.*;
 import com.trading.specification.TradingRunSpecification;
@@ -193,7 +194,7 @@ class TradingRunServiceTest {
             // Assert - verify WebSocket message content
             verify(messagingTemplate).convertAndSend(eq("/topic/runs/phases"), phaseUpdateCaptor.capture());
             PhaseUpdateMessage message = phaseUpdateCaptor.getValue();
-            assertEquals("phase_update", message.getType(), "WebSocket message type should be phase_update");
+            assertEquals(WebSocketMessageType.PHASE_UPDATE, message.getType(), "WebSocket message type should be phase_update");
             assertEquals(1L, message.getAgentId(), "WebSocket message should contain correct agent_id");
             assertEquals(100L, message.getRunId(), "WebSocket message should contain correct run_id");
             assertEquals("INITIALIZING", message.getPhase(), "WebSocket message should contain INITIALIZING phase");
@@ -305,7 +306,7 @@ class TradingRunServiceTest {
             // Assert - verify WebSocket message content
             verify(messagingTemplate).convertAndSend(eq("/topic/runs/phases"), phaseUpdateCaptor.capture());
             PhaseUpdateMessage message = phaseUpdateCaptor.getValue();
-            assertEquals("phase_update", message.getType());
+            assertEquals(WebSocketMessageType.PHASE_UPDATE, message.getType());
             assertEquals("RESEARCHING", message.getPhase());
         }
 

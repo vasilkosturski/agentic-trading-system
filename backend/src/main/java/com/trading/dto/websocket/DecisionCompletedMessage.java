@@ -1,6 +1,7 @@
 package com.trading.dto.websocket;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.trading.enums.WebSocketMessageType;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -12,7 +13,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class DecisionCompletedMessage {
 
-    private final String type = "decision_completed";
+    private final WebSocketMessageType type = WebSocketMessageType.DECISION_COMPLETED;
 
     @JsonProperty("agent_id")
     private Long agentId;
