@@ -13,8 +13,6 @@ import com.trading.repository.AgentReasoningStepRepository;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.RunService;
 import jakarta.validation.Valid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,12 +24,13 @@ import java.util.stream.Collectors;
  * REST controller for agent run tracking and management.
  * Returns data directly without ToolResponse wrapper.
  * Exceptions are handled by RunControllerAdvice and GlobalExceptionHandler.
+ *
+ * Note: Moved to /api/agent-runs to avoid conflict with TradingRunController.
+ * This controller will be removed in the remove-old-agent-runs proposal.
  */
 @RestController
-@RequestMapping("/api/runs")
+@RequestMapping("/api/agent-runs")
 public class RunController {
-
-    private static final Logger logger = LoggerFactory.getLogger(RunController.class);
 
     @Autowired
     private RunService runService;
