@@ -31,8 +31,8 @@ class Config:
 
     @property
     def BACKEND_API_RUNS(self) -> str:
-        """Run tracking API endpoint."""
-        return f"{self.BACKEND_BASE_URL}/api/runs"
+        """Run tracking API endpoint (legacy agent runs)."""
+        return f"{self.BACKEND_BASE_URL}/api/agent-runs"
 
     @property
     def BACKEND_API_AGENTS(self) -> str:
