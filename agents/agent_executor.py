@@ -1,19 +1,39 @@
-"""Agent execution orchestration - extracted from SimpleTrader."""
+"""Agent execution orchestration - extracted from SimpleTrader.
 
-import asyncio
+Uses new phase-based Trading Runs API (/api/runs) for tracking:
+- create_run() → POST /api/runs
+- update_phase() → PATCH /api/runs/{id}/phase
+- complete_run() → PUT /api/runs/{id}/complete
+"""
+
 import json
 import logging
 from datetime import datetime
-from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Protocol
 
 from agents import Agent, Runner
 
-# Import type-safe models
-from models import TradingDecision, MarketConditions
 
-# Type aliases for callable interfaces
-BuildMessageFn = Callable[[str, bool], str]  # (historical_context, force_trade) -> message
-CreateAgentFn = Callable[['AgentExecutor'], Awaitable[Agent]]  # (executor) -> Agent
+class BuildMessageFn(Protocol):
+    """Callback to build the agent prompt message."""
+    def __call__(self, historical_context: str, force_trade: bool) -> str: ...
+
+
+class CreateAgentFn(Protocol):
+    """Async callback to create an Agent instance."""
+    async def __call__(self, executor: 'AgentExecutor') -> Agent: ...
+
+# Import type-safe models
+from models import TradingDecision
+from models.run_tracking import (
+    CompleteRunData,
+    DecisionToolCallDto,
+    PhaseStatus,
+    ReasoningDto,
+    ResearchToolCallDto,
+    SourceDto,
+    TradeDecision,
+)
 
 # Import direct function tools
 from trading_tools import (
@@ -25,8 +45,8 @@ from trading_tools import (
 )
 from memory_tools import get_recent_activity
 
-# Import run tracking
-from run_tracking import start_run, end_run, mark_run_as_error
+# Import new run tracking
+from run_tracking import create_run, update_phase, complete_run
 
 # Import status broadcasting
 from status_broadcaster import (
@@ -48,14 +68,13 @@ logger = logging.getLogger(__name__)
 class AgentExecutor:
     """Handles agent execution orchestration for trading cycles.
 
-    Responsibilities:
-    - Initialize trading cycle (tracking, broadcasting)
-    - Prepare context (pre-fetch historical data)
-    - Create and run agent
-    - Parse agent results and tool usage
-    - Execute trading decisions
-    - Finalize cycle (end tracking, broadcast status)
-
+    Uses phase-based Trading Runs API for tracking:
+    - INITIALIZING: Run created
+    - RESEARCHING: Market research phase
+    - DECIDING: Trade decision phase
+    - TRADING: Trade execution (BUY/SELL only)
+    - COMPLETED: Run finished successfully
+    - ERROR: Run failed
     """
 
     def __init__(self, agent_id: int, name: str, strategy: str):
@@ -76,6 +95,24 @@ class AgentExecutor:
         self.last_decision: Optional[TradingDecision] = None
         self.tracker: Optional[ToolTracker] = None
 
+        # Phase timing
+        self.research_start_time: Optional[datetime] = None
+        self.decision_start_time: Optional[datetime] = None
+
+        # Phase data collection
+        self.research_candidates: List[str] = []
+        self.research_sources: List[SourceDto] = []
+        self.research_tool_calls: List[ResearchToolCallDto] = []
+        self.research_notes: str = ""
+
+        self.decision_sources: List[SourceDto] = []
+        self.decision_tool_calls: List[DecisionToolCallDto] = []
+
+        # Execution phase data
+        self.trade_id: Optional[int] = None
+        self.execution_status: Optional[PhaseStatus] = None
+        self.execution_error: Optional[str] = None
+
     async def execute_cycle(
         self,
         build_message_fn: BuildMessageFn,
@@ -93,15 +130,14 @@ class AgentExecutor:
             Dict with cycle results (decision, trade_count, summary)
 
         Phases:
-        1. Initialize: Start tracking, broadcast status
+        1. Initialize: Create run, update to RESEARCHING
         2. Prepare context: Pre-fetch historical data
         3. Create agent: Build agent with tools
         4. Run agent: Execute agent with message
-        5. Parse results: Extract decision and tool usage
-        6. Execute decision: Perform BUY/SELL/HOLD
-        7. Finalize: End tracking, broadcast completion
+        5. Parse results: Extract decision, update to DECIDING
+        6. Execute decision: Update to TRADING (if BUY/SELL), execute trade
+        7. Finalize: Complete run with all phase data
         """
-        run_type = "TRADING"  # Backend expects this for run categorization
         run_id = None
 
         print(
@@ -110,7 +146,7 @@ class AgentExecutor:
 
         try:
             # Phase 1: Start run tracking and setup
-            run_id = await self._phase1_start_run(run_type)
+            run_id = await self._phase1_start_run()
 
             # Phase 2: Prepare context (pre-fetch data)
             context = await self._phase2_prepare_context()
@@ -149,21 +185,15 @@ class AgentExecutor:
         finally:
             self._cleanup()
 
-    async def _phase1_start_run(self, run_type: str) -> int:
-        """Phase 1: Start a tracked run and initialize agent state.
-
-        Initializes agent account, starts backend run tracking, and sets up
-        tool tracking for transparency. Every trade must be linked to a run.
-
-        Args:
-            run_type: "TRADING" (sent to backend for run categorization)
+    async def _phase1_start_run(self) -> int:
+        """Phase 1: Create run and transition to RESEARCHING.
 
         Returns:
             run_id for tracking this cycle
 
         Raises:
             RuntimeError: If agent_id is not set
-            Exception: If run tracking fails to start
+            Exception: If run creation fails
         """
         # Initialize agent account (direct function call, not through agent)
         await initialize_agent(self.name)
@@ -178,74 +208,65 @@ class AgentExecutor:
             self.agent_id, self.name, PHASE_INITIALIZING, "Starting trading cycle", 0
         )
 
-        # Fetch balance and holdings for logging and run tracking
-        balance = await _get_balance_raw(self.agent_id)
-        holdings = await _get_holdings_raw(self.agent_id)
-
-        # Market conditions (timestamp for run tracking)
-        market_conditions = MarketConditions(
-            timestamp=datetime.now().isoformat(),
-        )
-
-        # Start run tracking (REQUIRED - every transaction must be linked to a run)
-        run_id = await start_run(self.agent_id, self.name, run_type, market_conditions)
+        # Create run via new API (POST /api/runs)
+        run_id = await create_run(self.agent_id)
         if run_id is None:
-            error_msg = f"CRITICAL: Failed to start run tracking for {self.name}. Cannot proceed without runId - every transaction must be linked to a run."
+            error_msg = f"CRITICAL: Failed to create run for {self.name}. Cannot proceed without runId."
             logger.error(f"🔴 {error_msg}")
             raise Exception(error_msg)
 
         self.current_run_id = run_id
         self.trade_count = 0
-        # NOTE: Don't clear last_decision here - it will be set during agent execution
-        # Clearing it breaks testing and there's no benefit to explicitly clearing
 
-        # Initialize tool tracker for transparency
+        # Update to RESEARCHING phase
+        await update_phase(run_id, "RESEARCHING")
+        self.research_start_time = datetime.now()
+
+        # Broadcast: RESEARCHING
+        broadcast_status(
+            self.agent_id, self.name, PHASE_RESEARCHING, "Researching market", 20
+        )
+
+        # Initialize tool tracker for local data collection
         self.tracker = ToolTracker(run_id)
+
+        # Fetch balance and holdings for logging
+        balance = await _get_balance_raw(self.agent_id)
+        holdings = await _get_holdings_raw(self.agent_id)
 
         # Log initial data access for transparency
         portfolio_info = f"Balance: ${balance:.2f}"
         if holdings:
-            # holdings is List[Holding] with typed attributes
-            symbols = [h.symbol for h in holdings[:5]]  # First 5 symbols
+            symbols = [h.symbol for h in holdings[:5]]
             positions_str = ", ".join(symbols) + ("..." if len(holdings) > 5 else "")
-            portfolio_info += (
-                f", Holdings: {len(holdings)} position(s) ({positions_str})"
-            )
+            portfolio_info += f", Holdings: {len(holdings)} position(s) ({positions_str})"
         else:
             portfolio_info += ", Holdings: None"
 
         self.tracker.log_data_access("Portfolio", portfolio_info)
 
-        # Log initialization
-        init_text = f"Starting portfolio review. Balance: ${balance:.2f}, Positions: {len(holdings)}"
-        self.tracker.log_reasoning(
-            "initialization", "Started portfolio review", init_text
+        # Add system context source
+        self.research_sources.append(
+            SourceDto.system_context(f"Portfolio context: {portfolio_info}")
         )
 
         return run_id
 
     async def _phase2_prepare_context(self) -> Dict[str, Any]:
-        """Phase 2: Prepare baseline context (recent activity) without steering agent.
-
-        Provides agent with recent trading history as context, but lets agent
-        autonomously decide what to research and focus on.
+        """Phase 2: Prepare baseline context (recent activity).
 
         Returns:
             Dict with historical_context (baseline recent activity)
         """
-        # Broadcast: RESEARCHING
-        broadcast_status(
-            self.agent_id,
-            self.name,
-            PHASE_RESEARCHING,
-            "Preparing context",
-            20,
-        )
-
         # Fetch recent activity (last 30 days) as baseline context
         recent_activity_json = await get_recent_activity(self.name, days=30)
 
         logger.info(f"📊 Baseline context prepared: recent activity (30 days)")
+
+        # Add system context source for recent activity
+        self.research_sources.append(
+            SourceDto.system_context("Retrieved 30-day trading activity history")
+        )
 
         return {
             "historical_context": recent_activity_json,
@@ -260,8 +281,6 @@ class AgentExecutor:
         Returns:
             Agent instance ready to run
         """
-        # Delegate to create_agent_fn to create agent with tools
-        # This keeps the executor focused on orchestration, not tool creation
         agent = await create_agent_fn(self)
         return agent
 
@@ -283,29 +302,34 @@ class AgentExecutor:
         Returns:
             Agent result object
         """
-        # Generate message with baseline historical context
-        message = build_message_fn(
-            context["historical_context"], force_trade
-        )
-
+        message = build_message_fn(context["historical_context"], force_trade)
         result = await Runner.run(agent, message, max_turns=30)
         return result
 
     async def _phase5_parse_results(self, result) -> None:
-        """Phase 5: Parse agent output and track tool usage.
+        """Phase 5: Parse agent output, collect research data, transition to DECIDING.
 
         Args:
-            result: Agent result object with new_items (OpenAI Agents SDK v0.2.4)
-
-        Updates:
-            self.tracker with tool calls and research queries
-
-        Note:
-            Tool parsing relies on SDK v0.2.4 structure. If SDK is updated,
-            this method may need adjustment. See requirements.txt for pinned version.
+            result: Agent result object with new_items (OpenAI Agents SDK)
         """
+        # Calculate research latency
+        research_latency_ms = None
+        if self.research_start_time:
+            research_latency_ms = int(
+                (datetime.now() - self.research_start_time).total_seconds() * 1000
+            )
+
+        # Update to DECIDING phase
+        if self.current_run_id:
+            await update_phase(self.current_run_id, "DECIDING")
+        self.decision_start_time = datetime.now()
+
+        # Broadcast: DECIDING
+        broadcast_status(
+            self.agent_id, self.name, PHASE_DECIDING, "Making investment decision", 70
+        )
+
         research_conducted = False
-        # Track tool names by call_id for matching outputs to their tool calls
         tool_name_by_call_id: Dict[str, str] = {}
 
         if not result or not hasattr(result, "new_items"):
@@ -315,38 +339,29 @@ class AgentExecutor:
         logger.info(f"📋 Parsing {len(result.new_items)} items from agent result")
 
         for i, item in enumerate(result.new_items):
-            item_type = type(item).__name__
             tool_name = None
             call_id = None
 
-            # Extract tool name and call_id from raw_item (SDK v0.2.4 structure)
+            # Extract tool name and call_id from raw_item
             if hasattr(item, 'raw_item') and item.raw_item is not None:
                 raw_item = item.raw_item
-
-                # Tool name is in raw_item.name
                 if hasattr(raw_item, 'name'):
                     name = getattr(raw_item, 'name')
                     if name and isinstance(name, str):
                         tool_name = name
-
-                # Call ID for matching tool calls to outputs
                 if hasattr(raw_item, 'call_id'):
                     call_id = getattr(raw_item, 'call_id')
 
-            # Fallback: call_id directly on item
             if not call_id and hasattr(item, 'call_id'):
                 call_id = getattr(item, 'call_id')
 
-            # Build call_id -> tool_name mapping for output items
             if tool_name and call_id:
                 tool_name_by_call_id[call_id] = tool_name
 
-            # If we have call_id but no tool_name, look up from mapping
             if not tool_name and call_id and call_id in tool_name_by_call_id:
                 tool_name = tool_name_by_call_id[call_id]
 
             if not tool_name:
-                # Not a tool call item (e.g., message item) - skip silently
                 continue
 
             logger.info(f"  🔧 Tool call: {tool_name}")
@@ -362,67 +377,53 @@ class AgentExecutor:
             if self.tracker:
                 self.tracker.log_tool_call(tool_name, {}, tool_result_full[:300])
 
+            # Track research tool calls
+            self.research_tool_calls.append(
+                ResearchToolCallDto(tool=tool_name, durationMs=None)
+            )
+
             # Special handling for Researcher tool - extract sources
             if tool_name == "Researcher":
                 research_conducted = True
-                self._process_researcher_output(
-                    tool_result_full, result.new_items, i
-                )
+                self._process_researcher_output(tool_result_full, result.new_items, i)
 
-        # Log research phase completion
+        # Build research notes
         if research_conducted:
             research_count = len(self.tracker.research_queries) if self.tracker else 0
             if research_count > 1:
-                research_text = f"Completed market research - conducted {research_count} research queries to gather comprehensive information."
+                self.research_notes = f"Conducted {research_count} research queries."
             else:
-                research_text = "Completed market research and analysis. Used Researcher tool to gather current market information."
+                self.research_notes = "Completed market research and analysis."
         else:
-            research_text = "Completed analysis without external research."
+            self.research_notes = "Analysis completed without external research."
 
         if self.tracker:
-            self.tracker.log_reasoning("research", "Research completed", research_text)
+            self.tracker.log_reasoning("research", "Research completed", self.research_notes)
 
     async def _phase6_execute_decision(self) -> None:
-        """Phase 6: Execute BUY/SELL/HOLD decision and track.
+        """Phase 6: Execute BUY/SELL/HOLD decision.
 
-        Reads self.last_decision and executes trade if BUY/SELL.
+        Updates to TRADING phase for BUY/SELL, captures execution result.
         """
-        # Broadcast: DECIDING (after agent completes reasoning)
-        broadcast_status(
-            self.agent_id, self.name, PHASE_DECIDING, "Making investment decision", 70
-        )
-
-        # Read structured decision from decide_action tool (if any)
         decision = self.last_decision
 
-        # CRITICAL DEBUG: Log what we're about to execute
-        logger.error(f"🟡 ABOUT TO EXECUTE: decision={decision}")
+        logger.info(f"🟡 ABOUT TO EXECUTE: decision={decision}")
 
         if decision and decision.action in ("BUY", "SELL"):
-            # Validate runId is set
             if self.current_run_id is None:
-                error_msg = f"CRITICAL: Cannot execute trade - runId is required but not set."
+                error_msg = "CRITICAL: Cannot execute trade - runId is required but not set."
                 logger.error(f"🔴 {error_msg}")
                 raise Exception(error_msg)
 
-            # Extract decision details (using Pydantic model attributes)
             action = decision.action
             symbol = decision.symbol
             quantity = decision.quantity
             rationale = decision.rationale or "Decision"
 
-            # CRITICAL DEBUG: Log execution details
-            logger.error(f"🟢 EXECUTING: {action} {quantity} shares of {symbol}")
-            logger.error(f"🟢 RATIONALE: {rationale[:200]}")
+            logger.info(f"🟢 EXECUTING: {action} {quantity} shares of {symbol}")
 
-            # Log decision with full context
-            decision_text = f"{action} {quantity} shares of {symbol}.\n\nRationale: {rationale}"
-            if decision.fullReasoning:
-                decision_text += f"\n\n{decision.fullReasoning}"
-            if self.tracker:
-                self.tracker.log_reasoning(
-                    "decision", f"Decided: {action} {symbol}", decision_text
-                )
+            # Update to TRADING phase
+            await update_phase(self.current_run_id, "TRADING")
 
             # Broadcast: TRADING
             broadcast_status(
@@ -431,7 +432,7 @@ class AgentExecutor:
 
             try:
                 if action == "BUY":
-                    await buy_shares(
+                    result = await buy_shares(
                         self.agent_id,
                         symbol,
                         quantity,
@@ -439,88 +440,116 @@ class AgentExecutor:
                         agent_name=self.name,
                     )
                 else:
-                    await sell_shares(
+                    result = await sell_shares(
                         self.agent_id,
                         symbol,
                         quantity,
                         runId=self.current_run_id,
                         agent_name=self.name,
                     )
-                self.trade_count += 1
 
-                # Log execution success
+                self.trade_count += 1
+                self.execution_status = PhaseStatus.COMPLETED
+                # Capture trade_id from result for audit trail
+                self.trade_id = result.tradeId
+
                 if self.tracker:
                     self.tracker.log_reasoning(
                         "execution",
                         f"Executed {action}",
                         f"Successfully executed {action} {quantity} {symbol}",
                     )
+
             except Exception as trade_err:
                 logger.error(f"Trade execution failed: {trade_err}")
+                self.execution_status = PhaseStatus.FAILED
+                self.execution_error = str(trade_err)
 
-                # Log execution failure
                 if self.tracker:
                     self.tracker.log_reasoning(
                         "execution", f"Failed {action}", f"Trade failed: {str(trade_err)}"
                     )
         else:
-            # HOLD decision
+            # HOLD decision - no trade execution
+            self.execution_status = PhaseStatus.SKIPPED
             summary = decision.rationale if decision else "No decision"
-            if not summary:
-                summary = "Portfolio unchanged"
             if self.tracker:
                 self.tracker.log_reasoning(
-                    "decision", "Decided: HOLD", f"No trades. {summary[:200]}"
+                    "decision", "Decided: HOLD", f"No trades. {summary[:200] if summary else ''}"
                 )
 
     async def _phase7_finalize(self, run_id: int) -> None:
-        """Phase 7: End run tracking with full context.
+        """Phase 7: Complete run with all phase data.
 
         Args:
             run_id: Run ID to finalize
         """
-        if run_id is not None:
-            # Extract research sources from decision if available
-            research_sources = []
-            if self.last_decision and self.last_decision.researchSources:
-                try:
-                    research_sources = json.loads(
-                        self.last_decision.researchSources
-                    )
-                except:
-                    research_sources = []
+        if run_id is None:
+            return
 
-            # Get historical context from decision if available
-            historical_context = (
-                self.last_decision.historicalContext
-                if self.last_decision
-                else "{}"
+        # Calculate decision latency
+        decision_latency_ms = None
+        if self.decision_start_time:
+            decision_latency_ms = int(
+                (datetime.now() - self.decision_start_time).total_seconds() * 1000
             )
 
-            # Use summary from decision or fallback
-            run_summary = (
-                self.last_decision.rationale
-                if self.last_decision
-                else "Agent execution completed"
-            )
-            if not run_summary:
-                run_summary = "Agent execution completed"
-
-            # Use fullReasoning from decision or fallback
-            run_full_reasoning = (
-                self.last_decision.fullReasoning
-                if self.last_decision
-                else ""
+        # Calculate research latency
+        research_latency_ms = None
+        if self.research_start_time and self.decision_start_time:
+            research_latency_ms = int(
+                (self.decision_start_time - self.research_start_time).total_seconds() * 1000
             )
 
-            await end_run(
-                run_id,
-                run_summary,
-                run_full_reasoning,
-                research_sources,
-                historical_context,
-                self.trade_count,
+        # Determine trade decision
+        decision = self.last_decision
+        trade_decision = TradeDecision.HOLD
+        symbol = None
+        quantity = None
+
+        if decision:
+            if decision.action == "BUY":
+                trade_decision = TradeDecision.BUY
+            elif decision.action == "SELL":
+                trade_decision = TradeDecision.SELL
+            symbol = decision.symbol if decision.action in ("BUY", "SELL") else None
+            quantity = decision.quantity if decision.action in ("BUY", "SELL") else None
+
+        # Build reasoning DTO from decision
+        reasoning = None
+        if decision and decision.fullReasoning:
+            reasoning = ReasoningDto(
+                portfolioContext=None,
+                historicalContext=None,
+                researchSummary=None,
+                candidateEvaluation=None,
+                finalRationale=decision.fullReasoning[:2000]  # Truncate if too long
             )
+
+        # Build CompleteRunData
+        complete_data = CompleteRunData(
+            # Research phase
+            candidates=self.research_candidates,
+            researchSources=self.research_sources,
+            researchNotes=self.research_notes,
+            researchToolCalls=self.research_tool_calls,
+            researchLatencyMs=research_latency_ms,
+            # Decision phase
+            decision=trade_decision,
+            symbol=symbol,
+            quantity=quantity,
+            reasoning=reasoning,
+            decisionSources=self.decision_sources,
+            decisionToolCalls=self.decision_tool_calls,
+            decisionLatencyMs=decision_latency_ms,
+            # Execution phase
+            tradeId=self.trade_id,
+            executionStatus=self.execution_status,
+            errorDetails=self.execution_error,
+        )
+
+        # Complete the run via new API
+        await complete_run(run_id, complete_data)
 
         # Broadcast: COMPLETED
         outcome_message = (
@@ -554,9 +583,17 @@ class AgentExecutor:
             outcome=f"Failed: {str(error)}",
         )
 
-        # Mark run as error if tracking was started
+        # Update run to ERROR phase and complete with error details
         if run_id is not None:
-            await mark_run_as_error(run_id, str(error))
+            await update_phase(run_id, "ERROR")
+
+            # Complete with partial data and error
+            error_data = CompleteRunData(
+                decision=TradeDecision.HOLD,  # Safe default
+                executionStatus=PhaseStatus.FAILED,
+                errorDetails=str(error)[:500],
+            )
+            await complete_run(run_id, error_data)
 
     def _cleanup(self) -> None:
         """Clean up execution state after cycle completes or fails."""
@@ -565,10 +602,25 @@ class AgentExecutor:
         self.last_decision = None
         self.tracker = None
 
+        # Reset timing
+        self.research_start_time = None
+        self.decision_start_time = None
+
+        # Reset phase data
+        self.research_candidates = []
+        self.research_sources = []
+        self.research_tool_calls = []
+        self.research_notes = ""
+        self.decision_sources = []
+        self.decision_tool_calls = []
+        self.trade_id = None
+        self.execution_status = None
+        self.execution_error = None
+
     def _process_researcher_output(
         self, tool_result: str, items: list, current_index: int
     ) -> None:
-        """Process Researcher tool output - extract sources and log research query.
+        """Process Researcher tool output - extract sources and candidates.
 
         Args:
             tool_result: Full output from Researcher tool
@@ -587,12 +639,16 @@ class AgentExecutor:
                     sources = research_json["sources"]
                 if "summary" in research_json:
                     result_summary = str(research_json["summary"])
+                # Extract candidates if present
+                if "candidates" in research_json and isinstance(research_json["candidates"], list):
+                    for candidate in research_json["candidates"]:
+                        if isinstance(candidate, str) and candidate not in self.research_candidates:
+                            self.research_candidates.append(candidate)
         except json.JSONDecodeError:
-            # Fallback: Extract URLs from text if not JSON
             sources = self._extract_urls_from_text(tool_result)
             result_summary = self._parse_research_summary(tool_result, sources)
 
-        # Try to find the original query from previous items
+        # Try to find the original query
         if current_index > 0:
             for j in range(current_index - 1, max(0, current_index - 5), -1):
                 prev_item = items[j]
@@ -608,6 +664,18 @@ class AgentExecutor:
                                     break
                                 except (json.JSONDecodeError, TypeError):
                                     pass
+
+        # Add web sources to research_sources
+        for source in sources:
+            if isinstance(source, dict):
+                url = source.get("url")
+                if url:
+                    self.research_sources.append(
+                        SourceDto.web(
+                            title=source.get("title", "Article"),
+                            url=str(url)
+                        )
+                    )
 
         if sources:
             logger.info(f"  📎 Research: {len(sources)} sources, query: {query[:50]}...")
@@ -646,12 +714,11 @@ class AgentExecutor:
         if not sources:
             url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
             urls = re.findall(url_pattern, text)
-            for url in urls[:5]:  # Limit to 5
-                # Try to extract domain as title
+            for url in urls[:5]:
                 domain = url.split("//")[-1].split("/")[0]
                 sources.append({"title": domain, "url": url})
 
-        return sources  # Return all SOURCE citations
+        return sources
 
     def _parse_research_summary(
         self, research_text: str, sources: List[Dict[str, str]]
@@ -668,12 +735,9 @@ class AgentExecutor:
         if not research_text:
             return "Research completed"
 
-        # Remove SOURCE citation markers to get clean text
         import re
-
         clean_text = re.sub(r"\[SOURCE:[^\]]+\]\([^)]+\)", "", research_text)
 
-        # Get first 250 chars of meaningful content
         lines = [
             line.strip()
             for line in clean_text.split("\n")
@@ -684,11 +748,8 @@ class AgentExecutor:
         if len(" ".join(lines)) > 250:
             summary_text += "..."
 
-        # Add source citation count
         if sources:
-            summary_text += (
-                f" (Cited {len(sources)} source{'s' if len(sources) != 1 else ''})"
-            )
+            summary_text += f" (Cited {len(sources)} source{'s' if len(sources) != 1 else ''})"
 
         return summary_text if summary_text else "Research completed"
 
@@ -735,5 +796,4 @@ class AgentExecutor:
 
         self.last_decision = decision
 
-        # CRITICAL DEBUG: Log the stored decision
-        logger.error(f"🔴 DECISION STORED: {decision.model_dump()}")
+        logger.info(f"🔴 DECISION STORED: action={action}, symbol={symbol}, quantity={quantity}")

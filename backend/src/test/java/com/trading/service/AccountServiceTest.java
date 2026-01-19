@@ -328,7 +328,7 @@ class AccountServiceTest {
             String symbol = "AAPL";
             Integer quantity = 10;
             Long runId = 100L;
-            TradeResult tradeResult = new TradeResult(symbol, quantity, 150.0, 98500.0);
+            TradeResult tradeResult = new TradeResult(1L, symbol, quantity, 150.0, 98500.0);
 
             when(tradingRunRepository.findById(runId)).thenReturn(Optional.of(testRun));
             when(buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId)).thenReturn(tradeResult);
@@ -404,7 +404,7 @@ class AccountServiceTest {
             String symbol = "AAPL";
             Integer quantity = 5;
             Long runId = 100L;
-            TradeResult tradeResult = new TradeResult(symbol, quantity, 155.0, 100775.0);
+            TradeResult tradeResult = new TradeResult(2L, symbol, quantity, 155.0, 100775.0);
 
             when(tradingRunRepository.findById(runId)).thenReturn(Optional.of(testRun));
             when(sellTradeExecutor.executeSell(agentName, symbol, quantity, runId)).thenReturn(tradeResult);

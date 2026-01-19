@@ -30,9 +30,9 @@ class Config:
         return f"{self.BACKEND_BASE_URL}/api/market"
 
     @property
-    def BACKEND_API_RUNS(self) -> str:
-        """Run tracking API endpoint (legacy agent runs)."""
-        return f"{self.BACKEND_BASE_URL}/api/agent-runs"
+    def BACKEND_API_TRADING_RUNS(self) -> str:
+        """New Trading Runs API endpoint (phase-based tracking)."""
+        return f"{self.BACKEND_BASE_URL}/api/runs"
 
     @property
     def BACKEND_API_AGENTS(self) -> str:
@@ -85,5 +85,5 @@ config = Config()
 BACKEND_BASE_URL = config.BACKEND_BASE_URL
 BACKEND_API_ACCOUNTS = config.BACKEND_API_ACCOUNTS
 BACKEND_API_MARKET = config.BACKEND_API_MARKET
-BACKEND_API_RUNS = config.BACKEND_API_RUNS
+BACKEND_API_TRADING_RUNS = config.BACKEND_API_TRADING_RUNS
 BACKEND_API_AGENTS = config.BACKEND_API_AGENTS

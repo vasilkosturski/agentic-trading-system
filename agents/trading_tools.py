@@ -14,7 +14,7 @@ from typing import Dict, List, Any, Optional
 from config import BACKEND_API_ACCOUNTS, BACKEND_BASE_URL
 
 # Import type-safe models
-from models import Holding
+from models import Holding, TradeResult
 
 # Import unified HTTP client
 from http_client import call_backend, BackendAPIError
@@ -81,7 +81,7 @@ async def buy_shares(
     quantity: int,
     runId: Optional[int] = None,
     agent_name: Optional[str] = None
-) -> str:
+) -> TradeResult:
     """Buy shares of a stock.
 
     IMPORTANT: Maximum 10 positions per agent. If you already hold 10 different stocks,
@@ -94,7 +94,7 @@ async def buy_shares(
         runId: Optional run ID to link this trade to an agent run
 
     Returns:
-        Confirmation message with transaction details
+        TradeResult with symbol, quantity, price, and newBalance
 
     Raises:
         Exception: If insufficient funds, position limit reached, or invalid symbol
@@ -108,7 +108,7 @@ async def buy_shares(
         })
         who = agent_name or agent_id
         logger.info(f"{who} bought {quantity} shares of {symbol}")
-        return str(result)
+        return TradeResult(**result)
     except Exception as e:
         who = agent_name or agent_id
         logger.error(f"Failed to buy shares for {who}: {e}")
@@ -121,7 +121,7 @@ async def sell_shares(
     quantity: int,
     runId: Optional[int] = None,
     agent_name: Optional[str] = None
-) -> str:
+) -> TradeResult:
     """Sell shares of a stock.
 
     Args:
@@ -131,7 +131,7 @@ async def sell_shares(
         runId: Optional run ID to link this trade to an agent run
 
     Returns:
-        Confirmation message with transaction details
+        TradeResult with symbol, quantity, price, and newBalance
 
     Raises:
         Exception: If you don't own enough shares or invalid symbol
@@ -145,7 +145,7 @@ async def sell_shares(
         })
         who = agent_name or agent_id
         logger.info(f"{who} sold {quantity} shares of {symbol}")
-        return str(result)
+        return TradeResult(**result)
     except Exception as e:
         who = agent_name or agent_id
         logger.error(f"Failed to sell shares for {who}: {e}")
