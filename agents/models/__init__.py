@@ -22,6 +22,8 @@ from .api_responses import (
     TradingSummary,
     SymbolHistoryResponse,
     PriceLookupResponse,
+    # Trade execution
+    TradeResult,
     # Tool error model
     ToolError,
 )
@@ -31,6 +33,16 @@ from .internal_state import (
     ResearchQueryRecord,
     DataAccessRecord,
     MarketConditions,
+)
+from .run_tracking import (
+    RunPhase,
+    PhaseStatus,
+    TradeDecision as RunTradeDecision,  # Avoid conflict with llm_output.TradingDecision
+    SourceDto,
+    ResearchToolCallDto,
+    DecisionToolCallDto,
+    ReasoningDto,
+    CompleteRunData,
 )
 
 __all__ = [
@@ -54,6 +66,8 @@ __all__ = [
     "TradingSummary",
     "SymbolHistoryResponse",
     "PriceLookupResponse",
+    # Trade Execution
+    "TradeResult",
     # Tool Error Model
     "ToolError",
     # Internal State Models
@@ -62,4 +76,13 @@ __all__ = [
     "ResearchQueryRecord",
     "DataAccessRecord",
     "MarketConditions",
+    # Run Tracking Models (new Trading Runs API)
+    "RunPhase",
+    "PhaseStatus",
+    "RunTradeDecision",
+    "SourceDto",
+    "ResearchToolCallDto",
+    "DecisionToolCallDto",
+    "ReasoningDto",
+    "CompleteRunData",
 ]

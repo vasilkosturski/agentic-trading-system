@@ -141,9 +141,31 @@ class PriceLookupResponse(BaseModel):
 # Tool Error Model (for standardized error responses from LLM tools)
 # =============================================================================
 
+# =============================================================================
+# Trade Execution Models
+# =============================================================================
+
+class TradeResult(BaseModel):
+    """Result of a trade execution (buy/sell) from backend API.
+
+    Matches Java TradeResult.java record.
+    Contains essential data for trade confirmation and audit trail.
+    """
+
+    tradeId: int = Field(gt=0, description="Transaction ID for audit trail")
+    symbol: str = Field(min_length=1, max_length=5, description="Stock symbol traded")
+    quantity: int = Field(gt=0, description="Number of shares traded")
+    price: float = Field(gt=0, description="Price per share at execution")
+    newBalance: float = Field(ge=0, description="Updated cash balance after trade")
+
+
+# =============================================================================
+# Tool Error Model (for standardized error responses from LLM tools)
+# =============================================================================
+
 class ToolError(BaseModel):
     """Standardized error response for LLM tools.
-    
+
     Used when a tool cannot return its normal response due to an error.
     The LLM receives this as a structured response it can interpret.
     """

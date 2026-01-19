@@ -59,14 +59,14 @@ public class SellTradeExecutor extends TradeExecutor {
         account.setBalance(account.getBalance() + totalProceeds);
         TradingAccount savedAccount = tradingAccountRepository.save(account);
 
-        // Create and save transaction
-        createTransaction(account, symbol, quantity, price, runId, TransactionType.SELL);
+        // Create and save transaction - capture ID for audit trail
+        AccountTransaction transaction = createTransaction(account, symbol, quantity, price, runId, TransactionType.SELL);
 
         // Update holding (reduce quantity or delete if 0)
         updateHolding(holding, quantity, agentName, symbol);
 
-        // Return essential trade details for LLM
-        return new TradeResult(symbol, quantity, price, savedAccount.getBalance());
+        // Return trade details with transaction ID for audit trail
+        return new TradeResult(transaction.getId(), symbol, quantity, price, savedAccount.getBalance());
     }
 
     /**

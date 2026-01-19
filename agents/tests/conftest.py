@@ -206,17 +206,20 @@ def mock_broadcast_status(mocker):
 
 @pytest.fixture
 def mock_run_tracking(mocker):
-    """Mock run tracking functions."""
-    start_run = mocker.patch("agent_executor.start_run")
-    end_run = mocker.patch("agent_executor.end_run")
-    mark_error = mocker.patch("agent_executor.mark_run_as_error")
+    """Mock run tracking functions (new phase-based API)."""
+    create_run = mocker.patch("agent_executor.create_run")
+    update_phase = mocker.patch("agent_executor.update_phase")
+    complete_run = mocker.patch("agent_executor.complete_run")
 
-    start_run.return_value = 123  # Sample run ID
+    # create_run returns run_id, update_phase/complete_run return bool
+    create_run.return_value = 123  # Sample run ID
+    update_phase.return_value = True
+    complete_run.return_value = True
 
     return {
-        "start_run": start_run,
-        "end_run": end_run,
-        "mark_run_as_error": mark_error,
+        "create_run": create_run,
+        "update_phase": update_phase,
+        "complete_run": complete_run,
     }
 
 
