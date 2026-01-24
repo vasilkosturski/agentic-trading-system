@@ -12,6 +12,7 @@ import java.util.List;
 public class AgentDetailDto {
     private Long id;
     private String name;
+    private String style;
     private String strategy;
     private Double initialCapital;
     private PortfolioInfo portfolio;

@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 public class AgentSummaryDto {
     private Long id;
     private String name;
+    private String style;
     private String strategy;
     private boolean active;
     private String lastActivity;

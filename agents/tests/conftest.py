@@ -56,6 +56,18 @@ def sample_agent_name() -> str:
 
 
 @pytest.fixture
+def sample_agent_style() -> str:
+    """Sample agent style for testing (two-agent architecture)."""
+    return "Value Investor"
+
+
+@pytest.fixture
+def sample_model_name() -> str:
+    """Sample model name for testing."""
+    return "gpt-4o-mini"
+
+
+@pytest.fixture
 def sample_strategy() -> str:
     """Sample investment strategy for testing."""
     return """Value investing strategy focused on:
@@ -130,6 +142,29 @@ def sample_decision() -> TradingDecision:
             "insights": []
         })
     )
+
+
+@pytest.fixture
+def sample_research_response():
+    """Sample research response from Market Analyst for testing (two-agent architecture)."""
+    from models.llm_output import ResearchResponse, ResearchSource
+    return ResearchResponse(
+        summary="Found 3 value stocks: JPM, BAC, WFC. All show strong fundamentals with P/E ratios under 15 and solid dividend yields.",
+        candidates=["JPM", "BAC", "WFC"],
+        sources=[
+            ResearchSource(title="JPMorgan Q4 Earnings Beat Expectations", url="https://example.com/jpm-earnings"),
+            ResearchSource(title="Bank Sector Analysis 2025", url="https://example.com/bank-analysis"),
+            ResearchSource(title="Wells Fargo Recovery Story", url="https://example.com/wfc-recovery"),
+        ]
+    )
+
+
+@pytest.fixture
+def mock_mcp_pool():
+    """Mock MCP pool for two-agent architecture testing."""
+    pool = MagicMock()
+    pool.get_server = AsyncMock(return_value=MagicMock())  # Returns mock MCP server
+    return pool
 
 
 @pytest.fixture

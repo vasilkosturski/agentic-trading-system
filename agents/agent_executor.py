@@ -13,18 +13,9 @@ from typing import Any, Dict, List, Literal, Optional, Protocol
 
 from agents import Agent, Runner
 
-
-class BuildMessageFn(Protocol):
-    """Callback to build the agent prompt message."""
-    def __call__(self, historical_context: str, force_trade: bool) -> str: ...
-
-
-class CreateAgentFn(Protocol):
-    """Async callback to create an Agent instance."""
-    async def __call__(self, executor: 'AgentExecutor') -> Agent: ...
-
 # Import type-safe models
-from models import TradingDecision
+from models import TradingDecision, ResearchResponse
+from pydantic import ValidationError
 from models.run_tracking import (
     CompleteRunData,
     DecisionToolCallDto,
@@ -48,6 +39,12 @@ from memory_tools import get_recent_activity
 # Import new run tracking
 from run_tracking import create_run, update_phase, complete_run
 
+# Import SDK parsing utilities
+from utils.sdk_parser import (
+    TOOL_RESEARCHER,
+    extract_tool_calls,
+)
+
 # Import status broadcasting
 from status_broadcaster import (
     broadcast_status,
@@ -61,6 +58,10 @@ from status_broadcaster import (
 
 # Import tool tracking
 from tool_tracking import ToolTracker
+
+# Import two-agent architecture
+from market_analyst import create_market_analyst_agent, build_research_prompt
+from decision_maker import create_decision_maker_agent, build_decision_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -77,17 +78,28 @@ class AgentExecutor:
     - ERROR: Run failed
     """
 
-    def __init__(self, agent_id: int, name: str, strategy: str):
+    def __init__(
+        self,
+        agent_id: int,
+        name: str,
+        agent_style: str,
+        strategy: str,
+        model_name: str = "gpt-4o-mini",
+    ):
         """Initialize executor with agent identity.
 
         Args:
             agent_id: Unique agent identifier
             name: Agent name (e.g., "Warren")
+            agent_style: Investment style (e.g., "Value Investor")
             strategy: Investment strategy description
+            model_name: Model to use for agents (default: gpt-4o-mini)
         """
         self.agent_id = agent_id
         self.name = name
+        self.agent_style = agent_style
         self.strategy = strategy
+        self.model_name = model_name
 
         # Per-run execution state
         self.current_run_id: Optional[int] = None
@@ -105,9 +117,6 @@ class AgentExecutor:
         self.research_tool_calls: List[ResearchToolCallDto] = []
         self.research_notes: str = ""
 
-        self.decision_sources: List[SourceDto] = []
-        self.decision_tool_calls: List[DecisionToolCallDto] = []
-
         # Execution phase data
         self.trade_id: Optional[int] = None
         self.execution_status: Optional[PhaseStatus] = None
@@ -115,28 +124,28 @@ class AgentExecutor:
 
     async def execute_cycle(
         self,
-        build_message_fn: BuildMessageFn,
-        create_agent_fn: CreateAgentFn,
+        mcp_pool,  # MCPPool
         force_trade: bool = False,
     ) -> Dict[str, Any]:
-        """Execute one complete portfolio review cycle with clear phases.
+        """Execute one complete portfolio review cycle with TWO-AGENT architecture.
 
         Args:
-            build_message_fn: Function that builds agent message (historical_context, force_trade) -> str
-            create_agent_fn: Async function that creates agent (executor) -> Agent
+            mcp_pool: MCP pool for creating agents
             force_trade: If True, agent must make BUY/SELL (no HOLD)
 
         Returns:
             Dict with cycle results (decision, trade_count, summary)
 
-        Phases:
+        Phases (two-agent architecture):
         1. Initialize: Create run, update to RESEARCHING
         2. Prepare context: Pre-fetch historical data
-        3. Create agent: Build agent with tools
-        4. Run agent: Execute agent with message
-        5. Parse results: Extract decision, update to DECIDING
+        3. Run Market Analyst: Research phase (RESEARCHING)
+        4. Run Decision Maker: Decision phase (DECIDING)
+        5. Validate results: Ensure decision was recorded
         6. Execute decision: Update to TRADING (if BUY/SELL), execute trade
         7. Finalize: Complete run with all phase data
+
+        Note: Old Phase 3 "Create agent" removed - agents now created in Phases 3 & 4
         """
         run_id = None
 
@@ -151,16 +160,18 @@ class AgentExecutor:
             # Phase 2: Prepare context (pre-fetch data)
             context = await self._phase2_prepare_context()
 
-            # Phase 3: Create agent with tools
-            agent = await self._phase3_create_agent(create_agent_fn)
-
-            # Phase 4: Run agent
-            result = await self._phase4_run_agent(
-                agent, build_message_fn, context, force_trade
+            # Phase 3: Run Market Analyst (RESEARCHING phase)
+            research_response = await self._phase3_run_market_analyst(
+                mcp_pool, context
             )
 
-            # Phase 5: Parse results and tool usage
-            await self._phase5_parse_results(result)
+            # Phase 4: Run Decision Maker (DECIDING phase)
+            await self._phase4_run_decision_maker(
+                mcp_pool, research_response, context, force_trade
+            )
+
+            # Phase 5: Validate results (decision already stored by decide_action tool)
+            await self._phase5_validate_results()
 
             # Phase 6: Execute decision
             await self._phase6_execute_decision()
@@ -272,53 +283,107 @@ class AgentExecutor:
             "historical_context": recent_activity_json,
         }
 
-    async def _phase3_create_agent(self, create_agent_fn: CreateAgentFn) -> Agent:
-        """Phase 3: Create agent with tools.
+    async def _phase3_run_market_analyst(
+        self, mcp_pool, context: Dict[str, Any]
+    ) -> ResearchResponse:
+        """Phase 3: Run Market Analyst agent (RESEARCHING phase).
 
         Args:
-            create_agent_fn: Async function that creates agent with tools
+            mcp_pool: MCP pool for creating agent
+            context: Dict with account data
 
         Returns:
-            Agent instance ready to run
+            ResearchResponse with candidates and sources
         """
-        agent = await create_agent_fn(self)
-        return agent
+        # Get current account state for research context
+        balance = await _get_balance_raw(self.agent_id)
+        holdings = await _get_holdings_raw(self.agent_id)
+        position_count = len(holdings)
 
-    async def _phase4_run_agent(
-        self,
-        agent: Agent,
-        build_message_fn: BuildMessageFn,
-        context: Dict[str, Any],
-        force_trade: bool,
-    ) -> Any:
-        """Phase 4: Generate message and run agent.
+        # Build holdings summary
+        if holdings:
+            symbols = [h.symbol for h in holdings[:5]]
+            holdings_summary = ", ".join(symbols) + ("..." if len(holdings) > 5 else "")
+        else:
+            holdings_summary = "None"
 
-        Args:
-            agent: Agent instance to run
-            build_message_fn: Function that builds agent message
-            context: Dict with historical_context (baseline recent activity)
-            force_trade: If True, agent must make BUY/SELL (no HOLD)
+        # Create Market Analyst agent
+        analyst = await create_market_analyst_agent(
+            agent_name=self.name,
+            agent_style=self.agent_style,
+            strategy=self.strategy,
+            mcp_pool=mcp_pool,
+            model_name=self.model_name,
+        )
 
-        Returns:
-            Agent result object
-        """
-        message = build_message_fn(context["historical_context"], force_trade)
-        result = await Runner.run(agent, message, max_turns=30)
-        return result
+        # Build research prompt
+        research_prompt = build_research_prompt(
+            agent_name=self.name,
+            agent_style=self.agent_style,
+            balance=balance,
+            position_count=position_count,
+            max_positions=10,
+            holdings_summary=holdings_summary,
+            historical_context=context.get("historical_context", "{}"),
+            force_trade=False,  # Research phase doesn't care about force_trade
+        )
 
-    async def _phase5_parse_results(self, result) -> None:
-        """Phase 5: Parse agent output, collect research data, transition to DECIDING.
+        logger.info(f"🔬 Running Market Analyst for {self.name}...")
 
-        Args:
-            result: Agent result object with new_items (OpenAI Agents SDK)
-        """
+        # Run Market Analyst
+        result = await Runner.run(analyst, research_prompt, max_turns=30)
+
+        # Extract ResearchResponse from result
+        if hasattr(result, 'output') and result.output:
+            research_response = result.output  # Already typed as ResearchResponse
+        else:
+            # Fallback if output not typed
+            logger.warning("Market Analyst result missing typed output, using empty response")
+            research_response = ResearchResponse(
+                summary="Research phase completed with no output",
+                sources=[],
+            )
+
+        # Collect research phase data
+        self.research_candidates = getattr(research_response, 'candidates', []) if hasattr(research_response, 'candidates') else []
+        self.research_sources = [
+            SourceDto(
+                type="web",
+                title=source.title,
+                url=source.url,
+            )
+            for source in research_response.sources
+        ]
+        self.research_notes = research_response.summary
+
         # Calculate research latency
-        research_latency_ms = None
         if self.research_start_time:
             research_latency_ms = int(
                 (datetime.now() - self.research_start_time).total_seconds() * 1000
             )
+            logger.info(f"📊 Market Analyst completed in {research_latency_ms}ms")
 
+        logger.info(
+            f"✅ Market Analyst found {len(self.research_candidates)} candidates with {len(self.research_sources)} sources"
+        )
+
+        return research_response
+
+    async def _phase4_run_decision_maker(
+        self,
+        mcp_pool,
+        research_response: ResearchResponse,
+        context: Dict[str, Any],
+        force_trade: bool,
+    ) -> None:
+        """Phase 4: Run Decision Maker agent (DECIDING phase).
+
+        Args:
+            mcp_pool: MCP pool for creating agent
+            research_response: Market Analyst research results
+            context: Dict with historical_context
+            force_trade: If True, agent must make BUY/SELL (no HOLD)
+        """
         # Update to DECIDING phase
         if self.current_run_id:
             await update_phase(self.current_run_id, "DECIDING")
@@ -329,76 +394,80 @@ class AgentExecutor:
             self.agent_id, self.name, PHASE_DECIDING, "Making investment decision", 70
         )
 
-        research_conducted = False
-        tool_name_by_call_id: Dict[str, str] = {}
+        # Get current account state
+        balance = await _get_balance_raw(self.agent_id)
+        holdings = await _get_holdings_raw(self.agent_id)
+        position_count = len(holdings)
 
-        if not result or not hasattr(result, "new_items"):
-            logger.warning("No new_items in agent result - skipping tool parsing")
-            return
+        # Build holdings summary
+        if holdings:
+            symbols = [h.symbol for h in holdings[:5]]
+            holdings_summary = ", ".join(symbols) + ("..." if len(holdings) > 5 else "")
+        else:
+            holdings_summary = "None"
 
-        logger.info(f"📋 Parsing {len(result.new_items)} items from agent result")
+        # Create Decision Maker agent
+        trader = await create_decision_maker_agent(
+            agent_name=self.name,
+            agent_style=self.agent_style,
+            strategy=self.strategy,
+            executor=self,
+            mcp_pool=mcp_pool,
+            model_name=self.model_name,
+        )
 
-        for i, item in enumerate(result.new_items):
-            tool_name = None
-            call_id = None
+        # Build decision prompt
+        decision_prompt = build_decision_prompt(
+            agent_name=self.name,
+            agent_style=self.agent_style,
+            research_response=research_response,
+            balance=balance,
+            position_count=position_count,
+            max_positions=10,
+            holdings_summary=holdings_summary,
+            historical_context=context.get("historical_context", ""),
+            force_trade=force_trade,
+        )
 
-            # Extract tool name and call_id from raw_item
-            if hasattr(item, 'raw_item') and item.raw_item is not None:
-                raw_item = item.raw_item
-                if hasattr(raw_item, 'name'):
-                    name = getattr(raw_item, 'name')
-                    if name and isinstance(name, str):
-                        tool_name = name
-                if hasattr(raw_item, 'call_id'):
-                    call_id = getattr(raw_item, 'call_id')
+        logger.info(f"🧠 Running Decision Maker for {self.name}...")
 
-            if not call_id and hasattr(item, 'call_id'):
-                call_id = getattr(item, 'call_id')
+        # Run Decision Maker agent
+        result = await Runner.run(trader, decision_prompt, max_turns=30)
 
-            if tool_name and call_id:
-                tool_name_by_call_id[call_id] = tool_name
-
-            if not tool_name and call_id and call_id in tool_name_by_call_id:
-                tool_name = tool_name_by_call_id[call_id]
-
-            if not tool_name:
-                continue
-
-            logger.info(f"  🔧 Tool call: {tool_name}")
-
-            # Extract tool output
-            tool_result_full = ""
-            if hasattr(item, "output"):
-                tool_result_full = str(item.output)
-            elif hasattr(item, "content"):
-                tool_result_full = str(item.content)
-
-            # Log tool call for audit trail
-            if self.tracker:
-                self.tracker.log_tool_call(tool_name, {}, tool_result_full[:300])
-
-            # Track research tool calls
-            self.research_tool_calls.append(
-                ResearchToolCallDto(tool=tool_name, durationMs=None)
+        # Decision is already stored by decide_action tool in self.last_decision
+        if not self.last_decision:
+            raise RuntimeError(
+                f"{self.name} completed decision phase but did not call decide_action tool"
             )
 
-            # Special handling for Researcher tool - extract sources
-            if tool_name == "Researcher":
-                research_conducted = True
-                self._process_researcher_output(tool_result_full, result.new_items, i)
+        logger.info(
+            f"✅ Decision Maker: {self.last_decision.action} {self.last_decision.symbol or ''}"
+        )
 
-        # Build research notes
-        if research_conducted:
-            research_count = len(self.tracker.research_queries) if self.tracker else 0
-            if research_count > 1:
-                self.research_notes = f"Conducted {research_count} research queries."
-            else:
-                self.research_notes = "Completed market research and analysis."
-        else:
-            self.research_notes = "Analysis completed without external research."
+        # Calculate decision latency
+        if self.decision_start_time:
+            decision_latency_ms = int(
+                (datetime.now() - self.decision_start_time).total_seconds() * 1000
+            )
+            logger.info(f"📊 Decision Maker completed in {decision_latency_ms}ms")
 
-        if self.tracker:
-            self.tracker.log_reasoning("research", "Research completed", self.research_notes)
+    async def _phase5_validate_results(self) -> None:
+        """Phase 5: Validate results from two-agent flow.
+
+        In the two-agent architecture, all data collection is done in Phase 3 and 4.
+        This phase just validates that we have a decision.
+        """
+        # Validate we have a decision
+        if not self.last_decision:
+            raise RuntimeError(
+                f"{self.name} reached Phase 5 but no decision was recorded. "
+                "Decision Maker agent should have called decide_action tool."
+            )
+
+        logger.info(
+            f"✅ Phase 5: Validated decision: {self.last_decision.action} "
+            f"{self.last_decision.symbol or ''}"
+        )
 
     async def _phase6_execute_decision(self) -> None:
         """Phase 6: Execute BUY/SELL/HOLD decision.
@@ -539,8 +608,6 @@ class AgentExecutor:
             symbol=symbol,
             quantity=quantity,
             reasoning=reasoning,
-            decisionSources=self.decision_sources,
-            decisionToolCalls=self.decision_tool_calls,
             decisionLatencyMs=decision_latency_ms,
             # Execution phase
             tradeId=self.trade_id,
@@ -611,8 +678,6 @@ class AgentExecutor:
         self.research_sources = []
         self.research_tool_calls = []
         self.research_notes = ""
-        self.decision_sources = []
-        self.decision_tool_calls = []
         self.trade_id = None
         self.execution_status = None
         self.execution_error = None
@@ -631,22 +696,17 @@ class AgentExecutor:
         query = "Market research"
         result_summary = "Research completed"
 
-        # Try to parse JSON response from Researcher
+        # Parse typed ResearchResponse from Researcher (enforced by output_type)
         try:
-            research_json = json.loads(tool_result)
-            if isinstance(research_json, dict):
-                if "sources" in research_json and isinstance(research_json["sources"], list):
-                    sources = research_json["sources"]
-                if "summary" in research_json:
-                    result_summary = str(research_json["summary"])
-                # Extract candidates if present
-                if "candidates" in research_json and isinstance(research_json["candidates"], list):
-                    for candidate in research_json["candidates"]:
-                        if isinstance(candidate, str) and candidate not in self.research_candidates:
-                            self.research_candidates.append(candidate)
-        except json.JSONDecodeError:
-            sources = self._extract_urls_from_text(tool_result)
-            result_summary = self._parse_research_summary(tool_result, sources)
+            research = ResearchResponse.model_validate_json(tool_result)
+            result_summary = research.summary
+            # Convert ResearchSource objects to dicts for backwards compatibility
+            sources = [{"title": src.title, "url": src.url} for src in research.sources]
+        except ValidationError as e:
+            logger.error(f"Failed to parse ResearchResponse (should not happen with output_type): {e}")
+            # If this happens, the SDK's output_type enforcement failed
+            result_summary = "Research completed (parsing failed)"
+            sources = []
 
         # Try to find the original query
         if current_index > 0:
@@ -682,76 +742,6 @@ class AgentExecutor:
 
         if self.tracker:
             self.tracker.log_research_query(query, result_summary, sources)
-
-    def _extract_urls_from_text(self, text: str) -> List[Dict[str, str]]:
-        """Extract URLs and titles from Researcher's SOURCE citations.
-
-        Args:
-            text: Text containing SOURCE citations in format [SOURCE: Title](URL)
-
-        Returns:
-            List of dicts with 'title' and 'url' keys
-        """
-        import re
-
-        sources = []
-
-        # Pattern 1: SOURCE citations (priority) - [SOURCE: Title](URL)
-        source_pattern = r"\[SOURCE:\s*([^\]]+)\]\(([^)]+)\)"
-        source_citations = re.findall(source_pattern, text)
-        for title, url in source_citations:
-            if url.startswith("http"):
-                sources.append({"title": title.strip(), "url": url.strip()})
-
-        # Pattern 2: Regular markdown links (fallback) - [Title](URL)
-        if not sources:
-            markdown_links = re.findall(r"\[([^\]]+)\]\(([^)]+)\)", text)
-            for title, url in markdown_links:
-                if url.startswith("http") and "SOURCE" not in title:
-                    sources.append({"title": title.strip(), "url": url.strip()})
-
-        # Pattern 3: Plain URLs (last resort fallback)
-        if not sources:
-            url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
-            urls = re.findall(url_pattern, text)
-            for url in urls[:5]:
-                domain = url.split("//")[-1].split("/")[0]
-                sources.append({"title": domain, "url": url})
-
-        return sources
-
-    def _parse_research_summary(
-        self, research_text: str, sources: List[Dict[str, str]]
-    ) -> str:
-        """Parse research result to create summary with source count.
-
-        Args:
-            research_text: Full research result text (with SOURCE citations)
-            sources: List of extracted URL citations from agent
-
-        Returns:
-            Clean summary of research with source count
-        """
-        if not research_text:
-            return "Research completed"
-
-        import re
-        clean_text = re.sub(r"\[SOURCE:[^\]]+\]\([^)]+\)", "", research_text)
-
-        lines = [
-            line.strip()
-            for line in clean_text.split("\n")
-            if line.strip() and not line.strip().startswith("http")
-        ]
-        summary_text = " ".join(lines)[:250].strip()
-
-        if len(" ".join(lines)) > 250:
-            summary_text += "..."
-
-        if sources:
-            summary_text += f" (Cited {len(sources)} source{'s' if len(sources) != 1 else ''})"
-
-        return summary_text if summary_text else "Research completed"
 
     def store_decision(
         self,
