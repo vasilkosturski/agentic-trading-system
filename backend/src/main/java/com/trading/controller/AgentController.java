@@ -44,6 +44,7 @@ public class AgentController {
                     .map(agent -> new AgentSummaryDto(
                             agent.getId(),
                             agent.getName(),
+                            agent.getStyle(),
                             agent.getDescription(),
                             agent.getIsActive() != null && agent.getIsActive(),
                             agent.getLastActivity() != null ? agent.getLastActivity().toString() : null
@@ -101,9 +102,11 @@ public class AgentController {
 
             // Build response (use description as strategy for now)
             String strategy = agent.getDescription() != null ? agent.getDescription() : "No strategy defined";
+            String style = agent.getStyle() != null ? agent.getStyle() : "Investor";
             AgentDetailDto detail = new AgentDetailDto(
                     agent.getId(),
                     agent.getName(),
+                    style,
                     strategy,
                     initialCapital,
                     portfolio,
