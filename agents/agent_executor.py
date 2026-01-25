@@ -4,17 +4,22 @@ Uses new phase-based Trading Runs API (/api/runs) for tracking:
 - create_run() → POST /api/runs
 - update_phase() → PATCH /api/runs/{id}/phase
 - complete_run() → PUT /api/runs/{id}/complete
+
+Architecture:
+- RunContext dataclass passed through all phases (explicit data flow)
+- No mutable instance state for per-run data
+- Fail-fast error handling (no silent fallbacks)
 """
 
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Literal, Optional, Protocol
+from typing import Literal, Optional
 
-from agents import Agent, Runner
+from agents import Runner
 
-# Import type-safe models
-from models import TradingDecision, ResearchResponse
+from models import TradingDecision, ResearchResponse, CycleResult
+from models.orchestration import RunContext, SharedPhaseContext
 from pydantic import ValidationError
 from models.run_tracking import (
     CompleteRunData,
@@ -76,6 +81,11 @@ class AgentExecutor:
     - TRADING: Trade execution (BUY/SELL only)
     - COMPLETED: Run finished successfully
     - ERROR: Run failed
+    
+    Data Flow:
+    - RunContext created in Phase 1 with guaranteed non-None values
+    - Context passed through all phases explicitly
+    - No instance variables for per-run state (only agent identity)
     """
 
     def __init__(
@@ -95,38 +105,22 @@ class AgentExecutor:
             strategy: Investment strategy description
             model_name: Model to use for agents (default: gpt-4o-mini)
         """
+        # Agent identity (immutable for lifetime of executor)
         self.agent_id = agent_id
         self.name = name
         self.agent_style = agent_style
         self.strategy = strategy
         self.model_name = model_name
-
-        # Per-run execution state
-        self.current_run_id: Optional[int] = None
-        self.trade_count: int = 0
-        self.last_decision: Optional[TradingDecision] = None
-        self.tracker: Optional[ToolTracker] = None
-
-        # Phase timing
-        self.research_start_time: Optional[datetime] = None
-        self.decision_start_time: Optional[datetime] = None
-
-        # Phase data collection
-        self.research_candidates: List[str] = []
-        self.research_sources: List[SourceDto] = []
-        self.research_tool_calls: List[ResearchToolCallDto] = []
-        self.research_notes: str = ""
-
-        # Execution phase data
-        self.trade_id: Optional[int] = None
-        self.execution_status: Optional[PhaseStatus] = None
-        self.execution_error: Optional[str] = None
+        
+        # Decision storage - needed for decide_action tool callback
+        # This is the only mutable state, set by Decision Maker's tool call
+        self._pending_decision: Optional[TradingDecision] = None
 
     async def execute_cycle(
         self,
         mcp_pool,  # MCPPool
         force_trade: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> CycleResult:
         """Execute one complete portfolio review cycle with TWO-AGENT architecture.
 
         Args:
@@ -134,77 +128,67 @@ class AgentExecutor:
             force_trade: If True, agent must make BUY/SELL (no HOLD)
 
         Returns:
-            Dict with cycle results (decision, trade_count, summary)
+            CycleResult with decision, trade_count, and run_id
 
         Phases (two-agent architecture):
-        1. Initialize: Create run, update to RESEARCHING
-        2. Prepare context: Pre-fetch historical data
+        1. Initialize: Create run, return RunContext
+        2. Prepare context: Pre-fetch historical data, return SharedPhaseContext
         3. Run Market Analyst: Research phase (RESEARCHING)
         4. Run Decision Maker: Decision phase (DECIDING)
-        5. Validate results: Ensure decision was recorded
-        6. Execute decision: Update to TRADING (if BUY/SELL), execute trade
-        7. Finalize: Complete run with all phase data
-
-        Note: Old Phase 3 "Create agent" removed - agents now created in Phases 3 & 4
+        5. Execute decision: Validate + execute trade (TRADING if BUY/SELL)
+        6. Finalize: Complete run with all phase data
         """
-        run_id = None
+        ctx: Optional[RunContext] = None
 
         print(
             f"🤖 {self.name} starting portfolio review at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
 
         try:
-            # Phase 1: Start run tracking and setup
-            run_id = await self._phase1_start_run()
+            # Phase 1: Start run tracking and setup - returns RunContext
+            ctx = await self._phase1_start_run()
 
-            # Phase 2: Prepare context (pre-fetch data)
-            context = await self._phase2_prepare_context()
+            # Phase 2: Prepare context (pre-fetch data) - updates ctx.shared_context
+            await self._phase2_prepare_context(ctx)
 
-            # Phase 3: Run Market Analyst (RESEARCHING phase)
-            research_response = await self._phase3_run_market_analyst(
-                mcp_pool, context
-            )
+            # Phase 3: Run Market Analyst (RESEARCHING phase) - updates ctx
+            await self._phase3_run_market_analyst(ctx, mcp_pool)
 
-            # Phase 4: Run Decision Maker (DECIDING phase)
-            await self._phase4_run_decision_maker(
-                mcp_pool, research_response, context, force_trade
-            )
+            # Phase 4: Run Decision Maker (DECIDING phase) - updates ctx.decision
+            await self._phase4_run_decision_maker(ctx, mcp_pool, force_trade)
 
-            # Phase 5: Validate results (decision already stored by decide_action tool)
-            await self._phase5_validate_results()
+            # Phase 5: Execute decision (includes validation)
+            await self._phase5_execute_decision(ctx)
 
-            # Phase 6: Execute decision
-            await self._phase6_execute_decision()
-
-            # Phase 7: Finalize cycle
-            await self._phase7_finalize(run_id)
+            # Phase 6: Finalize cycle
+            await self._phase6_finalize(ctx)
 
             print(
                 f"✅ {self.name} completed portfolio review at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             )
 
-            return {
-                "decision": self.last_decision,
-                "trade_count": self.trade_count,
-                "run_id": run_id,
-            }
+            return CycleResult(
+                decision=ctx.decision,
+                trade_count=ctx.trade_count,
+                run_id=ctx.run_id,
+            )
 
         except Exception as e:
-            await self._handle_cycle_error(e, run_id)
+            await self._handle_cycle_error(e, ctx)
             raise
 
         finally:
-            self._cleanup()
+            # Clear pending decision for next cycle
+            self._pending_decision = None
 
-    async def _phase1_start_run(self) -> int:
+    async def _phase1_start_run(self) -> RunContext:
         """Phase 1: Create run and transition to RESEARCHING.
 
         Returns:
-            run_id for tracking this cycle
+            RunContext with guaranteed non-None run_id and timestamps
 
         Raises:
-            RuntimeError: If agent_id is not set
-            Exception: If run creation fails
+            RuntimeError: If agent_id is not set or run creation fails
         """
         # Initialize agent account (direct function call, not through agent)
         await initialize_agent(self.name)
@@ -222,24 +206,30 @@ class AgentExecutor:
         # Create run via new API (POST /api/runs)
         run_id = await create_run(self.agent_id)
         if run_id is None:
-            error_msg = f"CRITICAL: Failed to create run for {self.name}. Cannot proceed without runId."
-            logger.error(f"🔴 {error_msg}")
-            raise Exception(error_msg)
-
-        self.current_run_id = run_id
-        self.trade_count = 0
+            raise RuntimeError(
+                f"Failed to create run for {self.name}. Cannot proceed without runId."
+            )
 
         # Update to RESEARCHING phase
         await update_phase(run_id, "RESEARCHING")
-        self.research_start_time = datetime.now()
+        research_start_time = datetime.now()
 
         # Broadcast: RESEARCHING
         broadcast_status(
             self.agent_id, self.name, PHASE_RESEARCHING, "Researching market", 20
         )
 
-        # Initialize tool tracker for local data collection
-        self.tracker = ToolTracker(run_id)
+        # Create RunContext with all guaranteed values
+        ctx = RunContext(
+            run_id=run_id,
+            agent_id=self.agent_id,
+            agent_name=self.name,
+            agent_style=self.agent_style,
+            strategy=self.strategy,
+            model_name=self.model_name,
+            research_start_time=research_start_time,
+            tracker=ToolTracker(run_id),
+        )
 
         # Fetch balance and holdings for logging
         balance = await _get_balance_raw(self.agent_id)
@@ -248,282 +238,246 @@ class AgentExecutor:
         # Log initial data access for transparency
         portfolio_info = f"Balance: ${balance:.2f}"
         if holdings:
-            symbols = [h.symbol for h in holdings[:5]]
-            positions_str = ", ".join(symbols) + ("..." if len(holdings) > 5 else "")
+            symbols = [h.symbol for h in holdings]
+            positions_str = ", ".join(symbols)
             portfolio_info += f", Holdings: {len(holdings)} position(s) ({positions_str})"
         else:
             portfolio_info += ", Holdings: None"
 
-        self.tracker.log_data_access("Portfolio", portfolio_info)
+        ctx.tracker.log_data_access("Portfolio", portfolio_info)
 
         # Add system context source
-        self.research_sources.append(
+        ctx.research_sources.append(
             SourceDto.system_context(f"Portfolio context: {portfolio_info}")
         )
 
-        return run_id
+        return ctx
 
-    async def _phase2_prepare_context(self) -> Dict[str, Any]:
+    async def _phase2_prepare_context(self, ctx: RunContext) -> None:
         """Phase 2: Prepare baseline context (recent activity).
 
-        Returns:
-            Dict with historical_context (baseline recent activity)
+        Args:
+            ctx: RunContext to update with shared_context
         """
         # Fetch recent activity (last 30 days) as baseline context
-        recent_activity_json = await get_recent_activity(self.name, days=30)
+        recent_activity_json = await get_recent_activity(ctx.agent_name, days=30)
 
         logger.info(f"📊 Baseline context prepared: recent activity (30 days)")
 
         # Add system context source for recent activity
-        self.research_sources.append(
+        ctx.research_sources.append(
             SourceDto.system_context("Retrieved 30-day trading activity history")
         )
 
-        return {
-            "historical_context": recent_activity_json,
-        }
+        # Store in context
+        ctx.shared_context = SharedPhaseContext(
+            historical_context=recent_activity_json
+        )
 
     async def _phase3_run_market_analyst(
-        self, mcp_pool, context: Dict[str, Any]
-    ) -> ResearchResponse:
+        self, ctx: RunContext, mcp_pool
+    ) -> None:
         """Phase 3: Run Market Analyst agent (RESEARCHING phase).
 
         Args:
+            ctx: RunContext to update with research results
             mcp_pool: MCP pool for creating agent
-            context: Dict with account data
-
-        Returns:
-            ResearchResponse with candidates and sources
         """
         # Get current account state for research context
-        balance = await _get_balance_raw(self.agent_id)
-        holdings = await _get_holdings_raw(self.agent_id)
+        balance = await _get_balance_raw(ctx.agent_id)
+        holdings = await _get_holdings_raw(ctx.agent_id)
         position_count = len(holdings)
 
-        # Build holdings summary
-        if holdings:
-            symbols = [h.symbol for h in holdings[:5]]
-            holdings_summary = ", ".join(symbols) + ("..." if len(holdings) > 5 else "")
-        else:
-            holdings_summary = "None"
+        # Build holdings summary - show all (max 10 positions per agent)
+        holdings_summary = ", ".join(h.symbol for h in holdings) if holdings else "None"
 
         # Create Market Analyst agent
         analyst = await create_market_analyst_agent(
-            agent_name=self.name,
-            agent_style=self.agent_style,
-            strategy=self.strategy,
+            agent_name=ctx.agent_name,
             mcp_pool=mcp_pool,
-            model_name=self.model_name,
+            model_name=ctx.model_name,
         )
 
         # Build research prompt
+        historical_context = ctx.shared_context.historical_context if ctx.shared_context else "{}"
         research_prompt = build_research_prompt(
-            agent_name=self.name,
-            agent_style=self.agent_style,
+            agent_name=ctx.agent_name,
+            agent_style=ctx.agent_style,
             balance=balance,
             position_count=position_count,
             max_positions=10,
             holdings_summary=holdings_summary,
-            historical_context=context.get("historical_context", "{}"),
-            force_trade=False,  # Research phase doesn't care about force_trade
+            historical_context=historical_context,
+            force_trade=False,
         )
 
-        logger.info(f"🔬 Running Market Analyst for {self.name}...")
+        logger.info(f"🔬 Running Market Analyst for {ctx.agent_name}...")
 
         # Run Market Analyst
         result = await Runner.run(analyst, research_prompt, max_turns=30)
 
-        # Extract ResearchResponse from result
-        if hasattr(result, 'output') and result.output:
-            research_response = result.output  # Already typed as ResearchResponse
-        else:
-            # Fallback if output not typed
-            logger.warning("Market Analyst result missing typed output, using empty response")
-            research_response = ResearchResponse(
-                summary="Research phase completed with no output",
-                sources=[],
+        # Extract ResearchResponse - FAIL FAST if no output
+        if not hasattr(result, 'output') or not result.output:
+            raise RuntimeError(
+                f"Market Analyst for {ctx.agent_name} failed to produce structured output. "
+                f"Result type: {type(result)}, has output attr: {hasattr(result, 'output')}"
             )
+        research_response = result.output
 
-        # Collect research phase data
-        self.research_candidates = getattr(research_response, 'candidates', []) if hasattr(research_response, 'candidates') else []
-        self.research_sources = [
-            SourceDto(
-                type="web",
-                title=source.title,
-                url=source.url,
-            )
+        # Update context with research results
+        ctx.research_response = research_response
+        ctx.research_candidates = research_response.candidates if hasattr(research_response, 'candidates') else []
+        ctx.research_sources.extend([
+            SourceDto.web(title=source.title, url=source.url)
             for source in research_response.sources
-        ]
-        self.research_notes = research_response.summary
+        ])
+        ctx.research_notes = research_response.summary
 
         # Calculate research latency
-        if self.research_start_time:
-            research_latency_ms = int(
-                (datetime.now() - self.research_start_time).total_seconds() * 1000
-            )
-            logger.info(f"📊 Market Analyst completed in {research_latency_ms}ms")
+        research_latency_ms = int(
+            (datetime.now() - ctx.research_start_time).total_seconds() * 1000
+        )
+        logger.info(f"📊 Market Analyst completed in {research_latency_ms}ms")
 
         logger.info(
-            f"✅ Market Analyst found {len(self.research_candidates)} candidates with {len(self.research_sources)} sources"
+            f"✅ Market Analyst found {len(ctx.research_candidates)} candidates "
+            f"with {len(ctx.research_sources)} sources"
         )
-
-        return research_response
 
     async def _phase4_run_decision_maker(
         self,
+        ctx: RunContext,
         mcp_pool,
-        research_response: ResearchResponse,
-        context: Dict[str, Any],
         force_trade: bool,
     ) -> None:
         """Phase 4: Run Decision Maker agent (DECIDING phase).
 
         Args:
+            ctx: RunContext to update with decision
             mcp_pool: MCP pool for creating agent
-            research_response: Market Analyst research results
-            context: Dict with historical_context
             force_trade: If True, agent must make BUY/SELL (no HOLD)
         """
         # Update to DECIDING phase
-        if self.current_run_id:
-            await update_phase(self.current_run_id, "DECIDING")
-        self.decision_start_time = datetime.now()
+        await update_phase(ctx.run_id, "DECIDING")
+        ctx.decision_start_time = datetime.now()
 
         # Broadcast: DECIDING
         broadcast_status(
-            self.agent_id, self.name, PHASE_DECIDING, "Making investment decision", 70
+            ctx.agent_id, ctx.agent_name, PHASE_DECIDING, "Making investment decision", 70
         )
 
         # Get current account state
-        balance = await _get_balance_raw(self.agent_id)
-        holdings = await _get_holdings_raw(self.agent_id)
+        balance = await _get_balance_raw(ctx.agent_id)
+        holdings = await _get_holdings_raw(ctx.agent_id)
         position_count = len(holdings)
 
         # Build holdings summary
-        if holdings:
-            symbols = [h.symbol for h in holdings[:5]]
-            holdings_summary = ", ".join(symbols) + ("..." if len(holdings) > 5 else "")
-        else:
-            holdings_summary = "None"
+        holdings_summary = ", ".join(h.symbol for h in holdings) if holdings else "None"
 
         # Create Decision Maker agent
         trader = await create_decision_maker_agent(
-            agent_name=self.name,
-            agent_style=self.agent_style,
-            strategy=self.strategy,
+            agent_name=ctx.agent_name,
             executor=self,
             mcp_pool=mcp_pool,
-            model_name=self.model_name,
+            model_name=ctx.model_name,
         )
 
         # Build decision prompt
+        historical_context = ctx.shared_context.historical_context if ctx.shared_context else ""
         decision_prompt = build_decision_prompt(
-            agent_name=self.name,
-            agent_style=self.agent_style,
-            research_response=research_response,
+            agent_name=ctx.agent_name,
+            agent_style=ctx.agent_style,
+            research_response=ctx.research_response,
             balance=balance,
             position_count=position_count,
             max_positions=10,
             holdings_summary=holdings_summary,
-            historical_context=context.get("historical_context", ""),
+            historical_context=historical_context,
             force_trade=force_trade,
         )
 
-        logger.info(f"🧠 Running Decision Maker for {self.name}...")
+        logger.info(f"🧠 Running Decision Maker for {ctx.agent_name}...")
 
         # Run Decision Maker agent
-        result = await Runner.run(trader, decision_prompt, max_turns=30)
+        await Runner.run(trader, decision_prompt, max_turns=30)
 
-        # Decision is already stored by decide_action tool in self.last_decision
-        if not self.last_decision:
+        # Decision is stored by decide_action tool in self._pending_decision
+        if not self._pending_decision:
             raise RuntimeError(
-                f"{self.name} completed decision phase but did not call decide_action tool"
+                f"{ctx.agent_name} completed decision phase but did not call decide_action tool"
             )
 
+        # Transfer decision to context
+        ctx.decision = self._pending_decision
+
         logger.info(
-            f"✅ Decision Maker: {self.last_decision.action} {self.last_decision.symbol or ''}"
+            f"✅ Decision Maker: {ctx.decision.action} {ctx.decision.symbol or ''}"
         )
 
         # Calculate decision latency
-        if self.decision_start_time:
-            decision_latency_ms = int(
-                (datetime.now() - self.decision_start_time).total_seconds() * 1000
-            )
-            logger.info(f"📊 Decision Maker completed in {decision_latency_ms}ms")
+        decision_latency_ms = int(
+            (datetime.now() - ctx.decision_start_time).total_seconds() * 1000
+        )
+        logger.info(f"📊 Decision Maker completed in {decision_latency_ms}ms")
 
-    async def _phase5_validate_results(self) -> None:
-        """Phase 5: Validate results from two-agent flow.
+    async def _phase5_execute_decision(self, ctx: RunContext) -> None:
+        """Phase 5: Execute BUY/SELL/HOLD decision.
 
-        In the two-agent architecture, all data collection is done in Phase 3 and 4.
-        This phase just validates that we have a decision.
+        Args:
+            ctx: RunContext with decision to execute
+
+        Updates ctx with execution results (trade_id, trade_count, execution_status).
         """
         # Validate we have a decision
-        if not self.last_decision:
+        if not ctx.decision:
             raise RuntimeError(
-                f"{self.name} reached Phase 5 but no decision was recorded. "
+                f"{ctx.agent_name} reached execution phase but no decision was recorded. "
                 "Decision Maker agent should have called decide_action tool."
             )
 
-        logger.info(
-            f"✅ Phase 5: Validated decision: {self.last_decision.action} "
-            f"{self.last_decision.symbol or ''}"
-        )
-
-    async def _phase6_execute_decision(self) -> None:
-        """Phase 6: Execute BUY/SELL/HOLD decision.
-
-        Updates to TRADING phase for BUY/SELL, captures execution result.
-        """
-        decision = self.last_decision
-
+        decision = ctx.decision
+        logger.info(f"✅ Validated decision: {decision.action} {decision.symbol or ''}")
         logger.info(f"🟡 ABOUT TO EXECUTE: decision={decision}")
 
-        if decision and decision.action in ("BUY", "SELL"):
-            if self.current_run_id is None:
-                error_msg = "CRITICAL: Cannot execute trade - runId is required but not set."
-                logger.error(f"🔴 {error_msg}")
-                raise Exception(error_msg)
-
+        if decision.action in ("BUY", "SELL"):
             action = decision.action
             symbol = decision.symbol
             quantity = decision.quantity
-            rationale = decision.rationale or "Decision"
 
             logger.info(f"🟢 EXECUTING: {action} {quantity} shares of {symbol}")
 
             # Update to TRADING phase
-            await update_phase(self.current_run_id, "TRADING")
+            await update_phase(ctx.run_id, "TRADING")
 
             # Broadcast: TRADING
             broadcast_status(
-                self.agent_id, self.name, PHASE_TRADING, "Executing trade", 90
+                ctx.agent_id, ctx.agent_name, PHASE_TRADING, "Executing trade", 90
             )
 
             try:
                 if action == "BUY":
                     result = await buy_shares(
-                        self.agent_id,
+                        ctx.agent_id,
                         symbol,
                         quantity,
-                        runId=self.current_run_id,
-                        agent_name=self.name,
+                        runId=ctx.run_id,
+                        agent_name=ctx.agent_name,
                     )
                 else:
                     result = await sell_shares(
-                        self.agent_id,
+                        ctx.agent_id,
                         symbol,
                         quantity,
-                        runId=self.current_run_id,
-                        agent_name=self.name,
+                        runId=ctx.run_id,
+                        agent_name=ctx.agent_name,
                     )
 
-                self.trade_count += 1
-                self.execution_status = PhaseStatus.COMPLETED
-                # Capture trade_id from result for audit trail
-                self.trade_id = result.tradeId
+                ctx.trade_count += 1
+                ctx.execution_status = PhaseStatus.COMPLETED
+                ctx.trade_id = result.tradeId
 
-                if self.tracker:
-                    self.tracker.log_reasoning(
+                if ctx.tracker:
+                    ctx.tracker.log_reasoning(
                         "execution",
                         f"Executed {action}",
                         f"Successfully executed {action} {quantity} {symbol}",
@@ -531,77 +485,73 @@ class AgentExecutor:
 
             except Exception as trade_err:
                 logger.error(f"Trade execution failed: {trade_err}")
-                self.execution_status = PhaseStatus.FAILED
-                self.execution_error = str(trade_err)
+                ctx.execution_status = PhaseStatus.FAILED
+                ctx.execution_error = str(trade_err)
 
-                if self.tracker:
-                    self.tracker.log_reasoning(
+                if ctx.tracker:
+                    ctx.tracker.log_reasoning(
                         "execution", f"Failed {action}", f"Trade failed: {str(trade_err)}"
                     )
         else:
             # HOLD decision - no trade execution
-            self.execution_status = PhaseStatus.SKIPPED
+            ctx.execution_status = PhaseStatus.SKIPPED
             summary = decision.rationale if decision else "No decision"
-            if self.tracker:
-                self.tracker.log_reasoning(
+            if ctx.tracker:
+                ctx.tracker.log_reasoning(
                     "decision", "Decided: HOLD", f"No trades. {summary[:200] if summary else ''}"
                 )
 
-    async def _phase7_finalize(self, run_id: int) -> None:
-        """Phase 7: Complete run with all phase data.
+    async def _phase6_finalize(self, ctx: RunContext) -> None:
+        """Phase 6: Complete run with all phase data.
 
         Args:
-            run_id: Run ID to finalize
+            ctx: RunContext with all phase data to persist
         """
-        if run_id is None:
-            return
-
-        # Calculate decision latency
+        # Calculate latencies
         decision_latency_ms = None
-        if self.decision_start_time:
-            decision_latency_ms = int(
-                (datetime.now() - self.decision_start_time).total_seconds() * 1000
-            )
-
-        # Calculate research latency
         research_latency_ms = None
-        if self.research_start_time and self.decision_start_time:
+        
+        if ctx.decision_start_time:
+            decision_latency_ms = int(
+                (datetime.now() - ctx.decision_start_time).total_seconds() * 1000
+            )
+        
+        if ctx.research_start_time and ctx.decision_start_time:
             research_latency_ms = int(
-                (self.decision_start_time - self.research_start_time).total_seconds() * 1000
+                (ctx.decision_start_time - ctx.research_start_time).total_seconds() * 1000
             )
 
         # Determine trade decision
-        decision = self.last_decision
         trade_decision = TradeDecision.HOLD
         symbol = None
         quantity = None
 
-        if decision:
-            if decision.action == "BUY":
+        if ctx.decision:
+            if ctx.decision.action == "BUY":
                 trade_decision = TradeDecision.BUY
-            elif decision.action == "SELL":
+            elif ctx.decision.action == "SELL":
                 trade_decision = TradeDecision.SELL
-            symbol = decision.symbol if decision.action in ("BUY", "SELL") else None
-            quantity = decision.quantity if decision.action in ("BUY", "SELL") else None
+            symbol = ctx.decision.symbol if ctx.decision.action in ("BUY", "SELL") else None
+            quantity = ctx.decision.quantity if ctx.decision.action in ("BUY", "SELL") else None
 
         # Build reasoning DTO from decision
         reasoning = None
-        if decision and decision.fullReasoning:
+        if ctx.decision and ctx.decision.fullReasoning:
             reasoning = ReasoningDto(
                 portfolioContext=None,
                 historicalContext=None,
                 researchSummary=None,
                 candidateEvaluation=None,
-                finalRationale=decision.fullReasoning[:2000]  # Truncate if too long
+                finalRationale=ctx.decision.fullReasoning[:2000]
             )
 
         # Build CompleteRunData
         complete_data = CompleteRunData(
             # Research phase
-            candidates=self.research_candidates,
-            researchSources=self.research_sources,
-            researchNotes=self.research_notes,
-            researchToolCalls=self.research_tool_calls,
+            candidates=ctx.research_candidates,
+            researchSources=ctx.research_sources,
+            researchNotes=ctx.research_notes,
+            researchToolCalls=ctx.research_tool_calls,
             researchLatencyMs=research_latency_ms,
             # Decision phase
             decision=trade_decision,
@@ -610,40 +560,44 @@ class AgentExecutor:
             reasoning=reasoning,
             decisionLatencyMs=decision_latency_ms,
             # Execution phase
-            tradeId=self.trade_id,
-            executionStatus=self.execution_status,
-            errorDetails=self.execution_error,
+            tradeId=ctx.trade_id,
+            executionStatus=ctx.execution_status,
+            errorDetails=ctx.execution_error,
         )
 
-        # Complete the run via new API
-        await complete_run(run_id, complete_data)
+        # Complete the run via API
+        await complete_run(ctx.run_id, complete_data)
 
         # Broadcast: COMPLETED
         outcome_message = (
-            f"Completed - {self.trade_count} trade(s) executed"
-            if self.trade_count > 0
+            f"Completed - {ctx.trade_count} trade(s) executed"
+            if ctx.trade_count > 0
             else "Completed - No trades (HOLD decision)"
         )
         broadcast_status(
-            self.agent_id,
-            self.name,
+            ctx.agent_id,
+            ctx.agent_name,
             PHASE_COMPLETED,
             outcome_message,
             100,
             outcome=outcome_message,
         )
 
-    async def _handle_cycle_error(self, error: Exception, run_id: Optional[int]) -> None:
+    async def _handle_cycle_error(self, error: Exception, ctx: Optional[RunContext]) -> None:
         """Handle cycle execution error.
 
         Args:
             error: Exception that occurred
-            run_id: Run ID if tracking was started
+            ctx: RunContext if available (may be None if Phase 1 failed)
         """
+        agent_id = ctx.agent_id if ctx else self.agent_id
+        agent_name = ctx.agent_name if ctx else self.name
+        run_id = ctx.run_id if ctx else None
+
         # Broadcast: ERROR
         broadcast_status(
-            self.agent_id,
-            self.name,
+            agent_id,
+            agent_name,
             PHASE_ERROR,
             f"Error: {str(error)}",
             0,
@@ -656,34 +610,14 @@ class AgentExecutor:
 
             # Complete with partial data and error
             error_data = CompleteRunData(
-                decision=TradeDecision.HOLD,  # Safe default
+                decision=TradeDecision.HOLD,
                 executionStatus=PhaseStatus.FAILED,
                 errorDetails=str(error)[:500],
             )
             await complete_run(run_id, error_data)
 
-    def _cleanup(self) -> None:
-        """Clean up execution state after cycle completes or fails."""
-        self.current_run_id = None
-        self.trade_count = 0
-        self.last_decision = None
-        self.tracker = None
-
-        # Reset timing
-        self.research_start_time = None
-        self.decision_start_time = None
-
-        # Reset phase data
-        self.research_candidates = []
-        self.research_sources = []
-        self.research_tool_calls = []
-        self.research_notes = ""
-        self.trade_id = None
-        self.execution_status = None
-        self.execution_error = None
-
     def _process_researcher_output(
-        self, tool_result: str, items: list, current_index: int
+        self, tool_result: str, items: list, current_index: int, ctx: RunContext
     ) -> None:
         """Process Researcher tool output - extract sources and candidates.
 
@@ -691,20 +625,19 @@ class AgentExecutor:
             tool_result: Full output from Researcher tool
             items: List of all items from agent result (for query extraction)
             current_index: Index of current item in items list
+            ctx: RunContext to update with sources
         """
         sources = []
         query = "Market research"
         result_summary = "Research completed"
 
-        # Parse typed ResearchResponse from Researcher (enforced by output_type)
+        # Parse typed ResearchResponse from Researcher
         try:
             research = ResearchResponse.model_validate_json(tool_result)
             result_summary = research.summary
-            # Convert ResearchSource objects to dicts for backwards compatibility
             sources = [{"title": src.title, "url": src.url} for src in research.sources]
         except ValidationError as e:
-            logger.error(f"Failed to parse ResearchResponse (should not happen with output_type): {e}")
-            # If this happens, the SDK's output_type enforcement failed
+            logger.error(f"Failed to parse ResearchResponse: {e}")
             result_summary = "Research completed (parsing failed)"
             sources = []
 
@@ -725,12 +658,12 @@ class AgentExecutor:
                                 except (json.JSONDecodeError, TypeError):
                                     pass
 
-        # Add web sources to research_sources
+        # Add web sources to context
         for source in sources:
             if isinstance(source, dict):
                 url = source.get("url")
                 if url:
-                    self.research_sources.append(
+                    ctx.research_sources.append(
                         SourceDto.web(
                             title=source.get("title", "Article"),
                             url=str(url)
@@ -740,8 +673,8 @@ class AgentExecutor:
         if sources:
             logger.info(f"  📎 Research: {len(sources)} sources, query: {query[:50]}...")
 
-        if self.tracker:
-            self.tracker.log_research_query(query, result_summary, sources)
+        if ctx.tracker:
+            ctx.tracker.log_research_query(query, result_summary, sources)
 
     def store_decision(
         self,
@@ -784,6 +717,7 @@ class AgentExecutor:
         # Validate decision consistency
         decision.validate_consistency()
 
-        self.last_decision = decision
+        # Store for transfer to RunContext after agent completes
+        self._pending_decision = decision
 
         logger.info(f"🔴 DECISION STORED: action={action}, symbol={symbol}, quantity={quantity}")

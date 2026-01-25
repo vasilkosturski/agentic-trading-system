@@ -38,8 +38,6 @@ class TestDecisionMakerAgent:
         # Create Decision Maker
         agent = await create_decision_maker_agent(
             agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
-            strategy=sample_strategy,
             executor=executor,
             mcp_pool=mock_mcp_pool,
             model_name=sample_model_name,
@@ -66,8 +64,6 @@ class TestDecisionMakerAgent:
         # Create Decision Maker (no MCP pool needed for this test)
         agent = await create_decision_maker_agent(
             agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
-            strategy=sample_strategy,
             executor=executor,
             mcp_pool=None,
             model_name=sample_model_name,
@@ -89,10 +85,10 @@ class TestDecisionMakerAgent:
             historical_context=json.dumps({"summary": "No prior trades", "insights": []}),
         )
 
-        # Verify decision stored
-        assert executor.last_decision is not None
-        assert executor.last_decision.action == "BUY"
-        assert executor.last_decision.symbol == "AAPL"
+        # Verify decision stored in _pending_decision (new architecture)
+        assert executor._pending_decision is not None
+        assert executor._pending_decision.action == "BUY"
+        assert executor._pending_decision.symbol == "AAPL"
 
     @patch("decision_maker.get_trading_history")
     async def test_get_symbol_trade_history_tool(
@@ -122,8 +118,6 @@ class TestDecisionMakerAgent:
         # Create Decision Maker
         agent = await create_decision_maker_agent(
             agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
-            strategy=sample_strategy,
             executor=executor,
             mcp_pool=None,
             model_name=sample_model_name,
@@ -163,8 +157,6 @@ class TestDecisionMakerAgent:
         # Create Decision Maker
         agent = await create_decision_maker_agent(
             agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
-            strategy=sample_strategy,
             executor=executor,
             mcp_pool=None,
             model_name=sample_model_name,
@@ -193,8 +185,6 @@ class TestDecisionMakerAgent:
         # Create Decision Maker with no MCP pool
         agent = await create_decision_maker_agent(
             agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
-            strategy=sample_strategy,
             executor=executor,
             mcp_pool=None,  # No MCP servers
             model_name=sample_model_name,

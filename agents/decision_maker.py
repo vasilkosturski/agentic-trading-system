@@ -32,8 +32,6 @@ logger = logging.getLogger(__name__)
 
 async def create_decision_maker_agent(
     agent_name: str,
-    agent_style: str,
-    strategy: str,
     executor: "AgentExecutor",
     mcp_pool: Optional["MCPPool"] = None,
     model_name: str = "gpt-4o-mini",
@@ -42,14 +40,15 @@ async def create_decision_maker_agent(
 
     Args:
         agent_name: Agent name (e.g., "Warren")
-        agent_style: Investment style (e.g., "Value Investor")
-        strategy: Full strategy description (kept for backwards compatibility, not used)
         executor: AgentExecutor instance for decision storage
         mcp_pool: Optional MCP pool for additional research
         model_name: Model to use (default: gpt-4o-mini)
 
     Returns:
         Agent configured for trading decisions
+    
+    Note:
+        Agent personality is loaded from template files (prompts/decision_maker/{agent_name}.txt).
     """
     # Load instructions from template file
     instructions = load_and_format_prompt(
@@ -153,7 +152,7 @@ async def create_decision_maker_agent(
         decision.validate_consistency()
 
         # Store in executor
-        executor.last_decision = decision
+        executor._pending_decision = decision
 
         logger.info(f"✅ Decision recorded: {act} {symbol or ''} {quantity or ''}")
 
