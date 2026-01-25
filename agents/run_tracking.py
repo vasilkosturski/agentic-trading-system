@@ -6,48 +6,24 @@ Implements the phase-based tracking workflow:
 - update_phase(): PATCH /api/runs/{id}/phase
 - complete_run(): PUT /api/runs/{id}/complete
 
-Uses a shared AsyncClient for connection pooling (httpx best practice).
+Uses BackendClient for centralized HTTP handling.
 """
 
 import logging
 from typing import Optional
 
-import httpx
-
-from config import BACKEND_API_TRADING_RUNS
+from backend_client import get_backend_client, close_backend_client, BackendAPIError
 from models.run_tracking import CompleteRunData
 
 logger = logging.getLogger(__name__)
 
-# Module-level shared client for connection pooling
-# Per httpx docs: "make sure you're not instantiating multiple client instances"
-# https://www.python-httpx.org/async/
-_client: Optional[httpx.AsyncClient] = None
-
-
-def _get_client() -> httpx.AsyncClient:
-    """Get or create the shared AsyncClient.
-
-    Lazy initialization ensures client is created only when needed.
-    Reuses TCP connections across requests for better performance.
-    """
-    global _client
-    if _client is None or _client.is_closed:
-        _client = httpx.AsyncClient(
-            timeout=httpx.Timeout(15.0, connect=5.0),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
-        )
-        logger.debug("Created new httpx AsyncClient for run tracking")
-    return _client
-
 
 async def close_client() -> None:
-    """Close the shared client. Call during application shutdown."""
-    global _client
-    if _client is not None and not _client.is_closed:
-        await _client.aclose()
-        logger.debug("Closed httpx AsyncClient")
-    _client = None
+    """Close the shared client. Call during application shutdown.
+    
+    DEPRECATED: Use close_backend_client() from backend_client module.
+    """
+    await close_backend_client()
 
 
 async def create_run(agent_id: int) -> Optional[int]:
@@ -61,28 +37,11 @@ async def create_run(agent_id: int) -> Optional[int]:
     Returns:
         Run ID if successful, None if failed
     """
-    url = BACKEND_API_TRADING_RUNS
-    payload = {"agentId": agent_id}
-    client = _get_client()
-
     try:
-        response = await client.post(url, json=payload)
-        response.raise_for_status()
-
-        result = response.json()
-        run_id = result.get("runId")
-        if run_id is not None:
-            logger.info(f"Created trading run #{run_id} for agent {agent_id}")
-            return run_id
-        else:
-            logger.error(f"create_run response missing runId: {result}")
-            return None
-
-    except httpx.HTTPStatusError as e:
-        logger.error(f"HTTP error creating run: {e.response.status_code} - {e.response.text}")
-        return None
-    except Exception as e:
-        logger.error(f"Error creating run: {e}")
+        client = get_backend_client()
+        return await client.create_run(agent_id)
+    except BackendAPIError as e:
+        logger.error(f"Failed to create run for agent {agent_id}: {e}")
         return None
 
 
@@ -98,22 +57,12 @@ async def update_phase(run_id: int, phase: str) -> bool:
     Returns:
         True if successful, False if failed
     """
-    url = f"{BACKEND_API_TRADING_RUNS}/{run_id}/phase"
-    payload = {"phase": phase}
-    client = _get_client()
-
     try:
-        response = await client.patch(url, json=payload)
-        response.raise_for_status()
-
-        logger.info(f"Updated run #{run_id} to phase {phase}")
+        client = get_backend_client()
+        await client.update_phase(run_id, phase)
         return True
-
-    except httpx.HTTPStatusError as e:
-        logger.error(f"HTTP error updating phase: {e.response.status_code} - {e.response.text}")
-        return False
-    except Exception as e:
-        logger.error(f"Error updating phase: {e}")
+    except BackendAPIError as e:
+        logger.error(f"Failed to update phase for run {run_id}: {e}")
         return False
 
 
@@ -129,20 +78,10 @@ async def complete_run(run_id: int, data: CompleteRunData) -> bool:
     Returns:
         True if successful, False if failed
     """
-    url = f"{BACKEND_API_TRADING_RUNS}/{run_id}/complete"
-    payload = data.to_json_dict()
-    client = _get_client()
-
     try:
-        response = await client.put(url, json=payload)
-        response.raise_for_status()
-
-        logger.info(f"Completed run #{run_id} with decision={data.decision.value}")
+        client = get_backend_client()
+        await client.complete_run(run_id, data)
         return True
-
-    except httpx.HTTPStatusError as e:
-        logger.error(f"HTTP error completing run: {e.response.status_code} - {e.response.text}")
-        return False
-    except Exception as e:
-        logger.error(f"Error completing run: {e}")
+    except BackendAPIError as e:
+        logger.error(f"Failed to complete run {run_id}: {e}")
         return False

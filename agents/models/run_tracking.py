@@ -9,7 +9,7 @@ Uses camelCase field names to match Java naming convention directly.
 """
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -46,7 +46,7 @@ class SourceDto(BaseModel):
     - web: Has title + url (verifiable)
     - system_context: Has description (internal tool usage)
     """
-    type: str  # "web" or "system_context"
+    type: Literal["web", "system_context"]
     title: Optional[str] = None
     url: Optional[str] = None
     description: Optional[str] = None

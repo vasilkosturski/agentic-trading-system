@@ -42,8 +42,6 @@ class TestMarketAnalystAgent:
         # Create Market Analyst
         agent = await create_market_analyst_agent(
             agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
-            strategy=sample_strategy,
             mcp_pool=mock_mcp_pool,
             model_name=sample_model_name,
         )
@@ -65,8 +63,6 @@ class TestMarketAnalystAgent:
     async def test_agent_has_no_trading_tools(
         self,
         sample_agent_name,
-        sample_agent_style,
-        sample_strategy,
         sample_model_name,
         mock_mcp_pool,
     ):
@@ -74,8 +70,6 @@ class TestMarketAnalystAgent:
         # Create Market Analyst
         agent = await create_market_analyst_agent(
             agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
-            strategy=sample_strategy,
             mcp_pool=mock_mcp_pool,
             model_name=sample_model_name,
         )
@@ -96,8 +90,6 @@ class TestMarketAnalystAgent:
     async def test_output_type_is_research_response(
         self,
         sample_agent_name,
-        sample_agent_style,
-        sample_strategy,
         sample_model_name,
         mock_mcp_pool,
     ):
@@ -105,8 +97,6 @@ class TestMarketAnalystAgent:
         # Create Market Analyst
         agent = await create_market_analyst_agent(
             agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
-            strategy=sample_strategy,
             mcp_pool=mock_mcp_pool,
             model_name=sample_model_name,
         )
@@ -120,17 +110,13 @@ class TestMarketAnalystAgent:
     async def test_instructions_include_agent_context(
         self,
         sample_agent_name,
-        sample_agent_style,
-        sample_strategy,
         sample_model_name,
         mock_mcp_pool,
     ):
-        """Test instructions include agent_name and agent_style."""
+        """Test instructions include agent_name."""
         # Create Market Analyst
         agent = await create_market_analyst_agent(
             agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
-            strategy=sample_strategy,
             mcp_pool=mock_mcp_pool,
             model_name=sample_model_name,
         )
@@ -141,9 +127,8 @@ class TestMarketAnalystAgent:
         # Verify agent name includes context
         assert sample_agent_name in agent.name
 
-        # Verify instructions include agent style (if accessible)
+        # Verify instructions include agent name (if accessible)
         if hasattr(agent, "instructions"):
-            assert sample_agent_style in agent.instructions
             assert sample_agent_name in agent.instructions
 
 

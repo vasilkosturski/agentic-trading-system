@@ -41,8 +41,6 @@ logger = logging.getLogger(__name__)
 
 async def create_market_analyst_agent(
     agent_name: str,
-    agent_style: str,
-    strategy: str,
     mcp_pool: "MCPPool",
     model_name: str = "gpt-4o-mini",
 ) -> Agent[ResearchResponse]:
@@ -50,13 +48,14 @@ async def create_market_analyst_agent(
 
     Args:
         agent_name: Agent name (e.g., "Warren")
-        agent_style: Investment style (e.g., "Value Investor")
-        strategy: Full strategy description (kept for backwards compatibility, not used)
         mcp_pool: MCP pool with Brave Search + Fetch servers
         model_name: Model to use (default: gpt-4o-mini)
 
     Returns:
         Agent configured for research with ResearchResponse output type
+    
+    Note:
+        Agent personality is loaded from template files (prompts/market_analyst/{agent_name}.txt).
     """
     # Load instructions from template file
     instructions = load_and_format_prompt(
