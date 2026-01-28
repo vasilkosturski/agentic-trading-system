@@ -30,6 +30,7 @@ from models import (
     PriceLookupResponse,
     ToolError,
 )
+from models.mcp_types import MCPServerName
 from http_client import BackendAPIError
 from pydantic import ValidationError
 
@@ -172,21 +173,21 @@ async def create_market_analyst_agent(
     mcp_servers = []
 
     # Add Brave Search server
-    brave_server = await mcp_pool.get_server("brave-search")
+    brave_server = await mcp_pool.get_server(MCPServerName.BRAVE_SEARCH)
     if brave_server:
         mcp_servers.append(brave_server)
     else:
         logger.warning("Brave Search MCP server not available for Market Analyst")
 
     # Add Fetch server
-    fetch_server = await mcp_pool.get_server("fetch")
+    fetch_server = await mcp_pool.get_server(MCPServerName.FETCH)
     if fetch_server:
         mcp_servers.append(fetch_server)
     else:
         logger.warning("Fetch MCP server not available for Market Analyst")
 
     # Add Memory server (optional, for context)
-    memory_server = await mcp_pool.get_server("memory")
+    memory_server = await mcp_pool.get_server(MCPServerName.MEMORY)
     if memory_server:
         mcp_servers.append(memory_server)
 
@@ -232,9 +233,15 @@ def build_research_prompt(
     Returns:
         Formatted prompt string
     """
+    # Calculate near-capacity threshold (70% of max)
+    near_capacity_threshold = int(max_positions * 0.7)
+
     prompt = f"""Research candidates for {agent_name}'s portfolio review.
 
 **Agent Style:** {agent_style}
+
+**Recent Trading Activity:**
+{historical_context if historical_context != "{}" else "No recent trades"}
 
 **Current Portfolio Context:**
 - Balance: ${balance:,.2f}
@@ -248,12 +255,12 @@ Research and identify 3-5 stock candidates that match {agent_name}'s {agent_styl
 """
 
     if position_count >= max_positions:
-        prompt += """
-- Portfolio is at maximum capacity (10 positions)
+        prompt += f"""
+- Portfolio is at maximum capacity ({max_positions} positions)
 - Focus on comparing new candidates vs. current holdings
 - Consider whether any current holdings should be replaced
 """
-    elif position_count >= 7:
+    elif position_count >= near_capacity_threshold:
         prompt += """
 - Portfolio is near capacity
 - Prioritize high-conviction ideas

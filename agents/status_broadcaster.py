@@ -9,17 +9,18 @@ import httpx
 from datetime import datetime, timezone
 from typing import Optional
 from config import BACKEND_BASE_URL
+from models.run_tracking import RunPhase
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Phase constants
-PHASE_INITIALIZING = "INITIALIZING"
-PHASE_RESEARCHING = "RESEARCHING"  # Combined: fetching data, research, analysis
-PHASE_DECIDING = "DECIDING"
-PHASE_TRADING = "TRADING"
-PHASE_COMPLETED = "COMPLETED"
-PHASE_ERROR = "ERROR"
+# Phase constants - use enum for type safety, aliases for backward compatibility
+PHASE_INITIALIZING = RunPhase.INITIALIZING
+PHASE_RESEARCHING = RunPhase.RESEARCHING
+PHASE_DECIDING = RunPhase.DECIDING
+PHASE_TRADING = RunPhase.TRADING
+PHASE_COMPLETED = RunPhase.COMPLETED
+PHASE_ERROR = RunPhase.ERROR
 
 
 async def broadcast_status_async(

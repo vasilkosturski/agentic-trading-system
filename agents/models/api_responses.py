@@ -4,8 +4,34 @@ These use Pydantic BaseModel because they validate data from external APIs
 (Java backend), which is an external boundary that needs validation.
 """
 
+from datetime import datetime
+from datetime import date as DateType
+from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
+
+
+# =============================================================================
+# Enums for Type Safety
+# =============================================================================
+
+class DataTier(str, Enum):
+    """Data quality tier from backend."""
+    REAL = "REAL"
+    MOCK = "MOCK"
+    CACHED = "CACHED"
+
+
+class TradeType(str, Enum):
+    """Trade direction."""
+    BUY = "BUY"
+    SELL = "SELL"
+
+
+class RunOutcome(str, Enum):
+    """Outcome of a trading run."""
+    COMPLETED = "COMPLETED"
+    ERROR = "ERROR"
 
 
 # =============================================================================
@@ -16,8 +42,8 @@ class PriceMetadata(BaseModel):
     """Stock price with data quality metadata (from backend API)."""
 
     price: float = Field(gt=0, description="Current stock price in USD")
-    dataTier: str = Field(description="REAL, MOCK, or CACHED")
-    timestamp: str = Field(description="ISO format timestamp")
+    dataTier: DataTier = Field(description="Data quality tier: REAL, MOCK, or CACHED")
+    timestamp: datetime = Field(description="Timestamp of price data")
     dataSource: str = Field(description="Data source name")
     dataAgeMinutes: int = Field(ge=0, description="Age of data in minutes")
 
@@ -25,7 +51,7 @@ class PriceMetadata(BaseModel):
 class HistoricalPrice(BaseModel):
     """Single historical price point."""
 
-    date: str = Field(description="Date in YYYY-MM-DD format")
+    date: DateType = Field(description="Date of the price point")
     price: float = Field(gt=0, description="Closing price in USD")
 
 
@@ -64,7 +90,7 @@ class HoldingsResponse(BaseModel):
 class ActivityTrade(BaseModel):
     """A trade within an activity run."""
 
-    type: str = Field(description="Trade type: BUY or SELL")
+    type: TradeType = Field(description="Trade type: BUY or SELL")
     symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
     quantity: int = Field(gt=0, description="Number of shares")
     price: float = Field(gt=0, description="Price per share")
@@ -73,8 +99,8 @@ class ActivityTrade(BaseModel):
 class ActivityRun(BaseModel):
     """A single trading run in recent activity."""
 
-    date: str = Field(description="Date of the run (ISO format)")
-    outcome: str = Field(description="Run outcome: COMPLETED, ERROR, etc.")
+    date: datetime = Field(description="Date/time of the run")
+    outcome: RunOutcome = Field(description="Run outcome: COMPLETED or ERROR")
     summary: str = Field(default="", description="Brief summary of the run")
     fullReasoning: Optional[str] = Field(default=None, description="Complete reasoning")
     researchSources: Optional[str] = Field(default=None, description="JSON string of web sources")
@@ -102,8 +128,8 @@ class SymbolPosition(BaseModel):
 class SymbolTrade(BaseModel):
     """A trade for a specific symbol."""
 
-    date: str = Field(description="Date of the trade")
-    type: str = Field(description="Trade type: BUY or SELL")
+    date: DateType = Field(description="Date of the trade")
+    type: TradeType = Field(description="Trade type: BUY or SELL")
     quantity: int = Field(gt=0, description="Number of shares")
     price: float = Field(gt=0, description="Price per share")
     totalAmount: float = Field(description="Total trade amount")
@@ -134,12 +160,8 @@ class PriceLookupResponse(BaseModel):
 
     symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
     price: float = Field(gt=0, description="Current price in USD")
-    timestamp: str = Field(description="ISO format timestamp of lookup")
+    timestamp: datetime = Field(description="Timestamp of lookup")
 
-
-# =============================================================================
-# Tool Error Model (for standardized error responses from LLM tools)
-# =============================================================================
 
 # =============================================================================
 # Trade Execution Models

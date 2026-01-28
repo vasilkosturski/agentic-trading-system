@@ -18,13 +18,15 @@ from models.llm_output import TradingDecision, ResearchResponse
 
 # Import trading and memory tools
 from trading_tools import buy_shares, sell_shares, _get_balance_raw, _get_holdings_raw
-from memory_tools import get_trading_history, get_recent_activity
+from memory_tools import get_trading_history
 
 # Import prompt loader
 from prompt_loader import load_and_format_prompt
 
+# Import MCP types
+from models.mcp_types import MCPServerName
+
 if TYPE_CHECKING:
-    from agent_executor import AgentExecutor
     from mcp_types import MCPPool
 
 logger = logging.getLogger(__name__)
@@ -32,23 +34,24 @@ logger = logging.getLogger(__name__)
 
 async def create_decision_maker_agent(
     agent_name: str,
-    executor: "AgentExecutor",
+    agent_id: int,
     mcp_pool: Optional["MCPPool"] = None,
     model_name: str = "gpt-4o-mini",
-) -> Agent:
+) -> Agent[TradingDecision]:
     """Create Decision Maker agent for decision phase.
 
     Args:
         agent_name: Agent name (e.g., "Warren")
-        executor: AgentExecutor instance for decision storage
+        agent_id: Agent ID for tools that need it
         mcp_pool: Optional MCP pool for additional research
         model_name: Model to use (default: gpt-4o-mini)
 
     Returns:
-        Agent configured for trading decisions
-    
+        Agent configured for trading decisions with structured TradingDecision output
+
     Note:
         Agent personality is loaded from template files (prompts/decision_maker/{agent_name}.txt).
+        Uses structured output (output_type=TradingDecision) instead of tool callback.
     """
     # Load instructions from template file
     instructions = load_and_format_prompt(
@@ -68,8 +71,9 @@ async def create_decision_maker_agent(
         Returns:
             JSON string with trade history for that symbol
         """
-        result = await get_trading_history(agent_name, symbol, days=90)
-        return result
+        result = await get_trading_history(agent_id, symbol, days=90)
+        # Serialize typed response to JSON for LLM consumption
+        return result.model_dump_json()
 
     # Create account summary tool
     @function_tool
@@ -79,10 +83,8 @@ async def create_decision_maker_agent(
         Returns:
             JSON string with current balance and holdings
         """
-        from agent_executor import AgentExecutor  # Local import to avoid circular
-
-        balance = await _get_balance_raw(executor.agent_id)
-        holdings = await _get_holdings_raw(executor.agent_id)
+        balance = await _get_balance_raw(agent_id)
+        holdings = await _get_holdings_raw(agent_id)
 
         holdings_list = [
             {
@@ -103,90 +105,33 @@ async def create_decision_maker_agent(
             indent=2,
         )
 
-    # Create decide_action tool that stores decision in executor
-    @function_tool
-    async def decide_action(
-        action: str,
-        symbol: Optional[str] = None,
-        quantity: Optional[int] = None,
-        rationale: Optional[str] = None,
-        fullReasoning: Optional[str] = None,
-        researchSources: Optional[str] = None,
-        historicalContext: Optional[str] = None,
-    ) -> str:
-        """Record your trading decision.
-
-        Args:
-            action: "BUY", "SELL", or "HOLD"
-            symbol: Stock symbol (required for BUY/SELL)
-            quantity: Number of shares (required for BUY/SELL)
-            rationale: Brief 1-2 sentence reason
-            fullReasoning: Complete analysis and reasoning
-            researchSources: JSON string with research sources
-            historicalContext: JSON string with historical insights
-
-        Returns:
-            Confirmation message
-        """
-        act = (action or "").upper()
-
-        if act not in ("BUY", "SELL", "HOLD"):
-            raise ValueError(f"action must be BUY, SELL, or HOLD (got: {action})")
-
-        if act in ("BUY", "SELL"):
-            if not symbol or not quantity or quantity <= 0:
-                raise ValueError(f"{act} requires symbol and positive quantity")
-
-        # Create and validate decision
-        decision = TradingDecision(
-            action=act,  # type: ignore
-            symbol=symbol or "",
-            quantity=quantity or 0,
-            rationale=rationale or "",
-            fullReasoning=fullReasoning or "",
-            researchSources=researchSources or "[]",
-            historicalContext=historicalContext or "[]",
-        )
-
-        # Validate consistency
-        decision.validate_consistency()
-
-        # Store in executor
-        executor._pending_decision = decision
-
-        logger.info(f"✅ Decision recorded: {act} {symbol or ''} {quantity or ''}")
-
-        return f"Decision recorded: {act}" + (
-            f" {quantity} shares of {symbol}" if act in ("BUY", "SELL") else ""
-        )
-
-    # Collect tools
+    # Collect tools (no decide_action - using structured output instead)
     tools = [
         get_symbol_trade_history,
         get_account_summary,
-        decide_action,
     ]
 
     # Add MCP servers if provided
     mcp_servers = []
     if mcp_pool:
         # Add Brave Search for additional research
-        brave_server = await mcp_pool.get_server("brave-search")
+        brave_server = await mcp_pool.get_server(MCPServerName.BRAVE_SEARCH)
         if brave_server:
             mcp_servers.append(brave_server)
 
         # Add Fetch for web content
-        fetch_server = await mcp_pool.get_server("fetch")
+        fetch_server = await mcp_pool.get_server(MCPServerName.FETCH)
         if fetch_server:
             mcp_servers.append(fetch_server)
 
-    # Create agent
-    trader = Agent(
+    # Create agent with structured output enforcement
+    trader = Agent[TradingDecision](
         name=f"{agent_name}-DecisionMaker",
         instructions=instructions,
         model=model_name,
         tools=tools,
         mcp_servers=mcp_servers,
+        output_type=TradingDecision,  # Enforces schema compliance like Market Analyst
     )
 
     logger.info(
@@ -284,7 +229,7 @@ def build_decision_prompt(
 1. Evaluate the Market Analyst's candidates
 2. Use get_symbol_trade_history() to check past performance
 3. Make your decision: BUY, SELL, or HOLD
-4. Call decide_action() with your decision and reasoning
+4. Provide your structured output with action, symbol, quantity, rationale, and fullReasoning
 
 Make your decision now."""
 

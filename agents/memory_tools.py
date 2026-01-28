@@ -9,19 +9,33 @@ These tools allow agents to:
 Data sources:
 - trading.account_transactions (individual trades)
 - analytics.agent_runs (overall cycle reasoning, including non-trades)
+
+API Design:
+- All functions use agent_id (integer) as the primary identifier
+- Functions return typed Pydantic models (not raw JSON strings)
+- Callers serialize to JSON only at boundaries (LLM prompts)
 """
 
 import logging
-from typing import Optional
+from typing import Optional, Union
 from config import BACKEND_BASE_URL
 
 # Import unified HTTP client
 from http_client import call_backend, BackendAPIError
 
+# Import typed response models
+from models.api_responses import (
+    RecentActivityResponse,
+    SymbolHistoryResponse,
+    ToolError,
+)
+
 logger = logging.getLogger(__name__)
 
 
-async def get_trading_history(agent_name: str, symbol: str, days: int = 30) -> str:
+async def get_trading_history(
+    agent_id: int, symbol: str, days: int = 30
+) -> Union[SymbolHistoryResponse, ToolError]:
     """
     Get complete trading history for a specific stock, including:
     - All trades (BUY/SELL) with reasoning
@@ -29,62 +43,74 @@ async def get_trading_history(agent_name: str, symbol: str, days: int = 30) -> s
     - Non-trades (considered but didn't act)
 
     Args:
-        agent_name: Name of the agent (e.g., "Warren")
+        agent_id: Agent ID (integer)
         symbol: Stock symbol (e.g., "NVDA")
         days: How many days back to look (default 30)
 
     Returns:
-        Natural language summary of trading history
+        SymbolHistoryResponse with typed trading history, or ToolError on failure
     """
     try:
         url = f"{BACKEND_BASE_URL}/api/memory/trading-history"
         params = {
-            "agentName": agent_name,
+            "agentId": agent_id,
             "symbol": symbol,
             "days": days
         }
 
         response = await call_backend("GET", url, params=params, timeout=10)
-        return response.text  # Returns JSON string as-is
+        return SymbolHistoryResponse.model_validate_json(response.text)
 
     except BackendAPIError as e:
-        # Convert HTTP errors to JSON strings (for LLM)
         if e.status_code == 404:
-            return '{"error": "No trading history found"}'
+            return ToolError(
+                error="No trading history found",
+                error_type="not_found",
+                context={"symbol": symbol, "days": days}
+            )
+        return ToolError(
+            error=str(e),
+            error_type="api_error",
+            context={"symbol": symbol, "days": days}
+        )
 
-        # Log already done by http_client, just return error JSON
-        return f'{{"error": "{str(e)}"}}'
 
-
-async def get_recent_activity(agent_name: str, days: int = 7) -> str:
+async def get_recent_activity(
+    agent_id: int, days: int = 7
+) -> Union[RecentActivityResponse, ToolError]:
     """
     Get recent trading activity across all stocks, organized by run.
     Shows what the agent has been doing, thinking, and considering.
 
     Args:
-        agent_name: Name of the agent (e.g., "Warren")
+        agent_id: Agent ID (integer)
         days: How many days back to look (default 7)
 
     Returns:
-        Natural language summary of recent activity
+        RecentActivityResponse with typed activity data, or ToolError on failure
     """
     try:
         url = f"{BACKEND_BASE_URL}/api/memory/recent-activity"
         params = {
-            "agentName": agent_name,
+            "agentId": agent_id,
             "days": days
         }
 
         response = await call_backend("GET", url, params=params, timeout=10)
-        return response.text  # Returns JSON string as-is
+        return RecentActivityResponse.model_validate_json(response.text)
 
     except BackendAPIError as e:
-        # Convert HTTP errors to JSON strings (for LLM)
         if e.status_code == 404:
-            return '{"error": "No recent activity found"}'
-
-        # Log already done by http_client, just return error JSON
-        return f'{{"error": "{str(e)}"}}'
+            return ToolError(
+                error="No recent activity found",
+                error_type="not_found",
+                context={"days": days}
+            )
+        return ToolError(
+            error=str(e),
+            error_type="api_error",
+            context={"days": days}
+        )
 
 
 # Tool metadata for OpenAI Agents SDK
