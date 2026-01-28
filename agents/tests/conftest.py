@@ -107,21 +107,28 @@ Total Portfolio Value: ${sample_balance + 15000 + 15000:,.2f}"""
 
 
 @pytest.fixture
-def sample_recent_activity() -> str:
-    """Sample recent activity JSON for testing."""
-    return json.dumps({
-        "runs": [
-            {
-                "runId": 1,
-                "runType": "TRADING",
-                "timestamp": "2025-12-10T10:00:00Z",
-                "trades": [
-                    {"symbol": "NVDA", "action": "BUY", "quantity": 50, "price": 145.0}
-                ],
-                "reasoning": "AI growth thesis"
-            }
-        ]
-    })
+def sample_recent_activity():
+    """Sample recent activity for testing (typed Pydantic model)."""
+    from models.api_responses import RecentActivityResponse, ActivityRun, ActivityTrade
+    return RecentActivityResponse(
+        agentName="Warren",
+        days=30,
+        runs=[
+            ActivityRun(
+                date="2025-12-10T10:00:00Z",
+                outcome="COMPLETED",
+                summary="Bought NVDA based on AI growth thesis",
+                fullReasoning="AI growth thesis",
+                researchSources=None,
+                historicalContext=None,
+                trades=[
+                    ActivityTrade(type="BUY", symbol="NVDA", quantity=50, price=145.0)
+                ]
+            )
+        ],
+        totalRuns=1,
+        totalTrades=1
+    )
 
 
 @pytest.fixture
@@ -308,6 +315,19 @@ def valid_recent_activity_data():
         "totalRuns": 0,
         "totalTrades": 0
     }
+
+
+@pytest.fixture
+def empty_recent_activity():
+    """Empty recent activity for testing (typed Pydantic model)."""
+    from models.api_responses import RecentActivityResponse
+    return RecentActivityResponse(
+        agentName="Warren",
+        days=30,
+        runs=[],
+        totalRuns=0,
+        totalTrades=0
+    )
 
 
 @pytest.fixture

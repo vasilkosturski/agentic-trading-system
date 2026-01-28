@@ -16,7 +16,6 @@ from agents import Agent, trace
 from agents import function_tool
 
 from market_tools import MARKET_TOOLS
-from memory_tools import get_trading_history, get_recent_activity
 from researcher import create_researcher_agent, REQUIRED_MCPS as RESEARCHER_MCPS
 from agent_executor import AgentExecutor
 from mcp_types import MCPName, MCPPool
@@ -73,7 +72,6 @@ async def run_trader_cycle(trader: 'SimpleTrader', mcp_pool: MCPPool, force_trad
                 agent_id=trader.agent_id,
                 name=trader.name,
                 agent_style=trader.agent_style,
-                strategy=trader.strategy,
                 model_name=trader.model_name,
             )
 

@@ -128,7 +128,7 @@ class TestDecisionMakerAgent:
 
         # Verify get_trading_history is importable and callable
         from decision_maker import get_trading_history
-        result = await get_trading_history(sample_agent_name, "AAPL", days=90)
+        result = await get_trading_history(sample_agent_id, "AAPL", days=90)
         assert "AAPL" in result
 
     @patch("decision_maker._get_balance_raw")

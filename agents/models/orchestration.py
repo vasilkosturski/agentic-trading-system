@@ -1,20 +1,24 @@
 """Orchestration models for AgentExecutor.
 
-Typed models for internal data flow between phases, replacing Dict[str, Any].
+Typed models for internal data flow between operations, replacing Dict[str, Any].
+Each operation has explicit input parameters and returns a typed result.
 """
 
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
 from models.llm_output import TradingDecision, ResearchResponse
+from models.run_tracking import SourceDto, PhaseStatus
+from models.api_responses import RecentActivityResponse
 
 if TYPE_CHECKING:
-    from models.run_tracking import SourceDto, ResearchToolCallDto, PhaseStatus
+    from models.run_tracking import ResearchToolCallDto
     from tool_tracking import ToolTracker
+    from models import Holding
 
 
 class SourceType(str, Enum):
@@ -30,59 +34,83 @@ class CycleResult(BaseModel):
     run_id: int
 
 
-class SharedPhaseContext(BaseModel):
-    """Data fetched once and shared across research and decision phases.
-    
-    Purpose:
-    - Caching: Avoid duplicate API calls for same data
-    - Consistency: Both agents see identical historical context
-    """
-    historical_context: str  # JSON: 30-day trading activity
+# ============================================================================
+# Operation Result Types - Each operation returns a typed result
+# ============================================================================
+
+@dataclass
+class ResearchResult:
+    """Result of market analyst research."""
+    research_response: Optional[ResearchResponse] = None
+    candidates: List[str] = field(default_factory=list)
+    sources: List[SourceDto] = field(default_factory=list)
+    notes: str = ""
+
+
+@dataclass
+class DecisionResult:
+    """Result of decision maker."""
+    decision: Optional[TradingDecision] = None
+    decision_start_time: Optional[datetime] = None
+
+
+@dataclass
+class ExecutionResult:
+    """Result of trade execution."""
+    trade_id: Optional[int] = None
+    trade_count: int = 0
+    execution_status: Optional[PhaseStatus] = None
+    execution_error: Optional[str] = None
 
 
 @dataclass
 class RunContext:
-    """Context for a single trading run, passed through phases.
-    
+    """Context for a single trading run, passed through operations.
+
     Replaces instance variables in AgentExecutor for explicit data flow.
     All fields set at creation are guaranteed non-None.
-    Optional fields are set as phases complete.
-    
+    Optional fields are set as operations complete.
+
     Benefits:
-    - Explicit data dependencies between phases
+    - Explicit data dependencies between operations
     - Testable in isolation (no hidden state)
     - No cleanup needed (context is discarded after cycle)
     """
-    # Guaranteed at creation (Phase 1)
+    # Guaranteed at creation
     run_id: int
     agent_id: int
     agent_name: str
     agent_style: str
-    strategy: str
     model_name: str
     research_start_time: datetime
-    
+
     # Tool tracker for local data collection
     tracker: Optional["ToolTracker"] = None
-    
+
+    # Account data (fetched once at start)
+    balance: float = 0.0
+    holdings: List[Any] = field(default_factory=list)  # List[Holding]
+
+    # Recent trading activity (30-day history)
+    recent_activity: Optional[RecentActivityResponse] = None
+
     # Set during execution
     decision_start_time: Optional[datetime] = None
-    
-    # Phase results (set as phases complete)
-    shared_context: Optional[SharedPhaseContext] = None
+
+    # Research results
     research_response: Optional[ResearchResponse] = None
     decision: Optional[TradingDecision] = None
-    
+
     # Research phase data collection
     research_candidates: List[str] = field(default_factory=list)
-    research_sources: List["SourceDto"] = field(default_factory=list)
-    research_tool_calls: List["ResearchToolCallDto"] = field(default_factory=list)
+    research_sources: List[SourceDto] = field(default_factory=list)
+    research_tool_calls: List[Any] = field(default_factory=list)  # ResearchToolCallDto
     research_notes: str = ""
-    
+
     # Execution phase data
     trade_id: Optional[int] = None
     trade_count: int = 0
-    execution_status: Optional["PhaseStatus"] = None
+    execution_status: Optional[PhaseStatus] = None
     execution_error: Optional[str] = None
 
 
@@ -90,16 +118,16 @@ class HoldingsSummary(BaseModel):
     """Holdings data with built-in serialization for prompts."""
     symbols: List[str]
     total_count: int
-    
+
     def to_prompt_text(self) -> str:
         """Serialize for LLM prompt consumption.
-        
+
         Shows all holdings (no truncation for portfolios under max).
         """
         if not self.symbols:
             return "None"
         return ", ".join(self.symbols)
-    
+
     @classmethod
     def from_holdings(cls, holdings: list) -> "HoldingsSummary":
         """Create from list of Holding objects."""
