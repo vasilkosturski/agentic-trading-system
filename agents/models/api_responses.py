@@ -109,13 +109,30 @@ class ActivityRun(BaseModel):
 
 
 class RecentActivityResponse(BaseModel):
-    """Response from /api/memory/recent-activity endpoint."""
+    """Response from /api/memory/recent-activity endpoint.
+
+    Note: totalRuns and totalTrades are computed from runs list.
+    Backend may still send these fields for backwards compatibility,
+    but they are ignored in favor of computed values.
+    """
 
     agentName: str = Field(description="Name of the trading agent")
     days: int = Field(gt=0, description="Number of days of activity")
     runs: list[ActivityRun] = Field(default_factory=list, description="List of trading runs")
-    totalRuns: int = Field(ge=0, description="Total number of runs")
-    totalTrades: int = Field(ge=0, description="Total number of trades")
+
+    # Keep fields for API compatibility but compute actual values
+    totalRuns: int = Field(default=0, ge=0, description="Deprecated - use len(runs)")
+    totalTrades: int = Field(default=0, ge=0, description="Deprecated - use computed_total_trades")
+
+    @property
+    def computed_total_runs(self) -> int:
+        """Compute total runs from runs list (single source of truth)."""
+        return len(self.runs)
+
+    @property
+    def computed_total_trades(self) -> int:
+        """Compute total trades from runs list (single source of truth)."""
+        return sum(len(run.trades) for run in self.runs)
 
 
 class SymbolPosition(BaseModel):

@@ -10,13 +10,12 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from textwrap import dedent
-from typing import Dict, Optional, Literal, cast
+from typing import Dict, Literal, cast
 
 from agents import Agent, trace
 from agents import function_tool
 
 from market_tools import MARKET_TOOLS
-from researcher import create_researcher_agent, REQUIRED_MCPS as RESEARCHER_MCPS
 from agent_executor import AgentExecutor
 from mcp_types import MCPName, MCPPool
 
@@ -27,8 +26,8 @@ logger = logging.getLogger(__name__)
 # MCP Requirements - Declare what this agent needs
 # =============================================================================
 
-# SimpleTrader uses Researcher, which needs these MCPs
-REQUIRED_MCPS = RESEARCHER_MCPS
+# SimpleTrader uses MarketAnalyst which needs Brave Search + Fetch for research
+REQUIRED_MCPS = [MCPName.BRAVE_SEARCH, MCPName.FETCH]
 
 
 # ============================================================================
@@ -64,10 +63,7 @@ async def run_trader_cycle(trader: 'SimpleTrader', mcp_pool: MCPPool, force_trad
 
         with trace(trace_name, trace_id=trace_id):
             # Create executor for this cycle (two-agent architecture)
-            # agent_id should be set by TradingSystem before calling run_trader_cycle
-            if trader.agent_id is None:
-                raise ValueError(f"Agent {trader.name} has no agent_id - must be set before running cycle")
-
+            # agent_id is required in SimpleTrader dataclass, guaranteed to be set
             executor = AgentExecutor(
                 agent_id=trader.agent_id,
                 name=trader.name,
@@ -102,8 +98,8 @@ class SimpleTrader:
     name: str
     agent_style: str  # e.g., "Value Investor", "Contrarian Macro"
     strategy: str
+    agent_id: int  # Required - set by TradingSystem.create()
     model_name: str = "gpt-4o-mini"
-    agent_id: Optional[int] = None
 
     async def run(self, mcp_pool: MCPPool, force_trade: bool = False):
         """Run a trading cycle. Delegates to module-level function.

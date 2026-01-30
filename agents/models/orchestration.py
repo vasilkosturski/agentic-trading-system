@@ -7,7 +7,7 @@ Each operation has explicit input parameters and returns a typed result.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List, TYPE_CHECKING, Any
+from typing import Optional, List, TYPE_CHECKING
 
 from pydantic import BaseModel
 
@@ -41,7 +41,7 @@ class CycleResult(BaseModel):
 @dataclass
 class ResearchResult:
     """Result of market analyst research."""
-    research_response: Optional[ResearchResponse] = None
+    research_response: ResearchResponse  # Required - throw on failure
     candidates: List[str] = field(default_factory=list)
     sources: List[SourceDto] = field(default_factory=list)
     notes: str = ""
@@ -50,17 +50,26 @@ class ResearchResult:
 @dataclass
 class DecisionResult:
     """Result of decision maker."""
-    decision: Optional[TradingDecision] = None
-    decision_start_time: Optional[datetime] = None
+    decision: TradingDecision  # Required - throw on failure
+    decision_start_time: datetime  # Required - always set before returning
 
 
 @dataclass
 class ExecutionResult:
     """Result of trade execution."""
-    trade_id: Optional[int] = None
-    trade_count: int = 0
-    execution_status: Optional[PhaseStatus] = None
+    execution_status: PhaseStatus  # Required - always set
+    trade_id: Optional[int] = None  # None for HOLD actions
     execution_error: Optional[str] = None
+
+
+@dataclass
+class AccountData:
+    """Account data fetched once at start of cycle.
+
+    Replaces tuple[float, List[Holding]] return for named access.
+    """
+    balance: float
+    holdings: List["Holding"]
 
 
 @dataclass
@@ -89,7 +98,7 @@ class RunContext:
 
     # Account data (fetched once at start)
     balance: float = 0.0
-    holdings: List[Any] = field(default_factory=list)  # List[Holding]
+    holdings: List["Holding"] = field(default_factory=list)
 
     # Recent trading activity (30-day history)
     recent_activity: Optional[RecentActivityResponse] = None
@@ -104,12 +113,12 @@ class RunContext:
     # Research phase data collection
     research_candidates: List[str] = field(default_factory=list)
     research_sources: List[SourceDto] = field(default_factory=list)
-    research_tool_calls: List[Any] = field(default_factory=list)  # ResearchToolCallDto
+    research_tool_calls: List["ResearchToolCallDto"] = field(default_factory=list)
     research_notes: str = ""
 
     # Execution phase data
     trade_id: Optional[int] = None
-    trade_count: int = 0
+    # trade_count removed - derive from trade_id: 1 if trade_id else 0
     execution_status: Optional[PhaseStatus] = None
     execution_error: Optional[str] = None
 

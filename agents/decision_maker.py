@@ -9,12 +9,14 @@ Per design document: system-design/workflows/trade-execution/trade_exec_workflow
 
 import logging
 import json
+from dataclasses import dataclass
 from agents import Agent, function_tool
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING
 
 # Import models
 from models.llm_output import TradingDecision, ResearchResponse
+from models.api_responses import RecentActivityResponse
 
 # Import trading and memory tools
 from trading_tools import buy_shares, sell_shares, _get_balance_raw, _get_holdings_raw
@@ -28,8 +30,121 @@ from models.mcp_types import MCPServerName
 
 if TYPE_CHECKING:
     from mcp_types import MCPPool
+    from models import Holding
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Typed Input Models for DecisionMaker
+# ============================================================================
+
+@dataclass
+class DecisionContext:
+    """Typed input context for Decision Maker.
+
+    Receives typed models, converts to strings internally for prompts.
+    """
+    agent_name: str
+    agent_style: str
+    research_response: ResearchResponse
+    balance: float
+    holdings: List["Holding"]
+    recent_activity: RecentActivityResponse
+    force_trade: bool = False
+    max_positions: int = 10
+
+    @property
+    def position_count(self) -> int:
+        """Current number of positions."""
+        return len(self.holdings)
+
+    @property
+    def holdings_summary(self) -> str:
+        """Convert holdings to JSON string for prompt."""
+        return json.dumps([h.symbol for h in self.holdings]) if self.holdings else "[]"
+
+    @property
+    def historical_context(self) -> str:
+        """Convert recent activity to JSON string for prompt."""
+        return self.recent_activity.model_dump_json()
+
+
+class DecisionMaker:
+    """Object-oriented Decision Maker agent.
+
+    Encapsulates agent creation and prompt building with typed inputs.
+    Converts typed models to strings internally for LLM consumption.
+
+    Usage (async factory pattern):
+        maker = await DecisionMaker.create(agent_name="Warren", agent_id=1, mcp_pool=pool)
+        prompt = maker.build_prompt(context)
+        result = await Runner.run(maker.agent, prompt)
+    """
+
+    # Class-level type annotations (PEP 526) for type checker support
+    agent_name: str
+    agent_id: int
+    mcp_pool: Optional["MCPPool"]
+    model_name: str
+    agent: Agent[TradingDecision]
+
+    def __init__(self) -> None:
+        """Private constructor. Use DecisionMaker.create() instead."""
+        pass
+
+    @classmethod
+    async def create(
+        cls,
+        agent_name: str,
+        agent_id: int,
+        mcp_pool: Optional["MCPPool"] = None,
+        model_name: str = "gpt-4o-mini",
+    ) -> "DecisionMaker":
+        """Create Decision Maker with agent already initialized.
+
+        Args:
+            agent_name: Agent name (e.g., "Warren")
+            agent_id: Agent ID for tools that need it
+            mcp_pool: Optional MCP pool for additional research
+            model_name: Model to use (default: gpt-4o-mini)
+
+        Returns:
+            DecisionMaker instance with agent ready to use
+        """
+        instance = cls.__new__(cls)
+        instance.agent_name = agent_name
+        instance.agent_id = agent_id
+        instance.mcp_pool = mcp_pool
+        instance.model_name = model_name
+        instance.agent = await create_decision_maker_agent(
+            agent_name=agent_name,
+            agent_id=agent_id,
+            mcp_pool=mcp_pool,
+            model_name=model_name,
+        )
+        return instance
+
+    def build_prompt(self, context: DecisionContext) -> str:
+        """Build decision prompt from typed context.
+
+        Args:
+            context: DecisionContext with typed models
+
+        Returns:
+            Formatted prompt string for LLM
+        """
+        return build_decision_prompt(
+            agent_name=context.agent_name,
+            agent_style=context.agent_style,
+            research_response=context.research_response,
+            balance=context.balance,
+            position_count=context.position_count,
+            max_positions=context.max_positions,
+            holdings_summary=context.holdings_summary,
+            historical_context=context.historical_context,
+            force_trade=context.force_trade,
+        )
 
 
 async def create_decision_maker_agent(
