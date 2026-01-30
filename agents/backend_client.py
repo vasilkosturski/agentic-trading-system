@@ -20,21 +20,9 @@ from config import (
 )
 from models import Holding, TradeResult
 from models.run_tracking import CompleteRunData
+from exceptions import BackendAPIError
 
 logger = logging.getLogger(__name__)
-
-
-class BackendAPIError(Exception):
-    """Backend API request failed.
-
-    Raised for:
-    - HTTP errors (4xx, 5xx status codes)
-    - Network errors (connection timeout, DNS failure)
-    - Invalid responses (malformed JSON, etc.)
-    """
-    def __init__(self, message: str, status_code: Optional[int] = None):
-        super().__init__(message)
-        self.status_code = status_code
 
 
 class BackendClient:
@@ -137,25 +125,32 @@ class BackendClient:
     
     # ========== Trading Operations ==========
     
-    async def initialize_agent(self, name: str, initial_balance: float = 100000.0) -> str:
+    async def initialize_agent(self, name: str, initial_balance: float = 100000.0) -> int:
         """Initialize agent account if it doesn't exist.
-        
+
         This is idempotent - safe to call multiple times.
-        
+
         Args:
             name: Agent name (Warren, George, Ray, Cathie)
             initial_balance: Starting balance in USD
-            
+
         Returns:
-            Confirmation message
+            agent_id from backend
+
+        Raises:
+            BackendAPIError: If initialization fails or backend doesn't return agent_id
         """
         url = BACKEND_API_ACCOUNTS
         response = await self._request("POST", url, json_data={
             "agentName": name,
             "initialBalance": initial_balance
         })
-        logger.info(f"Agent {name} initialized with ${initial_balance:,.2f}")
-        return f"Agent {name} initialized successfully with ${initial_balance:,.2f}"
+        data = response.json()
+        agent_id = data.get("id") if isinstance(data, dict) else None
+        if agent_id is None:
+            raise BackendAPIError(f"Backend did not return agent_id for {name}")
+        logger.info(f"Agent {name} (id={agent_id}) initialized with ${initial_balance:,.2f}")
+        return agent_id
     
     async def get_balance(self, agent_id: int) -> float:
         """Get the cash balance of an agent.

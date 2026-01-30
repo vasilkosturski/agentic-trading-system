@@ -10,7 +10,6 @@ Uses BackendClient for centralized HTTP handling.
 """
 
 import logging
-from typing import Optional
 
 from backend_client import get_backend_client, close_backend_client, BackendAPIError
 from models.run_tracking import CompleteRunData
@@ -26,7 +25,7 @@ async def close_client() -> None:
     await close_backend_client()
 
 
-async def create_run(agent_id: int) -> Optional[int]:
+async def create_run(agent_id: int) -> int:
     """Create a new trading run.
 
     POST /api/runs with {"agentId": agent_id}
@@ -35,14 +34,13 @@ async def create_run(agent_id: int) -> Optional[int]:
         agent_id: Backend identifier for the agent
 
     Returns:
-        Run ID if successful, None if failed
+        Run ID from backend
+
+    Raises:
+        BackendAPIError: If run creation fails
     """
-    try:
-        client = get_backend_client()
-        return await client.create_run(agent_id)
-    except BackendAPIError as e:
-        logger.error(f"Failed to create run for agent {agent_id}: {e}")
-        return None
+    client = get_backend_client()
+    return await client.create_run(agent_id)
 
 
 async def update_phase(run_id: int, phase: str) -> bool:

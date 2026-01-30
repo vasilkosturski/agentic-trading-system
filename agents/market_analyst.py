@@ -4,13 +4,42 @@ This agent runs during the RESEARCHING phase to find 3-5 stock candidates
 matching the agent's investment style. Uses Brave Search + Fetch MCPs for
 web research, plus database tools to check current portfolio context.
 
+Dual-Prompt Architecture
+------------------------
+This module uses TWO separate prompts that work together:
+
+1. **System/Instructions Prompt** (from template files):
+   - Location: prompts/market_analyst/{agent_name}.txt (e.g., warren.txt)
+   - Loaded by: load_and_format_prompt() in prompt_loader.py
+   - Purpose: Defines WHO the agent is (personality, investment style, criteria)
+   - Used as: `instructions` parameter when creating the Agent
+   - Fixed per agent personality
+
+2. **Task/User Prompt** (from build_research_prompt()):
+   - Built by: build_research_prompt() function below
+   - Purpose: Defines WHAT to do now (current context, balance, holdings)
+   - Used as: The message passed to Runner.run(agent, prompt)
+   - Changes each trading cycle with fresh data
+
+How they combine:
+    # 1. Create agent with personality (from template)
+    analyst = await create_market_analyst_agent(agent_name, ...)
+
+    # 2. Build task prompt with current context
+    research_prompt = build_research_prompt(balance, holdings, ...)
+
+    # 3. Run agent: system prompt + user prompt
+    result = await Runner.run(analyst, research_prompt)
+
 Per design document: system-design/workflows/trade-execution/trade_exec_workflow_design.md
 """
 
+import json
 import logging
+from dataclasses import dataclass
 from agents import Agent, function_tool
 from datetime import datetime
-from typing import Union, TYPE_CHECKING
+from typing import Union, List, TYPE_CHECKING
 
 # Import model for structured output
 from models.llm_output import ResearchResponse
@@ -36,8 +65,112 @@ from pydantic import ValidationError
 
 if TYPE_CHECKING:
     from mcp_types import MCPPool
+    from models import Holding
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Typed Input Models for MarketAnalyst
+# ============================================================================
+
+@dataclass
+class ResearchContext:
+    """Typed input context for Market Analyst research.
+
+    Receives typed models, converts to strings internally for prompts.
+    """
+    agent_name: str
+    agent_style: str
+    balance: float
+    holdings: List["Holding"]
+    recent_activity: RecentActivityResponse
+    max_positions: int = 10
+
+    @property
+    def position_count(self) -> int:
+        """Current number of positions."""
+        return len(self.holdings)
+
+    @property
+    def holdings_summary(self) -> str:
+        """Convert holdings to JSON string for prompt."""
+        return json.dumps([h.symbol for h in self.holdings]) if self.holdings else "[]"
+
+    @property
+    def historical_context(self) -> str:
+        """Convert recent activity to JSON string for prompt."""
+        return self.recent_activity.model_dump_json()
+
+
+class MarketAnalyst:
+    """Object-oriented Market Analyst agent.
+
+    Encapsulates agent creation and prompt building with typed inputs.
+    Converts typed models to strings internally for LLM consumption.
+
+    Usage (async factory pattern):
+        analyst = await MarketAnalyst.create(agent_name="Warren", mcp_pool=pool)
+        prompt = analyst.build_prompt(context)
+        result = await Runner.run(analyst.agent, prompt)
+    """
+
+    # Class-level type annotations (PEP 526) for type checker support
+    agent_name: str
+    mcp_pool: "MCPPool"
+    model_name: str
+    agent: Agent[ResearchResponse]
+
+    def __init__(self) -> None:
+        """Private constructor. Use MarketAnalyst.create() instead."""
+        pass
+
+    @classmethod
+    async def create(
+        cls,
+        agent_name: str,
+        mcp_pool: "MCPPool",
+        model_name: str = "gpt-4o-mini",
+    ) -> "MarketAnalyst":
+        """Create Market Analyst with agent already initialized.
+
+        Args:
+            agent_name: Agent name (e.g., "Warren")
+            mcp_pool: MCP pool with Brave Search + Fetch servers
+            model_name: Model to use (default: gpt-4o-mini)
+
+        Returns:
+            MarketAnalyst instance with agent ready to use
+        """
+        instance = cls.__new__(cls)
+        instance.agent_name = agent_name
+        instance.mcp_pool = mcp_pool
+        instance.model_name = model_name
+        instance.agent = await create_market_analyst_agent(
+            agent_name=agent_name,
+            mcp_pool=mcp_pool,
+            model_name=model_name,
+        )
+        return instance
+
+    def build_prompt(self, context: ResearchContext) -> str:
+        """Build research prompt from typed context.
+
+        Args:
+            context: ResearchContext with typed models
+
+        Returns:
+            Formatted prompt string for LLM
+        """
+        return build_research_prompt(
+            agent_name=context.agent_name,
+            agent_style=context.agent_style,
+            balance=context.balance,
+            position_count=context.position_count,
+            max_positions=context.max_positions,
+            holdings_summary=context.holdings_summary,
+            historical_context=context.historical_context,
+        )
 
 
 async def create_market_analyst_agent(
@@ -216,7 +349,6 @@ def build_research_prompt(
     max_positions: int,
     holdings_summary: str,
     historical_context: str = "{}",
-    force_trade: bool = False,
 ) -> str:
     """Build the research prompt for Market Analyst.
 
@@ -228,7 +360,6 @@ def build_research_prompt(
         max_positions: Maximum positions allowed (10)
         holdings_summary: Summary of current holdings
         historical_context: JSON string with recent trading activity
-        force_trade: Whether agent must find candidates (not used by analyst)
 
     Returns:
         Formatted prompt string

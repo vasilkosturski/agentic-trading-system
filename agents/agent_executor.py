@@ -14,18 +14,19 @@ Architecture:
 import json
 import logging
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from agents import Runner
 
-from models import TradingDecision, ResearchResponse, CycleResult, Holding
+from models import TradingDecision, ResearchResponse, CycleResult
 from models.orchestration import (
+    AccountData,
     RunContext,
     ResearchResult,
     DecisionResult,
     ExecutionResult,
 )
-from models.api_responses import RecentActivityResponse, ToolError
+from models.api_responses import RecentActivityResponse
 from models.run_tracking import (
     CompleteRunData,
     PhaseStatus,
@@ -62,9 +63,9 @@ from status_broadcaster import (
 # Import tool tracking
 from tool_tracking import ToolTracker
 
-# Import two-agent architecture
-from market_analyst import create_market_analyst_agent, build_research_prompt
-from decision_maker import create_decision_maker_agent, build_decision_prompt
+# Import two-agent architecture (OO classes with typed inputs)
+from market_analyst import MarketAnalyst, ResearchContext
+from decision_maker import DecisionMaker, DecisionContext
 
 logger = logging.getLogger(__name__)
 
@@ -139,11 +140,11 @@ class AgentExecutor:
             run_id = await self._start_run()
             
             # Fetch account data once (reused by both agents)
-            balance, holdings = await self._fetch_account_data(self.agent_id)
-            
+            account_data = await self._fetch_account_data(self.agent_id)
+
             # Fetch recent activity for context
             recent_activity = await self._fetch_recent_activity(self.agent_id)
-            
+
             # Build context inline (no separate function needed)
             ctx = RunContext(
                 run_id=run_id,
@@ -153,8 +154,8 @@ class AgentExecutor:
                 model_name=self.model_name,
                 research_start_time=research_start_time,
                 tracker=ToolTracker(run_id),
-                balance=balance,
-                holdings=holdings,
+                balance=account_data.balance,
+                holdings=account_data.holdings,
                 recent_activity=recent_activity,
             )
 
@@ -178,15 +179,19 @@ class AgentExecutor:
             ctx.decision_start_time = decision_result.decision_start_time
 
             # === EXECUTION PHASE ===
-            execution_result = await self._execute_trade(
-                run_id=ctx.run_id,
-                agent_id=ctx.agent_id,
-                decision=ctx.decision,
-            )
-            ctx.trade_id = execution_result.trade_id
-            ctx.trade_count = execution_result.trade_count
-            ctx.execution_status = execution_result.execution_status
-            ctx.execution_error = execution_result.execution_error
+            # Only execute trade for BUY/SELL decisions, skip for HOLD
+            if ctx.decision.action in (TradeDecision.BUY, TradeDecision.SELL):
+                execution_result = await self._execute_trade(
+                    run_id=ctx.run_id,
+                    agent_id=ctx.agent_id,
+                    decision=ctx.decision,
+                )
+                ctx.trade_id = execution_result.trade_id
+                ctx.execution_status = execution_result.execution_status
+                ctx.execution_error = execution_result.execution_error
+            else:
+                # HOLD decision - skip execution phase
+                ctx.execution_status = PhaseStatus.SKIPPED
 
             # === FINALIZATION ===
             await self._finalize_run(ctx)
@@ -195,9 +200,10 @@ class AgentExecutor:
                 f"✅ {self.name} completed portfolio review at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             )
 
+            # Derive trade_count from trade_id presence (1 if executed, 0 otherwise)
             return CycleResult(
                 decision=ctx.decision,
-                trade_count=ctx.trade_count,
+                trade_count=1 if ctx.trade_id else 0,
                 run_id=ctx.run_id,
             )
 
@@ -228,11 +234,8 @@ class AgentExecutor:
         )
 
         # Create run via API (POST /api/runs)
+        # create_run now throws BackendAPIError on failure
         run_id = await create_run(self.agent_id)
-        if run_id is None:
-            raise RuntimeError(
-                f"Failed to create run for {self.name}. Cannot proceed without runId."
-            )
 
         # Update to RESEARCHING phase
         await update_phase(run_id, RunPhase.RESEARCHING)
@@ -244,18 +247,26 @@ class AgentExecutor:
 
         return run_id
 
-    async def _fetch_account_data(self, agent_id: int) -> tuple[float, List[Holding]]:
+    async def _fetch_account_data(self, agent_id: int) -> AccountData:
         """Fetch balance and holdings once for the cycle.
 
         Args:
             agent_id: Agent ID for data fetching
 
         Returns:
-            Tuple of (balance, holdings)
+            AccountData with balance and holdings
+
+        Raises:
+            RuntimeError: If fetching fails
         """
-        balance = await _get_balance_raw(agent_id)
-        holdings = await _get_holdings_raw(agent_id)
-        return balance, holdings
+        try:
+            balance = await _get_balance_raw(agent_id)
+            holdings = await _get_holdings_raw(agent_id)
+            return AccountData(balance=balance, holdings=holdings)
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to fetch account data for agent {agent_id}: {e}"
+            )
 
     async def _fetch_recent_activity(self, agent_id: int) -> RecentActivityResponse:
         """Fetch recent trading activity for context.
@@ -269,14 +280,10 @@ class AgentExecutor:
         Raises:
             RuntimeError: If fetching fails
         """
+        # get_recent_activity throws BackendAPIError on failure
         result = await get_recent_activity(agent_id, days=30)
 
-        if isinstance(result, ToolError):
-            raise RuntimeError(
-                f"Failed to fetch recent activity for agent {agent_id}: {result.error}"
-            )
-
-        logger.info(f"📊 Context prepared: {result.totalRuns} runs, {result.totalTrades} trades (30 days)")
+        logger.info(f"📊 Context prepared: {result.computed_total_runs} runs, {result.computed_total_trades} trades (30 days)")
         return result
 
     async def _run_market_analyst(
@@ -295,9 +302,6 @@ class AgentExecutor:
         """
         research_start_time = datetime.now()
 
-        # Build holdings summary as JSON list
-        holdings_summary = json.dumps([h.symbol for h in ctx.holdings]) if ctx.holdings else "[]"
-
         # Log portfolio access
         portfolio_data = {
             "balance": round(ctx.balance, 2),
@@ -306,37 +310,38 @@ class AgentExecutor:
         }
         ctx.tracker.log_data_access("Portfolio", json.dumps(portfolio_data))
 
-        # Create Market Analyst agent
-        analyst = await create_market_analyst_agent(
+        # Create Market Analyst using async factory pattern
+        market_analyst = await MarketAnalyst.create(
             agent_name=ctx.agent_name,
             mcp_pool=mcp_pool,
             model_name=ctx.model_name,
         )
 
-        # Build research prompt (serialize recent_activity to JSON for LLM)
-        research_prompt = build_research_prompt(
+        # Build typed context (class converts to strings internally)
+        research_context = ResearchContext(
             agent_name=ctx.agent_name,
             agent_style=ctx.agent_style,
             balance=ctx.balance,
-            position_count=len(ctx.holdings),
+            holdings=ctx.holdings,
+            recent_activity=ctx.recent_activity,
             max_positions=10,
-            holdings_summary=holdings_summary,
-            historical_context=ctx.recent_activity.model_dump_json(),
-            force_trade=False,
         )
+
+        # Build prompt using OO interface
+        research_prompt = market_analyst.build_prompt(research_context)
 
         logger.info(f"🔬 Running Market Analyst for {ctx.agent_name}...")
 
         # Run Market Analyst
-        result = await Runner.run(analyst, research_prompt, max_turns=30)
+        result = await Runner.run(market_analyst.agent, research_prompt, max_turns=30)
 
-        # Extract ResearchResponse - FAIL FAST if no output
-        if not hasattr(result, 'output') or not result.output:
+        # Extract ResearchResponse - type-safe using SDK's final_output_as()
+        try:
+            research_response = result.final_output_as(ResearchResponse)
+        except TypeError as e:
             raise RuntimeError(
-                f"Market Analyst for {ctx.agent_name} failed to produce structured output. "
-                f"Result type: {type(result)}, has output attr: {hasattr(result, 'output')}"
-            )
-        research_response = result.output
+                f"Market Analyst for {ctx.agent_name} failed to produce ResearchResponse: {e}"
+            ) from e
 
         # Build sources list
         sources = [
@@ -353,7 +358,7 @@ class AgentExecutor:
         )
         logger.info(f"📊 Market Analyst completed in {research_latency_ms}ms")
 
-        candidates = research_response.candidates if hasattr(research_response, 'candidates') else []
+        candidates = research_response.candidates
         logger.info(f"✅ Market Analyst found {len(candidates)} candidates with {len(sources)} sources")
 
         return ResearchResult(
@@ -388,43 +393,44 @@ class AgentExecutor:
             ctx.agent_id, ctx.agent_name, PHASE_DECIDING, "Making investment decision", 70
         )
 
-        # Build holdings summary as JSON list (reuse from context)
-        holdings_summary = json.dumps([h.symbol for h in ctx.holdings]) if ctx.holdings else "[]"
-
-        # Create Decision Maker agent (now uses structured output)
-        trader = await create_decision_maker_agent(
+        # Create Decision Maker using async factory pattern
+        decision_maker = await DecisionMaker.create(
             agent_name=ctx.agent_name,
             agent_id=ctx.agent_id,
             mcp_pool=mcp_pool,
             model_name=ctx.model_name,
         )
 
-        # Build decision prompt (serialize recent_activity to JSON for LLM)
-        decision_prompt = build_decision_prompt(
+        # Type narrowing: research_response is guaranteed set by _run_market_analyst
+        assert ctx.research_response is not None, "research_response must be set before decision phase"
+
+        # Build typed context (class converts to strings internally)
+        decision_context = DecisionContext(
             agent_name=ctx.agent_name,
             agent_style=ctx.agent_style,
             research_response=ctx.research_response,
             balance=ctx.balance,
-            position_count=len(ctx.holdings),
-            max_positions=10,
-            holdings_summary=holdings_summary,
-            historical_context=ctx.recent_activity.model_dump_json(),
+            holdings=ctx.holdings,
+            recent_activity=ctx.recent_activity,
             force_trade=force_trade,
+            max_positions=10,
         )
+
+        # Build prompt using OO interface
+        decision_prompt = decision_maker.build_prompt(decision_context)
 
         logger.info(f"🧠 Running Decision Maker for {ctx.agent_name}...")
 
         # Run Decision Maker agent - get structured output directly
-        result = await Runner.run(trader, decision_prompt, max_turns=30)
+        result = await Runner.run(decision_maker.agent, decision_prompt, max_turns=30)
 
-        # Extract TradingDecision from structured output - FAIL FAST if no output
-        if not hasattr(result, 'output') or not result.output:
+        # Extract TradingDecision - type-safe using SDK's final_output_as()
+        try:
+            decision = result.final_output_as(TradingDecision)
+        except TypeError as e:
             raise RuntimeError(
-                f"Decision Maker for {ctx.agent_name} failed to produce structured output. "
-                f"Result type: {type(result)}, has output attr: {hasattr(result, 'output')}"
-            )
-
-        decision = result.output
+                f"Decision Maker for {ctx.agent_name} failed to produce TradingDecision: {e}"
+            ) from e
 
         logger.info(f"✅ Decision Maker: {decision.action} {decision.symbol or ''}")
 
@@ -466,7 +472,6 @@ class AgentExecutor:
         logger.info(f"🟡 ABOUT TO EXECUTE: decision={decision}")
 
         trade_id = None
-        trade_count = 0
         execution_status = None
         execution_error = None
 
@@ -503,7 +508,6 @@ class AgentExecutor:
                         agent_name=self.name,
                     )
 
-                trade_count = 1
                 execution_status = PhaseStatus.COMPLETED
                 trade_id = result.tradeId
 
@@ -516,9 +520,8 @@ class AgentExecutor:
             execution_status = PhaseStatus.SKIPPED
 
         return ExecutionResult(
-            trade_id=trade_id,
-            trade_count=trade_count,
             execution_status=execution_status,
+            trade_id=trade_id,
             execution_error=execution_error,
         )
 
@@ -527,43 +530,34 @@ class AgentExecutor:
 
         Args:
             ctx: RunContext with all data to persist
+
+        Note: This function is only called after successful completion of all phases.
+        By this point, research_start_time, decision_start_time, and decision are
+        guaranteed to be set (orchestrator ensures this via fail-fast in each phase).
         """
-        # Calculate latencies
-        decision_latency_ms = None
-        research_latency_ms = None
-        
-        if ctx.decision_start_time:
-            decision_latency_ms = int(
-                (datetime.now() - ctx.decision_start_time).total_seconds() * 1000
-            )
-        
-        if ctx.research_start_time and ctx.decision_start_time:
-            research_latency_ms = int(
-                (ctx.decision_start_time - ctx.research_start_time).total_seconds() * 1000
-            )
+        # Calculate latencies (no defensive checks - values guaranteed by orchestration)
+        decision_latency_ms = int(
+            (datetime.now() - ctx.decision_start_time).total_seconds() * 1000
+        )
+        research_latency_ms = int(
+            (ctx.decision_start_time - ctx.research_start_time).total_seconds() * 1000
+        )
 
-        # Determine trade decision
-        trade_decision = TradeDecision.HOLD
-        symbol = None
-        quantity = None
-
-        if ctx.decision:
-            if ctx.decision.action == TradeDecision.BUY:
-                trade_decision = TradeDecision.BUY
-            elif ctx.decision.action == TradeDecision.SELL:
-                trade_decision = TradeDecision.SELL
-            symbol = ctx.decision.symbol if ctx.decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
-            quantity = ctx.decision.quantity if ctx.decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
+        # Extract decision details (decision guaranteed by _run_decision_maker fail-fast)
+        decision = ctx.decision
+        trade_decision = decision.action
+        symbol = decision.symbol if decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
+        quantity = decision.quantity if decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
 
         # Build reasoning DTO from decision
         reasoning = None
-        if ctx.decision and ctx.decision.fullReasoning:
+        if decision.fullReasoning:
             reasoning = ReasoningDto(
                 portfolioContext=None,
                 historicalContext=None,
                 researchSummary=None,
                 candidateEvaluation=None,
-                finalRationale=ctx.decision.fullReasoning[:2000]
+                finalRationale=decision.fullReasoning[:2000]
             )
 
         # Build CompleteRunData
@@ -591,8 +585,8 @@ class AgentExecutor:
 
         # Broadcast: COMPLETED
         outcome_message = (
-            f"Completed - {ctx.trade_count} trade(s) executed"
-            if ctx.trade_count > 0
+            "Completed - 1 trade executed"
+            if ctx.trade_id
             else "Completed - No trades (HOLD decision)"
         )
         broadcast_status(

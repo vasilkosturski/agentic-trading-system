@@ -17,7 +17,6 @@ API Design:
 """
 
 import logging
-from typing import Optional, Union
 from config import BACKEND_BASE_URL
 
 # Import unified HTTP client
@@ -27,7 +26,6 @@ from http_client import call_backend, BackendAPIError
 from models.api_responses import (
     RecentActivityResponse,
     SymbolHistoryResponse,
-    ToolError,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 async def get_trading_history(
     agent_id: int, symbol: str, days: int = 30
-) -> Union[SymbolHistoryResponse, ToolError]:
+) -> SymbolHistoryResponse:
     """
     Get complete trading history for a specific stock, including:
     - All trades (BUY/SELL) with reasoning
@@ -48,36 +46,25 @@ async def get_trading_history(
         days: How many days back to look (default 30)
 
     Returns:
-        SymbolHistoryResponse with typed trading history, or ToolError on failure
+        SymbolHistoryResponse with typed trading history
+
+    Raises:
+        BackendAPIError: If API call fails
     """
-    try:
-        url = f"{BACKEND_BASE_URL}/api/memory/trading-history"
-        params = {
-            "agentId": agent_id,
-            "symbol": symbol,
-            "days": days
-        }
+    url = f"{BACKEND_BASE_URL}/api/memory/trading-history"
+    params = {
+        "agentId": agent_id,
+        "symbol": symbol,
+        "days": days
+    }
 
-        response = await call_backend("GET", url, params=params, timeout=10)
-        return SymbolHistoryResponse.model_validate_json(response.text)
-
-    except BackendAPIError as e:
-        if e.status_code == 404:
-            return ToolError(
-                error="No trading history found",
-                error_type="not_found",
-                context={"symbol": symbol, "days": days}
-            )
-        return ToolError(
-            error=str(e),
-            error_type="api_error",
-            context={"symbol": symbol, "days": days}
-        )
+    response = await call_backend("GET", url, params=params, timeout=10)
+    return SymbolHistoryResponse.model_validate_json(response.text)
 
 
 async def get_recent_activity(
     agent_id: int, days: int = 7
-) -> Union[RecentActivityResponse, ToolError]:
+) -> RecentActivityResponse:
     """
     Get recent trading activity across all stocks, organized by run.
     Shows what the agent has been doing, thinking, and considering.
@@ -87,30 +74,19 @@ async def get_recent_activity(
         days: How many days back to look (default 7)
 
     Returns:
-        RecentActivityResponse with typed activity data, or ToolError on failure
+        RecentActivityResponse with typed activity data
+
+    Raises:
+        BackendAPIError: If API call fails
     """
-    try:
-        url = f"{BACKEND_BASE_URL}/api/memory/recent-activity"
-        params = {
-            "agentId": agent_id,
-            "days": days
-        }
+    url = f"{BACKEND_BASE_URL}/api/memory/recent-activity"
+    params = {
+        "agentId": agent_id,
+        "days": days
+    }
 
-        response = await call_backend("GET", url, params=params, timeout=10)
-        return RecentActivityResponse.model_validate_json(response.text)
-
-    except BackendAPIError as e:
-        if e.status_code == 404:
-            return ToolError(
-                error="No recent activity found",
-                error_type="not_found",
-                context={"days": days}
-            )
-        return ToolError(
-            error=str(e),
-            error_type="api_error",
-            context={"days": days}
-        )
+    response = await call_backend("GET", url, params=params, timeout=10)
+    return RecentActivityResponse.model_validate_json(response.text)
 
 
 # Tool metadata for OpenAI Agents SDK
