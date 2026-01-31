@@ -6,7 +6,7 @@ Uses OpenAI Agents SDK @function_tool decorator for automatic schema generation
 
 import logging
 from agents import function_tool
-from typing import Dict, List, Any
+from typing import List, Any
 
 # Import centralized configuration
 from config import BACKEND_API_MARKET

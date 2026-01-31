@@ -9,13 +9,9 @@ with a run() interface for TradingSystem compatibility.
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from textwrap import dedent
-from typing import Dict, Literal, cast
 
-from agents import Agent, trace
-from agents import function_tool
+from agents import trace
 
-from market_tools import MARKET_TOOLS
 from agent_executor import AgentExecutor
 from mcp_types import MCPName, MCPPool
 
