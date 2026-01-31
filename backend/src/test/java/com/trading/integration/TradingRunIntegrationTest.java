@@ -1,6 +1,9 @@
 package com.trading.integration;
 
 import com.trading.dto.request.CompleteRunRequest;
+import com.trading.dto.request.DecisionPhaseDto;
+import com.trading.dto.request.ExecutionPhaseDto;
+import com.trading.dto.request.ResearchPhaseDto;
 import com.trading.dto.request.RunQueryFilter;
 import com.trading.dto.response.TradingRunDetailDto;
 import com.trading.dto.response.TradingRunDto;
@@ -296,42 +299,62 @@ class TradingRunIntegrationTest {
     }
 
     private void completeRunWithDecision(Long runId, TradeDecision decision, String symbol, Integer quantity) {
-        CompleteRunRequest request = new CompleteRunRequest();
-        request.setCandidates(Arrays.asList("AAPL", "GOOGL", "MSFT"));
-        request.setResearchNotes("Research notes for test");
-        request.setResearchLatencyMs(1000L);
-        request.setDecision(decision);
-        request.setSymbol(symbol);
-        request.setQuantity(quantity);
-        request.setDecisionLatencyMs(500L);
+        // Research phase DTO
+        ResearchPhaseDto research = new ResearchPhaseDto();
+        research.setCandidates(Arrays.asList("AAPL", "GOOGL", "MSFT"));
+        research.setNotes("Research notes for test");
+        research.setLatencyMs(1000L);
 
+        // Decision phase DTO
+        DecisionPhaseDto decisionDto = new DecisionPhaseDto();
+        decisionDto.setDecision(decision);
+        decisionDto.setSymbol(symbol);
+        decisionDto.setQuantity(quantity);
+        decisionDto.setLatencyMs(500L);
+
+        // Execution phase DTO (only for non-HOLD)
+        ExecutionPhaseDto execution = null;
         if (decision != TradeDecision.HOLD) {
-            request.setExecutionStatus(PhaseStatus.COMPLETED);
+            execution = new ExecutionPhaseDto();
+            execution.setStatus(PhaseStatus.COMPLETED);
         }
 
-        tradingRunService.completeRun(runId, request);
+        tradingRunService.completeRun(runId, new CompleteRunRequest(research, decisionDto, execution));
     }
 
     private CompleteRunRequest buildBuyCompleteRequest() {
-        CompleteRunRequest request = new CompleteRunRequest();
-        request.setCandidates(Arrays.asList("AAPL", "GOOGL", "MSFT"));
-        request.setResearchNotes("Tech sector analysis - strong fundamentals");
-        request.setResearchLatencyMs(3400L);
-        request.setDecision(TradeDecision.BUY);
-        request.setSymbol("AAPL");
-        request.setQuantity(10);
-        request.setDecisionLatencyMs(1200L);
-        request.setExecutionStatus(PhaseStatus.COMPLETED);
-        return request;
+        // Research phase DTO
+        ResearchPhaseDto research = new ResearchPhaseDto();
+        research.setCandidates(Arrays.asList("AAPL", "GOOGL", "MSFT"));
+        research.setNotes("Tech sector analysis - strong fundamentals");
+        research.setLatencyMs(3400L);
+
+        // Decision phase DTO
+        DecisionPhaseDto decision = new DecisionPhaseDto();
+        decision.setDecision(TradeDecision.BUY);
+        decision.setSymbol("AAPL");
+        decision.setQuantity(10);
+        decision.setLatencyMs(1200L);
+
+        // Execution phase DTO
+        ExecutionPhaseDto execution = new ExecutionPhaseDto();
+        execution.setStatus(PhaseStatus.COMPLETED);
+
+        return new CompleteRunRequest(research, decision, execution);
     }
 
     private CompleteRunRequest buildHoldCompleteRequest() {
-        CompleteRunRequest request = new CompleteRunRequest();
-        request.setCandidates(Arrays.asList("AAPL", "GOOGL", "MSFT"));
-        request.setResearchNotes("Market conditions uncertain - holding");
-        request.setResearchLatencyMs(2800L);
-        request.setDecision(TradeDecision.HOLD);
-        request.setDecisionLatencyMs(800L);
-        return request;
+        // Research phase DTO
+        ResearchPhaseDto research = new ResearchPhaseDto();
+        research.setCandidates(Arrays.asList("AAPL", "GOOGL", "MSFT"));
+        research.setNotes("Market conditions uncertain - holding");
+        research.setLatencyMs(2800L);
+
+        // Decision phase DTO
+        DecisionPhaseDto decision = new DecisionPhaseDto();
+        decision.setDecision(TradeDecision.HOLD);
+        decision.setLatencyMs(800L);
+
+        return new CompleteRunRequest(research, decision, null);
     }
 }

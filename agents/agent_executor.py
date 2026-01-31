@@ -29,8 +29,13 @@ from models.orchestration import (
 from models.api_responses import RecentActivityResponse
 from models.run_tracking import (
     CompleteRunData,
+    DecisionPhaseData,
+    DecisionToolCallDto,
+    ExecutionPhaseData,
     PhaseStatus,
     ReasoningDto,
+    ResearchPhaseData,
+    ResearchToolCallDto,
     RunPhase,
     SourceDto,
     TradeDecision,
@@ -177,6 +182,15 @@ class AgentExecutor:
             )
             ctx.decision = decision_result.decision
             ctx.decision_start_time = decision_result.decision_start_time
+
+            # Build decision sources - track what data informed the decision
+            ctx.decision_sources = [
+                # Research sources passed to decision maker
+                *[SourceDto.web(title=s.title, url=s.url) for s in ctx.research_response.sources],
+                # Internal data accessed
+                SourceDto.system_context(f"Portfolio: ${ctx.balance:,.2f}, {len(ctx.holdings)} positions"),
+                SourceDto.system_context(f"Recent activity: {len(ctx.recent_activity.runs) if ctx.recent_activity else 0} runs"),
+            ]
 
             # === EXECUTION PHASE ===
             # Only execute trade for BUY/SELL decisions, skip for HOLD
@@ -531,11 +545,17 @@ class AgentExecutor:
         Args:
             ctx: RunContext with all data to persist
 
-        Note: This function is only called after successful completion of all phases.
-        By this point, research_start_time, decision_start_time, and decision are
-        guaranteed to be set (orchestrator ensures this via fail-fast in each phase).
+        Preconditions (enforced via assertions):
+            - decision_start_time: set before decision phase
+            - decision: set by _run_decision_maker
+            - research_response: set by _run_market_analyst
         """
-        # Calculate latencies (no defensive checks - values guaranteed by orchestration)
+        # Fail-fast assertions - document and enforce preconditions
+        assert ctx.decision_start_time is not None, "decision_start_time must be set"
+        assert ctx.decision is not None, "decision must be set"
+        assert ctx.research_response is not None, "research_response must be set"
+
+        # Calculate latencies
         decision_latency_ms = int(
             (datetime.now() - ctx.decision_start_time).total_seconds() * 1000
         )
@@ -549,35 +569,46 @@ class AgentExecutor:
         symbol = decision.symbol if decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
         quantity = decision.quantity if decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
 
-        # Build reasoning DTO from decision
-        reasoning = None
-        if decision.fullReasoning:
-            reasoning = ReasoningDto(
-                portfolioContext=None,
-                historicalContext=None,
-                researchSummary=None,
-                candidateEvaluation=None,
-                finalRationale=decision.fullReasoning[:2000]
-            )
+        # Build reasoning DTO from decision's structured fields
+        # Use new structured fields if available, fall back to fullReasoning for legacy
+        reasoning = ReasoningDto(
+            portfolioContext=decision.portfolioContext[:2000] if decision.portfolioContext else None,
+            historicalContext=decision.historicalContext[:2000] if decision.historicalContext else None,
+            researchSummary=decision.researchSummary[:2000] if decision.researchSummary else None,
+            candidateEvaluation=decision.candidateEvaluation[:2000] if decision.candidateEvaluation else None,
+            finalRationale=(decision.finalRationale or decision.fullReasoning)[:2000] or None,
+        )
 
-        # Build CompleteRunData
-        complete_data = CompleteRunData(
-            # Research phase
+        # Build nested phase DTOs
+        research_data = ResearchPhaseData(
             candidates=ctx.research_candidates,
-            researchSources=ctx.research_sources,
-            researchNotes=ctx.research_notes,
-            researchToolCalls=ctx.research_tool_calls,
-            researchLatencyMs=research_latency_ms,
-            # Decision phase
+            sources=ctx.research_sources,
+            notes=ctx.research_notes,
+            toolCalls=ctx.research_tool_calls,
+            latencyMs=research_latency_ms,
+        )
+
+        decision_data = DecisionPhaseData(
             decision=trade_decision,
             symbol=symbol,
             quantity=quantity,
             reasoning=reasoning,
-            decisionLatencyMs=decision_latency_ms,
-            # Execution phase
+            sources=ctx.decision_sources,
+            toolCalls=ctx.decision_tool_calls,
+            latencyMs=decision_latency_ms,
+        )
+
+        execution_data = ExecutionPhaseData(
             tradeId=ctx.trade_id,
-            executionStatus=ctx.execution_status,
+            status=ctx.execution_status,
             errorDetails=ctx.execution_error,
+        )
+
+        # Build CompleteRunData with nested structure
+        complete_data = CompleteRunData(
+            research=research_data,
+            decision=decision_data,
+            execution=execution_data,
         )
 
         # Complete the run via API
@@ -623,11 +654,17 @@ class AgentExecutor:
         if run_id is not None:
             await update_phase(run_id, RunPhase.ERROR)
 
-            # Complete with partial data and error
-            error_data = CompleteRunData(
+            # Complete with partial data and error (nested structure)
+            error_decision = DecisionPhaseData(
                 decision=TradeDecision.HOLD,
-                executionStatus=PhaseStatus.FAILED,
+            )
+            error_execution = ExecutionPhaseData(
+                status=PhaseStatus.FAILED,
                 errorDetails=str(error)[:500],
+            )
+            error_data = CompleteRunData(
+                decision=error_decision,
+                execution=error_execution,
             )
             await complete_run(run_id, error_data)
 

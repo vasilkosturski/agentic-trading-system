@@ -16,7 +16,7 @@ from models.run_tracking import SourceDto, PhaseStatus
 from models.api_responses import RecentActivityResponse
 
 if TYPE_CHECKING:
-    from models.run_tracking import ResearchToolCallDto
+    from models.run_tracking import ResearchToolCallDto, DecisionToolCallDto
     from tool_tracking import ToolTracker
     from models import Holding
 
@@ -115,6 +115,10 @@ class RunContext:
     research_sources: List[SourceDto] = field(default_factory=list)
     research_tool_calls: List["ResearchToolCallDto"] = field(default_factory=list)
     research_notes: str = ""
+
+    # Decision phase data collection
+    decision_sources: List[SourceDto] = field(default_factory=list)
+    decision_tool_calls: List["DecisionToolCallDto"] = field(default_factory=list)
 
     # Execution phase data
     trade_id: Optional[int] = None

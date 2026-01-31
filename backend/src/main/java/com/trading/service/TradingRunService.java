@@ -1,6 +1,9 @@
 package com.trading.service;
 
 import com.trading.dto.request.CompleteRunRequest;
+import com.trading.dto.request.DecisionPhaseDto;
+import com.trading.dto.request.ExecutionPhaseDto;
+import com.trading.dto.request.ResearchPhaseDto;
 import com.trading.dto.request.RunQueryFilter;
 import com.trading.dto.response.*;
 import com.trading.dto.websocket.DecisionCompletedMessage;
@@ -139,37 +142,45 @@ public class TradingRunService {
      */
     @Transactional
     public void completeRun(Long runId, CompleteRunRequest request) {
-        logger.info("Completing run ID: {} with decision: {}", runId, request.getDecision());
-
         // Validate request first
         request.validate();
 
+        // Extract nested DTOs
+        ResearchPhaseDto researchDto = request.getResearch();
+        DecisionPhaseDto decisionDto = request.getDecision();
+        ExecutionPhaseDto executionDto = request.getExecution();
+
+        TradeDecision tradeDecision = decisionDto.getDecision();
+        logger.info("Completing run ID: {} with decision: {}", runId, tradeDecision);
+
         TradingRun run = getRun(runId);
 
-        // Create and persist research phase
-        ResearchPhase researchPhase = new ResearchPhase(run);
-        researchPhase.setCandidates(request.getCandidates());
-        researchPhase.setSources(request.getResearchSources());
-        researchPhase.setResearchNotes(request.getResearchNotes());
-        researchPhase.setToolCalls(request.getResearchToolCalls());
-        researchPhase.setLatencyMs(request.getResearchLatencyMs());
-        researchPhaseRepository.save(researchPhase);
+        // Create and persist research phase (if provided)
+        if (researchDto != null) {
+            ResearchPhase researchPhase = new ResearchPhase(run);
+            researchPhase.setCandidates(researchDto.getCandidates());
+            researchPhase.setSources(researchDto.getSources());
+            researchPhase.setResearchNotes(researchDto.getNotes());
+            researchPhase.setToolCalls(researchDto.getToolCalls());
+            researchPhase.setLatencyMs(researchDto.getLatencyMs());
+            researchPhaseRepository.save(researchPhase);
+        }
 
         // Create and persist decision phase
         DecisionPhase decisionPhase = new DecisionPhase(run);
-        decisionPhase.setDecision(request.getDecision());
-        decisionPhase.setSymbol(request.getSymbol());
-        decisionPhase.setQuantity(request.getQuantity());
-        decisionPhase.setReasoning(request.getReasoning());
-        decisionPhase.setSources(request.getDecisionSources());
-        decisionPhase.setToolCalls(request.getDecisionToolCalls());
-        decisionPhase.setLatencyMs(request.getDecisionLatencyMs());
+        decisionPhase.setDecision(tradeDecision);
+        decisionPhase.setSymbol(decisionDto.getSymbol());
+        decisionPhase.setQuantity(decisionDto.getQuantity());
+        decisionPhase.setReasoning(decisionDto.getReasoning());
+        decisionPhase.setSources(decisionDto.getSources());
+        decisionPhase.setToolCalls(decisionDto.getToolCalls());
+        decisionPhase.setLatencyMs(decisionDto.getLatencyMs());
         decisionPhaseRepository.save(decisionPhase);
 
         // Create execution phase only for BUY/SELL decisions
         Long tradeId = null;
-        if (request.getDecision() != TradeDecision.HOLD) {
-            ExecutionPhase executionPhase = createExecutionPhase(run, decisionPhase, request);
+        if (tradeDecision != TradeDecision.HOLD) {
+            ExecutionPhase executionPhase = createExecutionPhase(run, decisionPhase, executionDto);
             executionPhaseRepository.save(executionPhase);
             if (executionPhase.getTrade() != null) {
                 tradeId = executionPhase.getTrade().getId();
@@ -181,10 +192,10 @@ public class TradingRunService {
         tradingRunRepository.save(run);
 
         logger.info("Run {} completed with decision: {}, trade ID: {}",
-            runId, request.getDecision(), tradeId);
+            runId, tradeDecision, tradeId);
 
         // Broadcast decision completed
-        broadcastDecisionCompleted(run, request.getDecision(), tradeId);
+        broadcastDecisionCompleted(run, tradeDecision, tradeId);
     }
 
     // ========== 3.5 getRunWithAllPhases ==========
@@ -379,31 +390,37 @@ public class TradingRunService {
     }
 
     /**
-     * Create execution phase based on request data.
+     * Create execution phase based on execution DTO.
      */
     private ExecutionPhase createExecutionPhase(TradingRun run, DecisionPhase decisionPhase,
-                                                CompleteRunRequest request) {
+                                                ExecutionPhaseDto executionDto) {
         ExecutionPhase executionPhase = new ExecutionPhase();
         executionPhase.setRun(run);
         executionPhase.setDecision(decisionPhase);
 
-        if (request.getTradeId() != null) {
-            // Trade was executed - link to transaction
-            AccountTransaction trade = accountTransactionRepository.findById(request.getTradeId())
-                .orElse(null);
-            executionPhase.setTrade(trade);
-        }
+        if (executionDto != null) {
+            Long tradeId = executionDto.getTradeId();
+            if (tradeId != null) {
+                // Trade was executed - link to transaction
+                AccountTransaction trade = accountTransactionRepository.findById(tradeId)
+                    .orElse(null);
+                executionPhase.setTrade(trade);
+            }
 
-        if (request.getExecutionStatus() != null) {
-            executionPhase.setStatus(request.getExecutionStatus());
+            if (executionDto.getStatus() != null) {
+                executionPhase.setStatus(executionDto.getStatus());
+            } else {
+                // Default based on whether trade was successful
+                executionPhase.setStatus(tradeId != null
+                    ? PhaseStatus.COMPLETED
+                    : PhaseStatus.FAILED);
+            }
+
+            executionPhase.setErrorDetails(executionDto.getErrorDetails());
         } else {
-            // Default based on whether trade was successful
-            executionPhase.setStatus(request.getTradeId() != null
-                ? PhaseStatus.COMPLETED
-                : PhaseStatus.FAILED);
+            // No execution DTO provided - default to failed
+            executionPhase.setStatus(PhaseStatus.FAILED);
         }
-
-        executionPhase.setErrorDetails(request.getErrorDetails());
 
         return executionPhase;
     }

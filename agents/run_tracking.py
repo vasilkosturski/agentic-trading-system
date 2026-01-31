@@ -7,14 +7,11 @@ Implements the phase-based tracking workflow:
 - complete_run(): PUT /api/runs/{id}/complete
 
 Uses BackendClient for centralized HTTP handling.
+All functions let exceptions propagate for consistent error handling.
 """
 
-import logging
-
-from backend_client import get_backend_client, BackendAPIError
+from backend_client import get_backend_client
 from models.run_tracking import CompleteRunData
-
-logger = logging.getLogger(__name__)
 
 
 async def create_run(agent_id: int) -> int:
@@ -35,7 +32,7 @@ async def create_run(agent_id: int) -> int:
     return await client.create_run(agent_id)
 
 
-async def update_phase(run_id: int, phase: str) -> bool:
+async def update_phase(run_id: int, phase: str) -> None:
     """Update the phase of a trading run.
 
     PATCH /api/runs/{run_id}/phase with {"phase": phase}
@@ -44,19 +41,14 @@ async def update_phase(run_id: int, phase: str) -> bool:
         run_id: The run ID to update
         phase: New phase (INITIALIZING, RESEARCHING, DECIDING, TRADING, COMPLETED, ERROR)
 
-    Returns:
-        True if successful, False if failed
+    Raises:
+        BackendAPIError: If phase update fails
     """
-    try:
-        client = get_backend_client()
-        await client.update_phase(run_id, phase)
-        return True
-    except BackendAPIError as e:
-        logger.error(f"Failed to update phase for run {run_id}: {e}")
-        return False
+    client = get_backend_client()
+    await client.update_phase(run_id, phase)
 
 
-async def complete_run(run_id: int, data: CompleteRunData) -> bool:
+async def complete_run(run_id: int, data: CompleteRunData) -> None:
     """Complete a trading run with all phase data.
 
     PUT /api/runs/{run_id}/complete with full CompleteRunData payload.
@@ -65,13 +57,8 @@ async def complete_run(run_id: int, data: CompleteRunData) -> bool:
         run_id: The run ID to complete
         data: CompleteRunData containing all phase information
 
-    Returns:
-        True if successful, False if failed
+    Raises:
+        BackendAPIError: If run completion fails
     """
-    try:
-        client = get_backend_client()
-        await client.complete_run(run_id, data)
-        return True
-    except BackendAPIError as e:
-        logger.error(f"Failed to complete run {run_id}: {e}")
-        return False
+    client = get_backend_client()
+    await client.complete_run(run_id, data)
