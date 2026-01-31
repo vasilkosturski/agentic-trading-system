@@ -4,7 +4,7 @@ These use Pydantic BaseModel because they validate data from LLMs,
 which is untrusted external input that needs validation.
 """
 
-from typing import Literal, Optional
+from typing import Literal
 from pydantic import BaseModel, Field, ConfigDict
 
 

@@ -11,18 +11,10 @@ Uses BackendClient for centralized HTTP handling.
 
 import logging
 
-from backend_client import get_backend_client, close_backend_client, BackendAPIError
+from backend_client import get_backend_client, BackendAPIError
 from models.run_tracking import CompleteRunData
 
 logger = logging.getLogger(__name__)
-
-
-async def close_client() -> None:
-    """Close the shared client. Call during application shutdown.
-    
-    DEPRECATED: Use close_backend_client() from backend_client module.
-    """
-    await close_backend_client()
 
 
 async def create_run(agent_id: int) -> int:

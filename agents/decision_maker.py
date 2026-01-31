@@ -19,7 +19,7 @@ from models.llm_output import TradingDecision, ResearchResponse
 from models.api_responses import RecentActivityResponse
 
 # Import trading and memory tools
-from trading_tools import buy_shares, sell_shares, _get_balance_raw, _get_holdings_raw
+from trading_tools import _get_balance_raw, _get_holdings_raw
 from memory_tools import get_trading_history
 
 # Import prompt loader
