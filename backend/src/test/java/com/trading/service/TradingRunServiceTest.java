@@ -1,6 +1,9 @@
 package com.trading.service;
 
 import com.trading.dto.request.CompleteRunRequest;
+import com.trading.dto.request.DecisionPhaseDto;
+import com.trading.dto.request.ExecutionPhaseDto;
+import com.trading.dto.request.ResearchPhaseDto;
 import com.trading.dto.request.RunQueryFilter;
 import com.trading.dto.response.*;
 import com.trading.dto.websocket.DecisionCompletedMessage;
@@ -350,27 +353,40 @@ class TradingRunServiceTest {
     class CompleteRunTests {
 
         private CompleteRunRequest createBuyRequest() {
-            CompleteRunRequest request = new CompleteRunRequest();
-            request.setCandidates(Arrays.asList("JPM", "BAC", "WFC"));
-            request.setResearchNotes("Banking sector analysis");
-            request.setResearchLatencyMs(3400L);
-            request.setDecision(TradeDecision.BUY);
-            request.setSymbol("JPM");
-            request.setQuantity(30);
-            request.setDecisionLatencyMs(2100L);
-            request.setTradeId(500L);
-            request.setExecutionStatus(PhaseStatus.COMPLETED);
-            return request;
+            // Research phase DTO
+            ResearchPhaseDto research = new ResearchPhaseDto();
+            research.setCandidates(Arrays.asList("JPM", "BAC", "WFC"));
+            research.setNotes("Banking sector analysis");
+            research.setLatencyMs(3400L);
+
+            // Decision phase DTO
+            DecisionPhaseDto decision = new DecisionPhaseDto();
+            decision.setDecision(TradeDecision.BUY);
+            decision.setSymbol("JPM");
+            decision.setQuantity(30);
+            decision.setLatencyMs(2100L);
+
+            // Execution phase DTO
+            ExecutionPhaseDto execution = new ExecutionPhaseDto();
+            execution.setTradeId(500L);
+            execution.setStatus(PhaseStatus.COMPLETED);
+
+            return new CompleteRunRequest(research, decision, execution);
         }
 
         private CompleteRunRequest createHoldRequest() {
-            CompleteRunRequest request = new CompleteRunRequest();
-            request.setCandidates(Arrays.asList("JPM", "BAC", "WFC"));
-            request.setResearchNotes("Market conditions unfavorable");
-            request.setResearchLatencyMs(3400L);
-            request.setDecision(TradeDecision.HOLD);
-            request.setDecisionLatencyMs(2100L);
-            return request;
+            // Research phase DTO
+            ResearchPhaseDto research = new ResearchPhaseDto();
+            research.setCandidates(Arrays.asList("JPM", "BAC", "WFC"));
+            research.setNotes("Market conditions unfavorable");
+            research.setLatencyMs(3400L);
+
+            // Decision phase DTO
+            DecisionPhaseDto decision = new DecisionPhaseDto();
+            decision.setDecision(TradeDecision.HOLD);
+            decision.setLatencyMs(2100L);
+
+            return new CompleteRunRequest(research, decision, null);
         }
 
         @Test
@@ -446,7 +462,7 @@ class TradingRunServiceTest {
         void completeRun_SellDecision_CreatesAllThreePhases() {
             // Arrange
             CompleteRunRequest request = createBuyRequest();
-            request.setDecision(TradeDecision.SELL);
+            request.getDecision().setDecision(TradeDecision.SELL);
             when(tradingRunRepository.findById(100L)).thenReturn(Optional.of(testRun));
             when(tradingRunRepository.save(any(TradingRun.class))).thenReturn(testRun);
             when(researchPhaseRepository.save(any(ResearchPhase.class))).thenReturn(testResearchPhase);
@@ -576,7 +592,7 @@ class TradingRunServiceTest {
         void completeRun_InvalidRequest_BuyWithoutSymbol_ThrowsIllegalArgumentException() {
             // Arrange
             CompleteRunRequest request = createBuyRequest();
-            request.setSymbol(null);
+            request.getDecision().setSymbol(null);
 
             // Act & Assert
             IllegalArgumentException exception = assertThrows(
@@ -591,7 +607,7 @@ class TradingRunServiceTest {
         void completeRun_InvalidRequest_BuyWithoutQuantity_ThrowsIllegalArgumentException() {
             // Arrange
             CompleteRunRequest request = createBuyRequest();
-            request.setQuantity(null);
+            request.getDecision().setQuantity(null);
 
             // Act & Assert
             IllegalArgumentException exception = assertThrows(

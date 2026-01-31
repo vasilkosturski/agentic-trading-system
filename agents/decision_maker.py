@@ -344,7 +344,16 @@ def build_decision_prompt(
 1. Evaluate the Market Analyst's candidates
 2. Use get_symbol_trade_history() to check past performance
 3. Make your decision: BUY, SELL, or HOLD
-4. Provide your structured output with action, symbol, quantity, rationale, and fullReasoning
+4. Provide structured output with:
+   - action: BUY, SELL, or HOLD
+   - symbol: stock ticker (empty for HOLD)
+   - quantity: number of shares (0 for HOLD)
+   - rationale: brief 1-2 sentence reason
+   - portfolioContext: your current portfolio state and how it factors in
+   - historicalContext: what your trading history shows for this stock/sector
+   - researchSummary: key findings from the Market Analyst research
+   - candidateEvaluation: why this stock vs the other candidates
+   - finalRationale: your complete reasoning for this decision
 
 Make your decision now."""
 

@@ -58,16 +58,36 @@ class TradingDecision(BaseModel):
     )
     quantity: int = Field(default=0, ge=0, description="Number of shares (0 for HOLD)")
     rationale: str = Field(description="Brief 1-2 sentence reason for decision")
+
+    # Structured reasoning fields for ReasoningDto
+    portfolioContext: str = Field(
+        default="",
+        description="Current portfolio state analysis: cash, positions, exposure"
+    )
+    historicalContext: str = Field(
+        default="",
+        description="Trading history context: past trades for this symbol/sector"
+    )
+    researchSummary: str = Field(
+        default="",
+        description="Summary of research findings: key points from sources"
+    )
+    candidateEvaluation: str = Field(
+        default="",
+        description="Candidate comparison: why this stock vs alternatives"
+    )
+    finalRationale: str = Field(
+        default="",
+        description="Final decision rationale: the complete reasoning"
+    )
+
+    # Legacy field - kept for backward compatibility
     fullReasoning: str = Field(
-        default="", description="Complete analysis and reasoning"
+        default="", description="[DEPRECATED] Use structured fields instead"
     )
     researchSources: str = Field(
         default="[]",
         description="JSON string with research sources from Researcher tool",
-    )
-    historicalContext: str = Field(
-        default="[]",
-        description="JSON string with insights from past trading history",
     )
 
     model_config = ConfigDict(str_strip_whitespace=True)

@@ -309,27 +309,40 @@ class TradingRunControllerTest {
         }
 
         private CompleteRunRequest createBuyRequest() {
-            CompleteRunRequest request = new CompleteRunRequest();
-            request.setCandidates(Arrays.asList("AAPL", "GOOGL"));
-            request.setResearchNotes("Tech analysis");
-            request.setResearchLatencyMs(3400L);
-            request.setDecision(TradeDecision.BUY);
-            request.setSymbol("AAPL");
-            request.setQuantity(50);
-            request.setDecisionLatencyMs(2100L);
-            request.setTradeId(500L);
-            request.setExecutionStatus(PhaseStatus.COMPLETED);
-            return request;
+            // Research phase DTO (using fully qualified name to avoid conflict with response DTO)
+            var research = new com.trading.dto.request.ResearchPhaseDto();
+            research.setCandidates(Arrays.asList("AAPL", "GOOGL"));
+            research.setNotes("Tech analysis");
+            research.setLatencyMs(3400L);
+
+            // Decision phase DTO
+            var decision = new com.trading.dto.request.DecisionPhaseDto();
+            decision.setDecision(TradeDecision.BUY);
+            decision.setSymbol("AAPL");
+            decision.setQuantity(50);
+            decision.setLatencyMs(2100L);
+
+            // Execution phase DTO
+            var execution = new com.trading.dto.request.ExecutionPhaseDto();
+            execution.setTradeId(500L);
+            execution.setStatus(PhaseStatus.COMPLETED);
+
+            return new CompleteRunRequest(research, decision, execution);
         }
 
         private CompleteRunRequest createHoldRequest() {
-            CompleteRunRequest request = new CompleteRunRequest();
-            request.setCandidates(Arrays.asList("AAPL", "GOOGL"));
-            request.setResearchNotes("Market conditions unfavorable");
-            request.setResearchLatencyMs(3400L);
-            request.setDecision(TradeDecision.HOLD);
-            request.setDecisionLatencyMs(2100L);
-            return request;
+            // Research phase DTO (using fully qualified name to avoid conflict with response DTO)
+            var research = new com.trading.dto.request.ResearchPhaseDto();
+            research.setCandidates(Arrays.asList("AAPL", "GOOGL"));
+            research.setNotes("Market conditions unfavorable");
+            research.setLatencyMs(3400L);
+
+            // Decision phase DTO
+            var decision = new com.trading.dto.request.DecisionPhaseDto();
+            decision.setDecision(TradeDecision.HOLD);
+            decision.setLatencyMs(2100L);
+
+            return new CompleteRunRequest(research, decision, null);
         }
     }
 

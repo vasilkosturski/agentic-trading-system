@@ -96,32 +96,54 @@ class ReasoningDto(BaseModel):
     finalRationale: Optional[str] = None
 
 
-class CompleteRunData(BaseModel):
-    """Request data for PUT /api/runs/{id}/complete.
+class ResearchPhaseData(BaseModel):
+    """Research phase data for CompleteRunData.
 
-    Matches backend CompleteRunRequest.java.
-    Contains all phase data collected during the trading cycle.
+    Matches backend ResearchPhaseDto.java.
+    Contains all data collected during the RESEARCHING phase.
     """
-    # ========== Research Phase Data ==========
     candidates: List[str] = Field(default_factory=list)
-    researchSources: List[SourceDto] = Field(default_factory=list)
-    researchNotes: Optional[str] = None
-    researchToolCalls: List[ResearchToolCallDto] = Field(default_factory=list)
-    researchLatencyMs: Optional[int] = None
+    sources: List[SourceDto] = Field(default_factory=list)
+    notes: Optional[str] = None
+    toolCalls: List[ResearchToolCallDto] = Field(default_factory=list)
+    latencyMs: Optional[int] = None
 
-    # ========== Decision Phase Data ==========
+
+class DecisionPhaseData(BaseModel):
+    """Decision phase data for CompleteRunData.
+
+    Matches backend DecisionPhaseDto.java.
+    Contains all data collected during the DECIDING phase.
+    """
     decision: TradeDecision
     symbol: Optional[str] = None
     quantity: Optional[int] = None
     reasoning: Optional[ReasoningDto] = None
-    decisionSources: List[SourceDto] = Field(default_factory=list)
-    decisionToolCalls: List[DecisionToolCallDto] = Field(default_factory=list)
-    decisionLatencyMs: Optional[int] = None
+    sources: List[SourceDto] = Field(default_factory=list)
+    toolCalls: List[DecisionToolCallDto] = Field(default_factory=list)
+    latencyMs: Optional[int] = None
 
-    # ========== Execution Phase Data ==========
+
+class ExecutionPhaseData(BaseModel):
+    """Execution phase data for CompleteRunData.
+
+    Matches backend ExecutionPhaseDto.java.
+    Contains all data collected during the TRADING phase.
+    """
     tradeId: Optional[int] = None
-    executionStatus: Optional[PhaseStatus] = None
+    status: Optional[PhaseStatus] = None
     errorDetails: Optional[str] = None
+
+
+class CompleteRunData(BaseModel):
+    """Request data for PUT /api/runs/{id}/complete.
+
+    Matches backend CompleteRunRequest.java.
+    Nested structure with explicit phase DTOs for self-documenting API.
+    """
+    research: Optional[ResearchPhaseData] = None
+    decision: DecisionPhaseData
+    execution: Optional[ExecutionPhaseData] = None
 
     def to_json_dict(self) -> Dict[str, Any]:
         """Serialize to dict for API."""
