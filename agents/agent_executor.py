@@ -30,12 +30,10 @@ from models.api_responses import RecentActivityResponse
 from models.run_tracking import (
     CompleteRunData,
     DecisionPhaseData,
-    DecisionToolCallDto,
     ExecutionPhaseData,
     PhaseStatus,
     ReasoningDto,
     ResearchPhaseData,
-    ResearchToolCallDto,
     RunPhase,
     SourceDto,
     TradeDecision,
@@ -68,8 +66,12 @@ from status_broadcaster import (
 # Import tool tracking
 from tool_tracking import ToolTracker
 
+# Import SDK parsing for tool call extraction
+from utils.sdk_parser import extract_tool_calls
+from models.run_tracking import ToolCallDto
+
 # Import two-agent architecture (OO classes with typed inputs)
-from market_analyst import MarketAnalyst, ResearchContext
+from market_analyst import MarketAnalyst, MarketAnalystContext
 from decision_maker import DecisionMaker, DecisionContext
 
 logger = logging.getLogger(__name__)
@@ -173,6 +175,7 @@ class AgentExecutor:
             ctx.research_candidates = research_result.candidates
             ctx.research_sources = research_result.sources
             ctx.research_notes = research_result.notes
+            ctx.research_tool_calls = research_result.tool_calls
 
             # === DECISION PHASE ===
             decision_result = await self._run_decision_maker(
@@ -182,6 +185,7 @@ class AgentExecutor:
             )
             ctx.decision = decision_result.decision
             ctx.decision_start_time = decision_result.decision_start_time
+            ctx.decision_tool_calls = decision_result.tool_calls
 
             # Build decision sources - track what data informed the decision
             ctx.decision_sources = [
@@ -332,7 +336,7 @@ class AgentExecutor:
         )
 
         # Build typed context (class converts to strings internally)
-        research_context = ResearchContext(
+        research_context = MarketAnalystContext(
             agent_name=ctx.agent_name,
             agent_style=ctx.agent_style,
             balance=ctx.balance,
@@ -372,6 +376,18 @@ class AgentExecutor:
         )
         logger.info(f"📊 Market Analyst completed in {research_latency_ms}ms")
 
+        # Extract tool calls from SDK result
+        parsed_calls = extract_tool_calls(result.new_items)
+        tool_calls = [
+            ToolCallDto(
+                tool=pc.name,
+                params=pc.params,
+                durationMs=None,  # SDK doesn't provide individual durations
+            )
+            for pc in parsed_calls
+        ]
+        logger.info(f"🔧 Market Analyst made {len(tool_calls)} tool calls")
+
         candidates = research_response.candidates
         logger.info(f"✅ Market Analyst found {len(candidates)} candidates with {len(sources)} sources")
 
@@ -380,6 +396,7 @@ class AgentExecutor:
             candidates=candidates,
             sources=sources,
             notes=research_response.summary,
+            tool_calls=tool_calls,
         )
 
     async def _run_decision_maker(
@@ -448,6 +465,18 @@ class AgentExecutor:
 
         logger.info(f"✅ Decision Maker: {decision.action} {decision.symbol or ''}")
 
+        # Extract tool calls from SDK result
+        parsed_calls = extract_tool_calls(result.new_items)
+        tool_calls = [
+            ToolCallDto(
+                tool=pc.name,
+                params=pc.params,
+                durationMs=None,  # SDK doesn't provide individual durations
+            )
+            for pc in parsed_calls
+        ]
+        logger.info(f"🔧 Decision Maker made {len(tool_calls)} tool calls")
+
         # Calculate decision latency
         decision_latency_ms = int(
             (datetime.now() - decision_start_time).total_seconds() * 1000
@@ -457,6 +486,7 @@ class AgentExecutor:
         return DecisionResult(
             decision=decision,
             decision_start_time=decision_start_time,
+            tool_calls=tool_calls,
         )
 
     async def _execute_trade(
@@ -577,6 +607,20 @@ class AgentExecutor:
             researchSummary=decision.researchSummary[:2000] if decision.researchSummary else None,
             candidateEvaluation=decision.candidateEvaluation[:2000] if decision.candidateEvaluation else None,
             finalRationale=(decision.finalRationale or decision.fullReasoning)[:2000] or None,
+        )
+
+        # Monitor LLM structured reasoning field population
+        populated_fields = []
+        empty_fields = []
+        for field_name in ["portfolioContext", "historicalContext", "researchSummary", "candidateEvaluation", "finalRationale"]:
+            if getattr(reasoning, field_name):
+                populated_fields.append(field_name)
+            else:
+                empty_fields.append(field_name)
+
+        logger.info(
+            f"📝 Reasoning fields populated: {', '.join(populated_fields) or 'NONE'} "
+            f"(empty: {', '.join(empty_fields) or 'none'})"
         )
 
         # Build nested phase DTOs

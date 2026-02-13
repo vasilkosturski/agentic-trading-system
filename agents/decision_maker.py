@@ -10,13 +10,17 @@ Per design document: system-design/workflows/trade-execution/trade_exec_workflow
 import logging
 import json
 from dataclasses import dataclass
-from agents import Agent, function_tool
+from agents import Agent, Runner, function_tool
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
 
 # Import models
 from models.llm_output import TradingDecision, ResearchResponse
 from models.api_responses import RecentActivityResponse
+from models import AgentRunResult
+
+# Import SDK parsing utilities
+from utils.sdk_parser import extract_tool_calls, get_tool_errors
 
 # Import trading and memory tools
 from trading_tools import _get_balance_raw, _get_holdings_raw
@@ -26,7 +30,7 @@ from memory_tools import get_trading_history
 from prompt_loader import load_and_format_prompt
 
 # Import MCP types
-from models.mcp_types import MCPServerName
+from mcp_types import MCPName
 
 if TYPE_CHECKING:
     from mcp_types import MCPPool
@@ -146,6 +150,49 @@ class DecisionMaker:
             force_trade=context.force_trade,
         )
 
+    async def run(self, context: DecisionContext, max_turns: int = 10) -> AgentRunResult[TradingDecision]:
+        """Run decision maker agent and return result with full visibility.
+
+        Encapsulates prompt building, agent execution, and response extraction.
+        Returns tool errors in result - caller decides how to handle.
+
+        Args:
+            context: DecisionContext with typed models
+            max_turns: Maximum agent turns (default: 10)
+
+        Returns:
+            AgentRunResult containing:
+            - output: TradingDecision with action, symbol, quantity, rationale
+            - tool_calls: All tool calls made during execution
+            - tool_errors: Any tools that returned error responses
+
+        Raises:
+            MaxTurnsExceeded: If agent doesn't complete within max_turns
+
+        Usage:
+            result = await maker.run(context)
+            result.raise_if_errors()  # Opt-in fail-fast
+            # OR check result.has_errors for graceful handling
+        """
+        prompt = self.build_prompt(context)
+        result = await Runner.run(self.agent, prompt, max_turns=max_turns)
+
+        # Extract tool calls for visibility
+        tool_calls = extract_tool_calls(result.new_items)
+        tool_errors = get_tool_errors(tool_calls)
+
+        # Log errors but let caller decide how to handle
+        if tool_errors:
+            error_details = "; ".join([f"{e.name}: {e.output[:100]}" for e in tool_errors])
+            logger.warning(f"Tool errors detected (caller decides handling): {error_details}")
+
+        # Return result with full visibility - caller calls raise_if_errors() if they want fail-fast
+        return AgentRunResult(
+            output=result.final_output_as(TradingDecision),
+            tool_calls=tool_calls,
+            tool_errors=tool_errors,
+        )
+
 
 async def create_decision_maker_agent(
     agent_name: str,
@@ -226,16 +273,16 @@ async def create_decision_maker_agent(
         get_account_summary,
     ]
 
-    # Add MCP servers if provided
+    # Add MCP servers if provided (dict access)
     mcp_servers = []
     if mcp_pool:
         # Add Brave Search for additional research
-        brave_server = await mcp_pool.get_server(MCPServerName.BRAVE_SEARCH)
+        brave_server = mcp_pool.get(MCPName.BRAVE_SEARCH)
         if brave_server:
             mcp_servers.append(brave_server)
 
         # Add Fetch for web content
-        fetch_server = await mcp_pool.get_server(MCPServerName.FETCH)
+        fetch_server = mcp_pool.get(MCPName.FETCH)
         if fetch_server:
             mcp_servers.append(fetch_server)
 

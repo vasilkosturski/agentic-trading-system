@@ -12,7 +12,7 @@ if parent_env.exists():
 
 # THEN set defaults for unit tests (only if not already set by parent .env)
 os.environ.setdefault("OPENAI_API_KEY", "test-key-for-unit-tests")
-os.environ.setdefault("BACKEND_BASE_URL", "http://localhost:8080")
+os.environ.setdefault("BACKEND_URL", "http://localhost:8080")  # Matches config.py
 os.environ.setdefault("BACKEND_API_ACCOUNTS", "http://localhost:8080")
 os.environ.setdefault("BRAVE_API_KEY", "test-brave-key-for-unit-tests")
 
@@ -108,7 +108,11 @@ Total Portfolio Value: ${sample_balance + 15000 + 15000:,.2f}"""
 
 @pytest.fixture
 def sample_recent_activity():
-    """Sample recent activity for testing (typed Pydantic model)."""
+    """Sample recent activity for testing (typed Pydantic model).
+
+    IMPORTANT: This fixture is synced with sample_holdings.
+    The BUY trades here created the positions in sample_holdings.
+    """
     from models.api_responses import RecentActivityResponse, ActivityRun, ActivityTrade
     return RecentActivityResponse(
         agentName="Warren",
@@ -117,17 +121,28 @@ def sample_recent_activity():
             ActivityRun(
                 date="2025-12-10T10:00:00Z",
                 outcome="COMPLETED",
-                summary="Bought NVDA based on AI growth thesis",
-                fullReasoning="AI growth thesis",
+                summary="Bought AAPL based on strong fundamentals",
+                fullReasoning="Apple shows strong fundamentals with consistent revenue growth.",
                 researchSources=None,
                 historicalContext=None,
                 trades=[
-                    ActivityTrade(type="BUY", symbol="NVDA", quantity=50, price=145.0)
+                    ActivityTrade(type="BUY", symbol="AAPL", quantity=100, price=150.0)
+                ]
+            ),
+            ActivityRun(
+                date="2025-12-15T14:30:00Z",
+                outcome="COMPLETED",
+                summary="Bought MSFT based on cloud growth",
+                fullReasoning="Microsoft Azure growth continues to drive revenue.",
+                researchSources=None,
+                historicalContext=None,
+                trades=[
+                    ActivityTrade(type="BUY", symbol="MSFT", quantity=50, price=300.0)
                 ]
             )
         ],
-        totalRuns=1,
-        totalTrades=1
+        totalRuns=2,
+        totalTrades=2
     )
 
 
@@ -168,10 +183,15 @@ def sample_research_response():
 
 @pytest.fixture
 def mock_mcp_pool():
-    """Mock MCP pool for two-agent architecture testing."""
-    pool = MagicMock()
-    pool.get_server = AsyncMock(return_value=MagicMock())  # Returns mock MCP server
-    return pool
+    """Mock MCP pool for two-agent architecture testing.
+
+    Returns a dict with mock servers keyed by MCPName.
+    """
+    from mcp_types import MCPName
+    return {
+        MCPName.BRAVE_SEARCH: MagicMock(),
+        MCPName.FETCH: MagicMock(),
+    }
 
 
 @pytest.fixture

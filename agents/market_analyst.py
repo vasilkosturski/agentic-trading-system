@@ -37,7 +37,8 @@ Per design document: system-design/workflows/trade-execution/trade_exec_workflow
 import json
 import logging
 from dataclasses import dataclass
-from agents import Agent, function_tool
+from agents import Agent, Runner, function_tool
+from utils.sdk_parser import extract_tool_calls, get_tool_errors
 from datetime import datetime
 from typing import Union, List, TYPE_CHECKING
 
@@ -58,8 +59,9 @@ from models import (
     RecentActivityResponse,
     PriceLookupResponse,
     ToolError,
+    AgentRunResult,
 )
-from models.mcp_types import MCPServerName
+from mcp_types import MCPName
 from http_client import BackendAPIError
 from pydantic import ValidationError
 
@@ -75,7 +77,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 @dataclass
-class ResearchContext:
+class MarketAnalystContext:
     """Typed input context for Market Analyst research.
 
     Receives typed models, converts to strings internally for prompts.
@@ -106,13 +108,12 @@ class ResearchContext:
 class MarketAnalyst:
     """Object-oriented Market Analyst agent.
 
-    Encapsulates agent creation and prompt building with typed inputs.
+    Encapsulates agent creation, prompt building, and execution with typed inputs.
     Converts typed models to strings internally for LLM consumption.
 
     Usage (async factory pattern):
         analyst = await MarketAnalyst.create(agent_name="Warren", mcp_pool=pool)
-        prompt = analyst.build_prompt(context)
-        result = await Runner.run(analyst.agent, prompt)
+        response = await analyst.run(context)  # Returns ResearchResponse directly
     """
 
     # Class-level type annotations (PEP 526) for type checker support
@@ -153,11 +154,11 @@ class MarketAnalyst:
         )
         return instance
 
-    def build_prompt(self, context: ResearchContext) -> str:
+    def build_prompt(self, context: MarketAnalystContext) -> str:
         """Build research prompt from typed context.
 
         Args:
-            context: ResearchContext with typed models
+            context: MarketAnalystContext with typed models
 
         Returns:
             Formatted prompt string for LLM
@@ -170,6 +171,49 @@ class MarketAnalyst:
             max_positions=context.max_positions,
             holdings_summary=context.holdings_summary,
             historical_context=context.historical_context,
+        )
+
+    async def run(self, context: MarketAnalystContext, max_turns: int = 15) -> AgentRunResult[ResearchResponse]:
+        """Run market analyst agent and return result with full visibility.
+
+        Encapsulates prompt building, agent execution, and response extraction.
+        Returns tool errors in result - caller decides how to handle.
+
+        Args:
+            context: MarketAnalystContext with typed models
+            max_turns: Maximum agent turns (default: 15)
+
+        Returns:
+            AgentRunResult containing:
+            - output: ResearchResponse with candidates, summary, and sources
+            - tool_calls: All tool calls made during execution
+            - tool_errors: Any tools that returned error responses
+
+        Raises:
+            MaxTurnsExceeded: If agent doesn't complete within max_turns
+
+        Usage:
+            result = await analyst.run(context)
+            result.raise_if_errors()  # Opt-in fail-fast
+            # OR check result.has_errors for graceful handling
+        """
+        prompt = self.build_prompt(context)
+        result = await Runner.run(self.agent, prompt, max_turns=max_turns)
+
+        # Extract tool calls for visibility
+        tool_calls = extract_tool_calls(result.new_items)
+        tool_errors = get_tool_errors(tool_calls)
+
+        # Log errors but let caller decide how to handle
+        if tool_errors:
+            error_details = "; ".join([f"{e.name}: {e.output[:100]}" for e in tool_errors])
+            logger.warning(f"Tool errors detected (caller decides handling): {error_details}")
+
+        # Return result with full visibility - caller calls raise_if_errors() if they want fail-fast
+        return AgentRunResult(
+            output=result.final_output_as(ResearchResponse),
+            tool_calls=tool_calls,
+            tool_errors=tool_errors,
         )
 
 
@@ -302,27 +346,22 @@ async def create_market_analyst_agent(
         lookup_price_tool,
     ]
 
-    # Get MCP servers for research
+    # Get MCP servers for research (dict access)
     mcp_servers = []
 
     # Add Brave Search server
-    brave_server = await mcp_pool.get_server(MCPServerName.BRAVE_SEARCH)
+    brave_server = mcp_pool.get(MCPName.BRAVE_SEARCH)
     if brave_server:
         mcp_servers.append(brave_server)
     else:
         logger.warning("Brave Search MCP server not available for Market Analyst")
 
     # Add Fetch server
-    fetch_server = await mcp_pool.get_server(MCPServerName.FETCH)
+    fetch_server = mcp_pool.get(MCPName.FETCH)
     if fetch_server:
         mcp_servers.append(fetch_server)
     else:
         logger.warning("Fetch MCP server not available for Market Analyst")
-
-    # Add Memory server (optional, for context)
-    memory_server = await mcp_pool.get_server(MCPServerName.MEMORY)
-    if memory_server:
-        mcp_servers.append(memory_server)
 
     # Create agent with structured output enforcement
     analyst = Agent[ResearchResponse](

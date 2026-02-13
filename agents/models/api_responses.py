@@ -78,6 +78,17 @@ class Holding(BaseModel):
 # Memory API Response Models (for /api/memory/* endpoints)
 # =============================================================================
 
+class AccountResponse(BaseModel):
+    """Response from /api/accounts/{id} endpoint.
+
+    Basic account information from backend.
+    """
+
+    id: int = Field(description="Account ID")
+    name: str = Field(description="Account/agent name")
+    balance: float = Field(ge=0, description="Cash balance in USD")
+
+
 class HoldingsResponse(BaseModel):
     """Response from /api/memory/holdings endpoint."""
 

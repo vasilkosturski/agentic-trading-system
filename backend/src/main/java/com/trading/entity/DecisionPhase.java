@@ -1,6 +1,6 @@
 package com.trading.entity;
 
-import com.trading.dto.jsonb.DecisionToolCallDto;
+import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.ReasoningDto;
 import com.trading.dto.jsonb.SourceDto;
 import com.trading.enums.TradeDecision;
@@ -79,7 +79,7 @@ public class DecisionPhase {
      */
     @Type(JsonType.class)
     @Column(name = "tool_calls", columnDefinition = "jsonb")
-    private List<DecisionToolCallDto> toolCalls;
+    private List<ToolCallDto> toolCalls;
 
     // Observability metrics
     @Column(name = "tokens_used")

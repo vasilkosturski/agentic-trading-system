@@ -280,7 +280,7 @@ class TradingRunControllerTest {
                 .when(tradingRunService).completeRun(eq(100L), any(CompleteRunRequest.class));
 
             CompleteRunRequest request = createBuyRequest();
-            request.setSymbol(null);
+            request.getDecision().setSymbol(null);
 
             mockMvc.perform(put("/api/runs/100/complete")
                     .contentType(MediaType.APPLICATION_JSON)

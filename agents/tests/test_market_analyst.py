@@ -23,42 +23,28 @@ class TestMarketAnalystAgent:
         sample_agent_style,
         sample_strategy,
         sample_model_name,
-        mock_mcp_pool,
     ):
         """Test Market Analyst gets Brave Search + Fetch MCPs."""
-        # Mock MCP pool to return mock servers
+        from mcp_types import MCPName
+
+        # Create MCP pool dict with mock servers
         mock_brave_server = MagicMock()
         mock_fetch_server = MagicMock()
-
-        async def get_server_side_effect(name):
-            if name == "brave-search":
-                return mock_brave_server
-            elif name == "fetch":
-                return mock_fetch_server
-            return None
-
-        mock_mcp_pool.get_server = AsyncMock(side_effect=get_server_side_effect)
+        mcp_pool = {
+            MCPName.BRAVE_SEARCH: mock_brave_server,
+            MCPName.FETCH: mock_fetch_server,
+        }
 
         # Create Market Analyst
         agent = await create_market_analyst_agent(
             agent_name=sample_agent_name,
-            mcp_pool=mock_mcp_pool,
+            mcp_pool=mcp_pool,
             model_name=sample_model_name,
         )
 
         # Verify agent created
         assert agent is not None
         assert agent.name == f"{sample_agent_name}-MarketAnalyst"
-
-        # Verify MCP servers were requested
-        assert mock_mcp_pool.get_server.call_count >= 2
-        assert any(
-            call[0][0] == "brave-search"
-            for call in mock_mcp_pool.get_server.call_args_list
-        )
-        assert any(
-            call[0][0] == "fetch" for call in mock_mcp_pool.get_server.call_args_list
-        )
 
     async def test_agent_has_no_trading_tools(
         self,

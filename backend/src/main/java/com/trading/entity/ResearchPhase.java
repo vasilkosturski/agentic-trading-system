@@ -1,6 +1,6 @@
 package com.trading.entity;
 
-import com.trading.dto.jsonb.ResearchToolCallDto;
+import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.SourceDto;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
@@ -64,7 +64,7 @@ public class ResearchPhase {
      */
     @Type(JsonType.class)
     @Column(name = "tool_calls", columnDefinition = "jsonb")
-    private List<ResearchToolCallDto> toolCalls;
+    private List<ToolCallDto> toolCalls;
 
     // Observability metrics
     @Column(name = "tokens_used")

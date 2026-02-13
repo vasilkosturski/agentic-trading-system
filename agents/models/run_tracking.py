@@ -62,21 +62,14 @@ class SourceDto(BaseModel):
         return cls(type="system_context", description=description)
 
 
-class ResearchToolCallDto(BaseModel):
-    """Tool call record for research phase.
+class ToolCallDto(BaseModel):
+    """Unified tool call record for all phases (research, decision).
 
-    Matches backend ResearchToolCallDto.java.
-    Simpler structure - no params, just tool name and duration.
-    """
-    tool: str
-    durationMs: Optional[int] = None
-
-
-class DecisionToolCallDto(BaseModel):
-    """Tool call record for decision phase.
-
-    Matches backend DecisionToolCallDto.java.
-    Includes params for detailed tracking.
+    Matches backend ToolCallDto.java.
+    Fields:
+    - tool: Tool name (e.g., "query_holdings", "brave_search")
+    - params: Optional parameters (e.g., {"symbol": "JPM"})
+    - durationMs: Execution duration in milliseconds
     """
     tool: str
     params: Optional[Dict[str, Any]] = None
@@ -105,7 +98,7 @@ class ResearchPhaseData(BaseModel):
     candidates: List[str] = Field(default_factory=list)
     sources: List[SourceDto] = Field(default_factory=list)
     notes: Optional[str] = None
-    toolCalls: List[ResearchToolCallDto] = Field(default_factory=list)
+    toolCalls: List[ToolCallDto] = Field(default_factory=list)
     latencyMs: Optional[int] = None
 
 
@@ -120,7 +113,7 @@ class DecisionPhaseData(BaseModel):
     quantity: Optional[int] = None
     reasoning: Optional[ReasoningDto] = None
     sources: List[SourceDto] = Field(default_factory=list)
-    toolCalls: List[DecisionToolCallDto] = Field(default_factory=list)
+    toolCalls: List[ToolCallDto] = Field(default_factory=list)
     latencyMs: Optional[int] = None
 
 

@@ -49,7 +49,9 @@ def get_mcp_server_params() -> Dict[MCPName, dict]:
         MCPName.BRAVE_SEARCH: {
             "command": "npx",
             "args": ["-y", "@modelcontextprotocol/server-brave-search"],
-            "env": brave_env,
+            # NPM_CONFIG_LOGLEVEL=silent suppresses npm install output to stdout
+            # MCP protocol requires stdout for JSONRPC only - npm noise violates this
+            "env": {**brave_env, "NPM_CONFIG_LOGLEVEL": "silent"},
         },
     }
 

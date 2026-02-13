@@ -95,8 +95,8 @@ async def _fetch_price(symbol: str) -> PriceLookupResponse:
     Raises:
         Exception: If price lookup fails
     """
-    from market_tools import lookup_share_price
-    price = await lookup_share_price(symbol)  # type: ignore[operator]
+    from market_tools import _lookup_share_price
+    price = await _lookup_share_price(symbol)
     return PriceLookupResponse(
         symbol=symbol,
         price=price,

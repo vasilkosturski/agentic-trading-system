@@ -1,6 +1,6 @@
 package com.trading.dto.response;
 
-import com.trading.dto.jsonb.DecisionToolCallDto;
+import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.ReasoningDto;
 import com.trading.dto.jsonb.SourceDto;
 import com.trading.entity.DecisionPhase;
@@ -27,7 +27,7 @@ public class DecisionPhaseDto {
     private Integer quantity;
     private ReasoningDto reasoning;
     private List<SourceDto> sources;
-    private List<DecisionToolCallDto> toolCalls;
+    private List<ToolCallDto> toolCalls;
     private Long latencyMs;
     private Instant createdAt;
 
