@@ -41,6 +41,19 @@ async def _call_backend_api(endpoint: str) -> Any:
         # Already logged by http_client
         raise Exception(str(e)) from e
 
+async def _lookup_share_price(symbol: str) -> float:
+    """Internal: Get current price (no decorator).
+
+    Used by other modules that need to call this as a regular function.
+    """
+    try:
+        result = await _call_backend_api(f"/price/{symbol}/value")
+        return float(result)
+    except Exception as e:
+        logger.error(f"Failed to get price for {symbol}: {e}")
+        raise Exception(f"Failed to get price for {symbol}: {str(e)}")
+
+
 @function_tool
 async def lookup_share_price(symbol: str) -> float:
     """Get the current price of a stock symbol.
@@ -57,12 +70,7 @@ async def lookup_share_price(symbol: str) -> float:
     Raises:
         Exception: If symbol is invalid or data unavailable
     """
-    try:
-        result = await _call_backend_api(f"/price/{symbol}/value")
-        return float(result)
-    except Exception as e:
-        logger.error(f"Failed to get price for {symbol}: {e}")
-        raise Exception(f"Failed to get price for {symbol}: {str(e)}")
+    return await _lookup_share_price(symbol)
 
 @function_tool
 async def get_price_with_metadata(symbol: str) -> PriceMetadata:

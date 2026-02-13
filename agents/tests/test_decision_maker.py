@@ -2,9 +2,8 @@
 
 The Decision Maker is the second agent in the two-agent flow:
 - Receives research results from Market Analyst
-- Has trading tools (buy_shares, sell_shares)
 - Has database tools (get_symbol_trade_history, get_account_summary)
-- Records decision via decide_action tool
+- Uses structured output (TradingDecision) instead of tool callback
 """
 
 import json
@@ -12,8 +11,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from decision_maker import create_decision_maker_agent, build_decision_prompt
-from agent_executor import AgentExecutor
 from models import Holding
+from models.llm_output import TradingDecision
 
 
 @pytest.mark.asyncio
@@ -24,21 +23,14 @@ class TestDecisionMakerAgent:
         self,
         sample_agent_id,
         sample_agent_name,
-        sample_agent_style,
-        sample_strategy,
         sample_model_name,
         mock_mcp_pool,
     ):
-        """Test Decision Maker has trading tools."""
-        # Create executor (needed for decide_action tool)
-        executor = AgentExecutor(
-            sample_agent_id, sample_agent_name, sample_agent_style, sample_strategy
-        )
-
-        # Create Decision Maker
+        """Test Decision Maker is created with proper configuration."""
+        # Create Decision Maker (new API: agent_id instead of executor)
         agent = await create_decision_maker_agent(
             agent_name=sample_agent_name,
-            executor=executor,
+            agent_id=sample_agent_id,
             mcp_pool=mock_mcp_pool,
             model_name=sample_model_name,
         )
@@ -46,152 +38,27 @@ class TestDecisionMakerAgent:
         # Verify agent created
         assert agent is not None
         assert agent.name == f"{sample_agent_name}-DecisionMaker"
+        # Verify structured output type is TradingDecision
+        assert agent.output_type == TradingDecision
 
-    async def test_decide_action_tool_stores_in_executor(
+    async def test_create_agent_without_mcp_pool(
         self,
         sample_agent_id,
         sample_agent_name,
-        sample_agent_style,
-        sample_strategy,
         sample_model_name,
     ):
-        """Test decide_action tool stores decision in executor."""
-        # Create executor
-        executor = AgentExecutor(
-            sample_agent_id, sample_agent_name, sample_agent_style, sample_strategy
-        )
-
-        # Create Decision Maker (no MCP pool needed for this test)
-        agent = await create_decision_maker_agent(
-            agent_name=sample_agent_name,
-            executor=executor,
-            mcp_pool=None,
-            model_name=sample_model_name,
-        )
-
-        # Verify agent created
-        assert agent is not None
-
-        # Manually call decide_action (simulating tool call)
-        # Note: We can't directly invoke tools from the agent, but we can test that
-        # the executor has the store_decision method
-        executor.store_decision(
-            action="BUY",
-            symbol="AAPL",
-            quantity=100,
-            rationale="Strong growth",
-            full_reasoning="Detailed analysis",
-            research_sources=json.dumps({"summary": "AAPL research", "sources": []}),
-            historical_context=json.dumps({"summary": "No prior trades", "insights": []}),
-        )
-
-        # Verify decision stored in _pending_decision (new architecture)
-        assert executor._pending_decision is not None
-        assert executor._pending_decision.action == "BUY"
-        assert executor._pending_decision.symbol == "AAPL"
-
-    @patch("decision_maker.get_trading_history")
-    async def test_get_symbol_trade_history_tool(
-        self,
-        mock_get_trading_history,
-        sample_agent_id,
-        sample_agent_name,
-        sample_agent_style,
-        sample_strategy,
-        sample_model_name,
-    ):
-        """Test trading history tool works."""
-        # Mock trading history response
-        mock_get_trading_history.return_value = json.dumps({
-            "symbol": "AAPL",
-            "trades": [
-                {"action": "BUY", "quantity": 50, "price": 150.0, "date": "2025-01-01"}
-            ],
-            "summary": "Bought AAPL once"
-        })
-
-        # Create executor
-        executor = AgentExecutor(
-            sample_agent_id, sample_agent_name, sample_agent_style, sample_strategy
-        )
-
-        # Create Decision Maker
-        agent = await create_decision_maker_agent(
-            agent_name=sample_agent_name,
-            executor=executor,
-            mcp_pool=None,
-            model_name=sample_model_name,
-        )
-
-        # Verify agent created
-        assert agent is not None
-
-        # Verify get_trading_history is importable and callable
-        from decision_maker import get_trading_history
-        result = await get_trading_history(sample_agent_id, "AAPL", days=90)
-        assert "AAPL" in result
-
-    @patch("decision_maker._get_balance_raw")
-    @patch("decision_maker._get_holdings_raw")
-    async def test_get_account_summary_tool(
-        self,
-        mock_get_holdings,
-        mock_get_balance,
-        sample_agent_id,
-        sample_agent_name,
-        sample_agent_style,
-        sample_strategy,
-        sample_model_name,
-        sample_holdings,
-    ):
-        """Test account summary tool works."""
-        # Mock backend responses
-        mock_get_balance.return_value = 100000.0
-        mock_get_holdings.return_value = sample_holdings
-
-        # Create executor
-        executor = AgentExecutor(
-            sample_agent_id, sample_agent_name, sample_agent_style, sample_strategy
-        )
-
-        # Create Decision Maker
-        agent = await create_decision_maker_agent(
-            agent_name=sample_agent_name,
-            executor=executor,
-            mcp_pool=None,
-            model_name=sample_model_name,
-        )
-
-        # Verify agent created
-        assert agent is not None
-
-        # The get_account_summary tool is defined inside create_decision_maker_agent
-        # We can't directly test it, but we verify the mocks are set up correctly
-
-    async def test_optional_mcp_servers(
-        self,
-        sample_agent_id,
-        sample_agent_name,
-        sample_agent_style,
-        sample_strategy,
-        sample_model_name,
-    ):
-        """Test MCP servers are optional (can be None)."""
-        # Create executor
-        executor = AgentExecutor(
-            sample_agent_id, sample_agent_name, sample_agent_style, sample_strategy
-        )
-
+        """Test MCP pool is optional."""
         # Create Decision Maker with no MCP pool
         agent = await create_decision_maker_agent(
             agent_name=sample_agent_name,
-            executor=executor,
+            agent_id=sample_agent_id,
             mcp_pool=None,  # No MCP servers
             model_name=sample_model_name,
         )
 
         # Verify agent still created successfully
         assert agent is not None
+        assert agent.output_type == TradingDecision
 
 
 @pytest.mark.asyncio

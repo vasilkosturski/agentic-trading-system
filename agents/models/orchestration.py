@@ -7,7 +7,7 @@ Each operation has explicit input parameters and returns a typed result.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List, Generic, TypeVar, TYPE_CHECKING
 
 from pydantic import BaseModel
 
@@ -16,9 +16,70 @@ from models.run_tracking import SourceDto, PhaseStatus
 from models.api_responses import RecentActivityResponse
 
 if TYPE_CHECKING:
-    from models.run_tracking import ResearchToolCallDto, DecisionToolCallDto
+    from models.run_tracking import ToolCallDto
     from tool_tracking import ToolTracker
     from models import Holding
+    from utils.sdk_parser import ParsedToolCall
+
+
+# Generic type for agent output (ResearchResponse, TradingDecision, etc.)
+T = TypeVar("T")
+
+
+@dataclass
+class AgentRunResult(Generic[T]):
+    """Generic result from running an agent.
+
+    Provides full visibility into what happened during agent execution:
+    - output: The typed response (ResearchResponse, TradingDecision, etc.)
+    - tool_calls: All tool calls made during execution
+    - tool_errors: Any tools that returned error responses
+
+    Usage:
+        result = await market_analyst.run(context)
+
+        # Option 1: Fail-fast (throw on errors)
+        result.raise_if_errors()
+        print(result.output.candidates)
+
+        # Option 2: Handle errors gracefully
+        if result.has_errors:
+            log.warning(f"Partial failure: {result.error_summary}")
+            # Continue with partial data or retry
+        print(result.output.candidates)
+    """
+    output: T
+    tool_calls: List["ParsedToolCall"] = field(default_factory=list)
+    tool_errors: List["ParsedToolCall"] = field(default_factory=list)
+
+    @property
+    def has_errors(self) -> bool:
+        """Check if any tool calls returned errors."""
+        return len(self.tool_errors) > 0
+
+    @property
+    def error_summary(self) -> str:
+        """Get a summary of tool errors for logging."""
+        if not self.tool_errors:
+            return ""
+        return "; ".join([f"{e.name}: {e.output[:100]}" for e in self.tool_errors])
+
+    def raise_if_errors(self) -> None:
+        """Raise ToolExecutionError if any tool calls failed.
+
+        Opt-in fail-fast behavior. Call this when you want to stop
+        processing if any tools returned errors.
+
+        Raises:
+            ToolExecutionError: If tool_errors is not empty
+        """
+        if self.tool_errors:
+            # Import here to avoid circular dependency
+            from exceptions import ToolExecutionError
+            raise ToolExecutionError(
+                f"Tools failed during execution: {[e.name for e in self.tool_errors]}",
+                tool_errors=self.tool_errors
+            )
 
 
 class SourceType(str, Enum):
@@ -45,6 +106,7 @@ class ResearchResult:
     candidates: List[str] = field(default_factory=list)
     sources: List[SourceDto] = field(default_factory=list)
     notes: str = ""
+    tool_calls: List["ToolCallDto"] = field(default_factory=list)
 
 
 @dataclass
@@ -52,6 +114,7 @@ class DecisionResult:
     """Result of decision maker."""
     decision: TradingDecision  # Required - throw on failure
     decision_start_time: datetime  # Required - always set before returning
+    tool_calls: List["ToolCallDto"] = field(default_factory=list)
 
 
 @dataclass
@@ -76,55 +139,63 @@ class AccountData:
 class RunContext:
     """Context for a single trading run, passed through operations.
 
-    Replaces instance variables in AgentExecutor for explicit data flow.
-    All fields set at creation are guaranteed non-None.
-    Optional fields are set as operations complete.
+    Organized chronologically by phase (top to bottom = time flow):
+    - PHASE 0: INITIALIZATION - Created at cycle start
+    - PHASE 1: MARKET ANALYST (RESEARCHING) - Input → Output
+    - PHASE 2: DECISION MAKER (DECIDING) - Input → Output
+    - PHASE 3: EXECUTION (TRADING) - Input → Output
 
     Benefits:
     - Explicit data dependencies between operations
     - Testable in isolation (no hidden state)
     - No cleanup needed (context is discarded after cycle)
     """
-    # Guaranteed at creation
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # PHASE 0: INITIALIZATION (created at cycle start)
+    # ═══════════════════════════════════════════════════════════════════════════
     run_id: int
     agent_id: int
     agent_name: str
     agent_style: str
     model_name: str
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # PHASE 1: MARKET ANALYST (RESEARCHING)
+    # ═══════════════════════════════════════════════════════════════════════════
+    # --- Input ---
     research_start_time: datetime
-
-    # Tool tracker for local data collection
-    tracker: Optional["ToolTracker"] = None
-
-    # Account data (fetched once at start)
     balance: float = 0.0
     holdings: List["Holding"] = field(default_factory=list)
-
-    # Recent trading activity (30-day history)
     recent_activity: Optional[RecentActivityResponse] = None
+    tracker: Optional["ToolTracker"] = None
 
-    # Set during execution
-    decision_start_time: Optional[datetime] = None
-
-    # Research results
+    # --- Output ---
     research_response: Optional[ResearchResponse] = None
-    decision: Optional[TradingDecision] = None
-
-    # Research phase data collection
     research_candidates: List[str] = field(default_factory=list)
     research_sources: List[SourceDto] = field(default_factory=list)
-    research_tool_calls: List["ResearchToolCallDto"] = field(default_factory=list)
+    research_tool_calls: List["ToolCallDto"] = field(default_factory=list)
     research_notes: str = ""
 
-    # Decision phase data collection
-    decision_sources: List[SourceDto] = field(default_factory=list)
-    decision_tool_calls: List["DecisionToolCallDto"] = field(default_factory=list)
+    # ═══════════════════════════════════════════════════════════════════════════
+    # PHASE 2: DECISION MAKER (DECIDING)
+    # ═══════════════════════════════════════════════════════════════════════════
+    # --- Input: inherits research output above ---
+    decision_start_time: Optional[datetime] = None
 
-    # Execution phase data
-    trade_id: Optional[int] = None
-    # trade_count removed - derive from trade_id: 1 if trade_id else 0
-    execution_status: Optional[PhaseStatus] = None
-    execution_error: Optional[str] = None
+    # --- Output ---
+    decision: Optional[TradingDecision] = None  # BUY/SELL/HOLD - always set by phase end
+    decision_sources: List[SourceDto] = field(default_factory=list)
+    decision_tool_calls: List["ToolCallDto"] = field(default_factory=list)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # PHASE 3: EXECUTION (TRADING)
+    # ═══════════════════════════════════════════════════════════════════════════
+    # --- Input: decision from above ---
+    # --- Output ---
+    trade_id: Optional[int] = None  # Set if trade executed
+    execution_status: Optional[PhaseStatus] = None  # COMPLETED/FAILED/SKIPPED
+    execution_error: Optional[str] = None  # Error details if failed
 
 
 class HoldingsSummary(BaseModel):

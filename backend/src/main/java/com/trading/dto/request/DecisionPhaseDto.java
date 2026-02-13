@@ -1,6 +1,6 @@
 package com.trading.dto.request;
 
-import com.trading.dto.jsonb.DecisionToolCallDto;
+import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.ReasoningDto;
 import com.trading.dto.jsonb.SourceDto;
 import com.trading.enums.TradeDecision;
@@ -48,7 +48,7 @@ public class DecisionPhaseDto {
     /**
      * Tool calls made during decision phase.
      */
-    private List<DecisionToolCallDto> toolCalls;
+    private List<ToolCallDto> toolCalls;
 
     /**
      * Decision phase execution time in milliseconds.

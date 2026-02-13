@@ -1,6 +1,6 @@
 package com.trading.dto.request;
 
-import com.trading.dto.jsonb.ResearchToolCallDto;
+import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.SourceDto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -35,7 +35,7 @@ public class ResearchPhaseDto {
     /**
      * Tool calls made during research phase (Brave Search, Memory, etc.)
      */
-    private List<ResearchToolCallDto> toolCalls;
+    private List<ToolCallDto> toolCalls;
 
     /**
      * Research phase execution time in milliseconds.

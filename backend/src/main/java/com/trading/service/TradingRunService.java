@@ -1,9 +1,6 @@
 package com.trading.service;
 
 import com.trading.dto.request.CompleteRunRequest;
-import com.trading.dto.request.DecisionPhaseDto;
-import com.trading.dto.request.ExecutionPhaseDto;
-import com.trading.dto.request.ResearchPhaseDto;
 import com.trading.dto.request.RunQueryFilter;
 import com.trading.dto.response.*;
 import com.trading.dto.websocket.DecisionCompletedMessage;
@@ -145,10 +142,10 @@ public class TradingRunService {
         // Validate request first
         request.validate();
 
-        // Extract nested DTOs
-        ResearchPhaseDto researchDto = request.getResearch();
-        DecisionPhaseDto decisionDto = request.getDecision();
-        ExecutionPhaseDto executionDto = request.getExecution();
+        // Extract nested DTOs (using request package - different from response DTOs)
+        com.trading.dto.request.ResearchPhaseDto researchDto = request.getResearch();
+        com.trading.dto.request.DecisionPhaseDto decisionDto = request.getDecision();
+        com.trading.dto.request.ExecutionPhaseDto executionDto = request.getExecution();
 
         TradeDecision tradeDecision = decisionDto.getDecision();
         logger.info("Completing run ID: {} with decision: {}", runId, tradeDecision);
@@ -393,7 +390,7 @@ public class TradingRunService {
      * Create execution phase based on execution DTO.
      */
     private ExecutionPhase createExecutionPhase(TradingRun run, DecisionPhase decisionPhase,
-                                                ExecutionPhaseDto executionDto) {
+                                                com.trading.dto.request.ExecutionPhaseDto executionDto) {
         ExecutionPhase executionPhase = new ExecutionPhase();
         executionPhase.setRun(run);
         executionPhase.setDecision(decisionPhase);

@@ -1,9 +1,6 @@
 package com.trading.service;
 
 import com.trading.dto.request.CompleteRunRequest;
-import com.trading.dto.request.DecisionPhaseDto;
-import com.trading.dto.request.ExecutionPhaseDto;
-import com.trading.dto.request.ResearchPhaseDto;
 import com.trading.dto.request.RunQueryFilter;
 import com.trading.dto.response.*;
 import com.trading.dto.websocket.DecisionCompletedMessage;
@@ -353,21 +350,21 @@ class TradingRunServiceTest {
     class CompleteRunTests {
 
         private CompleteRunRequest createBuyRequest() {
-            // Research phase DTO
-            ResearchPhaseDto research = new ResearchPhaseDto();
+            // Research phase DTO (request package)
+            com.trading.dto.request.ResearchPhaseDto research = new com.trading.dto.request.ResearchPhaseDto();
             research.setCandidates(Arrays.asList("JPM", "BAC", "WFC"));
             research.setNotes("Banking sector analysis");
             research.setLatencyMs(3400L);
 
-            // Decision phase DTO
-            DecisionPhaseDto decision = new DecisionPhaseDto();
+            // Decision phase DTO (request package)
+            com.trading.dto.request.DecisionPhaseDto decision = new com.trading.dto.request.DecisionPhaseDto();
             decision.setDecision(TradeDecision.BUY);
             decision.setSymbol("JPM");
             decision.setQuantity(30);
             decision.setLatencyMs(2100L);
 
-            // Execution phase DTO
-            ExecutionPhaseDto execution = new ExecutionPhaseDto();
+            // Execution phase DTO (request package)
+            com.trading.dto.request.ExecutionPhaseDto execution = new com.trading.dto.request.ExecutionPhaseDto();
             execution.setTradeId(500L);
             execution.setStatus(PhaseStatus.COMPLETED);
 
@@ -375,14 +372,14 @@ class TradingRunServiceTest {
         }
 
         private CompleteRunRequest createHoldRequest() {
-            // Research phase DTO
-            ResearchPhaseDto research = new ResearchPhaseDto();
+            // Research phase DTO (request package)
+            com.trading.dto.request.ResearchPhaseDto research = new com.trading.dto.request.ResearchPhaseDto();
             research.setCandidates(Arrays.asList("JPM", "BAC", "WFC"));
             research.setNotes("Market conditions unfavorable");
             research.setLatencyMs(3400L);
 
-            // Decision phase DTO
-            DecisionPhaseDto decision = new DecisionPhaseDto();
+            // Decision phase DTO (request package)
+            com.trading.dto.request.DecisionPhaseDto decision = new com.trading.dto.request.DecisionPhaseDto();
             decision.setDecision(TradeDecision.HOLD);
             decision.setLatencyMs(2100L);
 

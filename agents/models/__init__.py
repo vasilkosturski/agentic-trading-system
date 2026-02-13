@@ -39,8 +39,7 @@ from .run_tracking import (
     PhaseStatus,
     TradeDecision as RunTradeDecision,  # Avoid conflict with llm_output.TradingDecision
     SourceDto,
-    ResearchToolCallDto,
-    DecisionToolCallDto,
+    ToolCallDto,
     ReasoningDto,
     CompleteRunData,
 )
@@ -49,6 +48,7 @@ from .orchestration import (
     CycleResult,
     RunContext,
     HoldingsSummary,
+    AgentRunResult,
 )
 
 __all__ = [
@@ -87,8 +87,7 @@ __all__ = [
     "PhaseStatus",
     "RunTradeDecision",
     "SourceDto",
-    "ResearchToolCallDto",
-    "DecisionToolCallDto",
+    "ToolCallDto",
     "ReasoningDto",
     "CompleteRunData",
     # Orchestration Models
@@ -96,4 +95,6 @@ __all__ = [
     "CycleResult",
     "RunContext",
     "HoldingsSummary",
+    # Agent Run Result (generic)
+    "AgentRunResult",
 ]

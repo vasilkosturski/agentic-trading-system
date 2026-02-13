@@ -1,6 +1,6 @@
 package com.trading.dto.response;
 
-import com.trading.dto.jsonb.ResearchToolCallDto;
+import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.SourceDto;
 import com.trading.entity.ResearchPhase;
 import lombok.AllArgsConstructor;
@@ -23,7 +23,7 @@ public class ResearchPhaseDto {
     private List<String> candidates;
     private List<SourceDto> sources;
     private String researchNotes;
-    private List<ResearchToolCallDto> toolCalls;
+    private List<ToolCallDto> toolCalls;
     private Long latencyMs;
     private Instant createdAt;
 

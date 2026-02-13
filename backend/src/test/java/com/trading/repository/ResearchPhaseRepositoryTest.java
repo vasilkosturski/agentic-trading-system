@@ -1,6 +1,6 @@
 package com.trading.repository;
 
-import com.trading.dto.jsonb.ResearchToolCallDto;
+import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.SourceDto;
 import com.trading.entity.ResearchPhase;
 import com.trading.entity.TradingAgent;
@@ -129,11 +129,11 @@ class ResearchPhaseRepositoryTest extends BaseRepositoryTest {
         // Arrange
         ResearchPhase phase = new ResearchPhase(testRun);
         
-        ResearchToolCallDto toolCall1 = new ResearchToolCallDto();
+        ToolCallDto toolCall1 = new ToolCallDto();
         toolCall1.setTool("brave_search");
         toolCall1.setDurationMs(1200L);
         
-        ResearchToolCallDto toolCall2 = new ResearchToolCallDto();
+        ToolCallDto toolCall2 = new ToolCallDto();
         toolCall2.setTool("memory_search");
         toolCall2.setDurationMs(50L);
         
@@ -146,11 +146,11 @@ class ResearchPhaseRepositoryTest extends BaseRepositoryTest {
         // Assert
         assertThat(loaded.getToolCalls()).hasSize(2);
         
-        ResearchToolCallDto loadedCall1 = loaded.getToolCalls().get(0);
+        ToolCallDto loadedCall1 = loaded.getToolCalls().get(0);
         assertThat(loadedCall1.getTool()).isEqualTo("brave_search");
         assertThat(loadedCall1.getDurationMs()).isEqualTo(1200L);
         
-        ResearchToolCallDto loadedCall2 = loaded.getToolCalls().get(1);
+        ToolCallDto loadedCall2 = loaded.getToolCalls().get(1);
         assertThat(loadedCall2.getTool()).isEqualTo("memory_search");
         assertThat(loadedCall2.getDurationMs()).isEqualTo(50L);
     }

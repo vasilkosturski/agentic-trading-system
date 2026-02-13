@@ -1,6 +1,6 @@
 package com.trading.repository;
 
-import com.trading.dto.jsonb.DecisionToolCallDto;
+import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.ReasoningDto;
 import com.trading.dto.jsonb.SourceDto;
 import com.trading.entity.DecisionPhase;
@@ -119,12 +119,12 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         phase.setSymbol("AAPL");
         phase.setQuantity(5);
         
-        DecisionToolCallDto toolCall1 = new DecisionToolCallDto();
+        ToolCallDto toolCall1 = new ToolCallDto();
         toolCall1.setTool("get_symbol_trade_history");
         toolCall1.setParams(Map.of("symbol", "AAPL", "limit", 10));
         toolCall1.setDurationMs(150L);
         
-        DecisionToolCallDto toolCall2 = new DecisionToolCallDto();
+        ToolCallDto toolCall2 = new ToolCallDto();
         toolCall2.setTool("get_current_price");
         toolCall2.setParams(Map.of("symbol", "AAPL"));
         toolCall2.setDurationMs(80L);
@@ -138,12 +138,12 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         // Assert
         assertThat(loaded.getToolCalls()).hasSize(2);
         
-        DecisionToolCallDto loadedCall1 = loaded.getToolCalls().get(0);
+        ToolCallDto loadedCall1 = loaded.getToolCalls().get(0);
         assertThat(loadedCall1.getTool()).isEqualTo("get_symbol_trade_history");
         assertThat(loadedCall1.getDurationMs()).isEqualTo(150L);
         assertThat(loadedCall1.getParams()).containsEntry("symbol", "AAPL");
         
-        DecisionToolCallDto loadedCall2 = loaded.getToolCalls().get(1);
+        ToolCallDto loadedCall2 = loaded.getToolCalls().get(1);
         assertThat(loadedCall2.getTool()).isEqualTo("get_current_price");
         assertThat(loadedCall2.getDurationMs()).isEqualTo(80L);
     }
