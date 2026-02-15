@@ -610,17 +610,18 @@ class AgentExecutor:
         )
 
         # Monitor LLM structured reasoning field population
-        populated_fields = []
-        empty_fields = []
-        for field_name in ["portfolioContext", "historicalContext", "researchSummary", "candidateEvaluation", "finalRationale"]:
-            if getattr(reasoning, field_name):
-                populated_fields.append(field_name)
-            else:
-                empty_fields.append(field_name)
-
+        reasoning_fields = {
+            "portfolioContext": reasoning.portfolioContext,
+            "historicalContext": reasoning.historicalContext,
+            "researchSummary": reasoning.researchSummary,
+            "candidateEvaluation": reasoning.candidateEvaluation,
+            "finalRationale": reasoning.finalRationale,
+        }
+        populated = [k for k, v in reasoning_fields.items() if v]
+        empty = [k for k, v in reasoning_fields.items() if not v]
         logger.info(
-            f"📝 Reasoning fields populated: {', '.join(populated_fields) or 'NONE'} "
-            f"(empty: {', '.join(empty_fields) or 'none'})"
+            f"📝 Reasoning fields populated: {', '.join(populated) or 'NONE'} "
+            f"(empty: {', '.join(empty) or 'none'})"
         )
 
         # Build nested phase DTOs
