@@ -44,6 +44,7 @@ class TestMarketAnalystE2E:
     """E2E smoke test for Market Analyst."""
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("require_openai_api_key", "require_brave_api_key", "require_backend")
     async def test_market_analyst_returns_candidates(
         self,
         real_mcp_pool: MCPPool,
@@ -52,9 +53,6 @@ class TestMarketAnalystE2E:
         test_model_name,
         sample_holdings,
         sample_recent_activity,
-        openai_api_key,  # Early validation - skips test if missing/invalid
-        brave_api_key,   # Early validation - skips test if missing/invalid
-        require_backend,  # Early validation - skips test if backend unreachable
     ):
         """Smoke test: Market Analyst finds stock candidates.
 
@@ -63,8 +61,8 @@ class TestMarketAnalystE2E:
         2. Real OpenAI API call works
         3. Returns valid ResearchResponse with candidates
 
-        Note: openai_api_key and brave_api_key fixtures validate keys early,
-        avoiding expensive LLM calls if credentials are missing.
+        Note: require_* fixtures validate prerequisites early,
+        avoiding expensive LLM calls if credentials or backend are missing.
         """
         logger.info("=" * 60)
         logger.info("E2E SMOKE TEST: Market Analyst")

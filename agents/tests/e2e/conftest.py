@@ -34,24 +34,23 @@ logger = logging.getLogger("e2e_tests")
 # Environment Validation
 # =============================================================================
 
-def _require_env(var_name: str) -> str:
-    """Get required environment variable or skip test."""
+def _require_env(var_name: str):
+    """Skip test if environment variable is missing or a test stub."""
     value = os.environ.get(var_name)
     if not value or value.startswith("test-"):
         pytest.skip(f"E2E tests require real {var_name}")
-    return value
 
 
 @pytest.fixture(scope="session")
-def openai_api_key() -> str:
-    """Real OpenAI API key."""
-    return _require_env("OPENAI_API_KEY")
+def require_openai_api_key():
+    """Skip if no real OpenAI API key."""
+    _require_env("OPENAI_API_KEY")
 
 
 @pytest.fixture(scope="session")
-def brave_api_key() -> str:
-    """Real Brave Search API key."""
-    return _require_env("BRAVE_API_KEY")
+def require_brave_api_key():
+    """Skip if no real Brave Search API key."""
+    _require_env("BRAVE_API_KEY")
 
 
 @pytest.fixture(scope="session")
@@ -61,11 +60,10 @@ def backend_url() -> str:
 
 
 @pytest.fixture(scope="session")
-def require_backend(backend_url) -> str:
-    """Verify backend is reachable, skip test if not.
+def require_backend(backend_url):
+    """Skip if backend is not reachable.
 
     Quick health check to avoid expensive LLM calls that will fail on tool errors.
-    Similar pattern to openai_api_key/brave_api_key early validation.
     """
     import urllib.request
     import urllib.error
@@ -73,7 +71,6 @@ def require_backend(backend_url) -> str:
         urllib.request.urlopen(f"{backend_url}/actuator/health", timeout=5)
     except (urllib.error.URLError, OSError):
         pytest.skip(f"Backend not reachable at {backend_url} - skipping E2E test")
-    return backend_url
 
 
 # =============================================================================
