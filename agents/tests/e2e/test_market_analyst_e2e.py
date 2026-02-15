@@ -54,6 +54,7 @@ class TestMarketAnalystE2E:
         sample_recent_activity,
         openai_api_key,  # Early validation - skips test if missing/invalid
         brave_api_key,   # Early validation - skips test if missing/invalid
+        require_backend,  # Early validation - skips test if backend unreachable
     ):
         """Smoke test: Market Analyst finds stock candidates.
 

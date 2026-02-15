@@ -94,16 +94,21 @@ def sample_holdings() -> List[Holding]:
 
 @pytest.fixture
 def sample_account_report(sample_balance, sample_holdings) -> str:
-    """Sample account report for testing."""
+    """Sample account report for testing.
+
+    Financial story: Agent started with $130K, bought $30K of stock (AAPL + MSFT),
+    leaving $100K cash. Total portfolio = cash + stock value = $130K.
+    """
     holdings_text = "\n".join([
         f"- {h.symbol}: {h.quantity} shares @ ${h.averagePrice:.2f} avg"
         for h in sample_holdings
     ])
+    stock_value = sum(h.quantity * h.averagePrice for h in sample_holdings)
     return f"""Account: Warren
 Balance: ${sample_balance:,.2f}
 Holdings:
 {holdings_text}
-Total Portfolio Value: ${sample_balance + 15000 + 15000:,.2f}"""
+Total Portfolio Value: ${sample_balance + stock_value:,.2f}"""
 
 
 @pytest.fixture

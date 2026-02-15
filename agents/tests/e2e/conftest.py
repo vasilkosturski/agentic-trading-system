@@ -11,7 +11,6 @@ WARNING: Tests using these fixtures cost real $ and make real API calls.
 import os
 import logging
 from pathlib import Path
-from typing import Optional
 
 import pytest
 from dotenv import load_dotenv
@@ -59,6 +58,22 @@ def brave_api_key() -> str:
 def backend_url() -> str:
     """Backend API URL (matches config.py BACKEND_URL env var)."""
     return os.environ.get("BACKEND_URL", "http://localhost:8080")
+
+
+@pytest.fixture(scope="session")
+def require_backend(backend_url) -> str:
+    """Verify backend is reachable, skip test if not.
+
+    Quick health check to avoid expensive LLM calls that will fail on tool errors.
+    Similar pattern to openai_api_key/brave_api_key early validation.
+    """
+    import urllib.request
+    import urllib.error
+    try:
+        urllib.request.urlopen(f"{backend_url}/actuator/health", timeout=5)
+    except (urllib.error.URLError, OSError):
+        pytest.skip(f"Backend not reachable at {backend_url} - skipping E2E test")
+    return backend_url
 
 
 # =============================================================================
