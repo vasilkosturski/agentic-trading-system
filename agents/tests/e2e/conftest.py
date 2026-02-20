@@ -1,11 +1,14 @@
 """E2E test fixtures with REAL integrations.
 
 These fixtures provide REAL connections to:
-- Backend API (PostgreSQL via REST)
+- Backend API (PostgreSQL via REST, auto-started via Docker)
 - Brave Search API
 - OpenAI API
 
 WARNING: Tests using these fixtures cost real $ and make real API calls.
+
+Docker services (postgres + backend) are managed by pytest-docker.
+They start automatically on first test and stop after the session.
 """
 
 import os
@@ -13,6 +16,7 @@ import logging
 from pathlib import Path
 
 import pytest
+import requests
 from dotenv import load_dotenv
 
 # Load environment with real API keys
@@ -53,59 +57,248 @@ def require_brave_api_key():
     _require_env("BRAVE_API_KEY")
 
 
-@pytest.fixture(scope="session")
-def backend_url() -> str:
-    """Backend API URL (matches config.py BACKEND_URL env var)."""
-    return os.environ.get("BACKEND_URL", "http://localhost:8080")
-
+# =============================================================================
+# Docker-based Backend (pytest-docker)
+# =============================================================================
 
 @pytest.fixture(scope="session")
-def require_backend(backend_url):
-    """Skip if backend is not reachable.
+def docker_compose_command():
+    """Use podman compose instead of docker compose."""
+    return "podman compose"
 
-    Quick health check to avoid expensive LLM calls that will fail on tool errors.
-    """
-    import urllib.request
-    import urllib.error
+
+@pytest.fixture(scope="session")
+def docker_compose_file(pytestconfig):
+    """Point pytest-docker to the E2E compose file."""
+    return os.path.join(
+        str(pytestconfig.rootdir), "..", "docker-compose.e2e.yml"
+    )
+
+
+def _is_backend_responsive(url: str) -> bool:
+    """Check if backend health endpoint responds."""
     try:
-        urllib.request.urlopen(f"{backend_url}/actuator/health", timeout=5)
-    except (urllib.error.URLError, OSError):
-        pytest.skip(f"Backend not reachable at {backend_url} - skipping E2E test")
+        resp = requests.get(f"{url}/actuator/health", timeout=5)
+        return resp.status_code == 200
+    except (requests.ConnectionError, requests.Timeout):
+        return False
+
+
+@pytest.fixture(scope="session")
+def require_backend(docker_ip, docker_services) -> str:
+    """Start backend via Docker and wait until healthy.
+
+    Returns the backend base URL for downstream fixtures.
+    Uses pytest-docker to auto-start postgres + backend from docker-compose.e2e.yml.
+
+    Also patches module-level URL variables so agent tools (market_tools,
+    backend_client) route requests to the Docker backend instead of the
+    default localhost:8080.
+    """
+    port = docker_services.port_for("backend", 8080)
+    url = f"http://{docker_ip}:{port}"
+    docker_services.wait_until_responsive(
+        timeout=120.0,
+        pause=2.0,
+        check=lambda: _is_backend_responsive(url),
+    )
+    logger.info(f"Backend ready at {url}")
+
+    # Patch module-level URL variables that were captured at import time.
+    # Without this, agent tools try to connect to localhost:8080 instead
+    # of the Docker backend's random port.
+    import config as config_module
+    import market_tools as market_tools_module
+    import backend_client as backend_client_module
+    import memory_tools as memory_tools_module
+    import researcher as researcher_module
+
+    config_module.BACKEND_BASE_URL = url
+    config_module.BACKEND_API_MARKET = f"{url}/api/market"
+    config_module.BACKEND_API_ACCOUNTS = f"{url}/api/accounts"
+    config_module.BACKEND_API_TRADING_RUNS = f"{url}/api/runs"
+    config_module.BACKEND_API_AGENTS = f"{url}/api/agents"
+    config_module.config.BACKEND_BASE_URL = url
+
+    market_tools_module.BACKEND_URL = f"{url}/api/market"
+
+    backend_client_module.BACKEND_BASE_URL = url
+    backend_client_module.BACKEND_API_ACCOUNTS = f"{url}/api/accounts"
+    backend_client_module.BACKEND_API_TRADING_RUNS = f"{url}/api/runs"
+
+    memory_tools_module.BACKEND_BASE_URL = url
+    researcher_module.BACKEND_BASE_URL = url
+
+    return url
 
 
 # =============================================================================
-# Test Agent Configuration
+# Database Seeding
+# =============================================================================
+
+@pytest.fixture(scope="session")
+def seed_test_data(docker_ip, docker_services, require_backend):
+    """Seed test data directly into postgres after JPA schema is created.
+
+    Depends on require_backend so that Hibernate has already created the schema
+    via ddl-auto: update before we INSERT rows.
+
+    All seed values come from seed_data.SEED_DATA — the single source of truth
+    for test data shared between DB seeding and test fixtures.
+    """
+    import psycopg2
+    from seed_data import SEED_DATA
+
+    agent = SEED_DATA.agent
+
+    pg_port = docker_services.port_for("postgres", 5432)
+    conn = psycopg2.connect(
+        host=docker_ip,
+        port=pg_port,
+        dbname="agentic_trading",
+        user="trading_user",
+        password="trading_password",
+    )
+    conn.autocommit = True
+    cur = conn.cursor()
+
+    try:
+        # Check if already seeded (idempotent)
+        cur.execute(
+            "SELECT id FROM agents.trading_agents WHERE name = %s",
+            (agent.name,),
+        )
+        if cur.fetchone():
+            logger.info("Test data already seeded — skipping")
+            return
+
+        # 1. Agent (omit 'style' — nullable column, may not exist in older backend images)
+        cur.execute(
+            """
+            INSERT INTO agents.trading_agents
+                (name, description, is_active, trading_frequency,
+                 initial_capital, total_trades, total_pnl, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+            RETURNING id
+            """,
+            (agent.name, agent.description, agent.is_active,
+             agent.trading_frequency, agent.initial_capital,
+             agent.total_trades, agent.total_pnl),
+        )
+        agent_id = cur.fetchone()[0]
+
+        # 2. Account
+        acct = SEED_DATA.account
+        cur.execute(
+            """
+            INSERT INTO trading.trading_accounts
+                (balance, agent_id, is_active, created_at, updated_at)
+            VALUES (%s, %s, %s, NOW(), NOW())
+            RETURNING id
+            """,
+            (acct.balance, agent_id, acct.is_active),
+        )
+        account_id = cur.fetchone()[0]
+
+        # 3. Holdings
+        for h in SEED_DATA.holdings:
+            cur.execute(
+                """
+                INSERT INTO trading.account_holdings
+                    (account_id, symbol, quantity, average_price, last_updated, created_at)
+                VALUES (%s, %s, %s, %s, NOW(), NOW())
+                """,
+                (account_id, h.symbol, h.quantity, h.average_price),
+            )
+
+        # 4. Agent runs (analytics schema — FK target for account_transactions)
+        run_ids = []
+        for run in SEED_DATA.agent_runs:
+            cur.execute(
+                """
+                INSERT INTO analytics.agent_runs
+                    (agent_name, run_type, start_time, end_time, outcome,
+                     summary, full_reasoning, research_sources, trade_count, created_at)
+                VALUES
+                    (%s, %s,
+                     NOW() - INTERVAL '%s days', NOW() - INTERVAL '%s days',
+                     %s, %s, %s, %s, %s,
+                     NOW() - INTERVAL '%s days')
+                RETURNING id
+                """,
+                (agent.name, run.run_type,
+                 run.days_ago, run.days_ago,
+                 run.outcome, run.summary, run.full_reasoning,
+                 run.research_sources, run.trade_count,
+                 run.days_ago),
+            )
+            run_ids.append(cur.fetchone()[0])
+
+        # 5. Transactions
+        for tx in SEED_DATA.transactions:
+            run_id = run_ids[tx.run_index]
+            days_ago = SEED_DATA.agent_runs[tx.run_index].days_ago
+            cur.execute(
+                """
+                INSERT INTO trading.account_transactions
+                    (account_id, symbol, quantity, price, timestamp,
+                     agent_run_id, transaction_type, total_amount, created_at)
+                VALUES
+                    (%s, %s, %s, %s, NOW() - INTERVAL '%s days',
+                     %s, %s, %s, NOW() - INTERVAL '%s days')
+                """,
+                (account_id, tx.symbol, tx.quantity, tx.price, days_ago,
+                 run_id, tx.transaction_type, tx.quantity * tx.price, days_ago),
+            )
+
+        logger.info(
+            f"Seeded test data: agent_id={agent_id}, account_id={account_id}, "
+            f"{len(SEED_DATA.holdings)} holdings, {len(run_ids)} runs, "
+            f"{len(SEED_DATA.transactions)} transactions"
+        )
+    finally:
+        cur.close()
+        conn.close()
+
+
+# =============================================================================
+# Test Agent Configuration (derived from seed_data — single source of truth)
 # =============================================================================
 
 @pytest.fixture
-def test_agent_id() -> int:
+def test_agent_id(seed_test_data) -> int:
     """Agent ID for E2E testing.
 
-    Uses agent ID 1 (Warren) by default for consistent testing.
+    Depends on seed_test_data to ensure the agent exists first.
+    Uses agent ID 1 (first seeded agent). The dependency on seed_test_data
+    ensures the agent is seeded before this fixture returns.
     """
     return 1
 
 
 @pytest.fixture
 def test_agent_name() -> str:
-    """Agent name for E2E testing."""
-    return "Warren"
+    """Agent name for E2E testing — derived from seed_data."""
+    from seed_data import TEST_AGENT
+    return TEST_AGENT.name
 
 
 @pytest.fixture
 def test_agent_style() -> str:
-    """Agent style for E2E testing."""
-    return "Value Investor"
+    """Agent style for E2E testing — derived from seed_data."""
+    from seed_data import TEST_AGENT
+    return TEST_AGENT.style
 
 
 @pytest.fixture
 def test_model_name() -> str:
-    """LLM model for E2E testing.
+    """LLM model for E2E testing — derived from seed_data.
 
     Uses gpt-4o for better instruction-following.
     Note: gpt-4o-mini struggles with complex multi-step agent workflows.
     """
-    return "gpt-4o"
+    from seed_data import TEST_AGENT
+    return TEST_AGENT.model_name
 
 
 # =============================================================================
@@ -113,13 +306,14 @@ def test_model_name() -> str:
 # =============================================================================
 
 @pytest.fixture
-async def real_backend_client(backend_url):
+async def real_backend_client(require_backend):
     """Real async HTTP client for backend API.
 
     Uses aiohttp to make real HTTP requests to the backend.
+    Backend URL comes from require_backend (Docker-managed).
     """
     import aiohttp
-    async with aiohttp.ClientSession(base_url=backend_url) as session:
+    async with aiohttp.ClientSession(base_url=require_backend) as session:
         yield session
 
 
@@ -139,27 +333,28 @@ async def real_agent_holdings(real_backend_client, test_agent_id):
 @pytest.fixture
 async def real_agent_balance(real_backend_client, test_agent_id):
     """Fetch real balance from backend."""
-    async with real_backend_client.get(f"/api/accounts/{test_agent_id}") as resp:
+    async with real_backend_client.get(f"/api/accounts/{test_agent_id}/balance") as resp:
         if resp.status == 200:
-            data = await resp.json()
-            from models.api_responses import AccountResponse
-            account = AccountResponse.model_validate(data)
-            return account.balance
+            return await resp.json()
         else:
             logger.warning(f"Failed to fetch balance: {resp.status}")
             return 0.0
 
 
 @pytest.fixture
-async def real_recent_activity(real_backend_client, test_agent_id):
+async def real_recent_activity(real_backend_client, test_agent_name):
     """Fetch real recent activity from backend."""
-    async with real_backend_client.get(f"/api/memory/{test_agent_id}/recent-activity?days=30") as resp:
+    # Pre-built image uses agentName param; current source uses agentId.
+    # Use agentName for compatibility with the deployed image.
+    params = {"agentName": test_agent_name, "days": "30"}
+    async with real_backend_client.get("/api/memory/recent-activity", params=params) as resp:
         if resp.status == 200:
             data = await resp.json()
             from models.api_responses import RecentActivityResponse
             return RecentActivityResponse(**data)
         else:
-            logger.warning(f"Failed to fetch recent activity: {resp.status}")
+            body = await resp.text()
+            logger.warning(f"Failed to fetch recent activity: {resp.status} — {body}")
             from models.api_responses import RecentActivityResponse
             return RecentActivityResponse(
                 agentName="Warren",

@@ -1,0 +1,43 @@
+# Docker Compose for E2E tests - postgres + backend only
+# Used by pytest-docker to auto-start services during E2E test runs
+#
+# Usage (manual): docker compose -f docker-compose.e2e.yml up -d
+# Usage (pytest): Automatic via pytest-docker fixtures in conftest.py
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: agentic_trading
+      POSTGRES_USER: trading_user
+      POSTGRES_PASSWORD: trading_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
+    ports:
+      - "5432"  # Random host port — discovered via docker_services.port_for()
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trading_user -d agentic_trading"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    image: ghcr.io/vasilkosturski/agentic-trading-backend:latest
+    environment:
+      SPRING_PROFILES_ACTIVE: postgresql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: agentic_trading
+      DB_USERNAME: trading_user
+      DB_PASSWORD: trading_password
+      POLYGON_API_KEY: ${POLYGON_API_KEY:-}
+      POLYGON_PLAN: ${POLYGON_PLAN:-free}
+    ports:
+      - "8080"  # Random host port — discovered via docker_services.port_for()
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12

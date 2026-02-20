@@ -40,19 +40,20 @@ async def real_mcp_pool():
 @pytest.mark.e2e
 @pytest.mark.slow
 @pytest.mark.costly
+@pytest.mark.usefixtures("require_openai_api_key", "require_brave_api_key", "require_backend", "seed_test_data")
 class TestMarketAnalystE2E:
     """E2E smoke test for Market Analyst."""
 
     @pytest.mark.asyncio
-    @pytest.mark.usefixtures("require_openai_api_key", "require_brave_api_key", "require_backend")
     async def test_market_analyst_returns_candidates(
         self,
         real_mcp_pool: MCPPool,
         test_agent_name,
         test_agent_style,
         test_model_name,
-        sample_holdings,
-        sample_recent_activity,
+        real_agent_holdings,
+        real_agent_balance,
+        real_recent_activity,
     ):
         """Smoke test: Market Analyst finds stock candidates.
 
@@ -60,6 +61,7 @@ class TestMarketAnalystE2E:
         1. Real Brave Search API call works
         2. Real OpenAI API call works
         3. Returns valid ResearchResponse with candidates
+        4. Uses real backend data (seeded agent, holdings, activity)
 
         Note: require_* fixtures validate prerequisites early,
         avoiding expensive LLM calls if credentials or backend are missing.
@@ -68,6 +70,8 @@ class TestMarketAnalystE2E:
         logger.info("E2E SMOKE TEST: Market Analyst")
         logger.info("=" * 60)
         logger.info(f"Agent: {test_agent_name} ({test_agent_style})")
+        logger.info(f"Balance: {real_agent_balance}")
+        logger.info(f"Holdings: {len(real_agent_holdings)} positions")
 
         # Create Market Analyst using async factory
         market_analyst = await MarketAnalyst.create(
@@ -76,13 +80,13 @@ class TestMarketAnalystE2E:
             model_name=test_model_name,
         )
 
-        # Build context
+        # Build context using real backend data
         context = MarketAnalystContext(
             agent_name=test_agent_name,
             agent_style=test_agent_style,
-            balance=50000.0,
-            holdings=sample_holdings,
-            recent_activity=sample_recent_activity,
+            balance=real_agent_balance,
+            holdings=real_agent_holdings,
+            recent_activity=real_recent_activity,
         )
 
         logger.info("Running Market Analyst...")
@@ -103,16 +107,21 @@ class TestMarketAnalystE2E:
         for tc in result.tool_calls:
             logger.info(f"  - {tc.name}: {tc.params}")
 
-        # Opt-in fail-fast: raise if any tools had errors
-        # This is where we decide to stop the test on tool failures
-        if result.has_errors:
+        # ALL tool errors are fatal — the E2E test validates the full pipeline
+        # including external integrations (Brave Search, Fetch).
+        # If external services are flaky, fix retry logic in the tools themselves.
+        if result.tool_errors:
             logger.error("=" * 60)
-            logger.error("TOOL ERRORS DETECTED")
+            logger.error("TOOL ERRORS (fatal)")
             logger.error("=" * 60)
             for err in result.tool_errors:
                 logger.error(f"  - {err.name}: {err.output[:200]}")
             logger.error("=" * 60)
-            result.raise_if_errors()  # Throws ToolExecutionError
+            from exceptions import ToolExecutionError
+            raise ToolExecutionError(
+                f"Tools failed: {[e.name for e in result.tool_errors]}",
+                tool_errors=result.tool_errors
+            )
 
         # Extract response from AgentRunResult
         response = result.output
@@ -124,11 +133,32 @@ class TestMarketAnalystE2E:
         logger.info(f"Sources: {len(response.sources)}")
         logger.info("-" * 40)
 
-        # Assertions - structure only (LLM output is non-deterministic)
+        # Structural assertions — these are deterministic guarantees from the
+        # ResearchResponse model, not LLM content judgments.
         assert response is not None
         assert isinstance(response, ResearchResponse)
-        assert isinstance(response.candidates, list)
+
+        # Summary should be meaningful research output
         assert isinstance(response.summary, str)
         assert len(response.summary) > 10, "Summary should be meaningful"
+
+        # Agent should always find at least one candidate stock
+        assert isinstance(response.candidates, list)
+        assert len(response.candidates) >= 1, "Market Analyst should find at least one candidate"
+        for candidate in response.candidates:
+            assert isinstance(candidate, str)
+            assert len(candidate) >= 1, "Candidate symbol must not be empty"
+
+        # Research should cite at least one source
+        assert len(response.sources) >= 1, "Research should cite at least one source"
+        for source in response.sources:
+            assert source.title, "Source must have a title"
+            assert source.url, "Source must have a URL"
+
+        # Agent should have made at least one tool call (brave_web_search at minimum)
+        assert len(result.tool_calls) >= 1, "Market Analyst should make at least one tool call"
+
+        # No tool errors should remain (already checked above, but assert for clarity)
+        assert len(result.tool_errors) == 0, f"Unexpected tool errors: {result.tool_errors}"
 
         logger.info("TEST PASSED")
