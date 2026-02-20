@@ -23,19 +23,17 @@ logger = logging.getLogger(__name__)
 BACKEND_URL = BACKEND_API_MARKET
 
 async def _call_backend_api(endpoint: str) -> Any:
-    """Helper to call Java backend API"""
+    """Helper to call Java backend API.
+
+    Backend returns data directly (no wrapper), so we just return
+    response.json(). HTTP errors are already handled by call_backend
+    which raises BackendAPIError.
+    """
     url = f"{BACKEND_URL}{endpoint}"
 
     try:
         response = await call_backend("GET", url)
-        result = response.json()
-
-        if result.get("success"):
-            return result.get("data")
-        else:
-            # Shouldn't happen (backend returns 4xx/5xx on error)
-            error_msg = result.get("error", "Unknown error")
-            raise Exception(f"API call failed: {error_msg}")
+        return response.json()
 
     except BackendAPIError as e:
         # Already logged by http_client

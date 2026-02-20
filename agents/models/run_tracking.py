@@ -70,10 +70,14 @@ class ToolCallDto(BaseModel):
     - tool: Tool name (e.g., "query_holdings", "brave_search")
     - params: Optional parameters (e.g., {"symbol": "JPM"})
     - durationMs: Execution duration in milliseconds
+    - error: Whether the tool call returned an error
+    - errorMessage: Truncated error output (max 500 chars)
     """
     tool: str
     params: Optional[Dict[str, Any]] = None
     durationMs: Optional[int] = None
+    error: Optional[bool] = None
+    errorMessage: Optional[str] = None
 
 
 class ReasoningDto(BaseModel):

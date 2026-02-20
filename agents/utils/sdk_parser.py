@@ -4,9 +4,12 @@ Uses isinstance() with SDK classes (ToolCallItem, ToolCallOutputItem) as
 recommended by official OpenAI documentation. Extracts tool calls from
 agent results.
 
-Uses proper typed access for SDK types:
-- ResponseFunctionToolCall: Pydantic model with name, call_id, arguments
-- FunctionCallOutput: TypedDict with call_id, output
+Error detection: matches the SDK's default_tool_error_function prefix.
+When a tool raises an exception, the SDK catches it and returns a string
+starting with "An error occurred while running the tool". This is the
+SDK's own deterministic output — not substring guessing.
+
+See: GitHub issue #2165 — SDK does not surface MCP isError for local tools.
 """
 
 import json
@@ -33,6 +36,8 @@ class ParsedToolCall:
     call_id: str
     output: str
     params: Optional[Dict[str, Any]] = None  # Tool input parameters
+    is_error: bool = False
+    error_message: Optional[str] = None
 
 
 def extract_tool_calls(items: list[RunItem]) -> list[ParsedToolCall]:
@@ -103,20 +108,48 @@ def extract_tool_calls(items: list[RunItem]) -> list[ParsedToolCall]:
             if call_id and call_id in tool_name_by_call_id:
                 tool_name = tool_name_by_call_id[call_id]
                 params = tool_params_by_call_id.get(call_id)
+                is_error, error_message = _detect_tool_error(output)
                 tool_calls.append(
-                    ParsedToolCall(name=tool_name, call_id=call_id, output=output, params=params)
+                    ParsedToolCall(
+                        name=tool_name,
+                        call_id=call_id,
+                        output=output,
+                        params=params,
+                        is_error=is_error,
+                        error_message=error_message,
+                    )
                 )
 
     return tool_calls
 
 
+# ---------------------------------------------------------------------------
+# Error Detection — SDK prefix match only
+# ---------------------------------------------------------------------------
+
+# SDK's default_tool_error_function produces this prefix when a tool raises.
+# This is deterministic, not substring guessing — it's the SDK's own output.
+_SDK_ERROR_PREFIX = "an error occurred while running the tool"
+
+
+def _detect_tool_error(output: str) -> tuple[bool, Optional[str]]:
+    """Detect tool errors by matching the SDK's default error prefix.
+
+    When a tool raises an exception, the SDK's default_tool_error_function
+    catches it and returns a string starting with a known prefix. We match
+    that prefix. Nothing else.
+
+    Returns:
+        (is_error, error_message) tuple
+    """
+    lower = output.lower() if output else ""
+    if lower.startswith(_SDK_ERROR_PREFIX):
+        return True, output[:500]
+    return False, None
+
+
 def get_tool_errors(tool_calls: list[ParsedToolCall]) -> list[ParsedToolCall]:
     """Filter tool calls to return only those with errors.
-
-    Detects errors by checking output for common error patterns:
-    - Contains "error=" or "error_type="
-    - Contains "Failed to" at start
-    - Contains "Network error" or "Connection error"
 
     Args:
         tool_calls: List of ParsedToolCall from extract_tool_calls()
@@ -124,19 +157,4 @@ def get_tool_errors(tool_calls: list[ParsedToolCall]) -> list[ParsedToolCall]:
     Returns:
         List of ParsedToolCall that contain error outputs
     """
-    error_patterns = [
-        "error=",
-        "error_type=",
-        "Failed to ",
-        "Network error",
-        "Connection error",
-        "api_error",
-    ]
-
-    errors = []
-    for tc in tool_calls:
-        output = tc.output.lower() if tc.output else ""
-        if any(pattern.lower() in output for pattern in error_patterns):
-            errors.append(tc)
-
-    return errors
+    return [tc for tc in tool_calls if tc.is_error]

@@ -383,6 +383,8 @@ class AgentExecutor:
                 tool=pc.name,
                 params=pc.params,
                 durationMs=None,  # SDK doesn't provide individual durations
+                error=pc.is_error if pc.is_error else None,
+                errorMessage=pc.error_message,
             )
             for pc in parsed_calls
         ]
@@ -472,6 +474,8 @@ class AgentExecutor:
                 tool=pc.name,
                 params=pc.params,
                 durationMs=None,  # SDK doesn't provide individual durations
+                error=pc.is_error if pc.is_error else None,
+                errorMessage=pc.error_message,
             )
             for pc in parsed_calls
         ]

@@ -12,6 +12,8 @@ import java.util.Map;
  * - tool: Tool name (e.g., "query_holdings", "brave_search", "get_symbol_trade_history")
  * - params: Optional tool parameters (e.g., {"symbol": "JPM"})
  * - durationMs: Duration in milliseconds
+ * - error: Whether the tool call returned an error (null for legacy records)
+ * - errorMessage: Truncated error output (null for successful calls)
  */
 @Data
 @NoArgsConstructor
@@ -34,11 +36,25 @@ public class ToolCallDto {
     private Long durationMs;
 
     /**
+     * Whether the tool call returned an error.
+     * Null for tool calls from before this field was added (backward-compatible).
+     */
+    private Boolean error;
+
+    /**
+     * Truncated error message (max 500 chars) when error is true.
+     * Null for successful tool calls.
+     */
+    private String errorMessage;
+
+    /**
      * Convenience constructor without params (for simple tool calls).
      */
     public ToolCallDto(String tool, Long durationMs) {
         this.tool = tool;
         this.params = null;
         this.durationMs = durationMs;
+        this.error = null;
+        this.errorMessage = null;
     }
 }
