@@ -16,7 +16,6 @@ os.environ.setdefault("BACKEND_URL", "http://localhost:8080")  # Matches config.
 os.environ.setdefault("BACKEND_API_ACCOUNTS", "http://localhost:8080")
 os.environ.setdefault("BRAVE_API_KEY", "test-brave-key-for-unit-tests")
 
-import asyncio
 import json
 from typing import Dict, List
 from unittest.mock import AsyncMock, MagicMock
@@ -26,14 +25,6 @@ from aioresponses import aioresponses
 
 # Import models for fixtures
 from models import TradingDecision, Holding
-
-
-@pytest.fixture
-def event_loop():
-    """Create an event loop for async tests."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest.fixture

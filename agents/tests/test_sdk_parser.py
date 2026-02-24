@@ -10,6 +10,9 @@ from utils.sdk_parser import (
     TOOL_DECIDE_ACTION,
     ParsedToolCall,
     extract_tool_calls,
+    get_tool_errors,
+    _detect_tool_error,
+    _SDK_ERROR_PREFIX,
 )
 
 
@@ -92,3 +95,62 @@ class TestExtractToolCalls:
 
         calls = extract_tool_calls([item])
         assert calls == []
+
+
+class TestErrorDetection:
+    """Test SDK error detection — prefix matching."""
+
+    def test_sdk_error_prefix_matches_installed_sdk(self):
+        """Verify our prefix matches the SDK's default_tool_error_function.
+
+        This test pins our detection against the installed SDK version.
+        If an SDK upgrade changes the error prefix, this test fails
+        immediately — preventing silent detection breakage.
+        """
+        from agents.tool import default_tool_error_function
+
+        error = Exception("test error")
+        output = default_tool_error_function(None, error)
+
+        assert output.lower().startswith(_SDK_ERROR_PREFIX), (
+            f"SDK error prefix mismatch! SDK produces: '{output[:80]}', "
+            f"we match: '{_SDK_ERROR_PREFIX}'"
+        )
+
+    def test_detect_sdk_error_output(self):
+        """Detect error from SDK's default error function output."""
+        output = "An error occurred while running the tool. Please try again. Error: connection refused"
+        is_error, message = _detect_tool_error(output)
+        assert is_error is True
+        assert message == output
+
+    def test_detect_normal_output(self):
+        """Normal tool output is not flagged as error."""
+        output = '{"symbol": "AAPL", "price": 180.50}'
+        is_error, message = _detect_tool_error(output)
+        assert is_error is False
+        assert message is None
+
+    def test_detect_empty_output(self):
+        """Empty output is not an error."""
+        is_error, message = _detect_tool_error("")
+        assert is_error is False
+        assert message is None
+
+    def test_error_message_truncated_at_500(self):
+        """Error messages are truncated to 500 chars."""
+        output = "An error occurred while running the tool. " + "x" * 600
+        is_error, message = _detect_tool_error(output)
+        assert is_error is True
+        assert len(message) == 500
+
+    def test_get_tool_errors_filters_correctly(self):
+        """get_tool_errors returns only error tool calls."""
+        calls = [
+            ParsedToolCall(name="good_tool", call_id="1", output="ok", is_error=False),
+            ParsedToolCall(name="bad_tool", call_id="2", output="err", is_error=True, error_message="fail"),
+            ParsedToolCall(name="another_good", call_id="3", output="ok", is_error=False),
+        ]
+        errors = get_tool_errors(calls)
+        assert len(errors) == 1
+        assert errors[0].name == "bad_tool"

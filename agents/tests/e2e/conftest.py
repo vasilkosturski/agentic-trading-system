@@ -17,14 +17,34 @@ from pathlib import Path
 
 import pytest
 import requests
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
-# Load environment with real API keys
-parent_env = Path(__file__).parent.parent.parent.parent / ".env"
-if parent_env.exists():
-    load_dotenv(parent_env, override=True)
+# Ensure common tool directories are on PATH.
+# IDE-spawned processes (VSCode, etc.) inherit a minimal PATH that excludes
+# /usr/local/bin, /opt/homebrew/bin, /opt/podman/bin, etc.  Extending PATH
+# at module level fixes this for ALL subprocesses (pytest-docker, etc.).
+_EXTRA_PATH_DIRS = [
+    "/usr/local/bin",
+    "/opt/homebrew/bin",
+    "/opt/podman/bin",
+    str(Path.home() / ".local/bin"),  # uv, uvx, pip --user installs
+]
+_current = os.environ.get("PATH", "")
+_missing = [d for d in _EXTRA_PATH_DIRS if d not in _current.split(os.pathsep)]
+if _missing:
+    os.environ["PATH"] = _current + os.pathsep + os.pathsep.join(_missing)
+
+# Load environment with real API keys.
+# find_dotenv walks up the directory tree from this file's location,
+# replacing the previous fragile 4x .parent chain.
+env_path = find_dotenv(usecwd=False)
+if env_path:
+    load_dotenv(env_path, override=True)
 else:
-    pytest.skip("No .env file found - E2E tests require real credentials", allow_module_level=True)
+    raise FileNotFoundError(
+        "No .env file found — E2E tests require real credentials. "
+        "Expected .env in agentic-trading-system/ (find_dotenv searched upward from conftest.py)."
+    )
 
 # Configure logging for E2E tests (verbose)
 logging.basicConfig(
@@ -67,12 +87,18 @@ def docker_compose_command():
     return "podman compose"
 
 
+# pytest-docker convention: auto-discovered by name, used by docker_services fixture.
 @pytest.fixture(scope="session")
-def docker_compose_file(pytestconfig):
-    """Point pytest-docker to the E2E compose file."""
-    return os.path.join(
-        str(pytestconfig.rootdir), "..", "docker-compose.e2e.yml"
-    )
+def docker_compose_file():
+    """Point pytest-docker to the E2E compose file.
+
+    Uses __file__ for reliable path resolution regardless of pytest rootdir
+    (which may be the git repo root rather than the agents/ directory).
+    """
+    # conftest.py is at agents/tests/e2e/conftest.py
+    # docker-compose.e2e.yml is at agentic-trading-system/docker-compose.e2e.yml
+    agents_dir = Path(__file__).resolve().parent.parent.parent
+    return str(agents_dir.parent / "docker-compose.e2e.yml")
 
 
 def _is_backend_responsive(url: str) -> bool:
@@ -163,15 +189,6 @@ def seed_test_data(docker_ip, docker_services, require_backend):
     cur = conn.cursor()
 
     try:
-        # Check if already seeded (idempotent)
-        cur.execute(
-            "SELECT id FROM agents.trading_agents WHERE name = %s",
-            (agent.name,),
-        )
-        if cur.fetchone():
-            logger.info("Test data already seeded — skipping")
-            return
-
         # 1. Agent (omit 'style' — nullable column, may not exist in older backend images)
         cur.execute(
             """
@@ -256,6 +273,8 @@ def seed_test_data(docker_ip, docker_services, require_backend):
             f"{len(SEED_DATA.holdings)} holdings, {len(run_ids)} runs, "
             f"{len(SEED_DATA.transactions)} transactions"
         )
+
+        return {"agent_id": agent_id, "account_id": account_id}
     finally:
         cur.close()
         conn.close()
@@ -267,13 +286,13 @@ def seed_test_data(docker_ip, docker_services, require_backend):
 
 @pytest.fixture
 def test_agent_id(seed_test_data) -> int:
-    """Agent ID for E2E testing.
+    """Actual DB-assigned agent ID from seed_test_data.
 
-    Depends on seed_test_data to ensure the agent exists first.
-    Uses agent ID 1 (first seeded agent). The dependency on seed_test_data
-    ensures the agent is seeded before this fixture returns.
+    Uses the real auto-incremented ID returned by seed_test_data instead of
+    a hardcoded value, so tests work even when the DB auto-increment doesn't
+    start at 1 (e.g. parallel test sessions sharing the same database).
     """
-    return 1
+    return seed_test_data["agent_id"]
 
 
 @pytest.fixture
@@ -326,8 +345,8 @@ async def real_agent_holdings(real_backend_client, test_agent_id):
             from models import Holding
             return [Holding(**h) for h in data]
         else:
-            logger.warning(f"Failed to fetch holdings: {resp.status}")
-            return []
+            body = await resp.text()
+            pytest.fail(f"Failed to fetch holdings: HTTP {resp.status}\n{body}")
 
 
 @pytest.fixture
@@ -337,16 +356,14 @@ async def real_agent_balance(real_backend_client, test_agent_id):
         if resp.status == 200:
             return await resp.json()
         else:
-            logger.warning(f"Failed to fetch balance: {resp.status}")
-            return 0.0
+            body = await resp.text()
+            pytest.fail(f"Failed to fetch balance: HTTP {resp.status}\n{body}")
 
 
 @pytest.fixture
-async def real_recent_activity(real_backend_client, test_agent_name):
+async def real_recent_activity(real_backend_client, test_agent_id):
     """Fetch real recent activity from backend."""
-    # Pre-built image uses agentName param; current source uses agentId.
-    # Use agentName for compatibility with the deployed image.
-    params = {"agentName": test_agent_name, "days": "30"}
+    params = {"agentId": test_agent_id, "days": "30"}
     async with real_backend_client.get("/api/memory/recent-activity", params=params) as resp:
         if resp.status == 200:
             data = await resp.json()
@@ -354,87 +371,7 @@ async def real_recent_activity(real_backend_client, test_agent_name):
             return RecentActivityResponse(**data)
         else:
             body = await resp.text()
-            logger.warning(f"Failed to fetch recent activity: {resp.status} — {body}")
-            from models.api_responses import RecentActivityResponse
-            return RecentActivityResponse(
-                agentName="Warren",
-                days=30,
-                runs=[],
-                totalRuns=0,
-                totalTrades=0
-            )
-
-
-# =============================================================================
-# Sample Data Fixtures (for smoke tests)
-# =============================================================================
-
-@pytest.fixture
-def sample_holdings():
-    """Sample holdings for smoke tests."""
-    from models import Holding
-    return [
-        Holding(symbol="AAPL", quantity=50, averagePrice=180.0),
-        Holding(symbol="MSFT", quantity=30, averagePrice=400.0),
-    ]
-
-
-@pytest.fixture
-def sample_recent_activity(test_agent_name):
-    """Sample recent activity for smoke tests.
-
-    IMPORTANT: This fixture is synced with sample_holdings.
-    The BUY trades here created the positions in sample_holdings.
-    Includes realistic research sources to test UI rendering.
-    """
-    import json
-    from datetime import datetime
-    from models.api_responses import RecentActivityResponse, ActivityRun, ActivityTrade
-
-    # Realistic research sources for AAPL analysis
-    aapl_sources = json.dumps([
-        {"type": "web", "title": "Apple Q4 2025 Earnings Report", "url": "https://investor.apple.com/earnings"},
-        {"type": "web", "title": "Apple iPhone 16 sales exceed expectations", "url": "https://www.reuters.com/technology/apple-iphone-sales"},
-        {"type": "system_context", "description": "Portfolio: $100,000.00, 0 positions"},
-    ])
-
-    # Realistic research sources for MSFT analysis
-    msft_sources = json.dumps([
-        {"type": "web", "title": "Microsoft Azure Revenue Growth Q4 2025", "url": "https://www.microsoft.com/investor"},
-        {"type": "web", "title": "Microsoft AI Integration Drives Enterprise Adoption", "url": "https://www.bloomberg.com/news/microsoft-ai"},
-        {"type": "system_context", "description": "Portfolio: $91,000.00, 1 position (AAPL)"},
-    ])
-
-    return RecentActivityResponse(
-        agentName=test_agent_name,
-        days=30,
-        runs=[
-            ActivityRun(
-                date=datetime.fromisoformat("2026-01-15T10:00:00"),
-                outcome="COMPLETED",
-                summary="Bought AAPL based on strong fundamentals",
-                fullReasoning="Apple shows strong fundamentals with consistent revenue growth.",
-                researchSources=aapl_sources,
-                historicalContext=None,
-                trades=[
-                    ActivityTrade(type="BUY", symbol="AAPL", quantity=50, price=180.0)
-                ]
-            ),
-            ActivityRun(
-                date=datetime.fromisoformat("2026-01-20T14:30:00"),
-                outcome="COMPLETED",
-                summary="Bought MSFT based on cloud growth",
-                fullReasoning="Microsoft Azure growth continues to drive revenue.",
-                researchSources=msft_sources,
-                historicalContext=None,
-                trades=[
-                    ActivityTrade(type="BUY", symbol="MSFT", quantity=30, price=400.0)
-                ]
-            ),
-        ],
-        totalRuns=2,
-        totalTrades=2
-    )
+            pytest.fail(f"Failed to fetch recent activity: HTTP {resp.status}\n{body}")
 
 
 # =============================================================================

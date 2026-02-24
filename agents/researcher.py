@@ -40,7 +40,7 @@ async def _fetch_holdings(agent_name: str) -> HoldingsResponse:
     """
     url = f"{BACKEND_BASE_URL}/api/memory/holdings"
     params = {"agentName": agent_name}
-    response = await call_backend("GET", url, params=params, timeout=10)
+    response = await call_backend("GET", url, params=params)
     return HoldingsResponse.model_validate_json(response.text)
 
 
@@ -59,7 +59,7 @@ async def _fetch_recent_activity(agent_name: str, days: int) -> RecentActivityRe
     """
     url = f"{BACKEND_BASE_URL}/api/memory/recent-activity"
     params = {"agentName": agent_name, "days": days}
-    response = await call_backend("GET", url, params=params, timeout=10)
+    response = await call_backend("GET", url, params=params)
     return RecentActivityResponse.model_validate_json(response.text)
 
 
@@ -79,7 +79,7 @@ async def _fetch_symbol_history(agent_name: str, symbol: str, days: int) -> Symb
     """
     url = f"{BACKEND_BASE_URL}/api/memory/trading-history"
     params = {"agentName": agent_name, "symbol": symbol, "days": days}
-    response = await call_backend("GET", url, params=params, timeout=10)
+    response = await call_backend("GET", url, params=params)
     return SymbolHistoryResponse.model_validate_json(response.text)
 
 

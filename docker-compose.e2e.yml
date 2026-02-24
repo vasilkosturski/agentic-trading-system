@@ -21,7 +21,9 @@ services:
       retries: 10
 
   backend:
-    image: ghcr.io/vasilkosturski/agentic-trading-backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
       SPRING_PROFILES_ACTIVE: postgresql
       DB_HOST: postgres

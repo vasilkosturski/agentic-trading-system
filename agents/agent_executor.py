@@ -681,6 +681,8 @@ class AgentExecutor:
     async def _handle_cycle_error(self, error: Exception, ctx: Optional[RunContext]) -> None:
         """Handle cycle execution error.
 
+        Best-effort error recording — never masks the original exception.
+
         Args:
             error: Exception that occurred
             ctx: RunContext if available (may be None if Phase 1 failed)
@@ -688,6 +690,8 @@ class AgentExecutor:
         agent_id = ctx.agent_id if ctx else self.agent_id
         agent_name = ctx.agent_name if ctx else self.name
         run_id = ctx.run_id if ctx else None
+
+        logger.error(f"Cycle error for {agent_name}: {error}")
 
         # Broadcast: ERROR
         broadcast_status(
@@ -699,21 +703,27 @@ class AgentExecutor:
             outcome=f"Failed: {str(error)}",
         )
 
-        # Update run to ERROR phase and complete with error details
+        # Update run to ERROR phase and complete with error details.
+        # Wrapped in try/except so error recording never masks the original exception.
         if run_id is not None:
-            await update_phase(run_id, RunPhase.ERROR)
+            try:
+                await update_phase(run_id, RunPhase.ERROR)
 
-            # Complete with partial data and error (nested structure)
-            error_decision = DecisionPhaseData(
-                decision=TradeDecision.HOLD,
-            )
-            error_execution = ExecutionPhaseData(
-                status=PhaseStatus.FAILED,
-                errorDetails=str(error)[:500],
-            )
-            error_data = CompleteRunData(
-                decision=error_decision,
-                execution=error_execution,
-            )
-            await complete_run(run_id, error_data)
+                # Complete with partial data and error (nested structure)
+                error_decision = DecisionPhaseData(
+                    decision=TradeDecision.HOLD,
+                )
+                error_execution = ExecutionPhaseData(
+                    status=PhaseStatus.FAILED,
+                    errorDetails=str(error)[:500],
+                )
+                error_data = CompleteRunData(
+                    decision=error_decision,
+                    execution=error_execution,
+                )
+                await complete_run(run_id, error_data)
+            except Exception as cleanup_err:
+                logger.error(
+                    f"Failed to record error state for run {run_id}: {cleanup_err}"
+                )
 
