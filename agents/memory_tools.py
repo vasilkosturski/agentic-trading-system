@@ -58,7 +58,7 @@ async def get_trading_history(
         "days": days
     }
 
-    response = await call_backend("GET", url, params=params, timeout=10)
+    response = await call_backend("GET", url, params=params)
     return SymbolHistoryResponse.model_validate_json(response.text)
 
 
@@ -85,7 +85,7 @@ async def get_recent_activity(
         "days": days
     }
 
-    response = await call_backend("GET", url, params=params, timeout=10)
+    response = await call_backend("GET", url, params=params)
     return RecentActivityResponse.model_validate_json(response.text)
 
 

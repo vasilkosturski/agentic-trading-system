@@ -6,6 +6,24 @@ Consolidates all HTTP communication with the Java backend:
 - Agent management (initialize)
 
 Uses a shared AsyncClient for connection pooling (httpx best practice).
+
+Lifecycle strategy — "loop-local singleton with optional DI":
+
+  Production path (no client injected):
+    A single BackendClient is created via get_backend_client() and reused for
+    the lifetime of the process.  Internally it lazily creates an
+    httpx.AsyncClient and tracks the asyncio event-loop ID so it can detect
+    when the loop changes (e.g. between pytest-asyncio test runs that use
+    per-function event loops) and transparently recreate the underlying HTTP
+    client.  This is the standard pattern used by Prefect, pydantic-ai, and
+    other async libraries that hold long-lived HTTP clients.
+
+  Test path (client injected):
+    Callers can pass a pre-built httpx.AsyncClient into __init__.  When an
+    external client is provided the loop-tracking logic is bypassed entirely
+    — the caller owns the client lifecycle.  This makes unit tests trivial:
+    inject a client created on the test's own event loop and no stale-socket
+    issues can occur.
 """
 
 import logging
@@ -27,44 +45,110 @@ logger = logging.getLogger(__name__)
 
 class BackendClient:
     """Centralized client for all backend API operations.
-    
+
     Provides typed methods for:
     - Trading: buy_shares, sell_shares, get_balance, get_holdings
     - Run tracking: create_run, update_phase, complete_run
     - Agent management: initialize_agent
-    
-    Uses connection pooling for better performance.
+
+    Supports two modes of operation:
+
+    1. **Production (default)** — no ``client`` argument.  An internal
+       ``httpx.AsyncClient`` is lazily created on first use and automatically
+       recreated whenever the asyncio event loop changes (loop-local singleton
+       pattern).  This keeps TCP connection pooling while avoiding
+       ``RuntimeError: Event loop is closed`` across pytest-asyncio test
+       boundaries.
+
+    2. **Injected (testing / advanced)** — pass an ``httpx.AsyncClient`` via
+       the ``client`` parameter.  The injected client is used as-is; no
+       loop-ID tracking is performed.  The caller owns the client lifecycle.
     """
-    
-    def __init__(self, timeout: float = 30.0):
+
+    def __init__(
+        self,
+        client: Optional[httpx.AsyncClient] = None,
+        timeout: float = 30.0,
+    ):
         """Initialize the backend client.
-        
+
         Args:
-            timeout: Default request timeout in seconds
+            client: Optional externally-managed ``httpx.AsyncClient``.  When
+                provided, this client is used directly and no internal
+                loop-tracking is performed (test / DI path).  When ``None``
+                (the default), an internal client is lazily created and
+                managed with loop-aware lifecycle (production path).
+            timeout: Default request timeout in seconds.  Only used when no
+                external *client* is provided.
         """
-        self._client: Optional[httpx.AsyncClient] = None
+        self._external_client: Optional[httpx.AsyncClient] = client
+        self._owned_client: Optional[httpx.AsyncClient] = None
         self._timeout = timeout
-    
+        self._loop_id: Optional[int] = None
+
     def _get_client(self) -> httpx.AsyncClient:
-        """Get or create the shared AsyncClient.
-        
-        Lazy initialization ensures client is created only when needed.
-        Reuses TCP connections across requests for better performance.
+        """Return the ``httpx.AsyncClient`` to use for the next request.
+
+        **Injected path** — when an external client was passed to ``__init__``,
+        it is returned immediately.  No loop-ID tracking is performed because
+        the caller owns the client lifecycle.
+
+        **Production path** — a loop-local singleton is lazily created.  The
+        asyncio event-loop ``id()`` is recorded on first creation; on every
+        subsequent call the current loop ID is compared to the stored one.  If
+        the loop changed (common under pytest-asyncio's per-function loop
+        scope) the old client is silently discarded and a fresh one is created
+        on the new loop.  We intentionally do *not* call ``aclose()`` on the
+        stale client because its event loop may already be dead, making the
+        async close impossible.
+
+        Why ``is_closed`` alone is not enough: ``httpx.AsyncClient.is_closed``
+        only becomes ``True`` after an explicit ``aclose()`` call.  A client
+        whose underlying TCP sockets are bound to a dead event loop still
+        reports ``is_closed == False``, so the loop-ID comparison is the only
+        reliable way to detect staleness.
+
+        References:
+            - httpx #2959: AsyncClient pooled connections fail across event loops
+              https://github.com/encode/httpx/discussions/2959
+            - pytest-asyncio default per-function loop scope:
+              https://pytest-asyncio.readthedocs.io/en/stable/how-to-guides/change_default_fixture_loop.html
+            - SO #72960518: Singleton async clients confirmed as root cause of
+              "Event loop is closed"
+              https://stackoverflow.com/questions/72960518
         """
-        if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(
+        # --- Injected (DI / test) path ---
+        if self._external_client is not None:
+            return self._external_client
+
+        # --- Production path: loop-local singleton ---
+        # Thread-safety note: This check-then-assign looks like a TOCTOU race,
+        # but it is safe. asyncio uses cooperative scheduling — coroutines only
+        # yield at `await` points, and this method has none, so it runs atomically.
+        import asyncio
+        try:
+            current_loop_id = id(asyncio.get_running_loop())
+        except RuntimeError:
+            current_loop_id = None
+
+        if self._owned_client is None or self._owned_client.is_closed or self._loop_id != current_loop_id:
+            self._owned_client = httpx.AsyncClient(
                 timeout=httpx.Timeout(self._timeout, connect=5.0),
                 limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
             )
-            logger.debug("Created new httpx AsyncClient for backend")
-        return self._client
+            self._loop_id = current_loop_id
+        return self._owned_client
     
     async def close(self) -> None:
-        """Close the client. Call during application shutdown."""
-        if self._client is not None and not self._client.is_closed:
-            await self._client.aclose()
+        """Close the internally-owned client.  Call during application shutdown.
+
+        If an external client was injected, this is a no-op — the caller is
+        responsible for closing it.
+        """
+        if self._owned_client is not None and not self._owned_client.is_closed:
+            await self._owned_client.aclose()
             logger.debug("Closed httpx AsyncClient")
-        self._client = None
+        self._owned_client = None
     
     async def _request(
         self,
@@ -128,7 +212,8 @@ class BackendClient:
     async def initialize_agent(self, name: str, initial_balance: float = 100000.0) -> int:
         """Initialize agent account if it doesn't exist.
 
-        This is idempotent - safe to call multiple times.
+        This is idempotent - safe to call multiple times. If the agent already
+        exists (backend returns 400), falls back to looking up the agent by name.
 
         Args:
             name: Agent name (Warren, George, Ray, Cathie)
@@ -141,16 +226,40 @@ class BackendClient:
             BackendAPIError: If initialization fails or backend doesn't return agent_id
         """
         url = BACKEND_API_ACCOUNTS
-        response = await self._request("POST", url, json_data={
-            "agentName": name,
-            "initialBalance": initial_balance
-        })
+        try:
+            response = await self._request("POST", url, json_data={
+                "agentName": name,
+                "initialBalance": initial_balance
+            })
+            data = response.json()
+            agent_id = data.get("id") if isinstance(data, dict) else None
+            if agent_id is None:
+                raise BackendAPIError(f"Backend did not return agent_id for {name}")
+            logger.info(f"Agent {name} (id={agent_id}) initialized with ${initial_balance:,.2f}")
+            return agent_id
+        except BackendAPIError as e:
+            if e.status_code == 400:
+                # Agent likely already exists — look up by name
+                logger.info(f"Agent {name} may already exist (HTTP 400), looking up...")
+                return await self._lookup_agent_id(name)
+            raise
+
+    async def _lookup_agent_id(self, name: str) -> int:
+        """Look up an existing agent's ID by name via GET /api/agents.
+
+        Used as a fallback when initialize_agent gets HTTP 400 (agent exists).
+        """
+        agents_url = f"{BACKEND_BASE_URL}/api/agents"
+        response = await self._request("GET", agents_url)
         data = response.json()
-        agent_id = data.get("id") if isinstance(data, dict) else None
-        if agent_id is None:
-            raise BackendAPIError(f"Backend did not return agent_id for {name}")
-        logger.info(f"Agent {name} (id={agent_id}) initialized with ${initial_balance:,.2f}")
-        return agent_id
+        if isinstance(data, dict) and "data" in data:
+            data = data["data"]
+        for agent in data:
+            if agent.get("name") == name:
+                agent_id = agent["id"]
+                logger.info(f"Found existing agent {name} (id={agent_id})")
+                return agent_id
+        raise BackendAPIError(f"Agent {name} not found in registry after 400 response")
     
     async def get_balance(self, agent_id: int) -> float:
         """Get the cash balance of an agent.
@@ -277,7 +386,7 @@ class BackendClient:
         """
         url = f"{BACKEND_API_TRADING_RUNS}/{run_id}/complete"
         await self._request("PUT", url, json_data=data.to_json_dict())
-        logger.info(f"Completed run #{run_id} with decision={data.decision.value}")
+        logger.info(f"Completed run #{run_id} with decision={data.decision.decision}")
 
 
 # Module-level singleton for backward compatibility
@@ -312,10 +421,9 @@ async def call_backend(
     *,
     params: Optional[Dict[str, Any]] = None,
     json_data: Optional[Dict[str, Any]] = None,
-    timeout: int = 30,
 ) -> httpx.Response:
     """Legacy function for backward compatibility.
-    
+
     New code should use BackendClient directly.
     """
     client = get_backend_client()

@@ -89,6 +89,11 @@ class TestMarketAnalystE2E:
             recent_activity=real_recent_activity,
         )
 
+        # Validate fixtures returned real seeded data (catches pipeline bugs early,
+        # before expensive LLM call).
+        assert len(real_agent_holdings) >= 2, "Expected seeded holdings (AAPL + MSFT)"
+        assert real_agent_balance > 0, "Expected positive seeded balance"
+
         logger.info("Running Market Analyst...")
 
         # Run agent - returns AgentRunResult with tool_calls and tool_errors
@@ -106,6 +111,15 @@ class TestMarketAnalystE2E:
         logger.info(f"Tool calls made: {len(result.tool_calls)}")
         for tc in result.tool_calls:
             logger.info(f"  - {tc.name}: {tc.params}")
+
+        # Agent should use portfolio context tools (query_holdings_tool and/or
+        # query_recent_activity_tool) — not just web search.
+        db_tool_names = {"query_holdings_tool", "query_recent_activity_tool"}
+        db_tool_calls = [tc for tc in result.tool_calls if tc.name in db_tool_names]
+        assert len(db_tool_calls) >= 1, (
+            f"Market Analyst should call at least one DB tool {db_tool_names}, "
+            f"but only called: {[tc.name for tc in result.tool_calls]}"
+        )
 
         # ALL tool errors are fatal — the E2E test validates the full pipeline
         # including external integrations (Brave Search, Fetch).
@@ -161,4 +175,63 @@ class TestMarketAnalystE2E:
         # No tool errors should remain (already checked above, but assert for clarity)
         assert len(result.tool_errors) == 0, f"Unexpected tool errors: {result.tool_errors}"
 
+        logger.info("TEST PASSED")
+
+    @pytest.mark.asyncio
+    async def test_market_analyst_uses_portfolio_context(
+        self,
+        real_mcp_pool: MCPPool,
+        test_agent_name,
+        test_agent_style,
+        test_model_name,
+        real_agent_holdings,
+        real_agent_balance,
+        real_recent_activity,
+    ):
+        """E2E: Market Analyst references existing holdings in its research.
+
+        The agent receives portfolio context (AAPL + MSFT holdings, recent trades)
+        via the prompt. A value investor MUST acknowledge existing positions when
+        researching new candidates. This test verifies the agent's output
+        demonstrates awareness of its portfolio history.
+
+        Seed data: AAPL (50 shares, $180), MSFT (30 shares, $400), balance $50k,
+        recent buys of both stocks in the last 15 days.
+        """
+        logger.info("=" * 60)
+        logger.info("E2E TEST: Market Analyst Portfolio Context Awareness")
+        logger.info("=" * 60)
+
+        market_analyst = await MarketAnalyst.create(
+            agent_name=test_agent_name,
+            mcp_pool=real_mcp_pool,
+            model_name=test_model_name,
+        )
+
+        context = MarketAnalystContext(
+            agent_name=test_agent_name,
+            agent_style=test_agent_style,
+            balance=real_agent_balance,
+            holdings=real_agent_holdings,
+            recent_activity=real_recent_activity,
+        )
+
+        result = await market_analyst.run(context, max_turns=15)
+        response = result.output
+
+        # The prompt includes "Current holdings: ["AAPL", "MSFT"]" and recent
+        # trading activity with buy reasoning. The agent's summary should
+        # reference at least one existing position — proving it used the
+        # portfolio context, not just web research.
+        held_symbols = {h.symbol for h in real_agent_holdings}
+        summary_upper = response.summary.upper()
+        mentioned = {s for s in held_symbols if s in summary_upper}
+
+        assert len(mentioned) >= 1, (
+            f"Market Analyst should reference at least one held stock "
+            f"({held_symbols}) in its summary, but summary mentions none.\n"
+            f"Summary: {response.summary[:300]}"
+        )
+
+        logger.info(f"Portfolio context verified — summary mentions: {mentioned}")
         logger.info("TEST PASSED")

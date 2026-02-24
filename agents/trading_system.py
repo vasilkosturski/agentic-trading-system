@@ -14,6 +14,7 @@ from config import BACKEND_API_AGENTS
 from api_server import TradingAPIServer
 from mcp_types import MCPName, MCPPool
 from mcp_params import get_mcp_server_params
+from backend_client import close_backend_client
 
 # Load environment variables
 load_dotenv(override=True)
@@ -232,11 +233,13 @@ async def run_continuous_trading():
     except Exception as e:
         logger.error(f"❌ Trading system error: {e}")
         raise
+    finally:
+        await close_backend_client()
 
 async def main():
     """Main function - single run for testing"""
     logger.info("🚀 Starting Agentic Trading System (single run)...")
-    
+
     try:
         system = await TradingSystem.create()  # Single API call: names → IDs, then create with IDs
         await system.run_all_agents()
@@ -244,6 +247,8 @@ async def main():
     except Exception as e:
         logger.error(f"❌ Trading system failed: {e}")
         raise
+    finally:
+        await close_backend_client()
 
 if __name__ == "__main__":
     # Check if we should run continuously or just once
