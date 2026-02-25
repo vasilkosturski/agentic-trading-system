@@ -98,7 +98,9 @@ class TestExtractToolCalls:
 
 
 class TestErrorDetection:
-    """Test SDK error detection — prefix matching."""
+    """Test SDK error detection — prefix matching and ToolError model detection."""
+
+    # --- SDK prefix detection (existing) ---
 
     def test_sdk_error_prefix_matches_installed_sdk(self):
         """Verify our prefix matches the SDK's default_tool_error_function.
@@ -124,25 +126,103 @@ class TestErrorDetection:
         assert is_error is True
         assert message == output
 
-    def test_detect_normal_output(self):
-        """Normal tool output is not flagged as error."""
-        output = '{"symbol": "AAPL", "price": 180.50}'
-        is_error, message = _detect_tool_error(output)
-        assert is_error is False
-        assert message is None
-
     def test_detect_empty_output(self):
         """Empty output is not an error."""
         is_error, message = _detect_tool_error("")
         assert is_error is False
         assert message is None
 
-    def test_error_message_truncated_at_500(self):
-        """Error messages are truncated to 500 chars."""
+    def test_error_message_truncated_at_500_sdk_prefix(self):
+        """SDK prefix error messages are truncated to 500 chars."""
         output = "An error occurred while running the tool. " + "x" * 600
         is_error, message = _detect_tool_error(output)
         assert is_error is True
         assert len(message) == 500
+
+    # --- ToolError model detection (new) ---
+
+    def test_detect_tool_error_model_api_error(self):
+        """Detect ToolError model output with error_type='api_error'."""
+        output = "error='HTTP 400: {\"message\": \"Bad request\"}' error_type='api_error' context={'agent_name': 'Warren', 'days': 30}"
+        is_error, message = _detect_tool_error(output)
+        assert is_error is True
+        assert message == output
+
+    def test_detect_tool_error_model_not_found(self):
+        """Detect ToolError model output with error_type='not_found'."""
+        output = "error='Agent not found' error_type='not_found' context={'agent_name': 'George'}"
+        is_error, message = _detect_tool_error(output)
+        assert is_error is True
+        assert message == output
+
+    def test_detect_tool_error_model_validation(self):
+        """Detect ToolError model output with error_type='validation'."""
+        output = "error='Invalid data from backend: 1 validation error' error_type='validation' context={'agent_name': 'Ray'}"
+        is_error, message = _detect_tool_error(output)
+        assert is_error is True
+        assert message == output
+
+    def test_detect_tool_error_model_unknown(self):
+        """Detect ToolError model output with error_type='unknown'."""
+        output = "error='Unexpected error: timeout' error_type='unknown' context={'agent_name': 'Cathie'}"
+        is_error, message = _detect_tool_error(output)
+        assert is_error is True
+        assert message == output
+
+    def test_tool_error_model_truncated_at_500(self):
+        """ToolError model messages are truncated to 500 chars."""
+        output = "error='" + "x" * 600 + "' error_type='api_error' context={}"
+        is_error, message = _detect_tool_error(output)
+        assert is_error is True
+        assert len(message) == 500
+
+    # --- False-positive prevention ---
+
+    def test_detect_normal_json_output(self):
+        """Normal JSON tool output is not flagged as error."""
+        output = '{"symbol": "AAPL", "price": 180.50}'
+        is_error, message = _detect_tool_error(output)
+        assert is_error is False
+        assert message is None
+
+    def test_detect_normal_text_output(self):
+        """Normal text tool output is not flagged as error."""
+        output = "Analysis complete: AAPL shows strong momentum."
+        is_error, message = _detect_tool_error(output)
+        assert is_error is False
+        assert message is None
+
+    def test_error_keyword_alone_not_flagged(self):
+        """Output containing only 'error=' but not 'error_type=' is not flagged."""
+        output = "error='something went wrong'"
+        is_error, message = _detect_tool_error(output)
+        assert is_error is False
+        assert message is None
+
+    def test_error_type_alone_not_flagged(self):
+        """Output containing only 'error_type=' but not 'error=' is not flagged."""
+        output = "error_type='api_error'"
+        is_error, message = _detect_tool_error(output)
+        assert is_error is False
+        assert message is None
+
+    def test_json_with_error_fields_not_flagged(self):
+        """JSON output with 'error' and 'error_type' keys is not flagged.
+
+        JSON uses 'error":' not 'error=' so the pattern doesn't match.
+        """
+        output = '{"error": "something", "error_type": "api_error"}'
+        is_error, message = _detect_tool_error(output)
+        assert is_error is False
+        assert message is None
+
+    def test_none_output_not_flagged(self):
+        """None-ish empty output is not an error."""
+        is_error, message = _detect_tool_error("")
+        assert is_error is False
+        assert message is None
+
+    # --- get_tool_errors filter ---
 
     def test_get_tool_errors_filters_correctly(self):
         """get_tool_errors returns only error tool calls."""
