@@ -331,6 +331,7 @@ class AgentExecutor:
         # Create Market Analyst using async factory pattern
         market_analyst = await MarketAnalyst.create(
             agent_name=ctx.agent_name,
+            agent_id=ctx.agent_id,
             mcp_pool=mcp_pool,
             model_name=ctx.model_name,
         )

@@ -6,9 +6,9 @@ Provides typed functions to fetch agent data from the backend API.
 Used by MarketAnalyst and other agents that need portfolio context.
 
 Functions:
-- _fetch_holdings(agent_name) → HoldingsResponse
-- _fetch_recent_activity(agent_name, days) → RecentActivityResponse
-- _fetch_symbol_history(agent_name, symbol, days) → SymbolHistoryResponse
+- _fetch_holdings(agent_id) → HoldingsResponse
+- _fetch_recent_activity(agent_id, days) → RecentActivityResponse
+- _fetch_symbol_history(agent_id, symbol, days) → SymbolHistoryResponse
 - _fetch_price(symbol) → PriceLookupResponse
 
 All functions throw BackendAPIError on failure (no ToolError here -
@@ -26,11 +26,11 @@ from models import (
 )
 
 
-async def _fetch_holdings(agent_name: str) -> HoldingsResponse:
+async def _fetch_holdings(agent_id: int) -> HoldingsResponse:
     """Fetch holdings from backend API.
 
     Args:
-        agent_name: Name of the trading agent
+        agent_id: ID of the trading agent
 
     Returns:
         HoldingsResponse with agent's current holdings
@@ -39,16 +39,16 @@ async def _fetch_holdings(agent_name: str) -> HoldingsResponse:
         BackendAPIError: If the API call fails
     """
     url = f"{BACKEND_BASE_URL}/api/memory/holdings"
-    params = {"agentName": agent_name}
+    params = {"agentId": agent_id}
     response = await call_backend("GET", url, params=params)
     return HoldingsResponse.model_validate_json(response.text)
 
 
-async def _fetch_recent_activity(agent_name: str, days: int) -> RecentActivityResponse:
+async def _fetch_recent_activity(agent_id: int, days: int) -> RecentActivityResponse:
     """Fetch recent activity from backend API.
 
     Args:
-        agent_name: Name of the trading agent
+        agent_id: ID of the trading agent
         days: Number of days to look back
 
     Returns:
@@ -58,16 +58,16 @@ async def _fetch_recent_activity(agent_name: str, days: int) -> RecentActivityRe
         BackendAPIError: If the API call fails
     """
     url = f"{BACKEND_BASE_URL}/api/memory/recent-activity"
-    params = {"agentName": agent_name, "days": days}
+    params = {"agentId": agent_id, "days": days}
     response = await call_backend("GET", url, params=params)
     return RecentActivityResponse.model_validate_json(response.text)
 
 
-async def _fetch_symbol_history(agent_name: str, symbol: str, days: int) -> SymbolHistoryResponse:
+async def _fetch_symbol_history(agent_id: int, symbol: str, days: int) -> SymbolHistoryResponse:
     """Fetch symbol trading history from backend API.
 
     Args:
-        agent_name: Name of the trading agent
+        agent_id: ID of the trading agent
         symbol: Stock symbol (e.g., AAPL)
         days: Number of days to look back
 
@@ -78,7 +78,7 @@ async def _fetch_symbol_history(agent_name: str, symbol: str, days: int) -> Symb
         BackendAPIError: If the API call fails
     """
     url = f"{BACKEND_BASE_URL}/api/memory/trading-history"
-    params = {"agentName": agent_name, "symbol": symbol, "days": days}
+    params = {"agentId": agent_id, "symbol": symbol, "days": days}
     response = await call_backend("GET", url, params=params)
     return SymbolHistoryResponse.model_validate_json(response.text)
 

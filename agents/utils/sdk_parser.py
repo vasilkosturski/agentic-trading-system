@@ -4,10 +4,12 @@ Uses isinstance() with SDK classes (ToolCallItem, ToolCallOutputItem) as
 recommended by official OpenAI documentation. Extracts tool calls from
 agent results.
 
-Error detection: matches the SDK's default_tool_error_function prefix.
-When a tool raises an exception, the SDK catches it and returns a string
-starting with "An error occurred while running the tool". This is the
-SDK's own deterministic output — not substring guessing.
+Error detection covers two patterns:
+1. SDK's default_tool_error_function prefix — when a tool raises, the SDK
+   catches it and returns "An error occurred while running the tool …".
+2. ToolError model returns — when a tool catches exceptions and returns a
+   ``ToolError`` Pydantic model, the SDK serialises it as a string with
+   distinctive ``error=`` and ``error_type=`` fields.
 
 See: GitHub issue #2165 — SDK does not surface MCP isError for local tools.
 """
@@ -124,7 +126,7 @@ def extract_tool_calls(items: list[RunItem]) -> list[ParsedToolCall]:
 
 
 # ---------------------------------------------------------------------------
-# Error Detection — SDK prefix match only
+# Error Detection — SDK prefix match + ToolError model detection
 # ---------------------------------------------------------------------------
 
 # SDK's default_tool_error_function produces this prefix when a tool raises.
@@ -133,18 +135,35 @@ _SDK_ERROR_PREFIX = "an error occurred while running the tool"
 
 
 def _detect_tool_error(output: str) -> tuple[bool, Optional[str]]:
-    """Detect tool errors by matching the SDK's default error prefix.
+    """Detect tool errors from two sources.
 
-    When a tool raises an exception, the SDK's default_tool_error_function
-    catches it and returns a string starting with a known prefix. We match
-    that prefix. Nothing else.
+    1. **SDK default prefix**: When a tool raises an exception, the SDK's
+       default_tool_error_function catches it and returns a string starting
+       with a known prefix.
+
+    2. **ToolError model returns**: When a tool catches an exception and
+       returns a ``ToolError`` Pydantic model, the SDK serialises it as a
+       string like ``error='HTTP 400: ...' error_type='api_error' ...``.
+       We detect the distinctive ``error_type=`` and ``error=`` fields.
 
     Returns:
         (is_error, error_message) tuple
     """
-    lower = output.lower() if output else ""
+    if not output:
+        return False, None
+
+    lower = output.lower()
+
+    # Pattern 1: SDK's default_tool_error_function prefix
     if lower.startswith(_SDK_ERROR_PREFIX):
         return True, output[:500]
+
+    # Pattern 2: ToolError model string representation
+    # Pydantic v2 str() produces: error='...' error_type='...' context={...}
+    # Both fields must be present to avoid false positives on normal JSON/text.
+    if "error_type=" in lower and "error=" in lower:
+        return True, output[:500]
+
     return False, None
 
 

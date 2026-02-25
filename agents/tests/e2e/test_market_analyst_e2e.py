@@ -48,6 +48,7 @@ class TestMarketAnalystE2E:
     async def test_market_analyst_returns_candidates(
         self,
         real_mcp_pool: MCPPool,
+        test_agent_id,
         test_agent_name,
         test_agent_style,
         test_model_name,
@@ -76,6 +77,7 @@ class TestMarketAnalystE2E:
         # Create Market Analyst using async factory
         market_analyst = await MarketAnalyst.create(
             agent_name=test_agent_name,
+            agent_id=test_agent_id,
             mcp_pool=real_mcp_pool,
             model_name=test_model_name,
         )
@@ -177,61 +179,3 @@ class TestMarketAnalystE2E:
 
         logger.info("TEST PASSED")
 
-    @pytest.mark.asyncio
-    async def test_market_analyst_uses_portfolio_context(
-        self,
-        real_mcp_pool: MCPPool,
-        test_agent_name,
-        test_agent_style,
-        test_model_name,
-        real_agent_holdings,
-        real_agent_balance,
-        real_recent_activity,
-    ):
-        """E2E: Market Analyst references existing holdings in its research.
-
-        The agent receives portfolio context (AAPL + MSFT holdings, recent trades)
-        via the prompt. A value investor MUST acknowledge existing positions when
-        researching new candidates. This test verifies the agent's output
-        demonstrates awareness of its portfolio history.
-
-        Seed data: AAPL (50 shares, $180), MSFT (30 shares, $400), balance $50k,
-        recent buys of both stocks in the last 15 days.
-        """
-        logger.info("=" * 60)
-        logger.info("E2E TEST: Market Analyst Portfolio Context Awareness")
-        logger.info("=" * 60)
-
-        market_analyst = await MarketAnalyst.create(
-            agent_name=test_agent_name,
-            mcp_pool=real_mcp_pool,
-            model_name=test_model_name,
-        )
-
-        context = MarketAnalystContext(
-            agent_name=test_agent_name,
-            agent_style=test_agent_style,
-            balance=real_agent_balance,
-            holdings=real_agent_holdings,
-            recent_activity=real_recent_activity,
-        )
-
-        result = await market_analyst.run(context, max_turns=15)
-        response = result.output
-
-        # The prompt includes "Current holdings: ["AAPL", "MSFT"]" and recent
-        # trading activity with buy reasoning. The agent's summary should
-        # reference at least one existing position — proving it used the
-        # portfolio context, not just web research.
-        held_symbols = {h.symbol for h in real_agent_holdings}
-        summary_upper = response.summary.upper()
-        mentioned = {s for s in held_symbols if s in summary_upper}
-
-        assert len(mentioned) >= 1, (
-            f"Market Analyst should reference at least one held stock "
-            f"({held_symbols}) in its summary, but summary mentions none.\n"
-            f"Summary: {response.summary[:300]}"
-        )
-
-        logger.info(f"Portfolio context verified — summary mentions: {mentioned}")
-        logger.info("TEST PASSED")

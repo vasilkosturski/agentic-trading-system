@@ -112,12 +112,13 @@ class MarketAnalyst:
     Converts typed models to strings internally for LLM consumption.
 
     Usage (async factory pattern):
-        analyst = await MarketAnalyst.create(agent_name="Warren", mcp_pool=pool)
+        analyst = await MarketAnalyst.create(agent_name="Warren", agent_id=1, mcp_pool=pool)
         response = await analyst.run(context)  # Returns ResearchResponse directly
     """
 
     # Class-level type annotations (PEP 526) for type checker support
     agent_name: str
+    agent_id: int
     mcp_pool: "MCPPool"
     model_name: str
     agent: Agent[ResearchResponse]
@@ -130,6 +131,7 @@ class MarketAnalyst:
     async def create(
         cls,
         agent_name: str,
+        agent_id: int,
         mcp_pool: "MCPPool",
         model_name: str = "gpt-4o-mini",
     ) -> "MarketAnalyst":
@@ -137,6 +139,7 @@ class MarketAnalyst:
 
         Args:
             agent_name: Agent name (e.g., "Warren")
+            agent_id: Agent ID for backend API calls
             mcp_pool: MCP pool with Brave Search + Fetch servers
             model_name: Model to use (default: gpt-4o-mini)
 
@@ -145,10 +148,12 @@ class MarketAnalyst:
         """
         instance = cls.__new__(cls)
         instance.agent_name = agent_name
+        instance.agent_id = agent_id
         instance.mcp_pool = mcp_pool
         instance.model_name = model_name
         instance.agent = await create_market_analyst_agent(
             agent_name=agent_name,
+            agent_id=agent_id,
             mcp_pool=mcp_pool,
             model_name=model_name,
         )
@@ -219,6 +224,7 @@ class MarketAnalyst:
 
 async def create_market_analyst_agent(
     agent_name: str,
+    agent_id: int,
     mcp_pool: "MCPPool",
     model_name: str = "gpt-4o-mini",
 ) -> Agent[ResearchResponse]:
@@ -226,12 +232,13 @@ async def create_market_analyst_agent(
 
     Args:
         agent_name: Agent name (e.g., "Warren")
+        agent_id: Agent ID for backend API calls (memory endpoints)
         mcp_pool: MCP pool with Brave Search + Fetch servers
         model_name: Model to use (default: gpt-4o-mini)
 
     Returns:
         Agent configured for research with ResearchResponse output type
-    
+
     Note:
         Agent personality is loaded from template files (prompts/market_analyst/{agent_name}.txt).
     """
@@ -251,7 +258,7 @@ async def create_market_analyst_agent(
             Current holdings with symbols, quantities, and values
         """
         try:
-            return await _fetch_holdings(agent_name)
+            return await _fetch_holdings(agent_id)
         except BackendAPIError as e:
             if e.status_code == 404:
                 return ToolError(
@@ -288,7 +295,7 @@ async def create_market_analyst_agent(
             Recent trades and decisions
         """
         try:
-            return await _fetch_recent_activity(agent_name, days)
+            return await _fetch_recent_activity(agent_id, days)
         except BackendAPIError as e:
             if e.status_code == 404:
                 return ToolError(
