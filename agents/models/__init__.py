@@ -13,7 +13,6 @@ from .api_responses import (
     MarketIndicators,
     Holding,
     # Memory API responses
-    HoldingsResponse,
     ActivityTrade,
     ActivityRun,
     RecentActivityResponse,
@@ -63,7 +62,6 @@ __all__ = [
     "MarketIndicators",
     "Holding",
     # API Response Models - Memory API
-    "HoldingsResponse",
     "ActivityTrade",
     "ActivityRun",
     "RecentActivityResponse",

@@ -2,7 +2,11 @@
 
 This agent runs during the RESEARCHING phase to find 3-5 stock candidates
 matching the agent's investment style. Uses Brave Search + Fetch MCPs for
-web research, plus database tools to check current portfolio context.
+web research, plus a price lookup tool for budget verification.
+
+Portfolio context (holdings, recent activity) is passed inline in the task
+prompt — the agent_executor pre-fetches this data, so no redundant API calls
+are needed.
 
 Dual-Prompt Architecture
 ------------------------
@@ -17,7 +21,7 @@ This module uses TWO separate prompts that work together:
 
 2. **Task/User Prompt** (from build_research_prompt()):
    - Built by: build_research_prompt() function below
-   - Purpose: Defines WHAT to do now (current context, balance, holdings)
+   - Purpose: Defines WHAT to do now (current context, balance, position count)
    - Used as: The message passed to Runner.run(agent, prompt)
    - Changes each trading cycle with fresh data
 
@@ -34,7 +38,6 @@ How they combine:
 Per design document: system-design/workflows/trade-execution/trade_exec_workflow_design.md
 """
 
-import json
 import logging
 from dataclasses import dataclass
 from agents import Agent, Runner, function_tool
@@ -49,20 +52,14 @@ from models.llm_output import ResearchResponse
 from prompt_loader import load_and_format_prompt
 
 # Import data layer functions from researcher (reuse existing implementation)
-from researcher import (
-    _fetch_holdings,
-    _fetch_recent_activity,
-    _fetch_price,
-)
+from researcher import _fetch_price
 from models import (
-    HoldingsResponse,
     RecentActivityResponse,
     PriceLookupResponse,
     ToolError,
     AgentRunResult,
 )
 from mcp_types import MCPName
-from http_client import BackendAPIError
 from pydantic import ValidationError
 
 if TYPE_CHECKING:
@@ -96,13 +93,26 @@ class MarketAnalystContext:
 
     @property
     def holdings_summary(self) -> str:
-        """Convert holdings to JSON string for prompt."""
-        return json.dumps([h.symbol for h in self.holdings]) if self.holdings else "[]"
+        """Format holdings as a readable string for inline prompt inclusion."""
+        if not self.holdings:
+            return "No current holdings."
+        lines = [f"Current Holdings ({self.position_count} positions):"]
+        for h in self.holdings:
+            lines.append(f"- {h.symbol}: {h.quantity} shares @ ${h.averagePrice:.2f} avg")
+        return "\n".join(lines)
 
     @property
     def historical_context(self) -> str:
-        """Convert recent activity to JSON string for prompt."""
-        return self.recent_activity.model_dump_json()
+        """Format recent activity as a readable string for inline prompt inclusion."""
+        if not self.recent_activity or not self.recent_activity.runs:
+            return "No recent trading activity."
+        lines = [f"Recent Activity ({len(self.recent_activity.runs)} runs):"]
+        for run in self.recent_activity.runs[:5]:
+            summary = run.summary[:100] if run.summary else "No summary"
+            trade_count = len(run.trades)
+            trades_str = f", {trade_count} trades" if trade_count > 0 else ", no trades"
+            lines.append(f"- {run.date}: {run.outcome}{trades_str} — {summary}")
+        return "\n".join(lines)
 
 
 class MarketAnalyst:
@@ -249,78 +259,7 @@ async def create_market_analyst_agent(
         datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     )
 
-    # Create database tools for portfolio context
-    @function_tool
-    async def query_holdings_tool() -> Union[HoldingsResponse, ToolError]:
-        """Get current portfolio holdings to avoid recommending stocks already heavily weighted.
-
-        Returns:
-            Current holdings with symbols, quantities, and values
-        """
-        try:
-            return await _fetch_holdings(agent_id)
-        except BackendAPIError as e:
-            if e.status_code == 404:
-                return ToolError(
-                    error="Agent not found",
-                    error_type="not_found",
-                    context={"agent_name": agent_name}
-                )
-            return ToolError(
-                error=str(e),
-                error_type="api_error",
-                context={"agent_name": agent_name}
-            )
-        except ValidationError as e:
-            return ToolError(
-                error=f"Invalid data from backend: {e}",
-                error_type="validation",
-                context={"agent_name": agent_name}
-            )
-        except Exception as e:
-            return ToolError(
-                error=f"Unexpected error: {e}",
-                error_type="unknown",
-                context={"agent_name": agent_name}
-            )
-
-    @function_tool
-    async def query_recent_activity_tool(days: int = 30) -> Union[RecentActivityResponse, ToolError]:
-        """Get recent trading activity to understand context and avoid repetitive recommendations.
-
-        Args:
-            days: How many days back to look (default: 30)
-
-        Returns:
-            Recent trades and decisions
-        """
-        try:
-            return await _fetch_recent_activity(agent_id, days)
-        except BackendAPIError as e:
-            if e.status_code == 404:
-                return ToolError(
-                    error="No recent activity found",
-                    error_type="not_found",
-                    context={"agent_name": agent_name, "days": days}
-                )
-            return ToolError(
-                error=str(e),
-                error_type="api_error",
-                context={"agent_name": agent_name, "days": days}
-            )
-        except ValidationError as e:
-            return ToolError(
-                error=f"Invalid data from backend: {e}",
-                error_type="validation",
-                context={"agent_name": agent_name, "days": days}
-            )
-        except Exception as e:
-            return ToolError(
-                error=f"Unexpected error: {e}",
-                error_type="unknown",
-                context={"agent_name": agent_name, "days": days}
-            )
-
+    # Create price lookup tool for budget verification
     @function_tool
     async def lookup_price_tool(symbol: str) -> Union[PriceLookupResponse, ToolError]:
         """Get current market price to check if candidates fit budget constraints.
@@ -346,10 +285,8 @@ async def create_market_analyst_agent(
                 context={"symbol": symbol}
             )
 
-    # Collect database tools
+    # Collect tools (price lookup only — holdings/activity passed inline)
     db_tools = [
-        query_holdings_tool,
-        query_recent_activity_tool,
         lookup_price_tool,
     ]
 
@@ -394,9 +331,13 @@ def build_research_prompt(
     position_count: int,
     max_positions: int,
     holdings_summary: str,
-    historical_context: str = "{}",
+    historical_context: str,
 ) -> str:
     """Build the research prompt for Market Analyst.
+
+    Portfolio context (holdings, recent activity) is included inline in the
+    prompt. The agent_executor pre-fetches this data, avoiding redundant
+    API calls from the LLM.
 
     Args:
         agent_name: Agent name
@@ -404,8 +345,8 @@ def build_research_prompt(
         balance: Available cash balance
         position_count: Current number of positions
         max_positions: Maximum positions allowed (10)
-        holdings_summary: Summary of current holdings
-        historical_context: JSON string with recent trading activity
+        holdings_summary: Pre-formatted holdings string
+        historical_context: Pre-formatted recent activity string
 
     Returns:
         Formatted prompt string
@@ -417,13 +358,13 @@ def build_research_prompt(
 
 **Agent Style:** {agent_style}
 
-**Recent Trading Activity:**
-{historical_context if historical_context != "{}" else "No recent trades"}
-
 **Current Portfolio Context:**
 - Balance: ${balance:,.2f}
 - Positions: {position_count}/{max_positions}
-- Current holdings: {holdings_summary if holdings_summary else "None"}
+- Current holdings:
+{holdings_summary}
+- Recent activity:
+{historical_context}
 
 **Your Task:**
 Research and identify 3-5 stock candidates that match {agent_name}'s {agent_style} investment style.

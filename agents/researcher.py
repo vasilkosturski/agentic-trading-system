@@ -6,7 +6,6 @@ Provides typed functions to fetch agent data from the backend API.
 Used by MarketAnalyst and other agents that need portfolio context.
 
 Functions:
-- _fetch_holdings(agent_id) → HoldingsResponse
 - _fetch_recent_activity(agent_id, days) → RecentActivityResponse
 - _fetch_symbol_history(agent_id, symbol, days) → SymbolHistoryResponse
 - _fetch_price(symbol) → PriceLookupResponse
@@ -19,29 +18,10 @@ from datetime import datetime
 from config import BACKEND_BASE_URL
 from http_client import call_backend
 from models import (
-    HoldingsResponse,
     RecentActivityResponse,
     SymbolHistoryResponse,
     PriceLookupResponse,
 )
-
-
-async def _fetch_holdings(agent_id: int) -> HoldingsResponse:
-    """Fetch holdings from backend API.
-
-    Args:
-        agent_id: ID of the trading agent
-
-    Returns:
-        HoldingsResponse with agent's current holdings
-
-    Raises:
-        BackendAPIError: If the API call fails
-    """
-    url = f"{BACKEND_BASE_URL}/api/memory/holdings"
-    params = {"agentId": agent_id}
-    response = await call_backend("GET", url, params=params)
-    return HoldingsResponse.model_validate_json(response.text)
 
 
 async def _fetch_recent_activity(agent_id: int, days: int) -> RecentActivityResponse:
@@ -57,8 +37,8 @@ async def _fetch_recent_activity(agent_id: int, days: int) -> RecentActivityResp
     Raises:
         BackendAPIError: If the API call fails
     """
-    url = f"{BACKEND_BASE_URL}/api/memory/recent-activity"
-    params = {"agentId": agent_id, "days": days}
+    url = f"{BACKEND_BASE_URL}/api/accounts/{agent_id}/memory/recent-activity"
+    params = {"days": days}
     response = await call_backend("GET", url, params=params)
     return RecentActivityResponse.model_validate_json(response.text)
 
@@ -77,8 +57,8 @@ async def _fetch_symbol_history(agent_id: int, symbol: str, days: int) -> Symbol
     Raises:
         BackendAPIError: If the API call fails
     """
-    url = f"{BACKEND_BASE_URL}/api/memory/trading-history"
-    params = {"agentId": agent_id, "symbol": symbol, "days": days}
+    url = f"{BACKEND_BASE_URL}/api/accounts/{agent_id}/memory/trading-history"
+    params = {"symbol": symbol, "days": days}
     response = await call_backend("GET", url, params=params)
     return SymbolHistoryResponse.model_validate_json(response.text)
 

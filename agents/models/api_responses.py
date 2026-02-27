@@ -75,7 +75,7 @@ class Holding(BaseModel):
 
 
 # =============================================================================
-# Memory API Response Models (for /api/memory/* endpoints)
+# Memory API Response Models (for /api/accounts/{agentId}/memory/* endpoints)
 # =============================================================================
 
 class AccountResponse(BaseModel):
@@ -87,15 +87,6 @@ class AccountResponse(BaseModel):
     id: int = Field(description="Account ID")
     name: str = Field(description="Account/agent name")
     balance: float = Field(ge=0, description="Cash balance in USD")
-
-
-class HoldingsResponse(BaseModel):
-    """Response from /api/memory/holdings endpoint."""
-
-    agentName: str = Field(description="Name of the trading agent")
-    balance: float = Field(ge=0, description="Cash balance in USD")
-    holdings: list[Holding] = Field(default_factory=list, description="List of stock holdings")
-    positionCount: int = Field(ge=0, description="Number of positions held")
 
 
 class ActivityTrade(BaseModel):
@@ -120,7 +111,7 @@ class ActivityRun(BaseModel):
 
 
 class RecentActivityResponse(BaseModel):
-    """Response from /api/memory/recent-activity endpoint.
+    """Response from /api/accounts/{agentId}/memory/recent-activity endpoint.
 
     Note: totalRuns and totalTrades are computed from runs list.
     Backend may still send these fields for backwards compatibility,
@@ -173,7 +164,7 @@ class TradingSummary(BaseModel):
 
 
 class SymbolHistoryResponse(BaseModel):
-    """Response from /api/memory/trading-history endpoint."""
+    """Response from /api/accounts/{agentId}/memory/trading-history endpoint."""
 
     symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
     agentName: str = Field(description="Name of the trading agent")
