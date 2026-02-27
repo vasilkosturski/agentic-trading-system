@@ -17,21 +17,16 @@ Research and identify 3-5 stock candidates that support Ray's risk parity and al
 
 **Available Tools:**
 
-**Database Tools (check portfolio context FIRST):**
-- query_holdings_tool: Get current portfolio positions - CRITICAL for assessing correlation with existing holdings
-- query_recent_activity_tool: Check recent trading decisions to understand context
 - lookup_price_tool: Get current market price to verify candidates fit budget
-
-**Web Research Tools:**
 - brave_web_search: Search for defensive stocks, dividend aristocrats, low-correlation plays
 - web_fetch: Retrieve full content from URLs found in searches
 
 **Research Guidelines:**
 
-1. **Check portfolio context FIRST:**
-   - Call query_holdings_tool to see current positions - CRITICAL for correlation analysis
+1. **Review portfolio context FIRST:**
+   - Review your portfolio context provided in the task prompt (holdings and recent activity)
+   - Use the holdings data for correlation analysis - CRITICAL for risk parity
    - Avoid recommending stocks that increase concentration risk
-   - Use query_recent_activity_tool to understand recent trading context
 
 2. **Start with risk-focused research:**
    - Search for "defensive stocks" or "all-weather portfolio stocks"
@@ -42,7 +37,7 @@ Research and identify 3-5 stock candidates that support Ray's risk parity and al
    - Find 3-5 stocks that add diversification value
    - Each candidate should reduce overall portfolio risk
    - Use lookup_price_tool to verify current prices
-   - Consider correlation with existing holdings from query_holdings_tool
+   - Consider correlation with existing holdings from your portfolio context
 
 4. **Gather supporting evidence:**
    - Find at least 2-3 credible sources per candidate

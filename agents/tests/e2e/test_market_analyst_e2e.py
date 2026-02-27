@@ -5,8 +5,12 @@ Run with: pytest tests/e2e/test_market_analyst_e2e.py -v -s
 WARNING: This test costs real $ (Brave Search + OpenAI). Run sparingly.
 """
 
+import json
 import logging
 from contextlib import AsyncExitStack
+from dataclasses import asdict
+from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 from agents.mcp import MCPServerStdio
@@ -18,6 +22,41 @@ from mcp_params import get_mcp_server_params
 from models.llm_output import ResearchResponse
 
 logger = logging.getLogger("e2e_tests.market_analyst")
+
+_RESULTS_DIR = Path(__file__).parent / "results"
+
+
+def _dump_result_to_json(test_name: str, result) -> None:
+    """Serialize AgentRunResult to JSON for manual inspection.
+
+    Writes to tests/e2e/results/{test_name}_{timestamp}.json.
+    Silently logs on failure — must never mask the real test outcome.
+    """
+    try:
+        _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        filename = f"{test_name}_{ts}.json"
+
+        # Build serializable dict
+        output_data = None
+        if result.output is not None:
+            # Pydantic model — use .model_dump()
+            output_data = result.output.model_dump()
+
+        data = {
+            "test_name": test_name,
+            "timestamp": ts,
+            "output": output_data,
+            "tool_calls": [asdict(tc) for tc in result.tool_calls],
+            "tool_errors": [asdict(tc) for tc in result.tool_errors],
+        }
+
+        filepath = _RESULTS_DIR / filename
+        filepath.write_text(json.dumps(data, indent=2, default=str))
+        logger.info(f"Result dumped to {filepath}")
+    except Exception:
+        logger.exception("Failed to dump result to JSON")
 
 
 @pytest.fixture
@@ -109,73 +148,71 @@ class TestMarketAnalystE2E:
             logger.error("=" * 60)
             raise
 
-        # Log tool calls from AgentRunResult
-        logger.info(f"Tool calls made: {len(result.tool_calls)}")
-        for tc in result.tool_calls:
-            logger.info(f"  - {tc.name}: {tc.params}")
+        # Dump result to JSON for manual inspection (always, even on failure)
+        try:
+            # Log tool calls from AgentRunResult
+            logger.info(f"Tool calls made: {len(result.tool_calls)}")
+            for tc in result.tool_calls:
+                logger.info(f"  - {tc.name}: {tc.params}")
 
-        # Agent should use portfolio context tools (query_holdings_tool and/or
-        # query_recent_activity_tool) — not just web search.
-        db_tool_names = {"query_holdings_tool", "query_recent_activity_tool"}
-        db_tool_calls = [tc for tc in result.tool_calls if tc.name in db_tool_names]
-        assert len(db_tool_calls) >= 1, (
-            f"Market Analyst should call at least one DB tool {db_tool_names}, "
-            f"but only called: {[tc.name for tc in result.tool_calls]}"
-        )
+            # Portfolio context (holdings, activity) is now passed inline in
+            # the prompt — no DB tool assertions needed.
 
-        # ALL tool errors are fatal — the E2E test validates the full pipeline
-        # including external integrations (Brave Search, Fetch).
-        # If external services are flaky, fix retry logic in the tools themselves.
-        if result.tool_errors:
-            logger.error("=" * 60)
-            logger.error("TOOL ERRORS (fatal)")
-            logger.error("=" * 60)
-            for err in result.tool_errors:
-                logger.error(f"  - {err.name}: {err.output[:200]}")
-            logger.error("=" * 60)
-            from exceptions import ToolExecutionError
-            raise ToolExecutionError(
-                f"Tools failed: {[e.name for e in result.tool_errors]}",
-                tool_errors=result.tool_errors
-            )
+            # ALL tool errors are fatal — the E2E test validates the full pipeline
+            # including external integrations (Brave Search, Fetch).
+            # If external services are flaky, fix retry logic in the tools themselves.
+            if result.tool_errors:
+                logger.error("=" * 60)
+                logger.error("TOOL ERRORS (fatal)")
+                logger.error("=" * 60)
+                for err in result.tool_errors:
+                    logger.error(f"  - {err.name}: {err.output[:200]}")
+                logger.error("=" * 60)
+                from exceptions import ToolExecutionError
+                raise ToolExecutionError(
+                    f"Tools failed: {[e.name for e in result.tool_errors]}",
+                    tool_errors=result.tool_errors
+                )
 
-        # Extract response from AgentRunResult
-        response = result.output
+            # Extract response from AgentRunResult
+            response = result.output
 
-        # Log results
-        logger.info("-" * 40)
-        logger.info(f"Summary: {response.summary[:200]}...")
-        logger.info(f"Candidates: {response.candidates}")
-        logger.info(f"Sources: {len(response.sources)}")
-        logger.info("-" * 40)
+            # Log results
+            logger.info("-" * 40)
+            logger.info(f"Summary: {response.summary[:200]}...")
+            logger.info(f"Candidates: {response.candidates}")
+            logger.info(f"Sources: {len(response.sources)}")
+            logger.info("-" * 40)
 
-        # Structural assertions — these are deterministic guarantees from the
-        # ResearchResponse model, not LLM content judgments.
-        assert response is not None
-        assert isinstance(response, ResearchResponse)
+            # Structural assertions — these are deterministic guarantees from the
+            # ResearchResponse model, not LLM content judgments.
+            assert response is not None
+            assert isinstance(response, ResearchResponse)
 
-        # Summary should be meaningful research output
-        assert isinstance(response.summary, str)
-        assert len(response.summary) > 10, "Summary should be meaningful"
+            # Summary should be meaningful research output
+            assert isinstance(response.summary, str)
+            assert len(response.summary) > 10, "Summary should be meaningful"
 
-        # Agent should always find at least one candidate stock
-        assert isinstance(response.candidates, list)
-        assert len(response.candidates) >= 1, "Market Analyst should find at least one candidate"
-        for candidate in response.candidates:
-            assert isinstance(candidate, str)
-            assert len(candidate) >= 1, "Candidate symbol must not be empty"
+            # Agent should always find at least one candidate stock
+            assert isinstance(response.candidates, list)
+            assert len(response.candidates) >= 1, "Market Analyst should find at least one candidate"
+            for candidate in response.candidates:
+                assert isinstance(candidate, str)
+                assert len(candidate) >= 1, "Candidate symbol must not be empty"
 
-        # Research should cite at least one source
-        assert len(response.sources) >= 1, "Research should cite at least one source"
-        for source in response.sources:
-            assert source.title, "Source must have a title"
-            assert source.url, "Source must have a URL"
+            # Research should cite at least one source
+            assert len(response.sources) >= 1, "Research should cite at least one source"
+            for source in response.sources:
+                assert source.title, "Source must have a title"
+                assert source.url, "Source must have a URL"
 
-        # Agent should have made at least one tool call (brave_web_search at minimum)
-        assert len(result.tool_calls) >= 1, "Market Analyst should make at least one tool call"
+            # Agent should have made at least one tool call (brave_web_search at minimum)
+            assert len(result.tool_calls) >= 1, "Market Analyst should make at least one tool call"
 
-        # No tool errors should remain (already checked above, but assert for clarity)
-        assert len(result.tool_errors) == 0, f"Unexpected tool errors: {result.tool_errors}"
+            # No tool errors should remain (already checked above, but assert for clarity)
+            assert len(result.tool_errors) == 0, f"Unexpected tool errors: {result.tool_errors}"
 
-        logger.info("TEST PASSED")
+            logger.info("TEST PASSED")
+        finally:
+            _dump_result_to_json("test_market_analyst_returns_candidates", result)
 

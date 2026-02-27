@@ -4,10 +4,12 @@ import com.trading.dto.request.*;
 import com.trading.dto.response.AccountReportDto;
 import com.trading.dto.response.HoldingDto;
 import com.trading.dto.response.PortfolioHistoryPoint;
+import com.trading.dto.response.RecentActivityResponse;
 import com.trading.dto.response.RecentTradeDto;
 import com.trading.dto.response.RunDetailDto;
 import com.trading.dto.response.TradeDetailResponse;
 import com.trading.dto.response.TradeResult;
+import com.trading.dto.response.TradingHistoryResponse;
 import com.trading.exception.ResourceNotFoundException;
 import jakarta.validation.Valid;
 import com.trading.entity.AccountPortfolioSnapshot;
@@ -18,12 +20,14 @@ import com.trading.repository.AccountTransactionRepository;
 import com.trading.repository.AgentReasoningStepRepository;
 import com.trading.service.AccountService;
 import com.trading.service.AgentIdentityService;
+import com.trading.service.MemoryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -49,6 +53,9 @@ public class AccountController {
 
     @Autowired
     private AgentIdentityService agentIdentityService;
+
+    @Autowired
+    private MemoryService memoryService;
 
     // ==================== NEW REST ENDPOINTS ====================
 
@@ -263,5 +270,60 @@ public class AccountController {
         );
 
         return ResponseEntity.ok(response);
+    }
+
+    // ==================== MEMORY ENDPOINTS (agent context) ====================
+
+    /**
+     * Get complete trading history for a specific stock.
+     * GET /api/accounts/{agentId}/memory/trading-history?symbol=NVDA&days=30
+     */
+    @GetMapping("/{agentId}/memory/trading-history")
+    public ResponseEntity<?> getTradingHistory(
+            @PathVariable Long agentId,
+            @RequestParam String symbol,
+            @RequestParam(defaultValue = "30") int days) {
+        try {
+            String agentName = agentIdentityService.requireAgentName(agentId);
+            TradingHistoryResponse history = memoryService.getTradingHistory(agentName, symbol, days);
+            if (history == null) {
+                return ResponseEntity.status(404).body(
+                    Map.of("error", "No trading history found for " + symbol + " in the last " + days + " days")
+                );
+            }
+            return ResponseEntity.ok(history);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                Map.of("error", "Failed to retrieve trading history: " + e.getMessage())
+            );
+        }
+    }
+
+    /**
+     * Get recent trading activity across all stocks.
+     * GET /api/accounts/{agentId}/memory/recent-activity?days=7
+     */
+    @GetMapping("/{agentId}/memory/recent-activity")
+    public ResponseEntity<?> getRecentActivity(
+            @PathVariable Long agentId,
+            @RequestParam(defaultValue = "7") int days) {
+        try {
+            String agentName = agentIdentityService.requireAgentName(agentId);
+            RecentActivityResponse activity = memoryService.getRecentActivity(agentName, days);
+            if (activity == null) {
+                return ResponseEntity.status(404).body(
+                    Map.of("error", "No recent activity found for agent in the last " + days + " days")
+                );
+            }
+            return ResponseEntity.ok(activity);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                Map.of("error", "Failed to retrieve recent activity: " + e.getMessage())
+            );
+        }
     }
 }

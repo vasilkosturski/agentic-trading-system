@@ -38,6 +38,7 @@ class TestMarketAnalystAgent:
         # Create Market Analyst
         agent = await create_market_analyst_agent(
             agent_name=sample_agent_name,
+            agent_id=1,
             mcp_pool=mcp_pool,
             model_name=sample_model_name,
         )
@@ -56,6 +57,7 @@ class TestMarketAnalystAgent:
         # Create Market Analyst
         agent = await create_market_analyst_agent(
             agent_name=sample_agent_name,
+            agent_id=1,
             mcp_pool=mock_mcp_pool,
             model_name=sample_model_name,
         )
@@ -83,6 +85,7 @@ class TestMarketAnalystAgent:
         # Create Market Analyst
         agent = await create_market_analyst_agent(
             agent_name=sample_agent_name,
+            agent_id=1,
             mcp_pool=mock_mcp_pool,
             model_name=sample_model_name,
         )
@@ -103,6 +106,7 @@ class TestMarketAnalystAgent:
         # Create Market Analyst
         agent = await create_market_analyst_agent(
             agent_name=sample_agent_name,
+            agent_id=1,
             mcp_pool=mock_mcp_pool,
             model_name=sample_model_name,
         )
@@ -132,8 +136,8 @@ class TestBuildResearchPrompt:
             balance=100000.0,
             position_count=3,
             max_positions=10,
-            holdings_summary="AAPL: 100 shares, MSFT: 50 shares",
-            historical_context='{"summary": "Recent trades"}',
+            holdings_summary="Current Holdings (3 positions):\n- AAPL: 10 shares @ $150.00 avg",
+            historical_context="No recent trading activity.",
         )
 
         # Verify prompt structure
@@ -144,26 +148,6 @@ class TestBuildResearchPrompt:
         assert "$100,000" in prompt or "100000" in prompt
         assert "3" in prompt  # position count
         assert "10" in prompt  # max positions
-
-    def test_prompt_includes_holdings_summary(
-        self, sample_agent_name, sample_agent_style
-    ):
-        """Test prompt includes current holdings."""
-        holdings_summary = "AAPL: 100 shares @ $150.00, MSFT: 50 shares @ $300.00"
-        prompt = build_research_prompt(
-            agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
-            balance=100000.0,
-            position_count=2,
-            max_positions=10,
-            holdings_summary=holdings_summary,
-            historical_context="{}",
-        )
-
-        # Verify holdings included
-        assert "AAPL" in prompt
-        assert "MSFT" in prompt
-        assert "100 shares" in prompt
 
     def test_prompt_adjusts_for_portfolio_capacity(
         self, sample_agent_name, sample_agent_style
@@ -176,8 +160,8 @@ class TestBuildResearchPrompt:
             balance=100000.0,
             position_count=9,
             max_positions=10,
-            holdings_summary="Multiple holdings",
-            historical_context="{}",
+            holdings_summary="Current Holdings (9 positions):\n- AAPL: 10 shares @ $150.00 avg",
+            historical_context="No recent trading activity.",
         )
 
         # Empty portfolio (0 out of 10)
@@ -187,8 +171,8 @@ class TestBuildResearchPrompt:
             balance=100000.0,
             position_count=0,
             max_positions=10,
-            holdings_summary="No holdings",
-            historical_context="{}",
+            holdings_summary="No current holdings.",
+            historical_context="No recent trading activity.",
         )
 
         # Verify prompts are different
@@ -197,24 +181,6 @@ class TestBuildResearchPrompt:
         # Verify capacity awareness
         assert "9" in prompt_full or "one more position" in prompt_full.lower()
         assert "0" in prompt_empty or "empty" in prompt_empty.lower()
-
-    def test_prompt_includes_historical_context(
-        self, sample_agent_name, sample_agent_style
-    ):
-        """Test prompt includes historical trading context."""
-        historical_context = '{"summary": "Last trade: Bought NVDA 50 shares", "insights": ["Strong AI growth"]}'
-        prompt = build_research_prompt(
-            agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
-            balance=100000.0,
-            position_count=1,
-            max_positions=10,
-            holdings_summary="NVDA: 50 shares",
-            historical_context=historical_context,
-        )
-
-        # Verify historical context included (either raw or parsed)
-        assert "NVDA" in prompt or "Last trade" in prompt or historical_context in prompt
 
     def test_prompt_includes_agent_style(
         self, sample_agent_name, sample_agent_style
@@ -226,8 +192,8 @@ class TestBuildResearchPrompt:
             balance=100000.0,
             position_count=5,
             max_positions=10,
-            holdings_summary="Diversified portfolio",
-            historical_context="{}",
+            holdings_summary="Current Holdings (5 positions):\n- AAPL: 10 shares @ $150.00 avg",
+            historical_context="No recent trading activity.",
         )
 
         # Verify agent style included

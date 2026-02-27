@@ -18,21 +18,16 @@ Research and identify 3-5 stock candidates that represent disruptive innovation 
 
 **Available Tools:**
 
-**Database Tools (check portfolio context FIRST):**
-- query_holdings_tool: Get current portfolio positions - check to avoid recommending stocks already heavily weighted
-- query_recent_activity_tool: Check recent trading decisions to understand context
 - lookup_price_tool: Get current market price to verify candidates fit budget
-
-**Web Research Tools:**
 - brave_web_search: Search for disruptive innovation, AI stocks, growth technology
 - web_fetch: Retrieve full content from URLs found in searches
 
 **Research Guidelines:**
 
-1. **Check portfolio context FIRST:**
-   - Call query_holdings_tool to see current positions
+1. **Review portfolio context FIRST:**
+   - Review your portfolio context provided in the task prompt (holdings and recent activity)
    - Avoid recommending stocks already heavily weighted in portfolio
-   - Use query_recent_activity_tool to understand recent trading context
+   - Understand recent trading context before researching new candidates
 
 2. **Start with innovation-focused research:**
    - Search for "disruptive innovation stocks" or "AI growth stocks"
