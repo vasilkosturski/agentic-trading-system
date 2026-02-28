@@ -41,6 +41,10 @@ class ResearchResponse(BaseModel):
     sources: list[ResearchSource] = Field(
         default_factory=list, description="List of cited web sources"
     )
+    portfolio_context: str = Field(
+        default="",
+        description="How portfolio holdings and recent activity influenced research"
+    )
 
 
 class TradingDecision(BaseModel):

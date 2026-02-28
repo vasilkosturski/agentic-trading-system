@@ -51,7 +51,7 @@ async def get_trading_history(
     Raises:
         BackendAPIError: If API call fails
     """
-    url = f"{BACKEND_BASE_URL}/api/accounts/{agent_id}/memory/trading-history"
+    url = f"{BACKEND_BASE_URL}/api/accounts/{agent_id}/runs/trading-history"
     params = {
         "symbol": symbol,
         "days": days
@@ -78,7 +78,7 @@ async def get_recent_activity(
     Raises:
         BackendAPIError: If API call fails
     """
-    url = f"{BACKEND_BASE_URL}/api/accounts/{agent_id}/memory/recent-activity"
+    url = f"{BACKEND_BASE_URL}/api/accounts/{agent_id}/runs/recent-activity"
     params = {
         "days": days
     }
