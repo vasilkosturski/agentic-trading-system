@@ -206,6 +206,9 @@ class TestMarketAnalystE2E:
                 assert source.title, "Source must have a title"
                 assert source.url, "Source must have a URL"
 
+            # Portfolio context should be populated (agent must explain how portfolio influenced research)
+            assert len(response.portfolio_context) > 20, "portfolio_context should explain how portfolio influenced research"
+
             # Agent should have made at least one tool call (brave_web_search at minimum)
             assert len(result.tool_calls) >= 1, "Market Analyst should make at least one tool call"
 

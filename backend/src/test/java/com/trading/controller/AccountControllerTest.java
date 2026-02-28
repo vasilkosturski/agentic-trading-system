@@ -92,6 +92,7 @@ class AccountControllerTest {
     @Test
     @DisplayName("GET /resources/accounts/{agentId} - Success")
     void testGetAccountResource_Success() throws Exception {
+        List<HoldingDto> holdings = List.of(new HoldingDto("AAPL", 10, 150.0));
         AccountReportDto report = new AccountReportDto(
             "Warren",           // agentName
             95000.0,           // balance
@@ -102,7 +103,8 @@ class AccountControllerTest {
             0.0,               // profitLossPercent
             java.time.LocalDateTime.now(),  // lastUpdated
             1,                 // holdingsCount
-            5L                 // transactionCount
+            5L,                // transactionCount
+            holdings           // holdings
         );
 
         when(agentIdentityService.requireAgentName(1L)).thenReturn("Warren");

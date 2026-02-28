@@ -272,13 +272,13 @@ public class AccountController {
         return ResponseEntity.ok(response);
     }
 
-    // ==================== MEMORY ENDPOINTS (agent context) ====================
+    // ==================== RUN HISTORY ENDPOINTS (agent context) ====================
 
     /**
      * Get complete trading history for a specific stock.
-     * GET /api/accounts/{agentId}/memory/trading-history?symbol=NVDA&days=30
+     * GET /api/accounts/{agentId}/runs/trading-history?symbol=NVDA&days=30
      */
-    @GetMapping("/{agentId}/memory/trading-history")
+    @GetMapping("/{agentId}/runs/trading-history")
     public ResponseEntity<?> getTradingHistory(
             @PathVariable Long agentId,
             @RequestParam String symbol,
@@ -303,9 +303,9 @@ public class AccountController {
 
     /**
      * Get recent trading activity across all stocks.
-     * GET /api/accounts/{agentId}/memory/recent-activity?days=7
+     * GET /api/accounts/{agentId}/runs/recent-activity?days=7
      */
-    @GetMapping("/{agentId}/memory/recent-activity")
+    @GetMapping("/{agentId}/runs/recent-activity")
     public ResponseEntity<?> getRecentActivity(
             @PathVariable Long agentId,
             @RequestParam(defaultValue = "7") int days) {

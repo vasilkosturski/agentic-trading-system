@@ -56,13 +56,21 @@ class TestDecisionMakerE2E:
             model_name=test_model_name,
         )
 
-        # Sample research response (simulates Market Analyst output)
+        # Realistic research response (simulates Market Analyst output with portfolio awareness)
         research_response = ResearchResponse(
-            summary="Found 3 value stocks with strong fundamentals. JPM has P/E of 12, solid dividend.",
-            candidates=["JPM", "BAC", "WFC"],
+            summary=(
+                "Identified 4 undervalued stocks with strong fundamentals. "
+                "Comcast (CMCSA) has P/E of 5.81, trading below intrinsic value with strong cash flow. "
+                "Allstate (ALL) offers P/E of 5.40 with robust underwriting margins. "
+                "Wix.com (WIX) trades at 47.7% discount to estimated fair value in growing SaaS sector. "
+                "WesBanco (WSBC) priced at $36.01 vs estimated cash flow value of $68.84."
+            ),
+            candidates=["CMCSA", "ALL", "WIX", "WSBC"],
             sources=[
-                ResearchSource(title="JPMorgan Analysis", url="https://example.com/jpm"),
-            ]
+                ResearchSource(title="Top 10 Most Undervalued Stocks in the S&P 500", url="https://www.nerdwallet.com/investing/learn/undervalued-stocks"),
+                ResearchSource(title="February 2026's Value Picks: Stocks Priced Below Estimated Worth", url="https://finance.yahoo.com/news/february-2026s-value-picks-stocks-113805029.html"),
+            ],
+            portfolio_context="Current portfolio holds AAPL and MSFT. Research focused on non-tech sectors to diversify. All 4 candidates are in financials/SaaS to reduce concentration risk.",
         )
 
         # Build context and prompt using real backend data
@@ -97,20 +105,24 @@ class TestDecisionMakerE2E:
         # Assertions — structure only (LLM output is non-deterministic)
         assert decision is not None
         assert isinstance(decision, TradingDecision)
-        assert decision.action in ["BUY", "SELL", "HOLD"]
 
-        if decision.action in ["BUY", "SELL"]:
-            assert decision.symbol is not None
-            assert decision.quantity is not None
-            assert decision.quantity > 0
+        # Decision should be BUY (given good candidates + available balance + position slots)
+        assert decision.action == "BUY", f"Expected BUY given strong candidates and available capital, got {decision.action}"
 
-            # Symbol format validation
-            assert decision.symbol.isalpha(), f"Symbol should be alphabetic: {decision.symbol}"
-            assert decision.symbol.isupper(), f"Symbol should be uppercase: {decision.symbol}"
-            assert 1 <= len(decision.symbol) <= 5, f"Symbol length should be 1-5: {decision.symbol}"
+        assert decision.symbol is not None
+        assert decision.quantity is not None
+        assert decision.quantity > 0
 
-            # Structured reasoning should be populated for trade decisions
-            assert len(decision.finalRationale) > 0, "finalRationale should be populated for BUY/SELL"
+        # Symbol format validation
+        assert decision.symbol.isalpha(), f"Symbol should be alphabetic: {decision.symbol}"
+        assert decision.symbol.isupper(), f"Symbol should be uppercase: {decision.symbol}"
+        assert 1 <= len(decision.symbol) <= 5, f"Symbol length should be 1-5: {decision.symbol}"
+
+        # Structured reasoning fields must be populated
+        assert len(decision.portfolioContext) > 20, "portfolioContext should explain current portfolio state"
+        assert len(decision.researchSummary) > 20, "researchSummary should reference research findings"
+        assert len(decision.candidateEvaluation) > 20, "candidateEvaluation should compare candidates"
+        assert len(decision.finalRationale) > 50, "finalRationale should be comprehensive"
 
         # Rationale quality — must be meaningful, not a stub
         assert isinstance(decision.rationale, str)

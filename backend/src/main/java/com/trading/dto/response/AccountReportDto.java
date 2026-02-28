@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Account report DTO returned by MCP resource endpoint.
@@ -24,4 +25,5 @@ public class AccountReportDto {
     private LocalDateTime lastUpdated;
     private Integer holdingsCount;
     private Long transactionCount;
+    private List<HoldingDto> holdings;
 }

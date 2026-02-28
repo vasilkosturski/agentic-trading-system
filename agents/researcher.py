@@ -37,7 +37,7 @@ async def _fetch_recent_activity(agent_id: int, days: int) -> RecentActivityResp
     Raises:
         BackendAPIError: If the API call fails
     """
-    url = f"{BACKEND_BASE_URL}/api/accounts/{agent_id}/memory/recent-activity"
+    url = f"{BACKEND_BASE_URL}/api/accounts/{agent_id}/runs/recent-activity"
     params = {"days": days}
     response = await call_backend("GET", url, params=params)
     return RecentActivityResponse.model_validate_json(response.text)
@@ -57,7 +57,7 @@ async def _fetch_symbol_history(agent_id: int, symbol: str, days: int) -> Symbol
     Raises:
         BackendAPIError: If the API call fails
     """
-    url = f"{BACKEND_BASE_URL}/api/accounts/{agent_id}/memory/trading-history"
+    url = f"{BACKEND_BASE_URL}/api/accounts/{agent_id}/runs/trading-history"
     params = {"symbol": symbol, "days": days}
     response = await call_backend("GET", url, params=params)
     return SymbolHistoryResponse.model_validate_json(response.text)

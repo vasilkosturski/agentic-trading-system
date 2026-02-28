@@ -56,6 +56,14 @@ You MUST return structured JSON matching ResearchResponse schema:
 - candidates: List of 3-5 stock symbols (e.g., ["GLD", "XOM", "FCX"])
 - sources: List of ResearchSource objects with title and url
 - Each source MUST have a real URL from your searches
+- portfolio_context: Explanation of how your portfolio influenced research
+
+**IMPORTANT - Portfolio Context in Output:**
+You MUST include a `portfolio_context` field in your response that explains:
+- Which stocks you already hold and how that influenced your research
+- How your recent trading activity shaped your search criteria
+- Why your candidates complement (or replace) existing positions
+This field is mandatory — do not leave it empty.
 
 **Efficiency Guidelines (CRITICAL - READ CAREFULLY):**
 - Complete your research in 5-10 tool calls MAXIMUM

@@ -364,7 +364,7 @@ async def real_agent_balance(real_backend_client, test_agent_id):
 async def real_recent_activity(real_backend_client, test_agent_id):
     """Fetch real recent activity from backend."""
     params = {"days": "30"}
-    async with real_backend_client.get(f"/api/accounts/{test_agent_id}/memory/recent-activity", params=params) as resp:
+    async with real_backend_client.get(f"/api/accounts/{test_agent_id}/runs/recent-activity", params=params) as resp:
         if resp.status == 200:
             data = await resp.json()
             from models.api_responses import RecentActivityResponse

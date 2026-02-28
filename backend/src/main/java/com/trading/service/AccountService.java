@@ -110,19 +110,8 @@ public class AccountService {
      */
     public List<HoldingDto> getHoldings(String agentName) {
         TradingAccount account = getAccount(agentName);
-
         List<AccountHolding> holdings = holdingRepository.findByAccount(account);
-        List<HoldingDto> holdingsList = new ArrayList<>();
-        
-        for (AccountHolding holding : holdings) {
-            holdingsList.add(new HoldingDto(
-                holding.getSymbol(),
-                holding.getQuantity(),
-                holding.getAveragePrice()
-            ));
-        }
-        
-        return holdingsList;
+        return toHoldingDtos(holdings);
     }
 
     /**
@@ -198,7 +187,8 @@ public class AccountService {
                 ((totalValue - DEFAULT_INITIAL_BALANCE) / DEFAULT_INITIAL_BALANCE) * 100,
                 account.getUpdatedAt(),
                 holdings.size(),
-                transactionRepository.countByAccount(account)
+                transactionRepository.countByAccount(account),
+                toHoldingDtos(holdings)
             );
 
         } catch (Exception e) {
@@ -289,6 +279,22 @@ public class AccountService {
         }
 
         snapshotRepository.save(snapshot);
+    }
+
+    /**
+     * Convert AccountHolding entities to HoldingDto list.
+     * Single source of truth for entity-to-DTO mapping used by getHoldings() and getAccountReport().
+     */
+    private List<HoldingDto> toHoldingDtos(List<AccountHolding> holdings) {
+        List<HoldingDto> dtos = new ArrayList<>();
+        for (AccountHolding holding : holdings) {
+            dtos.add(new HoldingDto(
+                holding.getSymbol(),
+                holding.getQuantity(),
+                holding.getAveragePrice()
+            ));
+        }
+        return dtos;
     }
 
     /**
