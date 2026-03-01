@@ -2,7 +2,6 @@ package com.trading.controller;
 
 import com.trading.dto.request.*;
 import com.trading.dto.response.AccountReportDto;
-import com.trading.dto.response.HoldingDto;
 import com.trading.dto.response.PortfolioHistoryPoint;
 import com.trading.dto.response.RecentActivityResponse;
 import com.trading.dto.response.RecentTradeDto;
@@ -70,34 +69,6 @@ public class AccountController {
     public ResponseEntity<String> createAccount(@Valid @RequestBody InitializeAgentRequest request) {
         accountService.initializeAgent(request.getName(), request.getInitialBalance());
         return ResponseEntity.status(201).body("Successfully initialized agent " + request.getName());
-    }
-
-    /**
-     * Get agent balance (REST endpoint).
-     * GET /api/accounts/{agentId}/balance
-     *
-     * @param agentId agent ID from path
-     * @return balance as Double
-     */
-    @GetMapping("/{agentId}/balance")
-    public ResponseEntity<Double> getBalanceRest(@PathVariable Long agentId) {
-        String name = agentIdentityService.requireAgentName(agentId);
-        Double balance = accountService.getBalance(name);
-        return ResponseEntity.ok(balance);
-    }
-
-    /**
-     * Get agent holdings (REST endpoint).
-     * GET /api/accounts/{agentId}/holdings
-     *
-     * @param agentId agent ID from path
-     * @return List of HoldingDto
-     */
-    @GetMapping("/{agentId}/holdings")
-    public ResponseEntity<List<HoldingDto>> getHoldingsRest(@PathVariable Long agentId) {
-        String name = agentIdentityService.requireAgentName(agentId);
-        List<HoldingDto> holdings = accountService.getHoldings(name);
-        return ResponseEntity.ok(holdings);
     }
 
     /**

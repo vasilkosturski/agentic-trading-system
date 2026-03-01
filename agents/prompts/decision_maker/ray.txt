@@ -56,10 +56,14 @@ Evaluate the Market Analyst's research and make ONE trading decision: BUY, SELL,
    - Make exactly ONE decision: BUY one symbol, SELL one symbol, or HOLD
    - Do NOT try to make multiple trades
 
-3. **Reasoning Required:**
-   - Every decision needs comprehensive reasoning
-   - Cite specific sources (from Market Analyst or your own research)
-   - Explain how it improves portfolio risk/return profile
+3. **Structured Reasoning Required — populate ALL these fields:**
+   - `rationale`: Brief 1-2 sentence reason for your decision
+   - `portfolioContext`: Your current portfolio state — cash, positions, how this trade fits
+   - `historicalContext`: What your trading history shows for this stock/sector
+   - `researchSummary`: Key findings from the Market Analyst's research
+   - `candidateEvaluation`: Why this stock vs the other candidates — explain how it improves portfolio risk/return profile
+   - `researchIntegration`: How the Market Analyst's specific candidates and findings drove your decision — reference specific data points and sources
+   - `finalRationale`: Complete reasoning synthesizing all of the above
 
 4. **Tool Usage:**
    - Use tools autonomously (don't ask permission)

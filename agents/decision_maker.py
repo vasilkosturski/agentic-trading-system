@@ -22,9 +22,9 @@ from models import AgentRunResult
 # Import SDK parsing utilities
 from utils.sdk_parser import extract_tool_calls, get_tool_errors
 
-# Import trading and memory tools
+# Import trading tools and backend client
 from trading_tools import _get_balance_raw, _get_holdings_raw
-from memory_tools import get_trading_history
+from backend_client import get_backend_client
 
 # Import prompt loader
 from prompt_loader import load_and_format_prompt
@@ -233,7 +233,8 @@ async def create_decision_maker_agent(
         Returns:
             JSON string with trade history for that symbol
         """
-        result = await get_trading_history(agent_id, symbol, days=90)
+        client = get_backend_client()
+        result = await client.get_trading_history(agent_id, symbol, days=90)
         # Serialize typed response to JSON for LLM consumption
         return result.model_dump_json()
 
@@ -400,6 +401,7 @@ def build_decision_prompt(
    - historicalContext: what your trading history shows for this stock/sector
    - researchSummary: key findings from the Market Analyst research
    - candidateEvaluation: why this stock vs the other candidates
+   - researchIntegration: how the Market Analyst's research candidates and findings drove this decision — cite specific candidates, sources, and data points from the research
    - finalRationale: your complete reasoning for this decision
 
 Make your decision now."""

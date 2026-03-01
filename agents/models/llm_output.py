@@ -84,6 +84,10 @@ class TradingDecision(BaseModel):
         default="",
         description="Final decision rationale: the complete reasoning"
     )
+    researchIntegration: str = Field(
+        default="",
+        description="How the Market Analyst's research candidates and findings drove this decision"
+    )
 
     # Legacy field - kept for backward compatibility
     fullReasoning: str = Field(

@@ -136,8 +136,6 @@ def require_backend(docker_ip, docker_services) -> str:
     import config as config_module
     import market_tools as market_tools_module
     import backend_client as backend_client_module
-    import memory_tools as memory_tools_module
-    import researcher as researcher_module
 
     config_module.BACKEND_BASE_URL = url
     config_module.BACKEND_API_MARKET = f"{url}/api/market"
@@ -151,9 +149,6 @@ def require_backend(docker_ip, docker_services) -> str:
     backend_client_module.BACKEND_BASE_URL = url
     backend_client_module.BACKEND_API_ACCOUNTS = f"{url}/api/accounts"
     backend_client_module.BACKEND_API_TRADING_RUNS = f"{url}/api/runs"
-
-    memory_tools_module.BACKEND_BASE_URL = url
-    researcher_module.BACKEND_BASE_URL = url
 
     return url
 
@@ -338,26 +333,27 @@ async def real_backend_client(require_backend):
 
 @pytest.fixture
 async def real_agent_holdings(real_backend_client, test_agent_id):
-    """Fetch real holdings from backend."""
-    async with real_backend_client.get(f"/api/accounts/{test_agent_id}/holdings") as resp:
+    """Fetch real holdings from backend via account report."""
+    async with real_backend_client.get(f"/api/accounts/resources/accounts/{test_agent_id}") as resp:
         if resp.status == 200:
             data = await resp.json()
             from models import Holding
-            return [Holding(**h) for h in data]
+            return [Holding(**h) for h in data.get("holdings", [])]
         else:
             body = await resp.text()
-            pytest.fail(f"Failed to fetch holdings: HTTP {resp.status}\n{body}")
+            pytest.fail(f"Failed to fetch holdings from account report: HTTP {resp.status}\n{body}")
 
 
 @pytest.fixture
 async def real_agent_balance(real_backend_client, test_agent_id):
-    """Fetch real balance from backend."""
-    async with real_backend_client.get(f"/api/accounts/{test_agent_id}/balance") as resp:
+    """Fetch real balance from backend via account report."""
+    async with real_backend_client.get(f"/api/accounts/resources/accounts/{test_agent_id}") as resp:
         if resp.status == 200:
-            return await resp.json()
+            data = await resp.json()
+            return data["balance"]
         else:
             body = await resp.text()
-            pytest.fail(f"Failed to fetch balance: HTTP {resp.status}\n{body}")
+            pytest.fail(f"Failed to fetch balance from account report: HTTP {resp.status}\n{body}")
 
 
 @pytest.fixture

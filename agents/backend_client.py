@@ -1,7 +1,7 @@
 """Unified Backend Client for all backend API calls.
 
 Consolidates all HTTP communication with the Java backend:
-- Trading operations (buy, sell, balance, holdings)
+- Trading operations (buy, sell, account report)
 - Run tracking (create, update phase, complete)
 - Agent management (initialize)
 
@@ -27,7 +27,7 @@ Lifecycle strategy — "loop-local singleton with optional DI":
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import httpx
 
@@ -36,7 +36,8 @@ from config import (
     BACKEND_API_ACCOUNTS,
     BACKEND_API_TRADING_RUNS,
 )
-from models import Holding, TradeResult
+from models import TradeResult
+from models.api_responses import RecentActivityResponse, SymbolHistoryResponse
 from models.run_tracking import CompleteRunData
 from exceptions import BackendAPIError
 
@@ -47,7 +48,7 @@ class BackendClient:
     """Centralized client for all backend API operations.
 
     Provides typed methods for:
-    - Trading: buy_shares, sell_shares, get_balance, get_holdings
+    - Trading: buy_shares, sell_shares, get_account_report
     - Run tracking: create_run, update_phase, complete_run
     - Agent management: initialize_agent
 
@@ -261,32 +262,23 @@ class BackendClient:
                 return agent_id
         raise BackendAPIError(f"Agent {name} not found in registry after 400 response")
     
-    async def get_balance(self, agent_id: int) -> float:
-        """Get the cash balance of an agent.
-        
+    async def get_account_report(self, agent_id: int) -> dict:
+        """Get full account report with balance, holdings, and portfolio metrics.
+
+        Uses the enriched AccountReportDto endpoint which returns everything
+        in a single call (balance, holdings, portfolio value, P&L, etc.).
+
         Args:
             agent_id: Backend identifier for the agent
-            
+
         Returns:
-            Current cash balance in USD
+            Dictionary with keys: agentName, balance, holdings, holdingsValue,
+            totalPortfolioValue, initialBalance, totalProfitLoss, etc.
         """
-        url = f"{BACKEND_API_ACCOUNTS}/{agent_id}/balance"
+        url = f"{BACKEND_BASE_URL}/api/accounts/resources/accounts/{agent_id}"
         response = await self._request("GET", url)
-        return float(response.json())
-    
-    async def get_holdings(self, agent_id: int) -> List[Holding]:
-        """Get the stock holdings of an agent.
-        
-        Args:
-            agent_id: Backend identifier for the agent
-            
-        Returns:
-            List of Holding objects with symbol, quantity, averagePrice
-        """
-        url = f"{BACKEND_API_ACCOUNTS}/{agent_id}/holdings"
-        response = await self._request("GET", url)
-        return [Holding(**item) for item in response.json()]
-    
+        return response.json()
+
     async def buy_shares(
         self,
         agent_id: int,
@@ -341,6 +333,49 @@ class BackendClient:
         })
         return TradeResult(**response.json())
     
+    # ========== Memory / History Operations ==========
+
+    async def get_trading_history(
+        self, agent_id: int, symbol: str, days: int = 30
+    ) -> SymbolHistoryResponse:
+        """Get complete trading history for a specific stock.
+
+        Args:
+            agent_id: Agent ID (integer)
+            symbol: Stock symbol (e.g., "NVDA")
+            days: How many days back to look (default 30)
+
+        Returns:
+            SymbolHistoryResponse with typed trading history
+
+        Raises:
+            BackendAPIError: If API call fails
+        """
+        url = f"{BACKEND_BASE_URL}/api/accounts/{agent_id}/runs/trading-history"
+        params = {"symbol": symbol, "days": days}
+        response = await self._request("GET", url, params=params)
+        return SymbolHistoryResponse.model_validate_json(response.text)
+
+    async def get_recent_activity(
+        self, agent_id: int, days: int = 7
+    ) -> RecentActivityResponse:
+        """Get recent trading activity across all stocks.
+
+        Args:
+            agent_id: Agent ID (integer)
+            days: How many days back to look (default 7)
+
+        Returns:
+            RecentActivityResponse with typed activity data
+
+        Raises:
+            BackendAPIError: If API call fails
+        """
+        url = f"{BACKEND_BASE_URL}/api/accounts/{agent_id}/runs/recent-activity"
+        params = {"days": days}
+        response = await self._request("GET", url, params=params)
+        return RecentActivityResponse.model_validate_json(response.text)
+
     # ========== Run Tracking Operations ==========
     
     async def create_run(self, agent_id: int) -> int:
