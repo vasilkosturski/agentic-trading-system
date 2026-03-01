@@ -172,12 +172,10 @@ class TestAgentExecutorStartRun:
 class TestAgentExecutorFetchData:
     """Test data fetching methods."""
 
-    @patch("agent_executor._get_balance_raw")
-    @patch("agent_executor._get_holdings_raw")
+    @patch("agent_executor._get_account_report_raw")
     async def test_fetch_account_data_returns_account_data(
         self,
-        mock_get_holdings,
-        mock_get_balance,
+        mock_get_report,
         sample_agent_id,
         sample_agent_name,
         sample_agent_style,
@@ -185,8 +183,13 @@ class TestAgentExecutorFetchData:
         sample_holdings,
     ):
         """Test _fetch_account_data returns AccountData."""
-        mock_get_balance.return_value = sample_balance
-        mock_get_holdings.return_value = sample_holdings
+        mock_get_report.return_value = {
+            "balance": sample_balance,
+            "holdings": [
+                {"symbol": h.symbol, "quantity": h.quantity, "averagePrice": h.averagePrice}
+                for h in sample_holdings
+            ],
+        }
 
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_agent_style)
 
@@ -196,17 +199,19 @@ class TestAgentExecutorFetchData:
         assert result.balance == sample_balance
         assert result.holdings == sample_holdings
 
-    @patch("agent_executor.get_recent_activity", new_callable=AsyncMock)
+    @patch("agent_executor.get_backend_client")
     async def test_fetch_recent_activity_returns_response(
         self,
-        mock_get_recent_activity,
+        mock_get_backend_client,
         sample_agent_id,
         sample_agent_name,
         sample_agent_style,
         sample_recent_activity,
     ):
         """Test _fetch_recent_activity returns RecentActivityResponse."""
-        mock_get_recent_activity.return_value = sample_recent_activity
+        mock_client = AsyncMock()
+        mock_client.get_recent_activity.return_value = sample_recent_activity
+        mock_get_backend_client.return_value = mock_client
 
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_agent_style)
 
@@ -217,7 +222,7 @@ class TestAgentExecutorFetchData:
         assert result.totalRuns == 1
         assert result.totalTrades == 1
 
-        mock_get_recent_activity.assert_called_once_with(sample_agent_id, days=30)
+        mock_client.get_recent_activity.assert_called_once_with(sample_agent_id, days=30)
 
 
 # ============================================================================
@@ -559,9 +564,8 @@ class TestAgentExecutorFullCycle:
     @patch("agent_executor.Runner")
     @patch("agent_executor.update_phase")
     @patch("agent_executor.create_run")
-    @patch("agent_executor.get_recent_activity", new_callable=AsyncMock)
-    @patch("agent_executor._get_balance_raw")
-    @patch("agent_executor._get_holdings_raw")
+    @patch("agent_executor.get_backend_client")
+    @patch("agent_executor._get_account_report_raw")
     @patch("agent_executor.initialize_agent")
     @patch("agent_executor.broadcast_status")
     @patch("agent_executor.ToolTracker")
@@ -570,9 +574,8 @@ class TestAgentExecutorFullCycle:
         mock_tracker_class,
         mock_broadcast,
         mock_initialize,
-        mock_get_holdings,
-        mock_get_balance,
-        mock_get_recent_activity,
+        mock_get_report,
+        mock_get_backend_client,
         mock_create_run,
         mock_update_phase,
         mock_runner_class,
@@ -592,9 +595,14 @@ class TestAgentExecutorFullCycle:
         """Test full cycle with successful BUY decision."""
         # Setup mocks
         mock_initialize.return_value = None
-        mock_get_balance.return_value = 100000.0
-        mock_get_holdings.return_value = []
-        mock_get_recent_activity.return_value = sample_recent_activity
+        mock_get_report.return_value = {
+            "balance": 100000.0,
+            "holdings": [],
+        }
+        # Mock get_backend_client for _fetch_recent_activity
+        mock_client = AsyncMock()
+        mock_client.get_recent_activity.return_value = sample_recent_activity
+        mock_get_backend_client.return_value = mock_client
         mock_create_run.return_value = 123
         mock_update_phase.return_value = True
         mock_complete_run.return_value = True

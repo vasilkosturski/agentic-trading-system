@@ -18,7 +18,7 @@ from typing import Optional
 
 from agents import Runner
 
-from models import TradingDecision, ResearchResponse, CycleResult
+from models import TradingDecision, ResearchResponse, CycleResult, Holding
 from models.orchestration import (
     AccountData,
     RunContext,
@@ -44,10 +44,9 @@ from trading_tools import (
     initialize_agent,
     buy_shares,
     sell_shares,
-    _get_balance_raw,
-    _get_holdings_raw,
+    _get_account_report_raw,
 )
-from memory_tools import get_recent_activity
+from backend_client import get_backend_client
 
 # Import new run tracking
 from run_tracking import create_run, update_phase, complete_run
@@ -268,6 +267,9 @@ class AgentExecutor:
     async def _fetch_account_data(self, agent_id: int) -> AccountData:
         """Fetch balance and holdings once for the cycle.
 
+        Uses a single HTTP call to the account report endpoint to get both
+        balance and holdings, avoiding duplicate requests.
+
         Args:
             agent_id: Agent ID for data fetching
 
@@ -278,8 +280,13 @@ class AgentExecutor:
             RuntimeError: If fetching fails
         """
         try:
-            balance = await _get_balance_raw(agent_id)
-            holdings = await _get_holdings_raw(agent_id)
+            report = await _get_account_report_raw(agent_id)
+            balance = report["balance"]
+            holdings_data = report.get("holdings", [])
+            holdings = [
+                Holding(symbol=h["symbol"], quantity=h["quantity"], averagePrice=h["averagePrice"])
+                for h in holdings_data
+            ]
             return AccountData(balance=balance, holdings=holdings)
         except Exception as e:
             raise RuntimeError(
@@ -298,8 +305,9 @@ class AgentExecutor:
         Raises:
             RuntimeError: If fetching fails
         """
-        # get_recent_activity throws BackendAPIError on failure
-        result = await get_recent_activity(agent_id, days=30)
+        # BackendClient.get_recent_activity throws BackendAPIError on failure
+        client = get_backend_client()
+        result = await client.get_recent_activity(agent_id, days=30)
 
         logger.info(f"📊 Context prepared: {result.computed_total_runs} runs, {result.computed_total_trades} trades (30 days)")
         return result

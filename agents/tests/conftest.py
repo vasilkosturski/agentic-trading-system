@@ -192,28 +192,30 @@ def mock_mcp_pool():
 
 @pytest.fixture
 def mock_backend_api(mock_aiohttp, sample_balance, sample_holdings, sample_account_report, sample_agent_id):
-    """Mock backend API responses using new REST endpoints."""
+    """Mock backend API responses using REST endpoints.
+
+    Uses the unified account report endpoint (AccountReportDto) for balance
+    and holdings data instead of the deleted separate endpoints.
+    """
     # Mock common API endpoints
     backend_url = "http://localhost:8080"
 
-    # Balance endpoint - GET /{agentId}/balance
+    # Account report endpoint - GET /api/accounts/resources/accounts/{agentId}
+    # Returns balance, holdings, and portfolio metrics in a single call.
     mock_aiohttp.get(
-        f"{backend_url}/{sample_agent_id}/balance",
-        payload=sample_balance,
-        repeat=True
-    )
-
-    # Holdings endpoint - GET /{agentId}/holdings
-    mock_aiohttp.get(
-        f"{backend_url}/{sample_agent_id}/holdings",
-        payload=[h.dict() for h in sample_holdings],  # Convert Holding objects to dicts
-        repeat=True
-    )
-
-    # Account report endpoint - GET /resources/accounts/{agentId}
-    mock_aiohttp.get(
-        f"{backend_url}/resources/accounts/{sample_agent_id}",
-        payload=sample_account_report,
+        f"{backend_url}/api/accounts/resources/accounts/{sample_agent_id}",
+        payload={
+            "agentName": "Warren",
+            "balance": sample_balance,
+            "holdings": [h.dict() for h in sample_holdings],
+            "holdingsValue": sum(h.quantity * h.averagePrice for h in sample_holdings),
+            "totalPortfolioValue": sample_balance + sum(h.quantity * h.averagePrice for h in sample_holdings),
+            "initialBalance": 130000.0,
+            "totalProfitLoss": 0.0,
+            "profitLossPercent": 0.0,
+            "holdingsCount": len(sample_holdings),
+            "transactionCount": 2,
+        },
         repeat=True
     )
 

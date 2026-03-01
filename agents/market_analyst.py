@@ -51,8 +51,7 @@ from models.llm_output import ResearchResponse
 # Import prompt loader
 from prompt_loader import load_and_format_prompt
 
-# Import data layer functions from researcher (reuse existing implementation)
-from researcher import _fetch_price
+from market_tools import _lookup_share_price
 from models import (
     RecentActivityResponse,
     PriceLookupResponse,
@@ -271,7 +270,12 @@ async def create_market_analyst_agent(
             Current stock price
         """
         try:
-            return await _fetch_price(symbol)
+            price = await _lookup_share_price(symbol)
+            return PriceLookupResponse(
+                symbol=symbol,
+                price=price,
+                timestamp=datetime.now(),
+            )
         except ValidationError as e:
             return ToolError(
                 error=f"Invalid price data: {e}",
