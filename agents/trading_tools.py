@@ -143,10 +143,10 @@ async def initialize_agent(name: str, initial_balance: float = 100000.0) -> str:
 
 # Helper functions for system use (not agent tools)
 
-async def _get_account_report_raw(agent_id: int) -> dict:
+async def _get_account_report_raw(agent_id: int) -> "AccountReport":
     """Get full account report from backend.
 
-    Returns the enriched AccountReportDto with balance, holdings,
+    Returns the typed AccountReport with balance, holdings,
     portfolio metrics, and P&L data in a single HTTP call.
     """
     client = get_backend_client()
@@ -156,7 +156,7 @@ async def _get_account_report_raw(agent_id: int) -> dict:
 async def _get_balance_raw(agent_id: int) -> float:
     """Get agent balance from account report - for system use, not exposed to agents."""
     report = await _get_account_report_raw(agent_id)
-    return report["balance"]
+    return report.balance
 
 
 async def _get_holdings_raw(agent_id: int) -> List[Holding]:
@@ -166,8 +166,7 @@ async def _get_holdings_raw(agent_id: int) -> List[Holding]:
         List of Holding objects with symbol, quantity, averagePrice
     """
     report = await _get_account_report_raw(agent_id)
-    holdings_data = report.get("holdings", [])
-    return [Holding(symbol=h["symbol"], quantity=h["quantity"], averagePrice=h["averagePrice"]) for h in holdings_data]
+    return report.holdings
 
 
 # No model-visible trading tools are exported. Account context is provided explicitly

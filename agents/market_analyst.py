@@ -397,15 +397,6 @@ Research and identify 3-5 stock candidates that match {agent_name}'s {agent_styl
 
     prompt += """
 
-**Deliverables:**
-1. List of 3-5 stock candidates with ticker symbols
-2. Research summary explaining why each fits the strategy
-3. Web sources for all claims (titles + URLs)
-4. Any risks or concerns identified
-
-**You MUST reference your portfolio context in the `portfolio_context` field of your response.**
-Explain which holdings you already have, how recent activity shaped your search, and why your candidates complement or replace existing positions. Do not leave portfolio_context empty.
-
 Begin your research now."""
 
     return prompt

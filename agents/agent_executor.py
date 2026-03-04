@@ -18,7 +18,7 @@ from typing import Optional
 
 from agents import Runner
 
-from models import TradingDecision, ResearchResponse, CycleResult, Holding
+from models import TradingDecision, ResearchResponse, CycleResult
 from models.orchestration import (
     AccountData,
     RunContext,
@@ -281,13 +281,7 @@ class AgentExecutor:
         """
         try:
             report = await _get_account_report_raw(agent_id)
-            balance = report["balance"]
-            holdings_data = report.get("holdings", [])
-            holdings = [
-                Holding(symbol=h["symbol"], quantity=h["quantity"], averagePrice=h["averagePrice"])
-                for h in holdings_data
-            ]
-            return AccountData(balance=balance, holdings=holdings)
+            return AccountData(balance=report.balance, holdings=report.holdings)
         except Exception as e:
             raise RuntimeError(
                 f"Failed to fetch account data for agent {agent_id}: {e}"
@@ -522,7 +516,7 @@ class AgentExecutor:
         if not decision:
             raise RuntimeError(
                 f"Agent {agent_id} reached execution phase but no decision was recorded. "
-                "Decision Maker agent should have called decide_action tool."
+                "Decision Maker agent should have returned a structured TradingDecision."
             )
 
         logger.info(f"✅ Validated decision: {decision.action} {decision.symbol or ''}")
@@ -612,29 +606,19 @@ class AgentExecutor:
         symbol = decision.symbol if decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
         quantity = decision.quantity if decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
 
-        # Build reasoning DTO from decision's structured fields
-        # Use new structured fields if available, fall back to fullReasoning for legacy
+        # Build reasoning DTO from decision's single reasoning field.
+        # Map decision.reasoning -> finalRationale for Java ReasoningDto compatibility.
+        # Other ReasoningDto fields are empty strings (UI shows finalRationale as main reasoning).
         reasoning = ReasoningDto(
-            portfolioContext=decision.portfolioContext[:2000] if decision.portfolioContext else None,
-            historicalContext=decision.historicalContext[:2000] if decision.historicalContext else None,
-            researchSummary=decision.researchSummary[:2000] if decision.researchSummary else None,
-            candidateEvaluation=decision.candidateEvaluation[:2000] if decision.candidateEvaluation else None,
-            finalRationale=(decision.finalRationale or decision.fullReasoning)[:2000] or None,
+            portfolioContext=None,
+            historicalContext=None,
+            researchSummary=None,
+            candidateEvaluation=None,
+            finalRationale=decision.reasoning[:2000] if decision.reasoning else None,
         )
 
-        # Monitor LLM structured reasoning field population
-        reasoning_fields = {
-            "portfolioContext": reasoning.portfolioContext,
-            "historicalContext": reasoning.historicalContext,
-            "researchSummary": reasoning.researchSummary,
-            "candidateEvaluation": reasoning.candidateEvaluation,
-            "finalRationale": reasoning.finalRationale,
-        }
-        populated = [k for k, v in reasoning_fields.items() if v]
-        empty = [k for k, v in reasoning_fields.items() if not v]
         logger.info(
-            f"📝 Reasoning fields populated: {', '.join(populated) or 'NONE'} "
-            f"(empty: {', '.join(empty) or 'none'})"
+            f"📝 Reasoning: mapped decision.reasoning ({len(decision.reasoning)} chars) -> finalRationale"
         )
 
         # Build nested phase DTOs

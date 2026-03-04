@@ -8,7 +8,6 @@ Per design document: system-design/workflows/trade-execution/trade_exec_workflow
 """
 
 import logging
-import json
 from dataclasses import dataclass
 from agents import Agent, Runner, function_tool
 from datetime import datetime
@@ -22,8 +21,7 @@ from models import AgentRunResult
 # Import SDK parsing utilities
 from utils.sdk_parser import extract_tool_calls, get_tool_errors
 
-# Import trading tools and backend client
-from trading_tools import _get_balance_raw, _get_holdings_raw
+# Import backend client
 from backend_client import get_backend_client
 
 # Import prompt loader
@@ -65,8 +63,13 @@ class DecisionContext:
 
     @property
     def holdings_summary(self) -> str:
-        """Convert holdings to JSON string for prompt."""
-        return json.dumps([h.symbol for h in self.holdings]) if self.holdings else "[]"
+        """Format holdings with quantity and price for prompt."""
+        if not self.holdings:
+            return "No current holdings."
+        lines = []
+        for h in self.holdings:
+            lines.append(f"- {h.symbol}: {h.quantity} shares @ ${h.averagePrice:.2f} avg")
+        return "\n".join(lines)
 
     @property
     def historical_context(self) -> str:
@@ -139,8 +142,6 @@ class DecisionMaker:
             Formatted prompt string for LLM
         """
         return build_decision_prompt(
-            agent_name=context.agent_name,
-            agent_style=context.agent_style,
             research_response=context.research_response,
             balance=context.balance,
             position_count=context.position_count,
@@ -238,40 +239,10 @@ async def create_decision_maker_agent(
         # Serialize typed response to JSON for LLM consumption
         return result.model_dump_json()
 
-    # Create account summary tool
-    @function_tool
-    async def get_account_summary() -> str:
-        """Get current account state (balance and holdings).
-
-        Returns:
-            JSON string with current balance and holdings
-        """
-        balance = await _get_balance_raw(agent_id)
-        holdings = await _get_holdings_raw(agent_id)
-
-        holdings_list = [
-            {
-                "symbol": h.symbol,
-                "quantity": h.quantity,
-                "average_cost": h.average_cost,
-                "current_value": h.quantity * getattr(h, "current_price", h.average_cost),
-            }
-            for h in holdings
-        ]
-
-        return json.dumps(
-            {
-                "balance": balance,
-                "position_count": len(holdings),
-                "holdings": holdings_list,
-            },
-            indent=2,
-        )
-
     # Collect tools (no decide_action - using structured output instead)
+    # Account data is passed inline in the decision prompt, no tool needed.
     tools = [
         get_symbol_trade_history,
-        get_account_summary,
     ]
 
     # Add MCP servers if provided (dict access)
@@ -305,8 +276,6 @@ async def create_decision_maker_agent(
 
 
 def build_decision_prompt(
-    agent_name: str,
-    agent_style: str,
     research_response: ResearchResponse,
     balance: float,
     position_count: int,
@@ -318,8 +287,6 @@ def build_decision_prompt(
     """Build the decision prompt for Decision Maker agent.
 
     Args:
-        agent_name: Agent name
-        agent_style: Investment style
         research_response: Market Analyst research results
         balance: Available cash balance
         position_count: Current number of positions
@@ -339,7 +306,7 @@ def build_decision_prompt(
         [f"- {source.title}: {source.url}" for source in research_response.sources]
     )
 
-    prompt = f"""You are {agent_name}, a {agent_style} trader. Time to make your decision.
+    prompt = f"""Time to make your trading decision.
 
 **Market Analyst Research:**
 
@@ -387,22 +354,6 @@ def build_decision_prompt(
 """
 
     prompt += """
-
-**Your Task:**
-1. Evaluate the Market Analyst's candidates
-2. Use get_symbol_trade_history() to check past performance
-3. Make your decision: BUY, SELL, or HOLD
-4. Provide structured output with:
-   - action: BUY, SELL, or HOLD
-   - symbol: stock ticker (empty for HOLD)
-   - quantity: number of shares (0 for HOLD)
-   - rationale: brief 1-2 sentence reason
-   - portfolioContext: your current portfolio state and how it factors in
-   - historicalContext: what your trading history shows for this stock/sector
-   - researchSummary: key findings from the Market Analyst research
-   - candidateEvaluation: why this stock vs the other candidates
-   - researchIntegration: how the Market Analyst's research candidates and findings drove this decision — cite specific candidates, sources, and data points from the research
-   - finalRationale: your complete reasoning for this decision
 
 Make your decision now."""
 

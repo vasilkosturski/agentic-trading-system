@@ -15,7 +15,7 @@ from agents.mcp import MCPServerStdio
 from agent_executor import AgentExecutor
 from mcp_types import MCPPool
 from mcp_params import get_mcp_server_params
-from models import CycleResult
+from models import CycleResult, TradeAction
 
 logger = logging.getLogger("e2e_tests.full_cycle")
 
@@ -100,7 +100,7 @@ class TestFullCycleE2E:
         assert result.run_id is not None and result.run_id > 0
 
         # With force_trade=True, must be BUY or SELL
-        assert result.decision.action in ["BUY", "SELL"], f"Expected BUY/SELL with force_trade, got {result.decision.action}"
+        assert result.decision.action in (TradeAction.BUY, TradeAction.SELL), f"Expected BUY/SELL with force_trade, got {result.decision.action}"
         assert result.decision.symbol is not None
         assert result.decision.quantity is not None
         assert result.decision.quantity > 0
@@ -115,8 +115,8 @@ class TestFullCycleE2E:
         assert result.decision.symbol.isupper(), f"Symbol should be uppercase: {result.decision.symbol}"
         assert 1 <= len(result.decision.symbol) <= 5, f"Symbol length should be 1-5: {result.decision.symbol}"
 
-        # Structured reasoning — finalRationale should be populated for trade decisions
-        assert len(result.decision.finalRationale) > 0, "finalRationale should be populated for BUY/SELL"
+        # Comprehensive reasoning field should be populated for trade decisions
+        assert len(result.decision.reasoning) > 0, "reasoning should be populated for BUY/SELL"
 
         # Trade should have been attempted (count is 0 or 1 depending on execution success)
         assert result.trade_count in [0, 1]
@@ -180,7 +180,7 @@ class TestFullCycleE2E:
 
         # --- Execution phase ---
         execution = run_detail.get("execution")
-        if result.decision.action in ["BUY", "SELL"]:
+        if result.decision.action in (TradeAction.BUY, TradeAction.SELL):
             assert execution is not None, "Execution phase should be present for BUY/SELL"
             assert execution["runId"] == run_id
             assert execution["status"] in ["COMPLETED", "FAILED"]

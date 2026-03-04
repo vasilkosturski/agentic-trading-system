@@ -169,31 +169,16 @@ class TestMarketAnalystE2E:
             # Portfolio context (holdings, activity) is now passed inline in
             # the prompt — no DB tool assertions needed.
 
-            # Separate critical vs non-critical tool errors.
-            # Price lookups depend on backend + Polygon API — non-critical for research.
-            # Brave Search + Fetch are the core research tools — must work.
-            NON_CRITICAL_TOOLS = {"lookup_price_tool"}
-            critical_errors = [e for e in result.tool_errors if e.name not in NON_CRITICAL_TOOLS]
-            non_critical_errors = [e for e in result.tool_errors if e.name in NON_CRITICAL_TOOLS]
-
-            if non_critical_errors:
-                logger.warning("=" * 60)
-                logger.warning("NON-CRITICAL TOOL ERRORS (price lookups — logged, not fatal)")
-                for err in non_critical_errors:
-                    logger.warning(f"  - {err.name}: {err.output[:200]}")
-                logger.warning("=" * 60)
-
-            if critical_errors:
-                logger.error("=" * 60)
-                logger.error("CRITICAL TOOL ERRORS (fatal)")
-                logger.error("=" * 60)
-                for err in critical_errors:
-                    logger.error(f"  - {err.name}: {err.output[:200]}")
-                logger.error("=" * 60)
+            # ALL tool errors are fatal — price lookup is mandatory for research
+            # (can't evaluate budget fit without knowing stock prices).
+            # If Polygon API is down, the test should fail.
+            if result.tool_errors:
+                for err in result.tool_errors:
+                    logger.error(f"TOOL ERROR: {err.name}: {err.output[:200]}")
                 from exceptions import ToolExecutionError
                 raise ToolExecutionError(
-                    f"Tools failed: {[e.name for e in critical_errors]}",
-                    tool_errors=critical_errors
+                    f"Tools failed: {[e.name for e in result.tool_errors]}",
+                    tool_errors=result.tool_errors
                 )
 
             # Extract response from AgentRunResult

@@ -26,7 +26,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -250,26 +249,13 @@ public class AccountController {
      * GET /api/accounts/{agentId}/runs/trading-history?symbol=NVDA&days=30
      */
     @GetMapping("/{agentId}/runs/trading-history")
-    public ResponseEntity<?> getTradingHistory(
+    public ResponseEntity<TradingHistoryResponse> getTradingHistory(
             @PathVariable Long agentId,
             @RequestParam String symbol,
             @RequestParam(defaultValue = "30") int days) {
-        try {
-            String agentName = agentIdentityService.requireAgentName(agentId);
-            TradingHistoryResponse history = memoryService.getTradingHistory(agentName, symbol, days);
-            if (history == null) {
-                return ResponseEntity.status(404).body(
-                    Map.of("error", "No trading history found for " + symbol + " in the last " + days + " days")
-                );
-            }
-            return ResponseEntity.ok(history);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(
-                Map.of("error", "Failed to retrieve trading history: " + e.getMessage())
-            );
-        }
+        String agentName = agentIdentityService.requireAgentName(agentId);
+        TradingHistoryResponse history = memoryService.getTradingHistory(agentName, symbol, days);
+        return ResponseEntity.ok(history);
     }
 
     /**
@@ -277,24 +263,11 @@ public class AccountController {
      * GET /api/accounts/{agentId}/runs/recent-activity?days=7
      */
     @GetMapping("/{agentId}/runs/recent-activity")
-    public ResponseEntity<?> getRecentActivity(
+    public ResponseEntity<RecentActivityResponse> getRecentActivity(
             @PathVariable Long agentId,
             @RequestParam(defaultValue = "7") int days) {
-        try {
-            String agentName = agentIdentityService.requireAgentName(agentId);
-            RecentActivityResponse activity = memoryService.getRecentActivity(agentName, days);
-            if (activity == null) {
-                return ResponseEntity.status(404).body(
-                    Map.of("error", "No recent activity found for agent in the last " + days + " days")
-                );
-            }
-            return ResponseEntity.ok(activity);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(
-                Map.of("error", "Failed to retrieve recent activity: " + e.getMessage())
-            );
-        }
+        String agentName = agentIdentityService.requireAgentName(agentId);
+        RecentActivityResponse activity = memoryService.getRecentActivity(agentName, days);
+        return ResponseEntity.ok(activity);
     }
 }

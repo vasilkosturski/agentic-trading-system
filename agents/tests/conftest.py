@@ -150,15 +150,7 @@ def sample_decision() -> TradingDecision:
         symbol="NVDA",
         quantity=50,
         rationale="Strong AI growth potential",
-        fullReasoning="NVDA shows strong fundamentals with AI datacenter growth. P/E ratio is reasonable at 40x forward earnings.",
-        researchSources=json.dumps({
-            "summary": "NVDA leading in AI chips",
-            "sources": [{"title": "NVDA Analysis", "url": "https://example.com/nvda"}]
-        }),
-        historicalContext=json.dumps({
-            "summary": "No prior NVDA trades",
-            "insights": []
-        })
+        reasoning="NVDA shows strong fundamentals with AI datacenter growth. P/E ratio is reasonable at 40x forward earnings. No prior NVDA trades in portfolio. Research highlights NVDA as top AI infrastructure play.",
     )
 
 

@@ -17,7 +17,7 @@ from agents import Runner
 from agents.mcp import MCPServerStdio
 
 from decision_maker import DecisionMaker, DecisionContext
-from models.llm_output import TradingDecision, ResearchResponse, ResearchSource
+from models.llm_output import TradeAction, TradingDecision, ResearchResponse, ResearchSource
 from mcp_types import MCPPool
 from mcp_params import get_mcp_server_params
 from utils.sdk_parser import extract_tool_calls
@@ -121,21 +121,22 @@ class TestDecisionMakerE2E:
             model_name=test_model_name,
         )
 
-        # Realistic research response (simulates Market Analyst output with portfolio awareness)
+        # Realistic research response — includes AAPL (seeded in DB) so
+        # get_symbol_trade_history returns real data for at least one candidate.
         research_response = ResearchResponse(
             summary=(
-                "Identified 4 undervalued stocks with strong fundamentals. "
+                "Identified 4 stocks with strong fundamentals. "
+                "Apple (AAPL) continues strong with consistent revenue growth and P/E of 28 — consider adding to existing position. "
                 "Comcast (CMCSA) has P/E of 5.81, trading below intrinsic value with strong cash flow. "
                 "Allstate (ALL) offers P/E of 5.40 with robust underwriting margins. "
-                "Wix.com (WIX) trades at 47.7% discount to estimated fair value in growing SaaS sector. "
                 "WesBanco (WSBC) priced at $36.01 vs estimated cash flow value of $68.84."
             ),
-            candidates=["CMCSA", "ALL", "WIX", "WSBC"],
+            candidates=["AAPL", "CMCSA", "ALL", "WSBC"],
             sources=[
                 ResearchSource(title="Top 10 Most Undervalued Stocks in the S&P 500", url="https://www.nerdwallet.com/investing/learn/undervalued-stocks"),
                 ResearchSource(title="February 2026's Value Picks: Stocks Priced Below Estimated Worth", url="https://finance.yahoo.com/news/february-2026s-value-picks-stocks-113805029.html"),
             ],
-            portfolio_context="Current portfolio holds AAPL and MSFT. Research focused on non-tech sectors to diversify. All 4 candidates are in financials/SaaS to reduce concentration risk.",
+            portfolio_context="Current portfolio holds AAPL and MSFT. AAPL already held — could add to position. Other candidates diversify into financials to reduce tech concentration.",
         )
 
         # Build context and prompt using real backend data
@@ -164,6 +165,12 @@ class TestDecisionMakerE2E:
         decision = result.final_output_as(TradingDecision)
         tool_calls = extract_tool_calls(result.new_items)
 
+        # ALL tool errors are fatal — backend should never return errors for valid requests
+        tool_errors = [tc for tc in tool_calls if tc.is_error]
+        if tool_errors:
+            for err in tool_errors:
+                logger.error(f"TOOL ERROR: {err.name}: {err.error_message[:200]}")
+
         # Dump result to JSON for manual inspection (always, even on failure)
         try:
             # Log results
@@ -177,12 +184,19 @@ class TestDecisionMakerE2E:
                 logger.info(f"  - {tc.name}: {tc.params}")
             logger.info("-" * 40)
 
+            # All tool errors are fatal
+            assert not tool_errors, f"Tool errors: {[e.name for e in tool_errors]}"
+
+            # Agent should have called get_symbol_trade_history at least once
+            tool_names = [tc.name for tc in tool_calls]
+            assert "get_symbol_trade_history" in tool_names, "DecisionMaker should check trade history for candidates"
+
             # Assertions -- structure only (LLM output is non-deterministic)
             assert decision is not None
             assert isinstance(decision, TradingDecision)
 
             # Decision should be BUY (given good candidates + available balance + position slots)
-            assert decision.action == "BUY", f"Expected BUY given strong candidates and available capital, got {decision.action}"
+            assert decision.action == TradeAction.BUY, f"Expected BUY given strong candidates and available capital, got {decision.action}"
 
             assert decision.symbol is not None
             assert decision.quantity is not None
@@ -193,14 +207,8 @@ class TestDecisionMakerE2E:
             assert decision.symbol.isupper(), f"Symbol should be uppercase: {decision.symbol}"
             assert 1 <= len(decision.symbol) <= 5, f"Symbol length should be 1-5: {decision.symbol}"
 
-            # Structured reasoning fields must be populated
-            assert len(decision.portfolioContext) > 20, "portfolioContext should explain current portfolio state"
-            assert len(decision.researchSummary) > 20, "researchSummary should reference research findings"
-            assert len(decision.candidateEvaluation) > 20, "candidateEvaluation should compare candidates"
-            assert len(decision.finalRationale) > 50, "finalRationale should be comprehensive"
-
-            # researchIntegration must explain how research drove the decision
-            assert len(decision.researchIntegration) > 20, "researchIntegration should explain how research drove the decision"
+            # Comprehensive reasoning field must be populated
+            assert len(decision.reasoning) > 50, "reasoning should be comprehensive"
 
             # Rationale quality -- must be meaningful, not a stub
             assert isinstance(decision.rationale, str)
