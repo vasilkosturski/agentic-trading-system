@@ -2,7 +2,8 @@
 
 The Decision Maker is the second agent in the two-agent flow:
 - Receives research results from Market Analyst
-- Has database tools (get_symbol_trade_history, get_account_summary)
+- Has database tools (get_symbol_trade_history)
+- Account data is passed inline in the decision prompt
 - Uses structured output (TradingDecision) instead of tool callback
 """
 
@@ -66,12 +67,10 @@ class TestBuildDecisionPrompt:
     """Test decision prompt generation."""
 
     def test_prompt_includes_research_results(
-        self, sample_agent_name, sample_agent_style, sample_research_response
+        self, sample_research_response
     ):
         """Test prompt includes Market Analyst candidates and sources."""
         prompt = build_decision_prompt(
-            agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
             research_response=sample_research_response,
             balance=100000.0,
             position_count=3,
@@ -92,12 +91,10 @@ class TestBuildDecisionPrompt:
         assert any(source.title in prompt for source in sample_research_response.sources)
 
     def test_prompt_includes_force_trade_flag(
-        self, sample_agent_name, sample_agent_style, sample_research_response
+        self, sample_research_response
     ):
         """Test force_trade appears in prompt when True."""
         prompt_with_force = build_decision_prompt(
-            agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
             research_response=sample_research_response,
             balance=100000.0,
             position_count=5,
@@ -108,8 +105,6 @@ class TestBuildDecisionPrompt:
         )
 
         prompt_without_force = build_decision_prompt(
-            agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
             research_response=sample_research_response,
             balance=100000.0,
             position_count=5,
@@ -126,12 +121,10 @@ class TestBuildDecisionPrompt:
         assert "must" in prompt_with_force.lower() or "force" in prompt_with_force.lower()
 
     def test_prompt_includes_position_limit_warning(
-        self, sample_agent_name, sample_agent_style, sample_research_response
+        self, sample_research_response
     ):
         """Test prompt warns when at 10 position limit."""
         prompt_at_limit = build_decision_prompt(
-            agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
             research_response=sample_research_response,
             balance=100000.0,
             position_count=10,  # At limit
@@ -142,8 +135,6 @@ class TestBuildDecisionPrompt:
         )
 
         prompt_not_at_limit = build_decision_prompt(
-            agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
             research_response=sample_research_response,
             balance=100000.0,
             position_count=5,  # Not at limit
@@ -161,13 +152,11 @@ class TestBuildDecisionPrompt:
         assert "limit" in prompt_at_limit.lower() or "maximum" in prompt_at_limit.lower() or "cannot buy" in prompt_at_limit.lower()
 
     def test_prompt_includes_balance_and_holdings(
-        self, sample_agent_name, sample_agent_style, sample_research_response
+        self, sample_research_response
     ):
         """Test prompt includes current balance and holdings."""
         holdings_summary = "AAPL: 100 shares @ $150.00, MSFT: 50 shares @ $300.00"
         prompt = build_decision_prompt(
-            agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
             research_response=sample_research_response,
             balance=100000.0,
             position_count=2,

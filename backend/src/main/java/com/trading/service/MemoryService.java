@@ -66,9 +66,21 @@ public class MemoryService {
                 .filter(t -> t.getTimestamp().isAfter(since))
                 .collect(Collectors.toList());
 
-        // Return 404 if no trading history found
+        // Return empty response — "no history" is valid data, not an error
         if (transactions.isEmpty()) {
-            return null;  // Controller will convert to 404
+            TradingHistoryResponse response = new TradingHistoryResponse();
+            response.setSymbol(symbol);
+            response.setAgentName(agentName);
+            response.setDays(days);
+            response.setCurrentPosition(new TradingHistoryResponse.Position(0, 0.0));
+            response.setTrades(List.of());
+            TradingHistoryResponse.Summary emptySummary = new TradingHistoryResponse.Summary();
+            emptySummary.setTotalTrades(0);
+            emptySummary.setBuys(0);
+            emptySummary.setSells(0);
+            emptySummary.setPattern("none");
+            response.setSummary(emptySummary);
+            return response;
         }
 
         // Build response DTO
@@ -97,9 +109,15 @@ public class MemoryService {
                 .limit(20)  // Limit to last 20 runs
                 .collect(Collectors.toList());
 
-        // Return 404 if no recent activity found
+        // Return empty response — "no activity" is valid data, not an error
         if (recentRuns.isEmpty()) {
-            return null;  // Controller will convert to 404
+            RecentActivityResponse response = new RecentActivityResponse();
+            response.setAgentName(agentName);
+            response.setDays(days);
+            response.setRuns(List.of());
+            response.setTotalRuns(0);
+            response.setTotalTrades(0);
+            return response;
         }
 
         // Build response DTO

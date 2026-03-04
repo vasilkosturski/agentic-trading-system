@@ -93,9 +93,7 @@ def sample_decision():
         symbol="AAPL",
         quantity=100,
         rationale="Strong growth",
-        fullReasoning="Detailed analysis",
-        researchSources="[]",
-        historicalContext="[]",
+        reasoning="Detailed analysis of AAPL fundamentals and portfolio fit.",
     )
 
 @pytest.fixture
@@ -183,13 +181,19 @@ class TestAgentExecutorFetchData:
         sample_holdings,
     ):
         """Test _fetch_account_data returns AccountData."""
-        mock_get_report.return_value = {
-            "balance": sample_balance,
-            "holdings": [
-                {"symbol": h.symbol, "quantity": h.quantity, "averagePrice": h.averagePrice}
-                for h in sample_holdings
-            ],
-        }
+        from models.api_responses import AccountReport
+        mock_get_report.return_value = AccountReport(
+            agentName=sample_agent_name,
+            balance=sample_balance,
+            holdingsValue=0.0,
+            totalPortfolioValue=sample_balance,
+            initialBalance=100000.0,
+            totalProfitLoss=0.0,
+            profitLossPercent=0.0,
+            holdingsCount=len(sample_holdings),
+            transactionCount=0,
+            holdings=sample_holdings,
+        )
 
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_agent_style)
 
@@ -427,9 +431,7 @@ class TestAgentExecutorExecuteTrade:
             symbol="",
             quantity=0,
             rationale="No good opportunities",
-            fullReasoning="Detailed analysis",
-            researchSources="[]",
-            historicalContext="[]",
+            reasoning="Detailed analysis shows no compelling opportunities at this time.",
         )
 
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_agent_style)
@@ -594,11 +596,20 @@ class TestAgentExecutorFullCycle:
     ):
         """Test full cycle with successful BUY decision."""
         # Setup mocks
+        from models.api_responses import AccountReport
         mock_initialize.return_value = None
-        mock_get_report.return_value = {
-            "balance": 100000.0,
-            "holdings": [],
-        }
+        mock_get_report.return_value = AccountReport(
+            agentName=sample_agent_name,
+            balance=100000.0,
+            holdingsValue=0.0,
+            totalPortfolioValue=100000.0,
+            initialBalance=100000.0,
+            totalProfitLoss=0.0,
+            profitLossPercent=0.0,
+            holdingsCount=0,
+            transactionCount=0,
+            holdings=[],
+        )
         # Mock get_backend_client for _fetch_recent_activity
         mock_client = AsyncMock()
         mock_client.get_recent_activity.return_value = sample_recent_activity

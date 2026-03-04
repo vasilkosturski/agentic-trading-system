@@ -7,7 +7,7 @@ These use Pydantic BaseModel because they validate data from external APIs
 from datetime import datetime
 from datetime import date as DateType
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -72,6 +72,26 @@ class Holding(BaseModel):
     symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
     quantity: int = Field(gt=0, description="Number of shares held")
     averagePrice: float = Field(gt=0, description="Average purchase price per share")
+
+
+class AccountReport(BaseModel):
+    """Full account report from /api/accounts/resources/accounts/{agentId}.
+
+    Single endpoint returning balance, holdings, and portfolio metrics.
+    Matches Java AccountReportDto.
+    """
+
+    agentName: str = Field(description="Agent name")
+    balance: float = Field(ge=0, description="Cash balance in USD")
+    holdingsValue: float = Field(ge=0, description="Total value of stock holdings")
+    totalPortfolioValue: float = Field(ge=0, description="Cash + holdings value")
+    initialBalance: float = Field(gt=0, description="Starting balance")
+    totalProfitLoss: float = Field(description="Total P&L in USD")
+    profitLossPercent: float = Field(description="P&L as percentage")
+    lastUpdated: Optional[str] = Field(default=None, description="Last activity timestamp")
+    holdingsCount: int = Field(ge=0, description="Number of stock positions")
+    transactionCount: int = Field(ge=0, description="Total number of trades")
+    holdings: List[Holding] = Field(default_factory=list, description="Detailed holdings list")
 
 
 # =============================================================================

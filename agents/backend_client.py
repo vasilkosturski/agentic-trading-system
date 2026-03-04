@@ -37,7 +37,7 @@ from config import (
     BACKEND_API_TRADING_RUNS,
 )
 from models import TradeResult
-from models.api_responses import RecentActivityResponse, SymbolHistoryResponse
+from models.api_responses import AccountReport, RecentActivityResponse, SymbolHistoryResponse
 from models.run_tracking import CompleteRunData
 from exceptions import BackendAPIError
 
@@ -262,7 +262,7 @@ class BackendClient:
                 return agent_id
         raise BackendAPIError(f"Agent {name} not found in registry after 400 response")
     
-    async def get_account_report(self, agent_id: int) -> dict:
+    async def get_account_report(self, agent_id: int) -> AccountReport:
         """Get full account report with balance, holdings, and portfolio metrics.
 
         Uses the enriched AccountReportDto endpoint which returns everything
@@ -272,12 +272,11 @@ class BackendClient:
             agent_id: Backend identifier for the agent
 
         Returns:
-            Dictionary with keys: agentName, balance, holdings, holdingsValue,
-            totalPortfolioValue, initialBalance, totalProfitLoss, etc.
+            AccountReport with balance, holdings, portfolio metrics, P&L.
         """
         url = f"{BACKEND_BASE_URL}/api/accounts/resources/accounts/{agent_id}"
         response = await self._request("GET", url)
-        return response.json()
+        return AccountReport.model_validate(response.json())
 
     async def buy_shares(
         self,
