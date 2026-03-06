@@ -150,7 +150,9 @@ def sample_decision() -> TradingDecision:
         symbol="NVDA",
         quantity=50,
         rationale="Strong AI growth potential",
-        reasoning="NVDA shows strong fundamentals with AI datacenter growth. P/E ratio is reasonable at 40x forward earnings. No prior NVDA trades in portfolio. Research highlights NVDA as top AI infrastructure play.",
+        portfolioContext="Currently hold 2/10 positions (AAPL, MSFT) with $100K available cash. Adding NVDA diversifies into AI infrastructure.",
+        historicalContext="No prior NVDA trades in portfolio. First entry into semiconductor sector.",
+        researchContext="Research highlights NVDA as top AI infrastructure play. P/E ratio is reasonable at 40x forward earnings with strong datacenter growth.",
     )
 
 

@@ -24,6 +24,7 @@
 {research_step_bullets}
 
 3. **Identify specific candidates:**
+   - **IMPORTANT**: Only recommend US-listed stocks on major exchanges (S&P 500, NASDAQ, NYSE). Do NOT recommend ADRs, OTC stocks, or foreign-listed securities — our price data only covers major US exchanges.
 {identify_candidates_bullets}
 
 4. **Gather supporting evidence:**

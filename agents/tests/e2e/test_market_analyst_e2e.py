@@ -169,9 +169,9 @@ class TestMarketAnalystE2E:
             # Portfolio context (holdings, activity) is now passed inline in
             # the prompt — no DB tool assertions needed.
 
-            # ALL tool errors are fatal — price lookup is mandatory for research
-            # (can't evaluate budget fit without knowing stock prices).
-            # If Polygon API is down, the test should fail.
+            # ALL tool errors are fatal — price lookups must succeed for all candidates.
+            # The prompt instructs the agent to pick US-listed stocks on major exchanges
+            # (S&P 500, NASDAQ, NYSE) which Polygon free tier covers.
             if result.tool_errors:
                 for err in result.tool_errors:
                     logger.error(f"TOOL ERROR: {err.name}: {err.output[:200]}")

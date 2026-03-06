@@ -606,19 +606,15 @@ class AgentExecutor:
         symbol = decision.symbol if decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
         quantity = decision.quantity if decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
 
-        # Build reasoning DTO from decision's single reasoning field.
-        # Map decision.reasoning -> finalRationale for Java ReasoningDto compatibility.
-        # Other ReasoningDto fields are empty strings (UI shows finalRationale as main reasoning).
+        # Build reasoning DTO with direct 1:1 field mapping from TradingDecision.
         reasoning = ReasoningDto(
-            portfolioContext=None,
-            historicalContext=None,
-            researchSummary=None,
-            candidateEvaluation=None,
-            finalRationale=decision.reasoning[:2000] if decision.reasoning else None,
+            portfolioContext=decision.portfolioContext[:2000] if decision.portfolioContext else None,
+            historicalContext=decision.historicalContext[:2000] if decision.historicalContext else None,
+            researchContext=decision.researchContext[:2000] if decision.researchContext else None,
         )
 
         logger.info(
-            f"📝 Reasoning: mapped decision.reasoning ({len(decision.reasoning)} chars) -> finalRationale"
+            f"📝 Reasoning: mapped 3 fields (portfolioContext, historicalContext, researchContext)"
         )
 
         # Build nested phase DTOs

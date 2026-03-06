@@ -73,13 +73,9 @@ class TradingDecision(BaseModel):
     )
     quantity: int = Field(default=0, ge=0, description="Number of shares (0 for HOLD)")
     rationale: str = Field(description="Brief 1-2 sentence reason for decision")
-    reasoning: str = Field(
-        default="",
-        description=(
-            "Comprehensive reasoning covering: portfolio context, historical analysis, "
-            "research findings, candidate comparison, and final decision rationale"
-        ),
-    )
+    portfolioContext: str = Field(default="", description="Current portfolio state and how this trade fits")
+    historicalContext: str = Field(default="", description="What trading history shows for this stock/sector")
+    researchContext: str = Field(default="", description="Key findings from Market Analyst's research that drove this decision")
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -96,7 +92,7 @@ class TradingDecision(BaseModel):
                 )
 
             # Check reasoning consistency
-            reasoning_text = (self.rationale + " " + self.reasoning).lower()
+            reasoning_text = (self.rationale + " " + self.researchContext).lower()
 
             if self.action == TradeAction.BUY and ("sell" in reasoning_text or "selling" in reasoning_text):
                 raise ValueError(

@@ -93,7 +93,9 @@ def sample_decision():
         symbol="AAPL",
         quantity=100,
         rationale="Strong growth",
-        reasoning="Detailed analysis of AAPL fundamentals and portfolio fit.",
+        portfolioContext="Portfolio has room for more positions with available cash.",
+        historicalContext="Previous AAPL trades have been profitable.",
+        researchContext="Detailed analysis of AAPL fundamentals shows strong growth potential.",
     )
 
 @pytest.fixture
@@ -431,7 +433,9 @@ class TestAgentExecutorExecuteTrade:
             symbol="",
             quantity=0,
             rationale="No good opportunities",
-            reasoning="Detailed analysis shows no compelling opportunities at this time.",
+            portfolioContext="Portfolio is well-positioned, no need to add exposure.",
+            historicalContext="Recent trades have been mixed, caution warranted.",
+            researchContext="Analysis shows no compelling opportunities at this time.",
         )
 
         executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_agent_style)

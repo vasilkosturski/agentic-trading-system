@@ -50,13 +50,9 @@ Evaluate the Market Analyst's research and make ONE trading decision: BUY, SELL,
 
 3. **Structured Reasoning Required — populate ALL these fields:**
    - `rationale`: Brief 1-2 sentence reason for your decision
-   - `reasoning`: Comprehensive reasoning covering ALL of the following in one field:
-     * Your current portfolio state and how this trade fits
-     * What your trading history shows for this stock/sector
-     * Key findings from the Market Analyst's research
-     * Why this stock vs the other candidates — {candidate_evaluation_hint}
-     * How the Market Analyst's specific findings drove your decision
-     * Your complete reasoning synthesizing everything above
+   - `portfolioContext`: Your current portfolio state — cash, positions, how this trade fits
+   - `historicalContext`: What your trading history shows for this stock/sector
+   - `researchContext`: Key findings from the Market Analyst's research and how they drove your decision — {candidate_evaluation_hint}
 
 4. **Tool Usage:**
    - Use tools autonomously (don't ask permission)

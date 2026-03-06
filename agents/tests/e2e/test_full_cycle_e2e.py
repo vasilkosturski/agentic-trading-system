@@ -115,8 +115,9 @@ class TestFullCycleE2E:
         assert result.decision.symbol.isupper(), f"Symbol should be uppercase: {result.decision.symbol}"
         assert 1 <= len(result.decision.symbol) <= 5, f"Symbol length should be 1-5: {result.decision.symbol}"
 
-        # Comprehensive reasoning field should be populated for trade decisions
-        assert len(result.decision.reasoning) > 0, "reasoning should be populated for BUY/SELL"
+        # Structured reasoning fields should be populated for trade decisions
+        assert len(result.decision.portfolioContext) > 0, "portfolioContext should be populated for BUY/SELL"
+        assert len(result.decision.researchContext) > 0, "researchContext should be populated for BUY/SELL"
 
         # Trade should have been attempted (count is 0 or 1 depending on execution success)
         assert result.trade_count in [0, 1]
@@ -165,16 +166,15 @@ class TestFullCycleE2E:
         assert decision["symbol"] == result.decision.symbol
         assert decision["quantity"] == result.decision.quantity
 
-        # Structured reasoning (5 fields)
+        # Structured reasoning (3 fields)
         reasoning = decision.get("reasoning")
         if reasoning is not None:
             reasoning_fields = [
-                "portfolioContext", "historicalContext", "researchSummary",
-                "candidateEvaluation", "finalRationale",
+                "portfolioContext", "historicalContext", "researchContext",
             ]
             for field in reasoning_fields:
                 assert field in reasoning, f"Reasoning missing field: {field}"
-            logger.info(f"  Decision reasoning: OK (all 5 fields present)")
+            logger.info(f"  Decision reasoning: OK (all 3 fields present)")
 
         logger.info(f"  Decision: OK (action={decision['decision']}, symbol={decision['symbol']})")
 

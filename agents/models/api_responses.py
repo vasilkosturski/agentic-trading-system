@@ -167,7 +167,7 @@ class SymbolPosition(BaseModel):
 class SymbolTrade(BaseModel):
     """A trade for a specific symbol."""
 
-    date: DateType = Field(description="Date of the trade")
+    date: str = Field(description="Date/time of the trade")
     type: TradeType = Field(description="Trade type: BUY or SELL")
     quantity: int = Field(gt=0, description="Number of shares")
     price: float = Field(gt=0, description="Price per share")
