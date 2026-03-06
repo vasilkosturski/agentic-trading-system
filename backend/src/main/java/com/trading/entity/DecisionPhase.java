@@ -58,8 +58,8 @@ public class DecisionPhase {
     private Integer quantity;
 
     /**
-     * Structured reasoning - 5 fields per design doc.
-     * JSONB: {portfolio_context, historical_context, research_summary, candidate_evaluation, final_rationale}
+     * Structured reasoning - 3 fields.
+     * JSONB: {portfolio_context, historical_context, research_summary}
      */
     @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")

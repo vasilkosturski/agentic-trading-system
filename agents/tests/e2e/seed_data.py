@@ -107,11 +107,20 @@ TEST_AGENT_RUNS = [
         full_reasoning="Microsoft Azure growth continues to drive revenue.",
         research_sources='[{"type":"web","title":"Microsoft Azure Revenue Growth","url":"https://www.microsoft.com/investor"}]',
     ),
+    SeedAgentRun(
+        run_type="TRADING",
+        days_ago=20,
+        outcome="COMPLETED",
+        summary="Bought CMCSA based on undervaluation and strong cash flow",
+        full_reasoning="Comcast trades at P/E of 5.81, well below intrinsic value with robust cash flow generation.",
+        research_sources='[{"type":"web","title":"Comcast Q4 2025 Earnings","url":"https://www.cmcsa.com/investor"}]',
+    ),
 ]
 
 TEST_TRANSACTIONS = [
     SeedTransaction(symbol="AAPL", quantity=50, price=180.0, transaction_type="BUY", run_index=0),
     SeedTransaction(symbol="MSFT", quantity=30, price=400.0, transaction_type="BUY", run_index=1),
+    SeedTransaction(symbol="CMCSA", quantity=200, price=30.0, transaction_type="BUY", run_index=2),
 ]
 
 SEED_DATA = SeedData(

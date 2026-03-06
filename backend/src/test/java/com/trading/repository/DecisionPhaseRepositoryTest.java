@@ -90,9 +90,7 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         ReasoningDto reasoning = new ReasoningDto();
         reasoning.setPortfolioContext("Current cash: $50,000. Holdings: 5 positions.");
         reasoning.setHistoricalContext("No previous trades in BAC. Last financials trade was GS.");
-        reasoning.setResearchSummary("Market Analyst identified BAC as top candidate based on earnings.");
-        reasoning.setCandidateEvaluation("BAC: Strong buy signal. JPM: Hold. WFC: Weak.");
-        reasoning.setFinalRationale("BAC has the best risk/reward ratio given current portfolio exposure.");
+        reasoning.setResearchContext("Market Analyst identified BAC as top candidate based on earnings.");
         
         phase.setReasoning(reasoning);
         
@@ -105,9 +103,7 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         assertThat(loadedReasoning).isNotNull();
         assertThat(loadedReasoning.getPortfolioContext()).isEqualTo("Current cash: $50,000. Holdings: 5 positions.");
         assertThat(loadedReasoning.getHistoricalContext()).isEqualTo("No previous trades in BAC. Last financials trade was GS.");
-        assertThat(loadedReasoning.getResearchSummary()).isEqualTo("Market Analyst identified BAC as top candidate based on earnings.");
-        assertThat(loadedReasoning.getCandidateEvaluation()).isEqualTo("BAC: Strong buy signal. JPM: Hold. WFC: Weak.");
-        assertThat(loadedReasoning.getFinalRationale()).isEqualTo("BAC has the best risk/reward ratio given current portfolio exposure.");
+        assertThat(loadedReasoning.getResearchContext()).isEqualTo("Market Analyst identified BAC as top candidate based on earnings.");
     }
 
     @Test
@@ -180,7 +176,6 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         // symbol and quantity should be null for HOLD
         
         ReasoningDto reasoning = new ReasoningDto();
-        reasoning.setFinalRationale("Market conditions unfavorable. Holding cash.");
         phase.setReasoning(reasoning);
         
         // Act

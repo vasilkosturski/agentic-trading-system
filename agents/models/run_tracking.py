@@ -84,13 +84,11 @@ class ReasoningDto(BaseModel):
     """Structured reasoning for decision phase.
 
     Matches backend ReasoningDto.java.
-    5-field structured reasoning as per system design.
+    3-field structured reasoning: portfolio context, historical context, research summary.
     """
     portfolioContext: Optional[str] = None
     historicalContext: Optional[str] = None
-    researchSummary: Optional[str] = None
-    candidateEvaluation: Optional[str] = None
-    finalRationale: Optional[str] = None
+    researchContext: Optional[str] = None
 
 
 class ResearchPhaseData(BaseModel):

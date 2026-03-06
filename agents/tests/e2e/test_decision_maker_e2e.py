@@ -207,8 +207,10 @@ class TestDecisionMakerE2E:
             assert decision.symbol.isupper(), f"Symbol should be uppercase: {decision.symbol}"
             assert 1 <= len(decision.symbol) <= 5, f"Symbol length should be 1-5: {decision.symbol}"
 
-            # Comprehensive reasoning field must be populated
-            assert len(decision.reasoning) > 50, "reasoning should be comprehensive"
+            # Structured reasoning fields must be populated
+            assert len(decision.portfolioContext) > 20, "portfolioContext should explain portfolio state"
+            assert len(decision.historicalContext) > 10, "historicalContext should reference trading history"
+            assert len(decision.researchContext) > 20, "researchContext should reference research"
 
             # Rationale quality -- must be meaningful, not a stub
             assert isinstance(decision.rationale, str)

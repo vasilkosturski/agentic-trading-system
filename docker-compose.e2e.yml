@@ -24,6 +24,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    env_file:
+      - .env
     environment:
       SPRING_PROFILES_ACTIVE: postgresql
       DB_HOST: postgres
@@ -31,8 +33,6 @@ services:
       DB_NAME: agentic_trading
       DB_USERNAME: trading_user
       DB_PASSWORD: trading_password
-      POLYGON_API_KEY: ${POLYGON_API_KEY:-}
-      POLYGON_PLAN: ${POLYGON_PLAN:-free}
     ports:
       - "8080"  # Random host port — discovered via docker_services.port_for()
     depends_on:
