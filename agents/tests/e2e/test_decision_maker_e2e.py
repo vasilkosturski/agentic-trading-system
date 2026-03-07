@@ -17,7 +17,7 @@ from agents import Runner
 from agents.mcp import MCPServerStdio
 
 from decision_maker import DecisionMaker, DecisionContext
-from models.llm_output import TradeAction, TradingDecision, ResearchResponse, ResearchSource
+from models.llm_output import TradeAction, TradingDecision, ResearchResponse, WebSource
 from mcp_types import MCPPool
 from mcp_params import get_mcp_server_params
 from utils.sdk_parser import extract_tool_calls
@@ -132,9 +132,9 @@ class TestDecisionMakerE2E:
                 "WesBanco (WSBC) priced at $36.01 vs estimated cash flow value of $68.84."
             ),
             candidates=["AAPL", "CMCSA", "ALL", "WSBC"],
-            sources=[
-                ResearchSource(title="Top 10 Most Undervalued Stocks in the S&P 500", url="https://www.nerdwallet.com/investing/learn/undervalued-stocks"),
-                ResearchSource(title="February 2026's Value Picks: Stocks Priced Below Estimated Worth", url="https://finance.yahoo.com/news/february-2026s-value-picks-stocks-113805029.html"),
+            webSources=[
+                WebSource(title="Top 10 Most Undervalued Stocks in the S&P 500", url="https://www.nerdwallet.com/investing/learn/undervalued-stocks"),
+                WebSource(title="February 2026's Value Picks: Stocks Priced Below Estimated Worth", url="https://finance.yahoo.com/news/february-2026s-value-picks-stocks-113805029.html"),
             ],
             portfolio_context="Current portfolio holds AAPL and MSFT. AAPL already held — could add to position. Other candidates diversify into financials to reduce tech concentration.",
         )

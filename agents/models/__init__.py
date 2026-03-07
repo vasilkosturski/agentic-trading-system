@@ -6,11 +6,12 @@ Follows Pydantic best practices:
 - type hints for simple primitives
 """
 
-from .llm_output import TradeAction, TradingDecision, ResearchSource, ResearchResponse
+from .llm_output import TradeAction, TradingDecision, WebSource, ResearchResponse
 from .api_responses import (
     PriceMetadata,
     HistoricalPrice,
     MarketIndicators,
+    MarketData,
     Holding,
     AccountReport,
     # Memory API responses
@@ -55,12 +56,13 @@ __all__ = [
     # LLM Output Models
     "TradeAction",
     "TradingDecision",
-    "ResearchSource",
+    "WebSource",
     "ResearchResponse",
     # API Response Models - Market Data
     "PriceMetadata",
     "HistoricalPrice",
     "MarketIndicators",
+    "MarketData",
     "Holding",
     "AccountReport",
     # API Response Models - Memory API

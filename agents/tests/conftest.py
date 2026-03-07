@@ -159,14 +159,14 @@ def sample_decision() -> TradingDecision:
 @pytest.fixture
 def sample_research_response():
     """Sample research response from Market Analyst for testing (two-agent architecture)."""
-    from models.llm_output import ResearchResponse, ResearchSource
+    from models.llm_output import ResearchResponse, WebSource
     return ResearchResponse(
         summary="Found 3 value stocks: JPM, BAC, WFC. All show strong fundamentals with P/E ratios under 15 and solid dividend yields.",
         candidates=["JPM", "BAC", "WFC"],
-        sources=[
-            ResearchSource(title="JPMorgan Q4 Earnings Beat Expectations", url="https://example.com/jpm-earnings"),
-            ResearchSource(title="Bank Sector Analysis 2025", url="https://example.com/bank-analysis"),
-            ResearchSource(title="Wells Fargo Recovery Story", url="https://example.com/wfc-recovery"),
+        webSources=[
+            WebSource(title="JPMorgan Q4 Earnings Beat Expectations", url="https://example.com/jpm-earnings"),
+            WebSource(title="Bank Sector Analysis 2025", url="https://example.com/bank-analysis"),
+            WebSource(title="Wells Fargo Recovery Story", url="https://example.com/wfc-recovery"),
         ]
     )
 

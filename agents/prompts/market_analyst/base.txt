@@ -42,7 +42,7 @@
 You MUST return structured JSON matching ResearchResponse schema:
 - summary: 2-3 paragraph research overview {summary_hint}
 - candidates: List of 3-5 stock symbols (e.g., {example_symbols})
-- sources: List of ResearchSource objects with title and url
+- webSources: List of WebSource objects with title and url
 - Each source MUST have a real URL from your searches
 - portfolio_context: Explanation of how your portfolio influenced research
 

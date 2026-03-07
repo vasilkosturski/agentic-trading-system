@@ -15,7 +15,7 @@ from models.orchestration import (
     DecisionResult,
     ExecutionResult,
 )
-from models.llm_output import TradingDecision, ResearchResponse, ResearchSource
+from models.llm_output import TradingDecision, ResearchResponse, WebSource
 from models.run_tracking import PhaseStatus, RunPhase, TradeDecision
 
 
@@ -80,9 +80,9 @@ def sample_research_response():
     return ResearchResponse(
         candidates=["AAPL", "NVDA"],
         summary="Found 2 candidates",
-        sources=[
-            ResearchSource(title="Article 1", url="https://example.com/1"),
-            ResearchSource(title="Article 2", url="https://example.com/2"),
+        webSources=[
+            WebSource(title="Article 1", url="https://example.com/1"),
+            WebSource(title="Article 2", url="https://example.com/2"),
         ],
     )
 

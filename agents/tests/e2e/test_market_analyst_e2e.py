@@ -188,7 +188,7 @@ class TestMarketAnalystE2E:
             logger.info("-" * 40)
             logger.info(f"Summary: {response.summary[:200]}...")
             logger.info(f"Candidates: {response.candidates}")
-            logger.info(f"Sources: {len(response.sources)}")
+            logger.info(f"Sources: {len(response.webSources)}")
             logger.info("-" * 40)
 
             # Structural assertions — these are deterministic guarantees from the
@@ -208,8 +208,8 @@ class TestMarketAnalystE2E:
                 assert len(candidate) >= 1, "Candidate symbol must not be empty"
 
             # Research should cite at least one source
-            assert len(response.sources) >= 1, "Research should cite at least one source"
-            for source in response.sources:
+            assert len(response.webSources) >= 1, "Research should cite at least one source"
+            for source in response.webSources:
                 assert source.title, "Source must have a title"
                 assert source.url, "Source must have a URL"
 

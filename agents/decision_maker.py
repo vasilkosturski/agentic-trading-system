@@ -303,7 +303,7 @@ def build_decision_prompt(
 
     # Format research sources
     sources_text = "\n".join(
-        [f"- {source.title}: {source.url}" for source in research_response.sources]
+        [f"- {source.title}: {source.url}" for source in research_response.webSources]
     )
 
     prompt = f"""Time to make your trading decision.

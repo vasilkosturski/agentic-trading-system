@@ -189,7 +189,7 @@ class AgentExecutor:
             # Build decision sources - track what data informed the decision
             ctx.decision_sources = [
                 # Research sources passed to decision maker
-                *[SourceDto.web(title=s.title, url=s.url) for s in ctx.research_response.sources],
+                *[SourceDto.web(title=s.title, url=s.url) for s in ctx.research_response.webSources],
                 # Internal data accessed
                 SourceDto.system_context(f"Portfolio: ${ctx.balance:,.2f}, {len(ctx.holdings)} positions"),
                 SourceDto.system_context(f"Recent activity: {len(ctx.recent_activity.runs) if ctx.recent_activity else 0} runs"),
@@ -367,7 +367,7 @@ class AgentExecutor:
         # Build sources list
         sources = [
             SourceDto.web(title=source.title, url=source.url)
-            for source in research_response.sources
+            for source in research_response.webSources
         ]
         # Add system context source for portfolio
         sources.append(SourceDto.system_context(f"Portfolio context: {json.dumps(portfolio_data)}"))
