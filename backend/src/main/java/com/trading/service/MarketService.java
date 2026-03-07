@@ -419,4 +419,54 @@ public class MarketService {
         public Instant getTimestamp() { return timestamp; }
         public String getWarning() { return warning; }
     }
+
+    /**
+     * Combined market data response: price + metadata + historical prices + indicators.
+     * Single DTO for the consolidated GET /api/market/{symbol} endpoint.
+     */
+    public static class MarketDataResponse {
+        private final Double price;
+        private final DataTier dataTier;
+        private final Instant timestamp;
+        private final String dataSource;
+        private final int dataAgeMinutes;
+        private final List<HistoricalPrice> historicalPrices;
+        private final MarketIndicators indicators;
+
+        public MarketDataResponse(PriceData priceData,
+                                  List<HistoricalPrice> historicalPrices,
+                                  MarketIndicators indicators) {
+            this.price = priceData.getPrice();
+            this.dataTier = priceData.getDataTier();
+            this.timestamp = priceData.getTimestamp();
+            this.dataSource = priceData.getDataSource();
+            this.dataAgeMinutes = priceData.getDataAgeMinutes();
+            this.historicalPrices = historicalPrices;
+            this.indicators = indicators;
+        }
+
+        public Double getPrice() { return price; }
+        public DataTier getDataTier() { return dataTier; }
+        public Instant getTimestamp() { return timestamp; }
+        public String getDataSource() { return dataSource; }
+        public int getDataAgeMinutes() { return dataAgeMinutes; }
+        public List<HistoricalPrice> getHistoricalPrices() { return historicalPrices; }
+        public MarketIndicators getIndicators() { return indicators; }
+    }
+
+    /**
+     * Get combined market data for a symbol: price + historical prices + indicators.
+     * Single method backing the consolidated endpoint.
+     */
+    public MarketDataResponse getMarketData(String symbol, int days) {
+        PriceData priceData = getSharePrice(symbol);
+        HistoricalPriceData historicalData = getHistoricalPrices(symbol, days);
+        MarketIndicatorsData indicatorsData = getMarketIndicators(symbol);
+
+        return new MarketDataResponse(
+            priceData,
+            historicalData.getPrices(),
+            indicatorsData.getIndicators()
+        );
+    }
 }

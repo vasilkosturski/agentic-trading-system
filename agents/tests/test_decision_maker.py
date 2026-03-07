@@ -86,9 +86,9 @@ class TestBuildDecisionPrompt:
 
         # Verify research results included
         assert sample_research_response.summary in prompt
-        assert len(sample_research_response.sources) > 0
+        assert len(sample_research_response.webSources) > 0
         # At least one source should be mentioned
-        assert any(source.title in prompt for source in sample_research_response.sources)
+        assert any(source.title in prompt for source in sample_research_response.webSources)
 
     def test_prompt_includes_force_trade_flag(
         self, sample_research_response

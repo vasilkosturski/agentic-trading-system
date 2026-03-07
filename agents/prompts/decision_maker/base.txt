@@ -52,7 +52,7 @@ Evaluate the Market Analyst's research and make ONE trading decision: BUY, SELL,
    - `rationale`: Brief 1-2 sentence reason for your decision
    - `portfolioContext`: Your current portfolio state — cash, positions, how this trade fits
    - `historicalContext`: What your trading history shows for this stock/sector
-   - `researchContext`: Key findings from the Market Analyst's research and how they drove your decision — {candidate_evaluation_hint}
+   - `researchContext`: MUST explicitly name the Market Analyst's candidates, cite specific data (P/E ratios, valuations), and explain why you chose this candidate over the others — {candidate_evaluation_hint}
 
 4. **Tool Usage:**
    - Use tools autonomously (don't ask permission)

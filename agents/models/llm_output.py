@@ -20,7 +20,7 @@ class TradeAction(str, Enum):
     HOLD = "HOLD"
 
 
-class ResearchSource(BaseModel):
+class WebSource(BaseModel):
     """A web source cited in research (from Researcher tool)."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -50,7 +50,7 @@ class ResearchResponse(BaseModel):
         default_factory=list,
         description="List of 3-5 stock symbols identified as potential candidates"
     )
-    sources: list[ResearchSource] = Field(
+    webSources: list[WebSource] = Field(
         default_factory=list, description="List of cited web sources"
     )
     portfolio_context: str = Field(

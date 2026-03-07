@@ -42,7 +42,7 @@ class PriceMetadata(BaseModel):
     """Stock price with data quality metadata (from backend API)."""
 
     price: float = Field(gt=0, description="Current stock price in USD")
-    dataTier: DataTier = Field(description="Data quality tier: REAL, MOCK, or CACHED")
+    dataTier: str = Field(description="Data quality tier from backend (e.g. END_OF_DAY, CACHED, MOCK)")
     timestamp: datetime = Field(description="Timestamp of price data")
     dataSource: str = Field(description="Data source name")
     dataAgeMinutes: int = Field(ge=0, description="Age of data in minutes")
@@ -61,6 +61,24 @@ class MarketIndicators(BaseModel):
     sma5: float = Field(description="5-day simple moving average")
     sma20: float = Field(description="20-day simple moving average")
     volatility: float = Field(ge=0, description="Price volatility measure")
+
+
+class MarketData(BaseModel):
+    """Combined market data from consolidated GET /api/market/{symbol} endpoint.
+
+    Contains price with metadata, historical prices, and technical indicators
+    in a single response to minimize HTTP calls.
+    """
+
+    price: float = Field(gt=0, description="Current stock price in USD")
+    dataTier: str = Field(description="Data quality tier from backend")
+    timestamp: datetime = Field(description="Timestamp of price data")
+    dataSource: str = Field(description="Data source description")
+    dataAgeMinutes: int = Field(ge=0, description="Age of data in minutes")
+    historicalPrices: List[HistoricalPrice] = Field(
+        default_factory=list, description="Historical daily prices"
+    )
+    indicators: MarketIndicators = Field(description="Technical indicators")
 
 
 class Holding(BaseModel):
