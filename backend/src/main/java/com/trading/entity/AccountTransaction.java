@@ -33,10 +33,6 @@ public class AccountTransaction {
     @Column(nullable = false)
     private Instant timestamp;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "agent_run_id", nullable = false)
-    private AgentRun agentRun; // Link to the agent run that created this transaction (REQUIRED)
-
     @Enumerated(EnumType.STRING)
     @Column(name = "transaction_type", nullable = false)
     private TransactionType transactionType; // BUY, SELL - MUST be set explicitly!

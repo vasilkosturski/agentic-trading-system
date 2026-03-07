@@ -88,25 +88,6 @@ services:
     # Run the production autonomous trading system
     command: python trading_system.py
 
-  # React Frontend
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: agentic-trading-frontend
-    restart: unless-stopped
-    environment:
-      VITE_API_BASE_URL: http://localhost:8080/api
-    ports:
-      - "5173:5173"  # Fixed: Use correct Vite port
-    volumes:
-      # Mount source code for development hot-reload
-      - ./frontend:/app
-      - /app/node_modules
-    networks:
-      - trading-network
-    depends_on:
-      - backend
 
 volumes:
   postgres_data:

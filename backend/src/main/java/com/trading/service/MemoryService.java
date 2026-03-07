@@ -4,12 +4,16 @@ import com.trading.dto.response.HoldingDto;
 import com.trading.dto.response.RecentActivityResponse;
 import com.trading.dto.response.TradingHistoryResponse;
 import com.trading.entity.AccountTransaction;
-import com.trading.entity.AgentRun;
-import com.trading.entity.TransactionType;
+import com.trading.entity.DecisionPhase;
+import com.trading.entity.ExecutionPhase;
 import com.trading.entity.TradingAccount;
+import com.trading.entity.TradingAgent;
+import com.trading.entity.TradingRun;
+import com.trading.entity.TransactionType;
 import com.trading.repository.AccountTransactionRepository;
-import com.trading.repository.AgentRunRepository;
 import com.trading.repository.TradingAccountRepository;
+import com.trading.repository.TradingAgentRepository;
+import com.trading.repository.TradingRunRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -30,7 +34,10 @@ public class MemoryService {
     private AccountTransactionRepository transactionRepository;
 
     @Autowired
-    private AgentRunRepository runRepository;
+    private TradingRunRepository tradingRunRepository;
+
+    @Autowired
+    private TradingAgentRepository tradingAgentRepository;
 
     @Autowired
     private TradingAccountRepository accountRepository;
@@ -88,7 +95,8 @@ public class MemoryService {
     }
 
     /**
-     * Get recent trading activity across all stocks
+     * Get recent trading activity across all stocks.
+     * Uses TradingRun (new system) to provide run-level context to agents.
      */
     public RecentActivityResponse getRecentActivity(String agentName, int days) {
         // Validate inputs
@@ -99,13 +107,28 @@ public class MemoryService {
             throw new IllegalArgumentException("Days must be between 1 and 90");
         }
 
+        // Look up agent to get ID for TradingRun queries
+        TradingAgent agent = tradingAgentRepository.findByName(agentName)
+            .orElse(null);
+
+        // If agent not found in new system, return empty response
+        if (agent == null) {
+            RecentActivityResponse response = new RecentActivityResponse();
+            response.setAgentName(agentName);
+            response.setDays(days);
+            response.setRuns(List.of());
+            response.setTotalRuns(0);
+            response.setTotalTrades(0);
+            return response;
+        }
+
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
 
-        // Get all recent runs
-        List<AgentRun> recentRuns = runRepository
-                .findByAgentNameOrderByStartTimeDesc(agentName)
+        // Get recent runs from the new TradingRun system
+        List<TradingRun> recentRuns = tradingRunRepository
+                .findByAgentIdOrderByStartedAtDesc(agent.getId())
                 .stream()
-                .filter(r -> r.getStartTime().isAfter(since))
+                .filter(r -> r.getStartedAt().isAfter(since))
                 .limit(20)  // Limit to last 20 runs
                 .collect(Collectors.toList());
 
@@ -120,7 +143,7 @@ public class MemoryService {
             return response;
         }
 
-        // Build response DTO
+        // Build response DTO from TradingRun data
         return buildRecentActivityResponse(agentName, days, recentRuns);
     }
 
@@ -133,7 +156,7 @@ public class MemoryService {
             int days,
             List<AccountTransaction> transactions,
             TradingAccount account) {
-        
+
         TradingHistoryResponse response = new TradingHistoryResponse();
         response.setSymbol(symbol);
         response.setAgentName(agentName);
@@ -176,7 +199,7 @@ public class MemoryService {
             trade.setQuantity(Math.abs(t.getQuantity()));
             trade.setPrice(Math.round(t.getPrice() * 100.0) / 100.0);
             trade.setTotalAmount(Math.round(Math.abs(t.getTotalAmount()) * 100.0) / 100.0);
-            // Rationale is now stored in AgentRun, not AccountTransaction
+            // Rationale is now stored in DecisionPhase, not AccountTransaction
             // Access it via run detail endpoint if needed
             trades.add(trade);
         }
@@ -185,12 +208,12 @@ public class MemoryService {
         // Summary
         long buyCount = transactions.stream().filter(t -> TransactionType.BUY.equals(t.getTransactionType())).count();
         long sellCount = transactions.stream().filter(t -> TransactionType.SELL.equals(t.getTransactionType())).count();
-        
+
         TradingHistoryResponse.Summary summary = new TradingHistoryResponse.Summary();
         summary.setTotalTrades(transactions.size());
         summary.setBuys((int) buyCount);
         summary.setSells((int) sellCount);
-        
+
         if (buyCount > sellCount) {
             summary.setPattern("accumulating");
         } else if (sellCount > buyCount) {
@@ -206,57 +229,51 @@ public class MemoryService {
     }
 
     /**
-     * Build recent activity response DTO
+     * Build recent activity response DTO from TradingRun data.
+     * Maps TradingRun + DecisionPhase + ExecutionPhase to the RecentActivityResponse format.
      */
-    private RecentActivityResponse buildRecentActivityResponse(String agentName, int days, List<AgentRun> runs) {
+    private RecentActivityResponse buildRecentActivityResponse(String agentName, int days, List<TradingRun> runs) {
         RecentActivityResponse response = new RecentActivityResponse();
         response.setAgentName(agentName);
         response.setDays(days);
 
         List<RecentActivityResponse.Run> runsList = new ArrayList<>();
         int totalTrades = 0;
-        
-        for (AgentRun run : runs) {
+
+        for (TradingRun run : runs) {
             RecentActivityResponse.Run runDto = new RecentActivityResponse.Run();
-            runDto.setDate(run.getStartTime().toString());
-            runDto.setOutcome(run.getOutcome());
+            runDto.setDate(run.getStartedAt().toString());
+            runDto.setOutcome(run.getStatus().name());
 
-            // Set all reasoning fields so agent can learn from past decisions
-            if (run.getSummary() != null && !run.getSummary().isEmpty()) {
-                runDto.setSummary(run.getSummary());
-            }
-            if (run.getFullReasoning() != null && !run.getFullReasoning().isEmpty()) {
-                runDto.setFullReasoning(run.getFullReasoning());
-            }
-            if (run.getResearchSources() != null && !run.getResearchSources().isEmpty()) {
-                runDto.setResearchSources(run.getResearchSources());
-            }
-            if (run.getHistoricalContext() != null && !run.getHistoricalContext().isEmpty()) {
-                runDto.setHistoricalContext(run.getHistoricalContext());
-            }
-
-            // Get trades for this run
-            if (run.getTradeCount() != null && run.getTradeCount() > 0) {
-                List<AccountTransaction> runTrades = transactionRepository.findByAgentRunId(run.getId());
-                if (!runTrades.isEmpty()) {
-                    List<RecentActivityResponse.Trade> trades = new ArrayList<>();
-                    for (AccountTransaction t : runTrades) {
-                        RecentActivityResponse.Trade trade = new RecentActivityResponse.Trade();
-                        trade.setType(t.getTransactionType().name());  // Convert enum to string
-                        trade.setSymbol(t.getSymbol());
-                        trade.setQuantity(Math.abs(t.getQuantity()));
-                        trade.setPrice(Math.round(t.getPrice() * 100.0) / 100.0);
-                        // Rationale is now stored in AgentRun, not AccountTransaction
-                        trades.add(trade);
+            // Extract reasoning from DecisionPhase if available
+            DecisionPhase decision = run.getDecision();
+            if (decision != null) {
+                if (decision.getReasoning() != null) {
+                    String reasoningSummary = decision.getReasoning().getResearchContext();
+                    if (reasoningSummary != null && !reasoningSummary.isEmpty()) {
+                        runDto.setSummary(reasoningSummary);
                     }
-                    runDto.setTrades(trades);
-                    totalTrades += runTrades.size();
                 }
             }
-            
+
+            // Extract trade info from ExecutionPhase if available
+            ExecutionPhase execution = run.getExecution();
+            if (execution != null && execution.getTrade() != null) {
+                AccountTransaction trade = execution.getTrade();
+                List<RecentActivityResponse.Trade> trades = new ArrayList<>();
+                RecentActivityResponse.Trade tradeDto = new RecentActivityResponse.Trade();
+                tradeDto.setType(trade.getTransactionType().name());
+                tradeDto.setSymbol(trade.getSymbol());
+                tradeDto.setQuantity(Math.abs(trade.getQuantity()));
+                tradeDto.setPrice(Math.round(trade.getPrice() * 100.0) / 100.0);
+                trades.add(tradeDto);
+                runDto.setTrades(trades);
+                totalTrades += 1;
+            }
+
             runsList.add(runDto);
         }
-        
+
         response.setRuns(runsList);
         response.setTotalRuns(runs.size());
         response.setTotalTrades(totalTrades);
@@ -264,4 +281,3 @@ public class MemoryService {
         return response;
     }
 }
-

@@ -40,15 +40,11 @@ class BuyTradeExecutorTest {
     @Mock
     private MarketService marketService;
 
-    @Mock
-    private AgentRunRepository agentRunRepository;
-
     @InjectMocks
     private BuyTradeExecutor buyTradeExecutor;
 
     private TradingAccount testAccount;
     private TradingAgent testAgent;
-    private AgentRun testRun;
     private MarketService.PriceData testPriceData;
 
     @BeforeEach
@@ -60,11 +56,6 @@ class BuyTradeExecutorTest {
         // Create test account with $10,000 balance
         testAccount = new TradingAccount(testAgent, 10000.0);
         testAccount.setId(1L);
-
-        // Create test agent run
-        testRun = new AgentRun();
-        testRun.setId(1L);
-        testRun.setAgentName(testAgent.getName());
 
         // Create test price data
         testPriceData = new MarketService.PriceData(150.0, DataTier.END_OF_DAY, Instant.now(), "POLYGON");
@@ -91,8 +82,6 @@ class BuyTradeExecutorTest {
             .thenReturn(testPriceData);
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
-        when(agentRunRepository.findById(runId))
-            .thenReturn(Optional.of(testRun));
         when(transactionRepository.save(any(AccountTransaction.class)))
             .thenReturn(new AccountTransaction());
         when(holdingRepository.findByAccountAndSymbol(testAccount, symbol))
@@ -127,8 +116,7 @@ class BuyTradeExecutorTest {
             () -> assertEquals(TransactionType.BUY, savedTransaction.getTransactionType(), "Transaction type should be BUY"),
             () -> assertEquals(quantity, savedTransaction.getQuantity(), "Quantity should match"),
             () -> assertEquals(price, savedTransaction.getPrice(), "Price should match"),
-            () -> assertNotNull(savedTransaction.getTimestamp(), "Timestamp should be set"),
-            () -> assertEquals(testRun, savedTransaction.getAgentRun(), "AgentRun should be linked")
+            () -> assertNotNull(savedTransaction.getTimestamp(), "Timestamp should be set")
         );
 
         // Verify holding was created with correct business logic
@@ -169,8 +157,6 @@ class BuyTradeExecutorTest {
             .thenReturn(new MarketService.PriceData(buyPrice, DataTier.END_OF_DAY, Instant.now(), "POLYGON"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
-        when(agentRunRepository.findById(1L))
-            .thenReturn(Optional.of(testRun));
         when(transactionRepository.save(any(AccountTransaction.class)))
             .thenReturn(new AccountTransaction());
         when(holdingRepository.findByAccountAndSymbol(testAccount, symbol))
@@ -221,8 +207,6 @@ class BuyTradeExecutorTest {
             .thenReturn(new MarketService.PriceData(price, DataTier.END_OF_DAY, Instant.now(), "POLYGON"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
-        when(agentRunRepository.findById(1L))
-            .thenReturn(Optional.of(testRun));
         when(transactionRepository.save(any(AccountTransaction.class)))
             .thenReturn(new AccountTransaction());
         when(holdingRepository.findByAccountAndSymbol(testAccount, symbol))
@@ -281,8 +265,6 @@ class BuyTradeExecutorTest {
             .thenReturn(testPriceData);
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
-        when(agentRunRepository.findById(1L))
-            .thenReturn(Optional.of(testRun));
         when(transactionRepository.save(any(AccountTransaction.class)))
             .thenReturn(new AccountTransaction());
         when(holdingRepository.findByAccountAndSymbol(testAccount, symbol))
@@ -435,37 +417,6 @@ class BuyTradeExecutorTest {
         verify(transactionRepository, never()).save(any());
     }
 
-    @Test
-    @DisplayName("Should throw RuntimeException when agent run not found")
-    void testExecuteBuy_AgentRunNotFound_ThrowsException() {
-        // Arrange
-        String agentName = "Warren";
-        String symbol = "AAPL";
-        Integer quantity = 10;
-        Long invalidRunId = 999L;
-
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.of(testAccount));
-        when(holdingRepository.findActiveHoldingsByAccount(testAccount))
-            .thenReturn(new ArrayList<>());
-        when(marketService.getSharePrice(symbol))
-            .thenReturn(testPriceData);
-        when(tradingAccountRepository.save(any(TradingAccount.class)))
-            .thenReturn(testAccount);
-        when(agentRunRepository.findById(invalidRunId))
-            .thenReturn(Optional.empty()); // Run doesn't exist
-
-        // Act & Assert
-        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
-            buyTradeExecutor.executeBuy(agentName, symbol, quantity, invalidRunId);
-        });
-
-        assertEquals("Agent run with id " + invalidRunId + " not found", exception.getMessage());
-
-        // Verify agentRunRepository was called
-        verify(agentRunRepository).findById(invalidRunId);
-    }
-
     // ========== BUSINESS LOGIC TESTS ==========
 
     @Test
@@ -488,8 +439,6 @@ class BuyTradeExecutorTest {
             .thenReturn(new MarketService.PriceData(price, DataTier.END_OF_DAY, Instant.now(), "POLYGON"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
-        when(agentRunRepository.findById(1L))
-            .thenReturn(Optional.of(testRun));
         when(transactionRepository.save(any(AccountTransaction.class)))
             .thenReturn(new AccountTransaction());
         when(holdingRepository.findByAccountAndSymbol(any(), any()))
@@ -545,8 +494,6 @@ class BuyTradeExecutorTest {
             .thenReturn(testPriceData);
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
-        when(agentRunRepository.findById(1L))
-            .thenReturn(Optional.of(testRun));
         when(transactionRepository.save(any(AccountTransaction.class)))
             .thenReturn(new AccountTransaction());
         when(holdingRepository.findByAccountAndSymbol(any(), any()))
@@ -570,43 +517,6 @@ class BuyTradeExecutorTest {
     }
 
     @Test
-    @DisplayName("Should link transaction to agent run")
-    void testExecuteBuy_TransactionCreation_LinkedToRun() {
-        // Arrange
-        Long runId = 1L;
-
-        when(tradingAccountRepository.findByAgentName("Warren"))
-            .thenReturn(Optional.of(testAccount));
-        when(holdingRepository.findActiveHoldingsByAccount(testAccount))
-            .thenReturn(new ArrayList<>());
-        when(marketService.getSharePrice("AAPL"))
-            .thenReturn(testPriceData);
-        when(tradingAccountRepository.save(any(TradingAccount.class)))
-            .thenReturn(testAccount);
-        when(agentRunRepository.findById(runId))
-            .thenReturn(Optional.of(testRun));
-        when(transactionRepository.save(any(AccountTransaction.class)))
-            .thenReturn(new AccountTransaction());
-        when(holdingRepository.findByAccountAndSymbol(any(), any()))
-            .thenReturn(null);
-        when(holdingRepository.save(any(AccountHolding.class)))
-            .thenReturn(new AccountHolding());
-
-        // Act
-        buyTradeExecutor.executeBuy("Warren", "AAPL", 10, runId);
-
-        // Assert - Verify agentRunRepository was queried with correct runId
-        verify(agentRunRepository).findById(runId);
-
-        // Verify transaction was linked to run
-        ArgumentCaptor<AccountTransaction> transactionCaptor = ArgumentCaptor.forClass(AccountTransaction.class);
-        verify(transactionRepository).save(transactionCaptor.capture());
-
-        AccountTransaction transaction = transactionCaptor.getValue();
-        assertEquals(testRun, transaction.getAgentRun());
-    }
-
-    @Test
     @DisplayName("Should fetch market price from MarketService")
     void testExecuteBuy_MarketPriceFetch_CalledCorrectly() {
         // Arrange
@@ -621,8 +531,6 @@ class BuyTradeExecutorTest {
             .thenReturn(testPriceData);
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
-        when(agentRunRepository.findById(1L))
-            .thenReturn(Optional.of(testRun));
         when(transactionRepository.save(any(AccountTransaction.class)))
             .thenReturn(new AccountTransaction());
         when(holdingRepository.findByAccountAndSymbol(any(), any()))
@@ -685,8 +593,6 @@ class BuyTradeExecutorTest {
             .thenReturn(new MarketService.PriceData(price, DataTier.END_OF_DAY, Instant.now(), "POLYGON"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
-        when(agentRunRepository.findById(1L))
-            .thenReturn(Optional.of(testRun));
         when(transactionRepository.save(any(AccountTransaction.class)))
             .thenReturn(new AccountTransaction());
         when(holdingRepository.findByAccountAndSymbol(any(), any()))
@@ -747,8 +653,6 @@ class BuyTradeExecutorTest {
             .thenReturn(new MarketService.PriceData(price, DataTier.END_OF_DAY, Instant.now(), "POLYGON"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
-        when(agentRunRepository.findById(1L))
-            .thenReturn(Optional.of(testRun));
         when(transactionRepository.save(any(AccountTransaction.class)))
             .thenReturn(new AccountTransaction());
         when(holdingRepository.findByAccountAndSymbol(any(), any()))

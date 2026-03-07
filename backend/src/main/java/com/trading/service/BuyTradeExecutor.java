@@ -32,9 +32,8 @@ public class BuyTradeExecutor extends TradeExecutor {
             TradingAccountRepository tradingAccountRepository,
             AccountTransactionRepository transactionRepository,
             AccountHoldingRepository holdingRepository,
-            MarketService marketService,
-            AgentRunRepository agentRunRepository) {
-        super(tradingAccountRepository, transactionRepository, holdingRepository, marketService, agentRunRepository);
+            MarketService marketService) {
+        super(tradingAccountRepository, transactionRepository, holdingRepository, marketService);
     }
 
     /**

@@ -23,7 +23,6 @@ public abstract class TradeExecutor {
     protected final AccountTransactionRepository transactionRepository;
     protected final AccountHoldingRepository holdingRepository;
     protected final MarketService marketService;
-    protected final AgentRunRepository agentRunRepository;
 
     /**
      * Constructor injection for all dependencies.
@@ -33,13 +32,11 @@ public abstract class TradeExecutor {
             TradingAccountRepository tradingAccountRepository,
             AccountTransactionRepository transactionRepository,
             AccountHoldingRepository holdingRepository,
-            MarketService marketService,
-            AgentRunRepository agentRunRepository) {
+            MarketService marketService) {
         this.tradingAccountRepository = tradingAccountRepository;
         this.transactionRepository = transactionRepository;
         this.holdingRepository = holdingRepository;
         this.marketService = marketService;
-        this.agentRunRepository = agentRunRepository;
     }
 
     /**
@@ -78,12 +75,6 @@ public abstract class TradeExecutor {
         transaction.setQuantity(quantity);
         transaction.setPrice(price);
         transaction.setTimestamp(Instant.now());
-
-        // Link transaction to agent run (REQUIRED)
-        AgentRun agentRun = agentRunRepository.findById(runId)
-            .orElseThrow(() -> new ResourceNotFoundException(
-                "Agent run with id " + runId + " not found"));
-        transaction.setAgentRun(agentRun);
 
         return transactionRepository.save(transaction);
     }
