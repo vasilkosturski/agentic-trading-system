@@ -8,7 +8,7 @@ Each agent declares which MCPs it needs via REQUIRED_MCPS.
 
 from enum import StrEnum
 from typing import Dict
-from mcp import ServerSession
+from agents.mcp import MCPServer
 
 
 class MCPName(StrEnum):
@@ -18,4 +18,4 @@ class MCPName(StrEnum):
 
 
 # Type alias for MCP pool
-MCPPool = Dict[MCPName, ServerSession]
+MCPPool = Dict[MCPName, MCPServer]

@@ -9,7 +9,8 @@ Per design document: system-design/workflows/trade-execution/trade_exec_workflow
 
 import logging
 from dataclasses import dataclass
-from agents import Agent, Runner, function_tool
+from agents import Agent, Runner, Tool, function_tool
+from agents.mcp import MCPServer
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
 
@@ -52,7 +53,7 @@ class DecisionContext:
     research_response: ResearchResponse
     balance: float
     holdings: List["Holding"]
-    recent_activity: RecentActivityResponse
+    recent_activity: Optional[RecentActivityResponse] = None
     force_trade: bool = False
     max_positions: int = 10
 
@@ -74,6 +75,8 @@ class DecisionContext:
     @property
     def historical_context(self) -> str:
         """Convert recent activity to JSON string for prompt."""
+        if not self.recent_activity:
+            return "No recent trading activity."
         return self.recent_activity.model_dump_json()
 
 
@@ -241,12 +244,12 @@ async def create_decision_maker_agent(
 
     # Collect tools (no decide_action - using structured output instead)
     # Account data is passed inline in the decision prompt, no tool needed.
-    tools = [
+    tools: list[Tool] = [
         get_symbol_trade_history,
     ]
 
     # Add MCP servers if provided (dict access)
-    mcp_servers = []
+    mcp_servers: list[MCPServer] = []
     if mcp_pool:
         # Add Brave Search for additional research
         brave_server = mcp_pool.get(MCPName.BRAVE_SEARCH)

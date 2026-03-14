@@ -223,49 +223,24 @@ def seed_test_data(docker_ip, docker_services, require_backend):
                 (account_id, h.symbol, h.quantity, h.average_price),
             )
 
-        # 4. Agent runs (analytics schema — FK target for account_transactions)
-        run_ids = []
-        for run in SEED_DATA.agent_runs:
-            cur.execute(
-                """
-                INSERT INTO analytics.agent_runs
-                    (agent_name, run_type, start_time, end_time, outcome,
-                     summary, full_reasoning, research_sources, trade_count, created_at)
-                VALUES
-                    (%s, %s,
-                     NOW() - INTERVAL '%s days', NOW() - INTERVAL '%s days',
-                     %s, %s, %s, %s, %s,
-                     NOW() - INTERVAL '%s days')
-                RETURNING id
-                """,
-                (agent.name, run.run_type,
-                 run.days_ago, run.days_ago,
-                 run.outcome, run.summary, run.full_reasoning,
-                 run.research_sources, run.trade_count,
-                 run.days_ago),
-            )
-            run_ids.append(cur.fetchone()[0])
-
-        # 5. Transactions
+        # 4. Transactions (TradingRun created during test execution, not seeded)
         for tx in SEED_DATA.transactions:
-            run_id = run_ids[tx.run_index]
-            days_ago = SEED_DATA.agent_runs[tx.run_index].days_ago
             cur.execute(
                 """
                 INSERT INTO trading.account_transactions
                     (account_id, symbol, quantity, price, timestamp,
-                     agent_run_id, transaction_type, total_amount, created_at)
+                     transaction_type, total_amount, created_at)
                 VALUES
-                    (%s, %s, %s, %s, NOW() - INTERVAL '%s days',
-                     %s, %s, %s, NOW() - INTERVAL '%s days')
+                    (%s, %s, %s, %s, NOW() - INTERVAL '10 days',
+                     %s, %s, NOW() - INTERVAL '10 days')
                 """,
-                (account_id, tx.symbol, tx.quantity, tx.price, days_ago,
-                 run_id, tx.transaction_type, tx.quantity * tx.price, days_ago),
+                (account_id, tx.symbol, tx.quantity, tx.price,
+                 tx.transaction_type, tx.quantity * tx.price),
             )
 
         logger.info(
             f"Seeded test data: agent_id={agent_id}, account_id={account_id}, "
-            f"{len(SEED_DATA.holdings)} holdings, {len(run_ids)} runs, "
+            f"{len(SEED_DATA.holdings)} holdings, "
             f"{len(SEED_DATA.transactions)} transactions"
         )
 

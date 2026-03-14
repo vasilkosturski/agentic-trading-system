@@ -15,6 +15,13 @@
 - brave_web_search: {brave_search_hint}
 - fetch: Retrieve full content from URLs found in searches
 
+**Price Lookup Failures:**
+- If a price lookup fails for any symbol, do NOT retry that symbol.
+- Move on immediately to your next candidate.
+- A failed lookup means data is unavailable for that symbol — retrying will not help.
+- You have limited tool calls; do not waste them on symbols that already failed.
+- If multiple lookups fail, continue with whichever candidates succeeded.
+
 **Research Guidelines:**
 
 1. **Review portfolio context FIRST:**

@@ -32,15 +32,11 @@ openai:
   model: gpt-4
   max-tokens: 2000
 
-# Market Data Configuration
+# Market Data Configuration (single provider: Finnhub)
 market:
-  alpha-vantage:
-    api-key: ${ALPHA_VANTAGE_API_KEY:demo}
-  polygon:
-    api-key: ${POLYGON_API_KEY:}
-    base-url: ${POLYGON_BASE_URL:https://api.polygon.io}
-    enabled: true
-    free-tier: true
+  finnhub:
+    api-key: ${FINNHUB_API_KEY:}
+    base-url: ${FINNHUB_BASE_URL:https://finnhub.io/api/v1}
   cache:
     ttl-minutes: 60
 

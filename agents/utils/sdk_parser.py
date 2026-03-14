@@ -98,12 +98,13 @@ def extract_tool_calls(items: list[RunItem]) -> list[ParsedToolCall]:
 
         # ToolCallOutputItem: Has the actual output
         if isinstance(item, ToolCallOutputItem):
-            # call_id is on raw_item (FunctionCallOutput TypedDict or dict)
-            raw_item = item.raw_item
-            if isinstance(raw_item, dict):
-                call_id = raw_item.get("call_id")
+            # call_id is on output_raw_item (FunctionCallOutput TypedDict or dict)
+            # SDK raw_item types differ between ToolCallItem and ToolCallOutputItem
+            output_raw_item: Any = item.raw_item
+            if isinstance(output_raw_item, dict):
+                call_id = output_raw_item.get("call_id")
             else:
-                call_id = getattr(raw_item, "call_id", None)
+                call_id = getattr(output_raw_item, "call_id", None)
             output = str(item.output) if item.output else ""
 
             # Look up tool name and params from earlier ToolCallItem

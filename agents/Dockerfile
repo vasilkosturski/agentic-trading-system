@@ -4,12 +4,25 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for MCP servers
+# Optionally trust extra CA
+COPY extra-ca.pe[m] /tmp/
+
+# Install system dependencies for MCP servers + optionally trust extra CA
 RUN apt-get update && apt-get install -y \
     nodejs \
     npm \
     curl \
+    ca-certificates \
+    && if [ -f /tmp/extra-ca.pem ]; then \
+         cp /tmp/extra-ca.pem /usr/local/share/ca-certificates/extra-ca.crt && \
+         update-ca-certificates && \
+         rm /tmp/extra-ca.pem; \
+       fi \
     && rm -rf /var/lib/apt/lists/*
+
+# Point Python SSL to system CA bundle (includes extra CA if present)
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
 # Install uv for Python package management (used by MCP servers)
 RUN pip install uv

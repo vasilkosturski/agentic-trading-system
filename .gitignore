@@ -134,6 +134,9 @@ bin/
 # Docker environment variables (keep .env.example)
 !.env.example
 
+# CA certs (injected at build time, not committed)
+*.pem
+
 # Docker volumes
 postgres_data/
 agent_memory/

@@ -10,6 +10,7 @@ from typing import Dict, List, Optional
 
 from backend_client import get_backend_client, BackendAPIError
 from models import Holding, TradeResult
+from models.api_responses import AccountReport
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +120,7 @@ async def sell_shares(
         raise Exception(f"Failed to sell {quantity} shares of {symbol}: {str(e)}")
 
 
-async def initialize_agent(name: str, initial_balance: float = 100000.0) -> str:
+async def initialize_agent(name: str, initial_balance: float = 100000.0) -> int:
     """Initialize agent account if it doesn't exist.
 
     This is idempotent - safe to call multiple times. If account exists, does nothing.
@@ -143,7 +144,7 @@ async def initialize_agent(name: str, initial_balance: float = 100000.0) -> str:
 
 # Helper functions for system use (not agent tools)
 
-async def _get_account_report_raw(agent_id: int) -> "AccountReport":
+async def _get_account_report_raw(agent_id: int) -> AccountReport:
     """Get full account report from backend.
 
     Returns the typed AccountReport with balance, holdings,

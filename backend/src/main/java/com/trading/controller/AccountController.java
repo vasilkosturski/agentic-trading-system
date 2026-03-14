@@ -2,6 +2,7 @@ package com.trading.controller;
 
 import com.trading.dto.request.*;
 import com.trading.dto.response.AccountReportDto;
+import com.trading.dto.response.CreateAccountResponse;
 import com.trading.dto.response.RecentActivityResponse;
 import com.trading.dto.response.TradeResult;
 import com.trading.dto.response.TradingHistoryResponse;
@@ -41,9 +42,15 @@ public class AccountController {
      * @return success message with 201 Created
      */
     @PostMapping
-    public ResponseEntity<String> createAccount(@Valid @RequestBody InitializeAgentRequest request) {
-        accountService.initializeAgent(request.getName(), request.getInitialBalance());
-        return ResponseEntity.status(201).body("Successfully initialized agent " + request.getName());
+    public ResponseEntity<CreateAccountResponse> createAccount(@Valid @RequestBody InitializeAgentRequest request) {
+        var account = accountService.initializeAgent(request.getName(), request.getInitialBalance());
+        var response = new CreateAccountResponse(
+            account.getAgent().getId(),
+            account.getId(),
+            request.getName(),
+            account.getBalance()
+        );
+        return ResponseEntity.status(201).body(response);
     }
 
     /**

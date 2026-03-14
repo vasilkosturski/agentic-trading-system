@@ -18,7 +18,7 @@ This directory contains database documentation for the Agentic Trading System.
 | ------ | ------ |
 | `agents` | `trading_agents`, `agent_logs` |
 | `trading` | `trading_accounts`, `account_transactions`, `account_holdings`, `account_portfolio_snapshots` |
-| `analytics` | `agent_runs` |
+| `trading` | `trading_runs`, `research_phases`, `decision_phases`, `execution_phases` |
 
 ## 🚀 Deployment
 

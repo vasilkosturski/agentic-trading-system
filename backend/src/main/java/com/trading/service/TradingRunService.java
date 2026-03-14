@@ -364,23 +364,10 @@ public class TradingRunService {
 
     /**
      * Validate phase transition is allowed.
-     * Valid transitions:
-     * - INITIALIZING -> RESEARCHING
-     * - RESEARCHING -> DECIDING
-     * - DECIDING -> TRADING
-     * - TRADING -> COMPLETED
-     * - Any -> ERROR (not validated here, handled by markAsError)
+     * Delegates to {@link RunPhase#canTransitionTo(RunPhase)} which encodes the state machine.
      */
     private void validatePhaseTransition(RunPhase currentPhase, RunPhase newPhase) {
-        boolean isValid = switch (currentPhase) {
-            case INITIALIZING -> newPhase == RunPhase.RESEARCHING;
-            case RESEARCHING -> newPhase == RunPhase.DECIDING;
-            case DECIDING -> newPhase == RunPhase.TRADING || newPhase == RunPhase.COMPLETED;
-            case TRADING -> newPhase == RunPhase.COMPLETED;
-            case COMPLETED, ERROR -> false;  // Terminal states
-        };
-
-        if (!isValid) {
+        if (!currentPhase.canTransitionTo(newPhase)) {
             throw new IllegalArgumentException(
                 "Invalid phase transition: " + currentPhase + " -> " + newPhase);
         }
