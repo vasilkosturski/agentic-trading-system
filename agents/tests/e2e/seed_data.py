@@ -41,25 +41,12 @@ class SeedHolding:
 
 
 @dataclass(frozen=True)
-class SeedAgentRun:
-    """Historical agent run for seeding."""
-    run_type: str
-    days_ago: int
-    outcome: str
-    summary: str
-    full_reasoning: str
-    research_sources: str
-    trade_count: int = 1
-
-
-@dataclass(frozen=True)
 class SeedTransaction:
     """Historical transaction for seeding."""
     symbol: str
     quantity: int
     price: float
     transaction_type: str
-    run_index: int  # Index into AGENT_RUNS list to get FK
 
 
 @dataclass(frozen=True)
@@ -68,7 +55,6 @@ class SeedData:
     agent: SeedAgent
     account: SeedAccount
     holdings: list[SeedHolding]
-    agent_runs: list[SeedAgentRun]
     transactions: list[SeedTransaction]
 
 
@@ -90,43 +76,15 @@ TEST_HOLDINGS = [
     SeedHolding(symbol="MSFT", quantity=30, average_price=400.0),
 ]
 
-TEST_AGENT_RUNS = [
-    SeedAgentRun(
-        run_type="TRADING",
-        days_ago=15,
-        outcome="COMPLETED",
-        summary="Bought AAPL based on strong fundamentals",
-        full_reasoning="Apple shows strong fundamentals with consistent revenue growth.",
-        research_sources='[{"type":"web","title":"Apple Q4 2025 Earnings","url":"https://investor.apple.com/earnings"}]',
-    ),
-    SeedAgentRun(
-        run_type="TRADING",
-        days_ago=10,
-        outcome="COMPLETED",
-        summary="Bought MSFT based on cloud growth",
-        full_reasoning="Microsoft Azure growth continues to drive revenue.",
-        research_sources='[{"type":"web","title":"Microsoft Azure Revenue Growth","url":"https://www.microsoft.com/investor"}]',
-    ),
-    SeedAgentRun(
-        run_type="TRADING",
-        days_ago=20,
-        outcome="COMPLETED",
-        summary="Bought CMCSA based on undervaluation and strong cash flow",
-        full_reasoning="Comcast trades at P/E of 5.81, well below intrinsic value with robust cash flow generation.",
-        research_sources='[{"type":"web","title":"Comcast Q4 2025 Earnings","url":"https://www.cmcsa.com/investor"}]',
-    ),
-]
-
 TEST_TRANSACTIONS = [
-    SeedTransaction(symbol="AAPL", quantity=50, price=180.0, transaction_type="BUY", run_index=0),
-    SeedTransaction(symbol="MSFT", quantity=30, price=400.0, transaction_type="BUY", run_index=1),
-    SeedTransaction(symbol="CMCSA", quantity=200, price=30.0, transaction_type="BUY", run_index=2),
+    SeedTransaction(symbol="AAPL", quantity=50, price=180.0, transaction_type="BUY"),
+    SeedTransaction(symbol="MSFT", quantity=30, price=400.0, transaction_type="BUY"),
+    SeedTransaction(symbol="CMCSA", quantity=200, price=30.0, transaction_type="BUY"),
 ]
 
 SEED_DATA = SeedData(
     agent=TEST_AGENT,
     account=TEST_ACCOUNT,
     holdings=TEST_HOLDINGS,
-    agent_runs=TEST_AGENT_RUNS,
     transactions=TEST_TRANSACTIONS,
 )

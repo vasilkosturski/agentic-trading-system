@@ -39,8 +39,7 @@ services:
       DB_USERNAME: trading_user
       DB_PASSWORD: trading_password
       # Market data API keys
-      POLYGON_API_KEY: ${POLYGON_API_KEY:-}
-      POLYGON_PLAN: ${POLYGON_PLAN:-free}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
     ports:
       - "8080:8080"
     networks:

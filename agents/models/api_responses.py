@@ -32,6 +32,7 @@ class RunOutcome(str, Enum):
     """Outcome of a trading run."""
     COMPLETED = "COMPLETED"
     ERROR = "ERROR"
+    IN_PROGRESS = "IN_PROGRESS"
 
 
 # =============================================================================
@@ -140,12 +141,12 @@ class ActivityRun(BaseModel):
     """A single trading run in recent activity."""
 
     date: datetime = Field(description="Date/time of the run")
-    outcome: RunOutcome = Field(description="Run outcome: COMPLETED or ERROR")
-    summary: str = Field(default="", description="Brief summary of the run")
+    outcome: RunOutcome = Field(description="Run outcome: COMPLETED, ERROR, or IN_PROGRESS")
+    summary: Optional[str] = Field(default=None, description="Brief summary of the run")
     fullReasoning: Optional[str] = Field(default=None, description="Complete reasoning")
     researchSources: Optional[str] = Field(default=None, description="JSON string of web sources")
     historicalContext: Optional[str] = Field(default=None, description="JSON string of historical insights")
-    trades: list[ActivityTrade] = Field(default_factory=list, description="Trades made in this run")
+    trades: Optional[list[ActivityTrade]] = Field(default=None, description="Trades made in this run")
 
 
 class RecentActivityResponse(BaseModel):
@@ -172,7 +173,7 @@ class RecentActivityResponse(BaseModel):
     @property
     def computed_total_trades(self) -> int:
         """Compute total trades from runs list (single source of truth)."""
-        return sum(len(run.trades) for run in self.runs)
+        return sum(len(run.trades or []) for run in self.runs)
 
 
 class SymbolPosition(BaseModel):

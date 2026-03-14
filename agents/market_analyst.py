@@ -40,10 +40,11 @@ Per design document: system-design/workflows/trade-execution/trade_exec_workflow
 
 import logging
 from dataclasses import dataclass
-from agents import Agent, Runner, function_tool
+from agents import Agent, Runner, Tool, function_tool
+from agents.mcp import MCPServer
 from utils.sdk_parser import extract_tool_calls, get_tool_errors
 from datetime import datetime
-from typing import Union, List, TYPE_CHECKING
+from typing import Optional, Union, List, TYPE_CHECKING
 
 # Import model for structured output
 from models.llm_output import ResearchResponse
@@ -82,7 +83,7 @@ class MarketAnalystContext:
     agent_style: str
     balance: float
     holdings: List["Holding"]
-    recent_activity: RecentActivityResponse
+    recent_activity: Optional[RecentActivityResponse] = None
     max_positions: int = 10
 
     @property
@@ -108,7 +109,7 @@ class MarketAnalystContext:
         lines = [f"Recent Activity ({len(self.recent_activity.runs)} runs):"]
         for run in self.recent_activity.runs[:5]:
             summary = run.summary[:100] if run.summary else "No summary"
-            trade_count = len(run.trades)
+            trade_count = len(run.trades) if run.trades else 0
             trades_str = f", {trade_count} trades" if trade_count > 0 else ", no trades"
             lines.append(f"- {run.date}: {run.outcome}{trades_str} — {summary}")
         return "\n".join(lines)
@@ -290,12 +291,12 @@ async def create_market_analyst_agent(
             )
 
     # Collect tools (price lookup only — holdings/activity passed inline)
-    db_tools = [
+    db_tools: list[Tool] = [
         lookup_price_tool,
     ]
 
     # Get MCP servers for research (dict access)
-    mcp_servers = []
+    mcp_servers: list[MCPServer] = []
 
     # Add Brave Search server
     brave_server = mcp_pool.get(MCPName.BRAVE_SEARCH)

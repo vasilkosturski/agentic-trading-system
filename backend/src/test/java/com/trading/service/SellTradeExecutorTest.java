@@ -55,7 +55,7 @@ class SellTradeExecutorTest {
         testAccount.setId(1L);
 
         // Create test price data
-        testPriceData = new MarketService.PriceData(150.0, DataTier.END_OF_DAY, Instant.now(), "POLYGON");
+        testPriceData = new MarketService.PriceData(150.0, DataTier.REAL_TIME, Instant.now(), "Finnhub");
     }
 
     // ========== HAPPY PATH TESTS ==========
@@ -80,7 +80,7 @@ class SellTradeExecutorTest {
         when(holdingRepository.findByAccountAndSymbol(testAccount, symbol))
             .thenReturn(existingHolding);
         when(marketService.getSharePrice(symbol))
-            .thenReturn(new MarketService.PriceData(marketPrice, DataTier.END_OF_DAY, Instant.now(), "POLYGON"));
+            .thenReturn(new MarketService.PriceData(marketPrice, DataTier.REAL_TIME, Instant.now(), "Finnhub"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -147,7 +147,7 @@ class SellTradeExecutorTest {
         when(holdingRepository.findByAccountAndSymbol(testAccount, symbol))
             .thenReturn(existingHolding);
         when(marketService.getSharePrice(symbol))
-            .thenReturn(new MarketService.PriceData(marketPrice, DataTier.END_OF_DAY, Instant.now(), "POLYGON"));
+            .thenReturn(new MarketService.PriceData(marketPrice, DataTier.REAL_TIME, Instant.now(), "Finnhub"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -352,7 +352,7 @@ class SellTradeExecutorTest {
         when(holdingRepository.findByAccountAndSymbol(testAccount, "AAPL"))
             .thenReturn(existingHolding);
         when(marketService.getSharePrice("AAPL"))
-            .thenReturn(new MarketService.PriceData(marketPrice, DataTier.END_OF_DAY, Instant.now(), "POLYGON"));
+            .thenReturn(new MarketService.PriceData(marketPrice, DataTier.REAL_TIME, Instant.now(), "Finnhub"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -539,7 +539,7 @@ class SellTradeExecutorTest {
         when(holdingRepository.findByAccountAndSymbol(testAccount, "AAPL"))
             .thenReturn(existingHolding);
         when(marketService.getSharePrice("AAPL"))
-            .thenReturn(new MarketService.PriceData(price, DataTier.END_OF_DAY, Instant.now(), "POLYGON"));
+            .thenReturn(new MarketService.PriceData(price, DataTier.REAL_TIME, Instant.now(), "Finnhub"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))

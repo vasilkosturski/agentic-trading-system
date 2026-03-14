@@ -82,14 +82,18 @@ async def _lookup_share_price(symbol: str) -> float:
         return float(data.price)
     except Exception as e:
         logger.error(f"Failed to get price for {symbol}: {e}")
-        raise Exception(f"Failed to get price for {symbol}: {str(e)}")
+        raise Exception(
+            f"Price data unavailable for {symbol}. "
+            "Skip this symbol and continue with other candidates. "
+            "Do NOT retry this symbol."
+        )
 
 
 @function_tool
 async def lookup_share_price(symbol: str) -> float:
     """Get the current price of a stock symbol.
 
-    Uses end-of-day data from Polygon.io (previous trading day close).
+    Uses real-time data from Finnhub.
     Data is cached for 60 minutes.
 
     Args:
@@ -116,9 +120,9 @@ async def get_price_with_metadata(symbol: str) -> PriceMetadata:
     Returns:
         PriceMetadata model with validated data:
         - price: Current price (float)
-        - dataTier: 'REAL' (Polygon.io), 'MOCK' (simulated), or 'CACHED' (from cache)
+        - dataTier: 'REAL_TIME' (Finnhub), 'MOCK' (simulated), or 'CACHED' (from cache)
         - timestamp: When data was retrieved (ISO format)
-        - dataSource: 'Polygon.io API' or 'Mock Data'
+        - dataSource: 'Finnhub API' or 'Mock Data'
         - dataAgeMinutes: How old the data is
     """
     try:
@@ -132,7 +136,11 @@ async def get_price_with_metadata(symbol: str) -> PriceMetadata:
         )
     except Exception as e:
         logger.error(f"Failed to get price metadata for {symbol}: {e}")
-        raise Exception(f"Failed to get price metadata for {symbol}: {str(e)}")
+        raise Exception(
+            f"Price data unavailable for {symbol}. "
+            "Skip this symbol and continue with other candidates. "
+            "Do NOT retry this symbol."
+        )
 
 
 @function_tool
@@ -152,7 +160,11 @@ async def get_historical_prices(symbol: str, days: int = 30) -> List[HistoricalP
         return data.historicalPrices
     except Exception as e:
         logger.error(f"Failed to get historical prices for {symbol}: {e}")
-        raise Exception(f"Failed to get historical prices for {symbol}: {str(e)}")
+        raise Exception(
+            f"Price data unavailable for {symbol}. "
+            "Skip this symbol and continue with other candidates. "
+            "Do NOT retry this symbol."
+        )
 
 
 @function_tool
@@ -175,7 +187,11 @@ async def get_market_indicators(symbol: str) -> MarketIndicators:
         return data.indicators
     except Exception as e:
         logger.error(f"Failed to get market indicators for {symbol}: {e}")
-        raise Exception(f"Failed to get market indicators for {symbol}: {str(e)}")
+        raise Exception(
+            f"Price data unavailable for {symbol}. "
+            "Skip this symbol and continue with other candidates. "
+            "Do NOT retry this symbol."
+        )
 
 
 # All market data tools that agents can use

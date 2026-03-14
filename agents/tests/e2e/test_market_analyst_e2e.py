@@ -171,7 +171,7 @@ class TestMarketAnalystE2E:
 
             # ALL tool errors are fatal — price lookups must succeed for all candidates.
             # The prompt instructs the agent to pick US-listed stocks on major exchanges
-            # (S&P 500, NASDAQ, NYSE) which Polygon free tier covers.
+            # (S&P 500, NASDAQ, NYSE) which Finnhub free tier covers.
             if result.tool_errors:
                 for err in result.tool_errors:
                     logger.error(f"TOOL ERROR: {err.name}: {err.output[:200]}")

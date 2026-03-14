@@ -80,26 +80,13 @@ class TradingDecision(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     def validate_consistency(self) -> None:
-        """Validate that action matches reasoning and required fields are present.
+        """Validate that action matches required fields.
 
         Raises:
-            ValueError: If decision is inconsistent
+            ValueError: If decision is structurally inconsistent
         """
         if self.action in (TradeAction.BUY, TradeAction.SELL):
             if not self.symbol or self.quantity <= 0:
                 raise ValueError(
                     f"symbol and positive quantity required for {self.action}"
-                )
-
-            # Check reasoning consistency
-            reasoning_text = (self.rationale + " " + self.researchContext).lower()
-
-            if self.action == TradeAction.BUY and ("sell" in reasoning_text or "selling" in reasoning_text):
-                raise ValueError(
-                    f"action=BUY but reasoning mentions 'sell'. Rationale: {self.rationale[:100]}"
-                )
-
-            if self.action == TradeAction.SELL and ("buy" in reasoning_text or "buying" in reasoning_text):
-                raise ValueError(
-                    f"action=SELL but reasoning mentions 'buy'. Rationale: {self.rationale[:100]}"
                 )

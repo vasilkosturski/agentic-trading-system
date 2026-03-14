@@ -328,7 +328,8 @@ class AgentExecutor:
             "holdings_count": len(ctx.holdings),
             "symbols": [h.symbol for h in ctx.holdings] if ctx.holdings else []
         }
-        ctx.tracker.log_data_access("Portfolio", json.dumps(portfolio_data))
+        if ctx.tracker:
+            ctx.tracker.log_data_access("Portfolio", json.dumps(portfolio_data))
 
         # Create Market Analyst using async factory pattern
         market_analyst = await MarketAnalyst.create(
@@ -602,7 +603,7 @@ class AgentExecutor:
 
         # Extract decision details (decision guaranteed by _run_decision_maker fail-fast)
         decision = ctx.decision
-        trade_decision = decision.action
+        trade_decision = TradeDecision(decision.action.value)
         symbol = decision.symbol if decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
         quantity = decision.quantity if decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
 

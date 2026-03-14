@@ -153,8 +153,8 @@ class TestFullCycleE2E:
         assert research["runId"] == run_id
         assert isinstance(research["candidates"], list)
         assert len(research["candidates"]) > 0, "Should have research candidates"
-        if research.get("webSources"):
-            for source in research["webSources"]:
+        if research.get("sources"):
+            for source in research["sources"]:
                 assert "type" in source, "Source must have a type"
         logger.info(f"  Research: OK (candidates={research['candidates']})")
 

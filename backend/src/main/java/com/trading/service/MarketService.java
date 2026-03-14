@@ -1,24 +1,15 @@
 package com.trading.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-// Note: Using HTTP client approach for Polygon API since Kotlin SDK has Java interop issues
-// import io.polygon.kotlin.sdk.rest.PolygonRestClient;
-// import io.polygon.kotlin.sdk.rest.stocks.AggregatesParameters;
-// import io.polygon.kotlin.sdk.rest.stocks.AggregatesDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.RestClientException;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -50,65 +41,37 @@ public class MarketService {
     private static final Logger logger = LoggerFactory.getLogger(MarketService.class);
     
     private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
     private final Random random = new Random();
-    
-    // Configuration - Polygon API only (simplified for demo)
-    @Value("${market.polygon.api-key:}")
-    private String polygonApiKey;
 
-    @Value("${market.polygon.base-url:https://api.polygon.io}")
-    private String polygonBaseUrl;
+    // Configuration - Finnhub
+    @Value("${market.finnhub.api-key:}")
+    private String finnhubApiKey;
 
-    @Value("${market.polygon.enabled:true}")
-    private boolean polygonEnabled;
-
-    @Value("${market.polygon.free-tier:true}")
-    private boolean polygonFreeTier;
+    @Value("${market.finnhub.base-url:https://finnhub.io/api/v1}")
+    private String finnhubBaseUrl;
 
     @Value("${market.cache.ttl-minutes:60}")
     private int cacheTtlMinutes;
-    
-    // Polygon HTTP client approach (avoiding Kotlin interop issues)
-    private boolean polygonClientInitialized = false;
-    
+
     // Cache for stock prices with timestamps
     private final Map<String, CachedPrice> priceCache = new ConcurrentHashMap<>();
-    
-    
-    public MarketService(ObjectMapper objectMapper) {
+
+
+    public MarketService() {
         this.restTemplate = new RestTemplate();
-        this.objectMapper = objectMapper;
     }
     
     /**
-     * Check if Polygon client is available
-     */
-    private boolean isPolygonAvailable() {
-        if (!polygonClientInitialized) {
-            if (polygonEnabled && polygonApiKey != null && !polygonApiKey.isEmpty()) {
-                logger.info("Polygon API key configured, using HTTP client approach");
-                polygonClientInitialized = true;
-                return true;
-            } else {
-                logger.debug("Polygon API not configured or disabled");
-                return false;
-            }
-        }
-        return polygonEnabled && polygonApiKey != null && !polygonApiKey.isEmpty();
-    }
-    
-    /**
-     * Get current stock price with caching and fallback mechanisms
+     * Get current stock price with caching (single provider: Finnhub)
      */
     public PriceData getSharePrice(String symbol) {
         if (symbol == null || symbol.trim().isEmpty()) {
             throw new IllegalArgumentException("Symbol cannot be null or empty");
         }
-        
+
         String upperSymbol = symbol.toUpperCase();
-        logger.info("🚀 DEBUGGING: MarketService.getSharePrice() called for symbol: {}", upperSymbol);
-        
+        logger.info("MarketService.getSharePrice() called for symbol: {}", upperSymbol);
+
         // Check cache first
         CachedPrice cachedPrice = priceCache.get(upperSymbol);
         if (cachedPrice != null && !cachedPrice.isExpired(cacheTtlMinutes)) {
@@ -117,132 +80,69 @@ public class MarketService {
                 "Data retrieved from cache (age: " + java.time.Duration.between(cachedPrice.timestamp, Instant.now()).toMinutes() + " minutes)");
         }
 
-        // Try to fetch real price
-        logger.info("📡 DEBUGGING: Attempting to fetch real price for {} from external APIs", upperSymbol);
-        PriceData realPriceData = fetchRealPrice(upperSymbol);
-        if (realPriceData != null) {
-            Instant fetchTime = Instant.now();
-            priceCache.put(upperSymbol, new CachedPrice(realPriceData.getPrice(), fetchTime));
-            logger.info("✅ DEBUGGING: Successfully fetched real price for {}: ${} from {} ({})",
-                upperSymbol, realPriceData.getPrice(), realPriceData.getDataSource(), realPriceData.getDataTier());
-            return realPriceData;
+        // Fetch from Finnhub
+        logger.info("Fetching price for {} from Finnhub", upperSymbol);
+        PriceData priceData = fetchFromFinnhub(upperSymbol);
+        if (priceData != null) {
+            priceCache.put(upperSymbol, new CachedPrice(priceData.getPrice(), Instant.now()));
+            logger.info("Successfully fetched price for {}: ${} from Finnhub", upperSymbol, priceData.getPrice());
+            return priceData;
         }
-        
-        // Zero tolerance for mock data - fail if real data unavailable
-        logger.error("CRITICAL: Unable to fetch real market data for {} - no fallback allowed", upperSymbol);
-        throw new RuntimeException("Unable to fetch real market data for symbol: " + upperSymbol +
-            ". All external APIs failed. Check API keys and network connectivity.");
+
+        logger.error("Unable to fetch market data for {} from Finnhub", upperSymbol);
+        throw new RuntimeException("Unable to fetch market data for symbol: " + upperSymbol +
+            ". Finnhub API failed. Check FINNHUB_API_KEY and network connectivity.");
     }
     
     /**
-     * Fetch real stock price from Polygon API only (simplified for demo)
+     * Fetch price from Finnhub API (real-time quotes, 60 calls/min free tier)
      */
-    private PriceData fetchRealPrice(String symbol) {
-        // Only use Polygon API - simplified approach matching source project
-        if (polygonEnabled) {
-            PriceData polygonPrice = fetchFromPolygon(symbol);
-            if (polygonPrice != null) {
-                return polygonPrice;
-            }
-        }
-        
-        logger.warn("❌ DEBUGGING: Failed to fetch real price for {} from Polygon API", symbol);
-        return null;
-    }
-    
-    /**
-     * Fetch price from Polygon API (free tier - end-of-day data) using HTTP client
-     */
-    private PriceData fetchFromPolygon(String symbol) {
+    private PriceData fetchFromFinnhub(String symbol) {
         try {
-            logger.info("🔍 DEBUGGING: Attempting Polygon API for symbol: {}", symbol);
-            if (!isPolygonAvailable()) {
-                logger.warn("❌ DEBUGGING: Polygon API not available for {} (enabled: {}, apiKey present: {})",
-                    symbol, polygonEnabled, polygonApiKey != null && !polygonApiKey.isEmpty());
-                return null;
+            logger.info("Fetching price from Finnhub for symbol: {}", symbol);
+
+            String url = String.format("%s/quote?symbol=%s&token=%s",
+                    finnhubBaseUrl, symbol, finnhubApiKey);
+
+            FinnhubQuoteResponse quote = restTemplate.getForObject(url, FinnhubQuoteResponse.class);
+
+            if (quote != null && quote.c() > 0) {
+                logger.info("Finnhub price for {}: ${}", symbol, quote.c());
+                return new PriceData(quote.c(), DataTier.REAL_TIME, Instant.now(),
+                        "Real-time quote from Finnhub");
             }
-            
-            // For free tier, get previous trading day's data
-            LocalDate targetDate = getPreviousTradingDay();
-            String dateStr = targetDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-            logger.info("📅 DEBUGGING: Using previous trading day: {} for symbol: {}", dateStr, symbol);
-            
-            // Polygon aggregates endpoint for daily data
-            String url = String.format(
-                "%s/v2/aggs/ticker/%s/range/1/day/%s/%s?adjusted=true&sort=asc&limit=1&apikey=%s",
-                polygonBaseUrl, symbol, dateStr, dateStr, polygonApiKey
-            );
-            logger.info("🌐 DEBUGGING: Making Polygon API request to: {}", url.replace(polygonApiKey, "***API_KEY***"));
-            
-            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
-            logger.info("📊 DEBUGGING: Polygon API response status: {} for symbol: {}", response.getStatusCode(), symbol);
-            
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                logger.info("📄 DEBUGGING: Polygon API response body: {}", response.getBody());
-                JsonNode jsonNode = objectMapper.readTree(response.getBody());
-                
-                // Check for successful response
-                if (jsonNode.has("status") && "OK".equals(jsonNode.get("status").asText())) {
-                    JsonNode results = jsonNode.get("results");
-                    logger.info("🔍 DEBUGGING: Polygon results array size: {}", results != null && results.isArray() ? results.size() : "null");
-                    
-                    if (results != null && results.isArray() && results.size() > 0) {
-                        JsonNode result = results.get(0);
-                        
-                        if (result.has("c")) { // 'c' is the closing price
-                            Double closePrice = result.get("c").asDouble();
-                            logger.info("💰 DEBUGGING: Polygon closing price found: ${} for {}", closePrice, symbol);
-                            
-                            if (closePrice > 0) {
-                                logger.info("✅ DEBUGGING: Successfully fetched Polygon end-of-day price for {}: ${} (date: {})", symbol, closePrice, dateStr);
-                                return new PriceData(closePrice, DataTier.END_OF_DAY, Instant.now(),
-                                    "End-of-day closing price from Polygon (free tier) for " + dateStr);
-                            }
-                        }
-                    }
-                } else {
-                    logger.warn("❌ DEBUGGING: Polygon API status not OK for {}: {}", symbol, jsonNode.get("status"));
-                }
-                
-                // Check for API limit or error messages
-                if (jsonNode.has("error")) {
-                    logger.warn("Polygon API error for {}: {}", symbol, jsonNode.get("error").asText());
-                } else if (jsonNode.has("message")) {
-                    logger.warn("Polygon API message for {}: {}", symbol, jsonNode.get("message").asText());
-                }
+
+            if (quote != null) {
+                logger.warn("Finnhub returned zero price for {} - symbol may not be supported", symbol);
             }
-            
-            logger.debug("No Polygon data available for {} on {}", symbol, dateStr);
+
+            logger.debug("No Finnhub data available for {}", symbol);
             return null;
-            
+
         } catch (RestClientException e) {
-            logger.error("HTTP error fetching from Polygon for {}: {}", symbol, e.getMessage());
+            logger.error("HTTP error fetching from Finnhub for {}: {}", symbol, e.getMessage());
             return null;
         } catch (Exception e) {
-            logger.error("Error fetching from Polygon for {}: {}", symbol, e.getMessage());
+            logger.error("Error fetching from Finnhub for {}: {}", symbol, e.getMessage());
             return null;
         }
     }
-    
+
     /**
-     * Get the previous trading day (skips weekends)
+     * Typed response for Finnhub /quote endpoint.
+     * Fields match the Finnhub JSON keys for automatic Jackson deserialization.
      */
-    private LocalDate getPreviousTradingDay() {
-        LocalDate date = LocalDate.now(ZoneId.of("America/New_York"));
-        
-        // Go back one day
-        date = date.minusDays(1);
-        
-        // Skip weekends - if it's Sunday, go to Friday; if Saturday, go to Friday
-        while (date.getDayOfWeek().getValue() > 5) { // Saturday = 6, Sunday = 7
-            date = date.minusDays(1);
-        }
-        
-        return date;
-    }
-    
-    
-    
+    private record FinnhubQuoteResponse(
+        double c,   // current price
+        double d,   // change
+        double dp,  // percent change
+        double h,   // high price of the day
+        double l,   // low price of the day
+        double o,   // open price of the day
+        double pc,  // previous close price
+        long t      // timestamp (unix)
+    ) {}
+
     /**
      * Get historical prices for a symbol (mock implementation for now)
      */

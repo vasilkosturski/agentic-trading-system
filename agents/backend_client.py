@@ -229,7 +229,7 @@ class BackendClient:
         url = BACKEND_API_ACCOUNTS
         try:
             response = await self._request("POST", url, json_data={
-                "agentName": name,
+                "name": name,
                 "initialBalance": initial_balance
             })
             data = response.json()
