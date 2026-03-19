@@ -203,9 +203,11 @@ class TestMarketAnalystE2E:
             # Agent should always find at least one candidate stock
             assert isinstance(response.candidates, list)
             assert len(response.candidates) >= 1, "Market Analyst should find at least one candidate"
+            from models.llm_output import CandidateStock
             for candidate in response.candidates:
-                assert isinstance(candidate, str)
-                assert len(candidate) >= 1, "Candidate symbol must not be empty"
+                assert isinstance(candidate, CandidateStock)
+                assert len(candidate.symbol) >= 1, "Candidate symbol must not be empty"
+                assert candidate.price > 0, "Candidate must have a positive price"
 
             # Research should cite at least one source
             assert len(response.webSources) >= 1, "Research should cite at least one source"

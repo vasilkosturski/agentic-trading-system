@@ -6,7 +6,8 @@ Follows Pydantic best practices:
 - type hints for simple primitives
 """
 
-from .llm_output import TradeAction, TradingDecision, WebSource, ResearchResponse
+from .investment_style import InvestmentStyle
+from .llm_output import TradeAction, TradingDecision, WebSource, CandidateStock, ResearchResponse
 from .api_responses import (
     PriceMetadata,
     HistoricalPrice,
@@ -53,10 +54,13 @@ from .orchestration import (
 )
 
 __all__ = [
+    # Investment Style Enum
+    "InvestmentStyle",
     # LLM Output Models
     "TradeAction",
     "TradingDecision",
     "WebSource",
+    "CandidateStock",
     "ResearchResponse",
     # API Response Models - Market Data
     "PriceMetadata",

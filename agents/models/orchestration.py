@@ -11,6 +11,7 @@ from typing import Optional, List, Generic, TypeVar, TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from models.investment_style import InvestmentStyle
 from models.llm_output import TradingDecision, ResearchResponse
 from models.run_tracking import SourceDto, PhaseStatus
 from models.api_responses import RecentActivityResponse
@@ -101,7 +102,11 @@ class CycleResult(BaseModel):
 
 @dataclass
 class ResearchResult:
-    """Result of market analyst research."""
+    """Result of market analyst research.
+
+    candidates is list[str] (symbol strings) for DB storage.
+    Prices live inside research_response.candidates (CandidateStock objects).
+    """
     research_response: ResearchResponse  # Required - throw on failure
     candidates: List[str] = field(default_factory=list)
     sources: List[SourceDto] = field(default_factory=list)
@@ -157,7 +162,7 @@ class RunContext:
     run_id: int
     agent_id: int
     agent_name: str
-    agent_style: str
+    agent_style: InvestmentStyle
     model_name: str
 
     # ═══════════════════════════════════════════════════════════════════════════

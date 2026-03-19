@@ -40,7 +40,7 @@ Per design document: system-design/workflows/trade-execution/trade_exec_workflow
 
 import logging
 from dataclasses import dataclass
-from agents import Agent, Runner, Tool, function_tool
+from agents import Agent, Runner, Tool, function_tool, output_guardrail, GuardrailFunctionOutput, RunContextWrapper
 from agents.mcp import MCPServer
 from utils.sdk_parser import extract_tool_calls, get_tool_errors
 from datetime import datetime
@@ -48,6 +48,7 @@ from typing import Optional, Union, List, TYPE_CHECKING
 
 # Import model for structured output
 from models.llm_output import ResearchResponse
+from models.investment_style import InvestmentStyle
 
 # Import prompt loader
 from prompt_loader import load_and_format_prompt
@@ -55,7 +56,6 @@ from prompt_loader import load_and_format_prompt
 from market_tools import _lookup_share_price
 from models import (
     RecentActivityResponse,
-    PriceLookupResponse,
     ToolError,
     AgentRunResult,
 )
@@ -70,6 +70,39 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
+# Output Guardrail
+# ============================================================================
+
+@output_guardrail
+async def validate_research_output(
+    _ctx: RunContextWrapper, _agent: Agent, output: ResearchResponse
+) -> GuardrailFunctionOutput:
+    """Validate that Market Analyst produced actionable research.
+
+    Checks that candidates and webSources are non-empty, and that every
+    candidate has a positive price (already enforced by Pydantic gt=0,
+    but we double-check here for the guardrail feedback message).
+    """
+    issues: list[str] = []
+    if not output.candidates:
+        issues.append("candidates is empty")
+    else:
+        # Pydantic gt=0 enforces positive prices at parse time, but
+        # if the LLM omits a price field Pydantic will reject the whole
+        # response before we get here. This check catches edge cases
+        # where candidates exist but none have valid prices.
+        no_price = [c.symbol for c in output.candidates if c.price <= 0]
+        if no_price:
+            issues.append(f"candidates missing prices: {no_price}")
+    if not output.webSources:
+        issues.append("webSources is empty")
+    return GuardrailFunctionOutput(
+        output_info={"issues": issues},
+        tripwire_triggered=len(issues) > 0,
+    )
+
+
+# ============================================================================
 # Typed Input Models for MarketAnalyst
 # ============================================================================
 
@@ -80,7 +113,7 @@ class MarketAnalystContext:
     Receives typed models, converts to strings internally for prompts.
     """
     agent_name: str
-    agent_style: str
+    agent_style: InvestmentStyle
     balance: float
     holdings: List["Holding"]
     recent_activity: Optional[RecentActivityResponse] = None
@@ -261,22 +294,22 @@ async def create_market_analyst_agent(
 
     # Create price lookup tool for budget verification
     @function_tool
-    async def lookup_price_tool(symbol: str) -> Union[PriceLookupResponse, ToolError]:
+    async def lookup_price_tool(symbol: str) -> Union[dict, ToolError]:
         """Get current market price to check if candidates fit budget constraints.
 
         Args:
             symbol: Stock symbol (e.g., AAPL, NVDA)
 
         Returns:
-            Current stock price
+            Dict with symbol, price, and timestamp (JSON-serializable by SDK)
         """
         try:
             price = await _lookup_share_price(symbol)
-            return PriceLookupResponse(
-                symbol=symbol,
-                price=price,
-                timestamp=datetime.now(),
-            )
+            return {
+                "symbol": symbol.upper(),
+                "price": price,
+                "timestamp": datetime.now().isoformat(),
+            }
         except ValidationError as e:
             return ToolError(
                 error=f"Invalid price data: {e}",
@@ -320,6 +353,7 @@ async def create_market_analyst_agent(
         mcp_servers=mcp_servers,
         tools=db_tools,
         output_type=ResearchResponse,  # Enforces schema compliance
+        output_guardrails=[validate_research_output],
     )
 
     logger.info(
@@ -331,7 +365,7 @@ async def create_market_analyst_agent(
 
 def build_research_prompt(
     agent_name: str,
-    agent_style: str,
+    agent_style: InvestmentStyle,
     balance: float,
     position_count: int,
     max_positions: int,
@@ -346,7 +380,7 @@ def build_research_prompt(
 
     Args:
         agent_name: Agent name
-        agent_style: Investment style (e.g., "Value Investor")
+        agent_style: Investment style enum value
         balance: Available cash balance
         position_count: Current number of positions
         max_positions: Maximum positions allowed (10)

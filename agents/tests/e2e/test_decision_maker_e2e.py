@@ -17,7 +17,7 @@ from agents import Runner
 from agents.mcp import MCPServerStdio
 
 from decision_maker import DecisionMaker, DecisionContext
-from models.llm_output import TradeAction, TradingDecision, ResearchResponse, WebSource
+from models.llm_output import TradeAction, TradingDecision, ResearchResponse, WebSource, CandidateStock
 from mcp_types import MCPPool
 from mcp_params import get_mcp_server_params
 from utils.sdk_parser import extract_tool_calls
@@ -131,7 +131,12 @@ class TestDecisionMakerE2E:
                 "Allstate (ALL) offers P/E of 5.40 with robust underwriting margins. "
                 "WesBanco (WSBC) priced at $36.01 vs estimated cash flow value of $68.84."
             ),
-            candidates=["AAPL", "CMCSA", "ALL", "WSBC"],
+            candidates=[
+                CandidateStock(symbol="AAPL", price=180.25),
+                CandidateStock(symbol="CMCSA", price=35.40),
+                CandidateStock(symbol="ALL", price=206.00),
+                CandidateStock(symbol="WSBC", price=36.01),
+            ],
             webSources=[
                 WebSource(title="Top 10 Most Undervalued Stocks in the S&P 500", url="https://www.nerdwallet.com/investing/learn/undervalued-stocks"),
                 WebSource(title="February 2026's Value Picks: Stocks Priced Below Estimated Worth", url="https://finance.yahoo.com/news/february-2026s-value-picks-stocks-113805029.html"),
