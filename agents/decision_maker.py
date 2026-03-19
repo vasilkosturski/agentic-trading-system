@@ -16,6 +16,7 @@ from typing import Optional, List, TYPE_CHECKING
 
 # Import models
 from models.llm_output import TradingDecision, ResearchResponse
+from models.investment_style import InvestmentStyle
 from models.api_responses import RecentActivityResponse
 from models import AgentRunResult
 
@@ -37,6 +38,33 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Position sizing limits by investment style (max % of portfolio per position)
+POSITION_SIZING_PCT: dict[InvestmentStyle, int] = {
+    InvestmentStyle.VALUE: 15,
+    InvestmentStyle.MOMENTUM: 20,
+    InvestmentStyle.RISK_PARITY: 15,
+    InvestmentStyle.GROWTH: 25,
+}
+
+# Default if style doesn't match any known style
+DEFAULT_POSITION_SIZING_PCT = 15
+
+
+def get_position_sizing_pct(style: InvestmentStyle) -> int:
+    """Get max position size percentage for an investment style.
+
+    Args:
+        style: InvestmentStyle enum value
+
+    Returns:
+        Max percentage of portfolio per position (e.g., 15 for 15%)
+    """
+    pct = POSITION_SIZING_PCT.get(style)
+    if pct is not None:
+        return pct
+    logger.warning(f"Unknown agent style '{style}', using default {DEFAULT_POSITION_SIZING_PCT}%")
+    return DEFAULT_POSITION_SIZING_PCT
+
 
 # ============================================================================
 # Typed Input Models for DecisionMaker
@@ -47,9 +75,10 @@ class DecisionContext:
     """Typed input context for Decision Maker.
 
     Receives typed models, converts to strings internally for prompts.
+    Prices are carried inside research_response.candidates (CandidateStock objects).
     """
     agent_name: str
-    agent_style: str
+    agent_style: InvestmentStyle
     research_response: ResearchResponse
     balance: float
     holdings: List["Holding"]
@@ -97,6 +126,7 @@ class DecisionMaker:
     agent_id: int
     mcp_pool: Optional["MCPPool"]
     model_name: str
+    agent_style: InvestmentStyle
     agent: Agent[TradingDecision]
 
     def __init__(self) -> None:
@@ -110,6 +140,7 @@ class DecisionMaker:
         agent_id: int,
         mcp_pool: Optional["MCPPool"] = None,
         model_name: str = "gpt-4o-mini",
+        agent_style: InvestmentStyle = InvestmentStyle.VALUE,
     ) -> "DecisionMaker":
         """Create Decision Maker with agent already initialized.
 
@@ -118,6 +149,7 @@ class DecisionMaker:
             agent_id: Agent ID for tools that need it
             mcp_pool: Optional MCP pool for additional research
             model_name: Model to use (default: gpt-4o-mini)
+            agent_style: Agent investment style (e.g., "Value Investor")
 
         Returns:
             DecisionMaker instance with agent ready to use
@@ -127,11 +159,13 @@ class DecisionMaker:
         instance.agent_id = agent_id
         instance.mcp_pool = mcp_pool
         instance.model_name = model_name
+        instance.agent_style = agent_style
         instance.agent = await create_decision_maker_agent(
             agent_name=agent_name,
             agent_id=agent_id,
             mcp_pool=mcp_pool,
             model_name=model_name,
+            agent_style=agent_style,
         )
         return instance
 
@@ -152,6 +186,7 @@ class DecisionMaker:
             holdings_summary=context.holdings_summary,
             historical_context=context.historical_context,
             force_trade=context.force_trade,
+            agent_style=context.agent_style,
         )
 
     async def run(self, context: DecisionContext, max_turns: int = 10) -> AgentRunResult[TradingDecision]:
@@ -203,6 +238,7 @@ async def create_decision_maker_agent(
     agent_id: int,
     mcp_pool: Optional["MCPPool"] = None,
     model_name: str = "gpt-4o-mini",
+    agent_style: InvestmentStyle = InvestmentStyle.VALUE,
 ) -> Agent[TradingDecision]:
     """Create Decision Maker agent for decision phase.
 
@@ -211,6 +247,7 @@ async def create_decision_maker_agent(
         agent_id: Agent ID for tools that need it
         mcp_pool: Optional MCP pool for additional research
         model_name: Model to use (default: gpt-4o-mini)
+        agent_style: Agent investment style
 
     Returns:
         Agent configured for trading decisions with structured TradingDecision output
@@ -219,11 +256,13 @@ async def create_decision_maker_agent(
         Agent personality is loaded from template files (prompts/decision_maker/{agent_name}.txt).
         Uses structured output (output_type=TradingDecision) instead of tool callback.
     """
-    # Load instructions from template file
+    # Load instructions from template file with position sizing parameter
+    position_sizing_pct = get_position_sizing_pct(agent_style)
     instructions = load_and_format_prompt(
         "decision_maker",
         agent_name,
         datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        position_sizing_pct=str(position_sizing_pct),
     )
 
     # Create trading history tool
@@ -286,23 +325,33 @@ def build_decision_prompt(
     holdings_summary: str,
     historical_context: str,
     force_trade: bool = False,
+    agent_style: InvestmentStyle = InvestmentStyle.VALUE,
 ) -> str:
     """Build the decision prompt for Decision Maker agent.
 
     Args:
-        research_response: Market Analyst research results
+        research_response: Market Analyst research results (candidates carry prices)
         balance: Available cash balance
         position_count: Current number of positions
         max_positions: Maximum positions allowed (10)
         holdings_summary: Summary of current holdings
         historical_context: Recent trading history
         force_trade: Whether agent MUST make a trade (no HOLD allowed)
+        agent_style: Investment style for position sizing rules
 
     Returns:
         Formatted prompt string
     """
-    # Format research candidates
-    candidates_text = "\n".join([f"- {candidate}" for candidate in research_response.candidates])
+    position_sizing_pct = get_position_sizing_pct(agent_style)
+    max_position_value = balance * position_sizing_pct / 100.0
+
+    # Format research candidates with prices from CandidateStock objects
+    candidate_lines = []
+    for candidate in research_response.candidates:
+        candidate_lines.append(
+            f"- {candidate.symbol} (current price: ${candidate.price:,.2f})"
+        )
+    candidates_text = "\n".join(candidate_lines)
 
     # Format research sources
     sources_text = "\n".join(
@@ -330,6 +379,22 @@ def build_decision_prompt(
 {historical_context if historical_context else "No recent trades"}
 
 """
+
+    # Add price-based budget constraint (prices always available via CandidateStock)
+    if research_response.candidates:
+        prompt += """**BUDGET CONSTRAINT (MANDATORY):**
+- total_cost = quantity x price_per_share
+- total_cost MUST be <= available cash balance (${balance:,.2f})
+- If you cannot afford at least 1 share, do NOT pick that candidate
+""".format(balance=balance)
+
+    # Add position sizing constraint (always, reinforces the system prompt rule)
+    prompt += """**POSITION SIZING CONSTRAINT (MANDATORY):**
+- Max {pct}% of portfolio per position
+- max_position_value = ${max_val:,.2f}
+- total_cost for any single trade MUST be <= ${max_val:,.2f}
+- This prevents over-concentration in any single holding
+""".format(pct=position_sizing_pct, max_val=max_position_value)
 
     if force_trade:
         prompt += """

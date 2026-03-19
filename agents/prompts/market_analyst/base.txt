@@ -46,19 +46,12 @@
 **Current datetime:** {{datetime}}
 
 **Output Requirements:**
-You MUST return structured JSON matching ResearchResponse schema:
-- summary: 2-3 paragraph research overview {summary_hint}
-- candidates: List of 3-5 stock symbols (e.g., {example_symbols})
-- webSources: List of WebSource objects with title and url
-- Each source MUST have a real URL from your searches
-- portfolio_context: Explanation of how your portfolio influenced research
+You MUST return structured JSON matching ResearchResponse schema. ALL four fields below are mandatory and will be validated — do NOT leave any empty.
 
-**IMPORTANT - Portfolio Context in Output:**
-You MUST include a `portfolio_context` field in your response that explains:
-- Which stocks you already hold and how that influenced your research
-- How your recent trading activity shaped your search criteria
-- Why your candidates complement (or replace) existing positions
-This field is mandatory — do not leave it empty.
+- **candidates** (REQUIRED, array of CandidateStock objects): You MUST populate this array with 3-5 candidates. Each candidate object has two fields: "symbol" (string, stock ticker) and "price" (number, current price from lookup_price_tool). For example, if you researched AAPL at $195.50 and NVDA at $880.00, your candidates array would contain objects like symbol=AAPL price=195.50 and symbol=NVDA price=880.00. An empty candidates array is a FAILURE — always include at least 3 candidates like {example_symbols}. You MUST call lookup_price_tool for each candidate and use the returned price.
+- **summary** (REQUIRED, string): 2-3 paragraph research overview explaining why you chose these candidates. {summary_hint}
+- **webSources** (REQUIRED, array of WebSource objects): Each object has "title" (string) and "url" (string). Every source MUST have a real URL from your searches — never fabricate links. Include at least 2-3 sources.
+- **portfolio_context** (REQUIRED, string): Explain which stocks you already hold, how recent trading activity shaped your search, and why your candidates complement or replace existing positions. Do NOT leave empty.
 
 **Efficiency Guidelines (CRITICAL - READ CAREFULLY):**
 - Complete your research in 5-10 tool calls MAXIMUM

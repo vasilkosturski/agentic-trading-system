@@ -18,7 +18,9 @@ from typing import Optional
 
 from agents import Runner
 
-from models import TradingDecision, ResearchResponse, CycleResult
+from guardrail_retry import run_with_guardrail_retry
+
+from models import TradingDecision, ResearchResponse, CycleResult, InvestmentStyle
 from models.orchestration import (
     AccountData,
     RunContext,
@@ -97,7 +99,7 @@ class AgentExecutor:
         self,
         agent_id: int,
         name: str,
-        agent_style: str,
+        agent_style: InvestmentStyle,
         model_name: str = "gpt-4o-mini",
     ):
         """Initialize executor with agent identity.
@@ -105,7 +107,7 @@ class AgentExecutor:
         Args:
             agent_id: Unique agent identifier
             name: Agent name (e.g., "Warren")
-            agent_style: Investment style (e.g., "Value Investor")
+            agent_style: Investment style enum value
             model_name: Model to use for agents (default: gpt-4o-mini)
         """
         # Agent identity (immutable for lifetime of executor)
@@ -354,8 +356,16 @@ class AgentExecutor:
 
         logger.info(f"🔬 Running Market Analyst for {ctx.agent_name}...")
 
-        # Run Market Analyst
-        result = await Runner.run(market_analyst.agent, research_prompt, max_turns=30)
+        # Run Market Analyst with guardrail retry loop.
+        # If the output guardrail rejects the response, the retry function
+        # reconstructs the conversation and retries so the LLM can self-correct.
+        result = await run_with_guardrail_retry(
+            market_analyst.agent,
+            research_prompt,
+            max_attempts=3,
+            max_turns=30,
+            agent_name=ctx.agent_name,
+        )
 
         # Extract ResearchResponse - type-safe using SDK's final_output_as()
         try:
@@ -394,12 +404,19 @@ class AgentExecutor:
         ]
         logger.info(f"🔧 Market Analyst made {len(tool_calls)} tool calls")
 
-        candidates = research_response.candidates
-        logger.info(f"✅ Market Analyst found {len(candidates)} candidates with {len(sources)} sources")
+        # Prices are now carried directly in CandidateStock objects within
+        # research_response.candidates — no brittle tool-output parsing needed.
+        # Extract symbol strings for DB storage (backend expects list[str]).
+        candidate_symbols = [c.symbol for c in research_response.candidates]
+
+        logger.info(
+            f"✅ Market Analyst found {len(candidate_symbols)} candidates "
+            f"with prices, {len(sources)} sources"
+        )
 
         return ResearchResult(
             research_response=research_response,
-            candidates=candidates,
+            candidates=candidate_symbols,
             sources=sources,
             notes=research_response.summary,
             tool_calls=tool_calls,
@@ -436,6 +453,7 @@ class AgentExecutor:
             agent_id=ctx.agent_id,
             mcp_pool=mcp_pool,
             model_name=ctx.model_name,
+            agent_style=ctx.agent_style,
         )
 
         # Type narrowing: research_response is guaranteed set by _run_market_analyst

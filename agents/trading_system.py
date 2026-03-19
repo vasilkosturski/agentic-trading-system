@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 from agents.mcp import MCPServerStdio
 from simple_trader import SimpleTrader
+from models.investment_style import InvestmentStyle
 from api_server import TradingAPIServer
 from mcp_types import MCPName, MCPPool
 from mcp_params import get_mcp_server_params
@@ -36,10 +37,10 @@ class TradingSystem:
     
     # Agent definitions — single source of truth for agent names and config
     AGENT_CONFIGS = [
-        {"name": "Warren", "style": "Value Investor", "balance": 105000.0},
-        {"name": "George", "style": "Momentum Trader", "balance": 52500.0},
-        {"name": "Ray", "style": "Risk Parity", "balance": 78000.0},
-        {"name": "Cathie", "style": "Growth Innovation", "balance": 63500.0},
+        {"name": "Warren", "style": InvestmentStyle.VALUE, "balance": 100000.0},
+        {"name": "George", "style": InvestmentStyle.MOMENTUM, "balance": 100000.0},
+        {"name": "Ray", "style": InvestmentStyle.RISK_PARITY, "balance": 100000.0},
+        {"name": "Cathie", "style": InvestmentStyle.GROWTH, "balance": 100000.0},
     ]
 
     @classmethod
@@ -55,7 +56,7 @@ class TradingSystem:
             try:
                 agent_id = await client.initialize_agent(name, balance)
                 agents.append(SimpleTrader(name, style, "", agent_id=agent_id))
-                logger.info(f"✓ Created {name} ({style}) with agent ID {agent_id}")
+                logger.info(f"Created {name} ({style}) with agent ID {agent_id}")
             except Exception as e:
                 logger.error(f"Failed to initialize agent {name}: {e}")
 
@@ -83,27 +84,25 @@ class TradingSystem:
             forced_agent = random.choice(self.agents).name
             logger.info(f"🎯 Manual trigger: Forcing {forced_agent} to make a trade this cycle")
 
-        # Create MCP pool for this trading cycle
-        async with AsyncExitStack() as stack:
-            # Get MCP server configurations
-            mcp_params = get_mcp_server_params()
+        async def run_agent_with_own_mcp(agent: SimpleTrader, force_trade: bool):
+            """Each agent gets its own MCP pool to avoid stdio interleaving."""
+            async with AsyncExitStack() as stack:
+                mcp_params = get_mcp_server_params()
+                mcp_pool: MCPPool = {}
+                for mcp_name, params in mcp_params.items():
+                    server = await stack.enter_async_context(
+                        MCPServerStdio(params, client_session_timeout_seconds=120)
+                    )
+                    mcp_pool[mcp_name] = server
+                logger.info(f"✅ MCP pool created for {agent.name}: {list(mcp_pool.keys())}")
+                await agent.run(mcp_pool, force_trade=force_trade)
 
-            # Create pool: MCPName -> ServerSession
-            mcp_pool: MCPPool = {}
-            for mcp_name, params in mcp_params.items():
-                server = await stack.enter_async_context(
-                    MCPServerStdio(params, client_session_timeout_seconds=120)
-                )
-                mcp_pool[mcp_name] = server
-
-            logger.info(f"✅ MCP pool created with {len(mcp_pool)} servers: {list(mcp_pool.keys())}")
-
-            # Run all agents concurrently with shared MCP pool
-            tasks = [
-                agent.run(mcp_pool, force_trade=(agent.name == forced_agent))
-                for agent in self.agents
-            ]
-            await asyncio.gather(*tasks, return_exceptions=True)
+        # Run all agents concurrently, each with its own MCP servers
+        tasks = [
+            run_agent_with_own_mcp(agent, force_trade=(agent.name == forced_agent))
+            for agent in self.agents
+        ]
+        await asyncio.gather(*tasks, return_exceptions=True)
 
         logger.info("✅ All agents completed their trading cycle")
     

@@ -1,31 +1,24 @@
 """SDK parsing utilities for OpenAI Agents SDK results.
 
-Uses isinstance() with SDK classes (ToolCallItem, ToolCallOutputItem) as
-recommended by official OpenAI documentation. Extracts tool calls from
-agent results.
+Extracts tool calls from agent result items by pairing ToolCallItem (name +
+params) with ToolCallOutputItem (output) via call_id.
+
+Output strings come from raw_item["output"] which the SDK already serializes
+(see ItemHelpers.tool_call_output_item → _convert_tool_output), so we never
+need to guess the type of item.output ourselves.
 
 Error detection covers two patterns:
-1. SDK's default_tool_error_function prefix — when a tool raises, the SDK
-   catches it and returns "An error occurred while running the tool …".
-2. ToolError model returns — when a tool catches exceptions and returns a
-   ``ToolError`` Pydantic model, the SDK serialises it as a string with
-   distinctive ``error=`` and ``error_type=`` fields.
-
-See: GitHub issue #2165 — SDK does not surface MCP isError for local tools.
+1. SDK's default_tool_error_function prefix — "An error occurred …"
+2. ToolError model returns — distinctive error= and error_type= fields.
 """
 
 import json
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-# Import SDK item types for isinstance() checks
 from agents.items import RunItem, ToolCallItem, ToolCallOutputItem
 
-# Import OpenAI response types for proper typed access
-from openai.types.responses.response_function_tool_call import ResponseFunctionToolCall
 
-
-# Tool name constants
 TOOL_RESEARCHER = "Researcher"
 TOOL_DECIDE_ACTION = "decide_action"
 
@@ -37,91 +30,61 @@ class ParsedToolCall:
     name: str
     call_id: str
     output: str
-    params: Optional[Dict[str, Any]] = None  # Tool input parameters
+    params: Optional[Dict[str, Any]] = None
     is_error: bool = False
     error_message: Optional[str] = None
 
 
+def _field(obj: Any, key: str) -> Any:
+    """Read a field from a dict or object — handles both SDK raw_item shapes."""
+    if isinstance(obj, dict):
+        return obj.get(key)
+    return getattr(obj, key, None)
+
+
 def extract_tool_calls(items: list[RunItem]) -> list[ParsedToolCall]:
-    """Extract tool calls from SDK result items using isinstance().
+    """Extract tool calls from SDK result items.
 
-    Uses SDK classes (ToolCallItem, ToolCallOutputItem) as recommended
-    by OpenAI documentation. Maps call_id to tool names to associate
-    outputs with their originating tool calls.
-
-    Args:
-        items: List of items from agent result.new_items
-
-    Returns:
-        List of ParsedToolCall with name, call_id, output, and params
+    Pairs ToolCallItem (name + params) with ToolCallOutputItem (output)
+    via call_id. Output is read from raw_item which the SDK already
+    serializes to a string.
     """
     tool_calls: List[ParsedToolCall] = []
-    tool_name_by_call_id: Dict[str, str] = {}
-    tool_params_by_call_id: Dict[str, Optional[Dict[str, Any]]] = {}
+    names: Dict[str, str] = {}
+    params: Dict[str, Optional[Dict[str, Any]]] = {}
 
     for item in items:
-        # ToolCallItem: Record tool name and params mapping (no output yet)
         if isinstance(item, ToolCallItem):
-            raw_item = item.raw_item
-            if not raw_item:
+            raw = item.raw_item
+            if not raw:
                 continue
-
-            # ResponseFunctionToolCall has guaranteed required fields
-            if isinstance(raw_item, ResponseFunctionToolCall):
-                tool_name_by_call_id[raw_item.call_id] = raw_item.name
-                # Parse arguments (guaranteed str)
+            call_id = _field(raw, "call_id")
+            name = _field(raw, "name")
+            if not call_id or not name:
+                continue
+            names[call_id] = name
+            args = _field(raw, "arguments")
+            if args:
                 try:
-                    tool_params_by_call_id[raw_item.call_id] = json.loads(raw_item.arguments)
-                except json.JSONDecodeError:
-                    tool_params_by_call_id[raw_item.call_id] = {"raw": raw_item.arguments[:200]}
-            else:
-                # Dict or other tool types - need None checks
-                if isinstance(raw_item, dict):
-                    name = raw_item.get("name")
-                    call_id = raw_item.get("call_id")
-                    arguments = raw_item.get("arguments")
-                else:
-                    name = getattr(raw_item, "name", None)
-                    call_id = getattr(raw_item, "call_id", None)
-                    arguments = getattr(raw_item, "arguments", None)
+                    params[call_id] = json.loads(args) if isinstance(args, str) else args
+                except (json.JSONDecodeError, TypeError):
+                    params[call_id] = None
 
-                if name and call_id:
-                    tool_name_by_call_id[call_id] = name
-                    params = None
-                    if arguments:
-                        try:
-                            params = json.loads(arguments) if isinstance(arguments, str) else arguments
-                        except (json.JSONDecodeError, TypeError):
-                            params = {"raw": str(arguments)[:200]}
-                    tool_params_by_call_id[call_id] = params
-            continue  # Wait for output item
-
-        # ToolCallOutputItem: Has the actual output
-        if isinstance(item, ToolCallOutputItem):
-            # call_id is on output_raw_item (FunctionCallOutput TypedDict or dict)
-            # SDK raw_item types differ between ToolCallItem and ToolCallOutputItem
-            output_raw_item: Any = item.raw_item
-            if isinstance(output_raw_item, dict):
-                call_id = output_raw_item.get("call_id")
-            else:
-                call_id = getattr(output_raw_item, "call_id", None)
-            output = str(item.output) if item.output else ""
-
-            # Look up tool name and params from earlier ToolCallItem
-            if call_id and call_id in tool_name_by_call_id:
-                tool_name = tool_name_by_call_id[call_id]
-                params = tool_params_by_call_id.get(call_id)
-                is_error, error_message = _detect_tool_error(output)
-                tool_calls.append(
-                    ParsedToolCall(
-                        name=tool_name,
-                        call_id=call_id,
-                        output=output,
-                        params=params,
-                        is_error=is_error,
-                        error_message=error_message,
-                    )
-                )
+        elif isinstance(item, ToolCallOutputItem):
+            raw = item.raw_item
+            call_id = _field(raw, "call_id")
+            # SDK already serialized the output (ItemHelpers._convert_tool_output)
+            output = _field(raw, "output") or ""
+            if call_id and call_id in names:
+                is_error, error_msg = _detect_tool_error(output)
+                tool_calls.append(ParsedToolCall(
+                    name=names[call_id],
+                    call_id=call_id,
+                    output=output,
+                    params=params.get(call_id),
+                    is_error=is_error,
+                    error_message=error_msg,
+                ))
 
     return tool_calls
 

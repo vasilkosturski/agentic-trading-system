@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from agent_executor import AgentExecutor
+from models.investment_style import InvestmentStyle
 from models.orchestration import (
     CycleResult,
     RunContext,
@@ -15,7 +16,7 @@ from models.orchestration import (
     DecisionResult,
     ExecutionResult,
 )
-from models.llm_output import TradingDecision, ResearchResponse, WebSource
+from models.llm_output import CandidateStock, TradingDecision, ResearchResponse, WebSource
 from models.run_tracking import PhaseStatus, RunPhase, TradeDecision
 
 
@@ -33,7 +34,7 @@ def sample_agent_name():
 
 @pytest.fixture
 def sample_agent_style():
-    return "Value Investor"
+    return InvestmentStyle.VALUE
 
 @pytest.fixture
 def sample_strategy():
@@ -78,7 +79,10 @@ def sample_recent_activity():
 @pytest.fixture
 def sample_research_response():
     return ResearchResponse(
-        candidates=["AAPL", "NVDA"],
+        candidates=[
+            CandidateStock(symbol="AAPL", price=185.0),
+            CandidateStock(symbol="NVDA", price=145.0),
+        ],
         summary="Found 2 candidates",
         webSources=[
             WebSource(title="Article 1", url="https://example.com/1"),
@@ -240,7 +244,7 @@ class TestAgentExecutorMarketAnalyst:
     """Test _run_market_analyst method."""
 
     @patch("agent_executor.MarketAnalyst")
-    @patch("agent_executor.Runner")
+    @patch("guardrail_retry.Runner")
     async def test_run_market_analyst_returns_research_result(
         self,
         mock_runner_class,
@@ -260,9 +264,10 @@ class TestAgentExecutorMarketAnalyst:
         mock_analyst_instance.build_prompt.return_value = "test prompt"
         mock_market_analyst_class.create = AsyncMock(return_value=mock_analyst_instance)
 
-        # Setup mock Runner result
+        # Setup mock Runner result with empty new_items (no tool calls)
         mock_result = MagicMock()
         mock_result.final_output_as.return_value = sample_research_response
+        mock_result.new_items = []  # No tool calls → no candidate prices extracted
         mock_runner_class.run = AsyncMock(return_value=mock_result)
 
         executor = AgentExecutor(
@@ -289,7 +294,9 @@ class TestAgentExecutorMarketAnalyst:
         # Verify ResearchResult returned
         assert isinstance(result, ResearchResult)
         assert result.research_response == sample_research_response
+        # Candidates extracted as symbol strings from CandidateStock objects
         assert len(result.candidates) == 2
+        assert result.candidates == ["AAPL", "NVDA"]
         assert result.notes == sample_research_response.summary
 
 
@@ -568,6 +575,7 @@ class TestAgentExecutorFullCycle:
     @patch("agent_executor.DecisionMaker")
     @patch("agent_executor.MarketAnalyst")
     @patch("agent_executor.Runner")
+    @patch("guardrail_retry.Runner")
     @patch("agent_executor.update_phase")
     @patch("agent_executor.create_run")
     @patch("agent_executor.get_backend_client")
@@ -584,6 +592,7 @@ class TestAgentExecutorFullCycle:
         mock_get_backend_client,
         mock_create_run,
         mock_update_phase,
+        mock_guardrail_runner_class,
         mock_runner_class,
         mock_market_analyst_class,
         mock_decision_maker_class,
@@ -637,14 +646,16 @@ class TestAgentExecutorFullCycle:
         mock_dm_instance.build_prompt.return_value = "decision prompt"
         mock_decision_maker_class.create = AsyncMock(return_value=mock_dm_instance)
 
-        # Runner returns research then decision
+        # Market Analyst runs through guardrail_retry.Runner
         mock_research_result = MagicMock()
         mock_research_result.final_output_as.return_value = sample_research_response
+        mock_research_result.new_items = []  # No tool calls
+        mock_guardrail_runner_class.run = AsyncMock(return_value=mock_research_result)
 
+        # Decision Maker runs through agent_executor.Runner
         mock_decision_result = MagicMock()
         mock_decision_result.final_output_as.return_value = sample_decision
-
-        mock_runner_class.run = AsyncMock(side_effect=[mock_research_result, mock_decision_result])
+        mock_runner_class.run = AsyncMock(return_value=mock_decision_result)
 
         # Trade execution
         mock_buy.return_value = MagicMock(tradeId=456)

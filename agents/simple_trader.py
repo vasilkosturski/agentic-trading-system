@@ -13,6 +13,7 @@ from datetime import datetime
 from agents import trace
 
 from agent_executor import AgentExecutor
+from models.investment_style import InvestmentStyle
 from mcp_types import MCPName, MCPPool
 
 logger = logging.getLogger(__name__)
@@ -92,10 +93,10 @@ class SimpleTrader:
     to match the researcher.py pattern.
     """
     name: str
-    agent_style: str  # e.g., "Value Investor", "Contrarian Macro"
+    agent_style: InvestmentStyle
     strategy: str
     agent_id: int  # Required - set by TradingSystem.create()
-    model_name: str = "gpt-4o-mini"
+    model_name: str = "gpt-4o"
 
     async def run(self, mcp_pool: MCPPool, force_trade: bool = False):
         """Run a trading cycle. Delegates to module-level function.

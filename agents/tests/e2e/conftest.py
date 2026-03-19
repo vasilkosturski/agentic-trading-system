@@ -13,6 +13,7 @@ They start automatically on first test and stop after the session.
 
 import os
 import logging
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -81,10 +82,70 @@ def require_brave_api_key():
 # Docker-based Backend (pytest-docker)
 # =============================================================================
 
+@pytest.fixture(scope="session", autouse=True)
+def _ensure_buildkit_zscaler_trust():
+    """Inject Zscaler CA into BuildKit container if present.
+
+    BuildKit runs in its own container and doesn't inherit the Podman VM's
+    CA trust store. After a `podman system prune`, the CA must be re-injected.
+    This fixture is idempotent — safe to run when Zscaler is not in use.
+    """
+    ca_file = Path.home() / "zscaler-ca.pem"
+    if not ca_file.exists():
+        return  # No Zscaler CA — nothing to do
+
+    podman = "/opt/podman/bin/podman"
+    container = "buildx_buildkit_default"
+
+    # Check if buildkit container exists and is running
+    result = subprocess.run(
+        [podman, "container", "exists", container],
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        return  # Container doesn't exist yet — will be created by compose
+
+    # Check if CA is already injected
+    result = subprocess.run(
+        [podman, "exec", container, "test", "-f",
+         "/usr/local/share/ca-certificates/zscaler-ca.crt"],
+        capture_output=True,
+    )
+    if result.returncode == 0:
+        return  # Already injected
+
+    logger.info("Injecting Zscaler CA into BuildKit container...")
+    subprocess.run(
+        [podman, "exec", container, "mkdir", "-p",
+         "/usr/local/share/ca-certificates"],
+        check=True, capture_output=True,
+    )
+    subprocess.run(
+        [podman, "cp", str(ca_file),
+         f"{container}:/usr/local/share/ca-certificates/zscaler-ca.crt"],
+        check=True, capture_output=True,
+    )
+    subprocess.run(
+        [podman, "exec", container, "sh", "-c",
+         "apk --no-cache add ca-certificates 2>/dev/null; update-ca-certificates 2>/dev/null"],
+        check=True, capture_output=True,
+    )
+    subprocess.run(
+        [podman, "restart", container],
+        check=True, capture_output=True,
+    )
+    logger.info("BuildKit container now trusts Zscaler CA.")
+
+
 @pytest.fixture(scope="session")
 def docker_compose_command():
-    """Use podman compose instead of docker compose."""
-    return "podman compose"
+    """Use docker-compose CLI (Go binary) which supports buildkit.
+
+    `podman compose` forcefully sets DOCKER_BUILDKIT=0, falling back to the
+    legacy builder. The docker-compose binary talks to Podman via DOCKER_HOST
+    but uses buildkit for builds.
+    """
+    return "docker-compose"
 
 
 # pytest-docker convention: auto-discovered by name, used by docker_services fixture.
@@ -273,7 +334,7 @@ def test_agent_name() -> str:
 
 
 @pytest.fixture
-def test_agent_style() -> str:
+def test_agent_style() -> "InvestmentStyle":
     """Agent style for E2E testing — derived from seed_data."""
     from seed_data import TEST_AGENT
     return TEST_AGENT.style

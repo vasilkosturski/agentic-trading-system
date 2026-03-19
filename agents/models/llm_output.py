@@ -38,6 +38,21 @@ class HistoricalInsight(BaseModel):
     )
 
 
+class CandidateStock(BaseModel):
+    """A stock candidate with its verified price from lookup_price_tool.
+
+    The Market Analyst populates this after calling lookup_price_tool
+    for each candidate, ensuring prices are always available downstream.
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    symbol: str = Field(
+        min_length=1, max_length=5, description="Stock ticker symbol (e.g., AAPL)"
+    )
+    price: float = Field(gt=0, description="Current price from lookup_price_tool")
+
+
 class ResearchResponse(BaseModel):
     """Market Analyst agent's structured output.
 
@@ -46,9 +61,9 @@ class ResearchResponse(BaseModel):
     """
 
     summary: str = Field(min_length=1, description="Research findings and analysis")
-    candidates: list[str] = Field(
+    candidates: list[CandidateStock] = Field(
         default_factory=list,
-        description="List of 3-5 stock symbols identified as potential candidates"
+        description="List of 3-5 stock candidates with their current prices"
     )
     webSources: list[WebSource] = Field(
         default_factory=list, description="List of cited web sources"

@@ -10,13 +10,15 @@ Uses dataclasses for type safety and readability instead of raw SQL strings.
 from dataclasses import dataclass, field
 from typing import Optional
 
+from models.investment_style import InvestmentStyle
+
 
 @dataclass(frozen=True)
 class SeedAgent:
     """Agent configuration for seeding and test fixtures."""
     name: str
     description: str
-    style: str
+    style: InvestmentStyle
     model_name: str
     is_active: bool = True
     trading_frequency: str = "DAILY"
@@ -65,7 +67,7 @@ class SeedData:
 TEST_AGENT = SeedAgent(
     name="Warren",
     description="Value investing agent",
-    style="Value Investor",
+    style=InvestmentStyle.VALUE,
     model_name="gpt-4o",
 )
 

@@ -25,6 +25,7 @@ from aioresponses import aioresponses
 
 # Import models for fixtures
 from models import TradingDecision, Holding
+from models.investment_style import InvestmentStyle
 
 
 @pytest.fixture
@@ -47,9 +48,9 @@ def sample_agent_name() -> str:
 
 
 @pytest.fixture
-def sample_agent_style() -> str:
+def sample_agent_style() -> InvestmentStyle:
     """Sample agent style for testing (two-agent architecture)."""
-    return "Value Investor"
+    return InvestmentStyle.VALUE
 
 
 @pytest.fixture
@@ -159,10 +160,14 @@ def sample_decision() -> TradingDecision:
 @pytest.fixture
 def sample_research_response():
     """Sample research response from Market Analyst for testing (two-agent architecture)."""
-    from models.llm_output import ResearchResponse, WebSource
+    from models.llm_output import ResearchResponse, WebSource, CandidateStock
     return ResearchResponse(
         summary="Found 3 value stocks: JPM, BAC, WFC. All show strong fundamentals with P/E ratios under 15 and solid dividend yields.",
-        candidates=["JPM", "BAC", "WFC"],
+        candidates=[
+            CandidateStock(symbol="JPM", price=195.50),
+            CandidateStock(symbol="BAC", price=42.30),
+            CandidateStock(symbol="WFC", price=58.75),
+        ],
         webSources=[
             WebSource(title="JPMorgan Q4 Earnings Beat Expectations", url="https://example.com/jpm-earnings"),
             WebSource(title="Bank Sector Analysis 2025", url="https://example.com/bank-analysis"),
