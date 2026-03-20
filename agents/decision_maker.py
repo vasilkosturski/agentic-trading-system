@@ -11,6 +11,7 @@ import logging
 from dataclasses import dataclass
 from agents import Agent, Runner, Tool, function_tool
 from agents.mcp import MCPServer
+from config import Config
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
 
@@ -139,7 +140,7 @@ class DecisionMaker:
         agent_name: str,
         agent_id: int,
         mcp_pool: Optional["MCPPool"] = None,
-        model_name: str = "gpt-4o-mini",
+        model_name: str = Config.OPENAI_MODEL,
         agent_style: InvestmentStyle = InvestmentStyle.VALUE,
     ) -> "DecisionMaker":
         """Create Decision Maker with agent already initialized.
@@ -148,7 +149,7 @@ class DecisionMaker:
             agent_name: Agent name (e.g., "Warren")
             agent_id: Agent ID for tools that need it
             mcp_pool: Optional MCP pool for additional research
-            model_name: Model to use (default: gpt-4o-mini)
+            model_name: Model to use (default: Config.OPENAI_MODEL)
             agent_style: Agent investment style (e.g., "Value Investor")
 
         Returns:
@@ -237,7 +238,7 @@ async def create_decision_maker_agent(
     agent_name: str,
     agent_id: int,
     mcp_pool: Optional["MCPPool"] = None,
-    model_name: str = "gpt-4o-mini",
+    model_name: str = Config.OPENAI_MODEL,
     agent_style: InvestmentStyle = InvestmentStyle.VALUE,
 ) -> Agent[TradingDecision]:
     """Create Decision Maker agent for decision phase.
@@ -246,7 +247,7 @@ async def create_decision_maker_agent(
         agent_name: Agent name (e.g., "Warren")
         agent_id: Agent ID for tools that need it
         mcp_pool: Optional MCP pool for additional research
-        model_name: Model to use (default: gpt-4o-mini)
+        model_name: Model to use (default: Config.OPENAI_MODEL)
         agent_style: Agent investment style
 
     Returns:

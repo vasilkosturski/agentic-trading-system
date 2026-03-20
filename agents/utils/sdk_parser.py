@@ -73,8 +73,10 @@ def extract_tool_calls(items: list[RunItem]) -> list[ParsedToolCall]:
         elif isinstance(item, ToolCallOutputItem):
             raw = item.raw_item
             call_id = _field(raw, "call_id")
-            # SDK already serialized the output (ItemHelpers._convert_tool_output)
-            output = _field(raw, "output") or ""
+            # SDK serializes output via _convert_tool_output → str or list
+            # (list when tool returns structured ToolOutputText/Image/File)
+            raw_output = _field(raw, "output") or ""
+            output = json.dumps(raw_output) if isinstance(raw_output, list) else str(raw_output)
             if call_id and call_id in names:
                 is_error, error_msg = _detect_tool_error(output)
                 tool_calls.append(ParsedToolCall(
