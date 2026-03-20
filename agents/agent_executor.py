@@ -18,6 +18,7 @@ from typing import Optional
 
 from agents import Runner
 
+from config import Config
 from guardrail_retry import run_with_guardrail_retry
 
 from models import TradingDecision, ResearchResponse, CycleResult, InvestmentStyle
@@ -100,7 +101,7 @@ class AgentExecutor:
         agent_id: int,
         name: str,
         agent_style: InvestmentStyle,
-        model_name: str = "gpt-4o-mini",
+        model_name: str = Config.OPENAI_MODEL,
     ):
         """Initialize executor with agent identity.
 
@@ -108,7 +109,7 @@ class AgentExecutor:
             agent_id: Unique agent identifier
             name: Agent name (e.g., "Warren")
             agent_style: Investment style enum value
-            model_name: Model to use for agents (default: gpt-4o-mini)
+            model_name: Model to use for agents
         """
         # Agent identity (immutable for lifetime of executor)
         self.agent_id = agent_id

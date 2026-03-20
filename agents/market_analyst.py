@@ -42,6 +42,7 @@ import logging
 from dataclasses import dataclass
 from agents import Agent, Runner, Tool, function_tool, output_guardrail, GuardrailFunctionOutput, RunContextWrapper
 from agents.mcp import MCPServer
+from config import Config
 from utils.sdk_parser import extract_tool_calls, get_tool_errors
 from datetime import datetime
 from typing import Optional, Union, List, TYPE_CHECKING
@@ -73,29 +74,39 @@ logger = logging.getLogger(__name__)
 # Output Guardrail
 # ============================================================================
 
+_PLACEHOLDER_DOMAINS = {"example.com", "example.org", "example.net", "placeholder.com"}
+
+
 @output_guardrail
 async def validate_research_output(
     _ctx: RunContextWrapper, _agent: Agent, output: ResearchResponse
 ) -> GuardrailFunctionOutput:
     """Validate that Market Analyst produced actionable research.
 
-    Checks that candidates and webSources are non-empty, and that every
-    candidate has a positive price (already enforced by Pydantic gt=0,
-    but we double-check here for the guardrail feedback message).
+    Checks:
+    - candidates and webSources are non-empty
+    - candidates have positive prices
+    - webSources contain real URLs, not placeholder/hallucinated domains
     """
     issues: list[str] = []
     if not output.candidates:
         issues.append("candidates is empty")
     else:
-        # Pydantic gt=0 enforces positive prices at parse time, but
-        # if the LLM omits a price field Pydantic will reject the whole
-        # response before we get here. This check catches edge cases
-        # where candidates exist but none have valid prices.
         no_price = [c.symbol for c in output.candidates if c.price <= 0]
         if no_price:
             issues.append(f"candidates missing prices: {no_price}")
     if not output.webSources:
         issues.append("webSources is empty")
+    else:
+        # Detect hallucinated URLs — model sometimes fabricates sources
+        # instead of using brave_web_search
+        fake = [s.url for s in output.webSources
+                if any(d in s.url for d in _PLACEHOLDER_DOMAINS)]
+        if fake:
+            issues.append(
+                f"webSources contain placeholder URLs (use brave_web_search "
+                f"for real sources): {fake}"
+            )
     return GuardrailFunctionOutput(
         output_info={"issues": issues},
         tripwire_triggered=len(issues) > 0,
@@ -176,7 +187,7 @@ class MarketAnalyst:
         agent_name: str,
         agent_id: int,
         mcp_pool: "MCPPool",
-        model_name: str = "gpt-4o-mini",
+        model_name: str = Config.OPENAI_MODEL,
     ) -> "MarketAnalyst":
         """Create Market Analyst with agent already initialized.
 
@@ -184,7 +195,7 @@ class MarketAnalyst:
             agent_name: Agent name (e.g., "Warren")
             agent_id: Agent ID for backend API calls
             mcp_pool: MCP pool with Brave Search + Fetch servers
-            model_name: Model to use (default: gpt-4o-mini)
+            model_name: Model to use (default: Config.OPENAI_MODEL)
 
         Returns:
             MarketAnalyst instance with agent ready to use
@@ -269,7 +280,7 @@ async def create_market_analyst_agent(
     agent_name: str,
     agent_id: int,
     mcp_pool: "MCPPool",
-    model_name: str = "gpt-4o-mini",
+    model_name: str = Config.OPENAI_MODEL,
 ) -> Agent[ResearchResponse]:
     """Create Market Analyst agent for research phase.
 
@@ -277,7 +288,7 @@ async def create_market_analyst_agent(
         agent_name: Agent name (e.g., "Warren")
         agent_id: Agent ID for backend API calls (memory endpoints)
         mcp_pool: MCP pool with Brave Search + Fetch servers
-        model_name: Model to use (default: gpt-4o-mini)
+        model_name: Model to use (default: Config.OPENAI_MODEL)
 
     Returns:
         Agent configured for research with ResearchResponse output type

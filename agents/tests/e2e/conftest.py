@@ -83,16 +83,16 @@ def require_brave_api_key():
 # =============================================================================
 
 @pytest.fixture(scope="session", autouse=True)
-def _ensure_buildkit_zscaler_trust():
-    """Inject Zscaler CA into BuildKit container if present.
+def _ensure_buildkit_extra_ca_trust():
+    """Inject extra CA into BuildKit container if present.
 
     BuildKit runs in its own container and doesn't inherit the Podman VM's
     CA trust store. After a `podman system prune`, the CA must be re-injected.
-    This fixture is idempotent — safe to run when Zscaler is not in use.
+    This fixture is idempotent — safe to run when no extra CA is configured.
     """
-    ca_file = Path.home() / "zscaler-ca.pem"
+    ca_file = Path.home() / "extra-ca.pem"
     if not ca_file.exists():
-        return  # No Zscaler CA — nothing to do
+        return  # No extra CA — nothing to do
 
     podman = "/opt/podman/bin/podman"
     container = "buildx_buildkit_default"
@@ -108,13 +108,13 @@ def _ensure_buildkit_zscaler_trust():
     # Check if CA is already injected
     result = subprocess.run(
         [podman, "exec", container, "test", "-f",
-         "/usr/local/share/ca-certificates/zscaler-ca.crt"],
+         "/usr/local/share/ca-certificates/extra-ca.crt"],
         capture_output=True,
     )
     if result.returncode == 0:
         return  # Already injected
 
-    logger.info("Injecting Zscaler CA into BuildKit container...")
+    logger.info("Injecting extra CA into BuildKit container...")
     subprocess.run(
         [podman, "exec", container, "mkdir", "-p",
          "/usr/local/share/ca-certificates"],
@@ -122,7 +122,7 @@ def _ensure_buildkit_zscaler_trust():
     )
     subprocess.run(
         [podman, "cp", str(ca_file),
-         f"{container}:/usr/local/share/ca-certificates/zscaler-ca.crt"],
+         f"{container}:/usr/local/share/ca-certificates/extra-ca.crt"],
         check=True, capture_output=True,
     )
     subprocess.run(
@@ -134,7 +134,7 @@ def _ensure_buildkit_zscaler_trust():
         [podman, "restart", container],
         check=True, capture_output=True,
     )
-    logger.info("BuildKit container now trusts Zscaler CA.")
+    logger.info("BuildKit container now trusts extra CA.")
 
 
 @pytest.fixture(scope="session")
