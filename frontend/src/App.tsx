@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react'
-import './App.css'
+import { Table, Badge, Container, Title, Text } from '@mantine/core'
+import type { MantineColor } from '@mantine/core'
+
+type RunStatus = 'COMPLETED' | 'IN_PROGRESS' | 'FAILED'
+type RunPhase = 'INITIALIZING' | 'RESEARCHING' | 'DECIDING' | 'TRADING' | 'COMPLETED' | 'ERROR'
+type TradeDecision = 'BUY' | 'SELL' | 'HOLD'
 
 interface TradingRun {
   runId: number
   agentId: number
-  status: string
-  phase: string
-  decision: string | null
+  status: RunStatus
+  phase: RunPhase
+  decision: TradeDecision | null
   symbol: string | null
   startedAt: string
   completedAt: string | null
@@ -17,16 +22,27 @@ interface Agent {
   name: string
 }
 
-function decisionClass(decision: string | null): string {
+function statusColor(status: RunStatus): MantineColor {
+  switch (status) {
+    case 'COMPLETED':
+      return 'green'
+    case 'IN_PROGRESS':
+      return 'yellow'
+    case 'FAILED':
+      return 'red'
+  }
+}
+
+function decisionColor(decision: TradeDecision | null): MantineColor {
   switch (decision) {
     case 'BUY':
-      return 'decision-buy'
+      return 'green'
     case 'SELL':
-      return 'decision-sell'
+      return 'red'
     case 'HOLD':
-      return 'decision-hold'
+      return 'gray'
     default:
-      return ''
+      return 'gray'
   }
 }
 
@@ -64,7 +80,7 @@ function App() {
         setRuns(runsData.runs ?? [])
         setAgents(agentsData)
       } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
+        if (controller.signal.aborted) return
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
         if (!controller.signal.aborted) {
@@ -81,69 +97,73 @@ function App() {
 
   if (loading) {
     return (
-      <div className="app">
-        <h1>Trading Dashboard</h1>
-        <p className="status-message">Loading runs...</p>
-      </div>
+      <Container size="lg" py="xl">
+        <Title order={1} mb="lg">Trading Dashboard</Title>
+        <Text size="lg" c="dimmed">Loading runs...</Text>
+      </Container>
     )
   }
 
   if (error) {
     return (
-      <div className="app">
-        <h1>Trading Dashboard</h1>
-        <p className="status-message error">{error}</p>
-      </div>
+      <Container size="lg" py="xl">
+        <Title order={1} mb="lg">Trading Dashboard</Title>
+        <Text size="lg" c="red">{error}</Text>
+      </Container>
     )
   }
 
   if (runs.length === 0) {
     return (
-      <div className="app">
-        <h1>Trading Dashboard</h1>
-        <p className="status-message">No trading runs yet.</p>
-      </div>
+      <Container size="lg" py="xl">
+        <Title order={1} mb="lg">Trading Dashboard</Title>
+        <Text size="lg" c="dimmed">No trading runs yet.</Text>
+      </Container>
     )
   }
 
   return (
-    <div className="app">
-      <h1>Trading Dashboard</h1>
-      <table className="runs-table">
-        <thead>
-          <tr>
-            <th>Run ID</th>
-            <th>Agent</th>
-            <th>Status</th>
-            <th>Decision</th>
-            <th>Symbol</th>
-            <th>Started</th>
-            <th>Completed</th>
-          </tr>
-        </thead>
-        <tbody>
+    <Container size="lg" py="xl">
+      <Title order={1} mb="lg">Trading Dashboard</Title>
+      <Table striped highlightOnHover>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Run ID</Table.Th>
+            <Table.Th>Agent</Table.Th>
+            <Table.Th>Status</Table.Th>
+            <Table.Th>Decision</Table.Th>
+            <Table.Th>Symbol</Table.Th>
+            <Table.Th>Started</Table.Th>
+            <Table.Th>Completed</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
           {runs.map((run) => (
-            <tr key={run.runId}>
-              <td>{run.runId}</td>
-              <td>{agentMap.get(run.agentId) ?? `Agent #${run.agentId}`}</td>
-              <td>
-                <span className={`status-badge status-${run.status.toLowerCase()}`}>
+            <Table.Tr key={run.runId}>
+              <Table.Td>{run.runId}</Table.Td>
+              <Table.Td>{agentMap.get(run.agentId) ?? `Agent #${run.agentId}`}</Table.Td>
+              <Table.Td>
+                <Badge color={statusColor(run.status)} variant="light">
                   {run.status}
-                </span>
-              </td>
-              <td>
-                <span className={decisionClass(run.decision)}>
-                  {run.decision ?? '\u2014'}
-                </span>
-              </td>
-              <td>{run.symbol ?? '\u2014'}</td>
-              <td>{formatTimestamp(run.startedAt)}</td>
-              <td>{formatTimestamp(run.completedAt)}</td>
-            </tr>
+                </Badge>
+              </Table.Td>
+              <Table.Td>
+                {run.decision ? (
+                  <Badge color={decisionColor(run.decision)} variant="light">
+                    {run.decision}
+                  </Badge>
+                ) : (
+                  '\u2014'
+                )}
+              </Table.Td>
+              <Table.Td>{run.symbol ?? '\u2014'}</Table.Td>
+              <Table.Td>{formatTimestamp(run.startedAt)}</Table.Td>
+              <Table.Td>{formatTimestamp(run.completedAt)}</Table.Td>
+            </Table.Tr>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </Table.Tbody>
+      </Table>
+    </Container>
   )
 }
 
