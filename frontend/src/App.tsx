@@ -1,26 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Table, Badge, Container, Title, Text } from '@mantine/core'
 import type { MantineColor } from '@mantine/core'
-
-type RunStatus = 'COMPLETED' | 'IN_PROGRESS' | 'FAILED'
-type RunPhase = 'INITIALIZING' | 'RESEARCHING' | 'DECIDING' | 'TRADING' | 'COMPLETED' | 'ERROR'
-type TradeDecision = 'BUY' | 'SELL' | 'HOLD'
-
-interface TradingRun {
-  runId: number
-  agentId: number
-  status: RunStatus
-  phase: RunPhase
-  decision: TradeDecision | null
-  symbol: string | null
-  startedAt: string
-  completedAt: string | null
-}
-
-interface Agent {
-  id: number
-  name: string
-}
+import type { TradingRun, RunStatus, TradeDecision, Agent } from './types.ts'
 
 function statusColor(status: RunStatus): MantineColor {
   switch (status) {
@@ -51,7 +33,8 @@ function formatTimestamp(ts: string | null): string {
   return new Date(ts).toLocaleString()
 }
 
-function App() {
+function RunsTable() {
+  const navigate = useNavigate()
   const [runs, setRuns] = useState<TradingRun[]>([])
   const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
@@ -139,7 +122,11 @@ function App() {
         </Table.Thead>
         <Table.Tbody>
           {runs.map((run) => (
-            <Table.Tr key={run.runId}>
+            <Table.Tr
+              key={run.runId}
+              style={{ cursor: 'pointer' }}
+              onClick={() => navigate(`/runs/${run.runId}`)}
+            >
               <Table.Td>{run.runId}</Table.Td>
               <Table.Td>{agentMap.get(run.agentId) ?? `Agent #${run.agentId}`}</Table.Td>
               <Table.Td>
@@ -167,4 +154,4 @@ function App() {
   )
 }
 
-export default App
+export default RunsTable
