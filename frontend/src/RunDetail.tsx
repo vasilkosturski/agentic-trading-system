@@ -78,6 +78,26 @@ function formatParams(params: Record<string, unknown>): string {
     .join(', ')
 }
 
+function PhaseMetrics({ phase }: { phase: ResearchPhase | DecisionPhase }) {
+  const hasTokens = phase.inputTokens != null || phase.outputTokens != null
+  if (!hasTokens && !phase.modelName && !phase.numTurns) return null
+
+  return (
+    <Group gap="lg" mb="sm">
+      {phase.modelName && <Text size="xs" c="dimmed">Model: {phase.modelName}</Text>}
+      {phase.numTurns != null && <Text size="xs" c="dimmed">Turns: {phase.numTurns}</Text>}
+      {hasTokens && (
+        <Text size="xs" c="dimmed">
+          Tokens: {phase.inputTokens?.toLocaleString() ?? '?'} in / {phase.outputTokens?.toLocaleString() ?? '?'} out / {phase.tokensUsed?.toLocaleString() ?? '?'} total
+        </Text>
+      )}
+      {(phase.cachedTokens ?? 0) > 0 && <Text size="xs" c="dimmed">Cached: {phase.cachedTokens!.toLocaleString()}</Text>}
+      {(phase.reasoningTokens ?? 0) > 0 && <Text size="xs" c="dimmed">Reasoning: {phase.reasoningTokens!.toLocaleString()}</Text>}
+      {phase.costUsd != null && <Text size="xs" c="dimmed">Cost: ${phase.costUsd.toFixed(4)}</Text>}
+    </Group>
+  )
+}
+
 function ToolCallsTable({ toolCalls }: { toolCalls: ToolCall[] }) {
   if (toolCalls.length === 0) return null
   return (
@@ -121,6 +141,8 @@ function ResearchSection({ research }: { research: ResearchPhase | null }) {
         <Title order={3}>Research Phase</Title>
         <Text c="dimmed" size="sm">Completed in {research.latencyMs.toLocaleString()}ms</Text>
       </Group>
+
+      <PhaseMetrics phase={research} />
 
       <Text fw={600} mb={4}>Candidates</Text>
       <Group gap="xs" mb="md">
@@ -172,6 +194,8 @@ function DecisionSection({ decision }: { decision: DecisionPhase | null }) {
         <Title order={3}>Decision Phase</Title>
         <Text c="dimmed" size="sm">Completed in {decision.latencyMs.toLocaleString()}ms</Text>
       </Group>
+
+      <PhaseMetrics phase={decision} />
 
       <Group gap="sm" mb="md">
         <Badge color={decisionColor(decision.decision)} variant="light" size="lg">
@@ -232,6 +256,17 @@ function ExecutionSection({ execution }: { execution: ExecutionPhase | null }) {
 
       {execution.tradeId != null && (
         <Text size="sm" mb="sm">Trade ID: {execution.tradeId}</Text>
+      )}
+
+      {execution.trade && (
+        <Group gap="sm" mb="sm">
+          <Badge color={decisionColor(execution.trade.transactionType as TradeDecision)} variant="light">
+            {execution.trade.transactionType}
+          </Badge>
+          <Text fw={600}>{execution.trade.quantity} shares {execution.trade.symbol}</Text>
+          <Text c="dimmed">@ ${execution.trade.price.toFixed(2)}</Text>
+          <Text fw={600}>= ${execution.trade.totalAmount.toLocaleString()}</Text>
+        </Group>
       )}
 
       {execution.errorDetails && (

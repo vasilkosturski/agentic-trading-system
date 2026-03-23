@@ -51,6 +51,14 @@ export interface ResearchPhase {
   researchNotes: string
   toolCalls: ToolCall[]
   latencyMs: number
+  tokensUsed: number | null
+  inputTokens: number | null
+  outputTokens: number | null
+  numTurns: number | null
+  cachedTokens: number | null
+  reasoningTokens: number | null
+  costUsd: number | null
+  modelName: string | null
 }
 
 export interface DecisionPhase {
@@ -62,6 +70,22 @@ export interface DecisionPhase {
   sources: Source[]
   toolCalls: ToolCall[]
   latencyMs: number
+  tokensUsed: number | null
+  inputTokens: number | null
+  outputTokens: number | null
+  numTurns: number | null
+  cachedTokens: number | null
+  reasoningTokens: number | null
+  costUsd: number | null
+  modelName: string | null
+}
+
+export interface TradeDetail {
+  symbol: string
+  transactionType: string
+  quantity: number
+  price: number
+  totalAmount: number
 }
 
 export interface ExecutionPhase {
@@ -69,6 +93,7 @@ export interface ExecutionPhase {
   tradeId: number | null
   status: string
   errorDetails: string | null
+  trade: TradeDetail | null
 }
 
 export interface RunDetailResponse {

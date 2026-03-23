@@ -7,7 +7,7 @@ Each operation has explicit input parameters and returns a typed result.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List, Generic, TypeVar, TYPE_CHECKING
+from typing import Any, Dict, Optional, List, Generic, TypeVar, TYPE_CHECKING
 
 from pydantic import BaseModel
 
@@ -112,6 +112,7 @@ class ResearchResult:
     sources: List[SourceDto] = field(default_factory=list)
     notes: str = ""
     tool_calls: List["ToolCallDto"] = field(default_factory=list)
+    usage_metrics: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -120,6 +121,7 @@ class DecisionResult:
     decision: TradingDecision  # Required - throw on failure
     decision_start_time: datetime  # Required - always set before returning
     tool_calls: List["ToolCallDto"] = field(default_factory=list)
+    usage_metrics: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -181,6 +183,7 @@ class RunContext:
     research_sources: List[SourceDto] = field(default_factory=list)
     research_tool_calls: List["ToolCallDto"] = field(default_factory=list)
     research_notes: str = ""
+    research_usage_metrics: Dict[str, Any] = field(default_factory=dict)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # PHASE 2: DECISION MAKER (DECIDING)
@@ -192,6 +195,7 @@ class RunContext:
     decision: Optional[TradingDecision] = None  # BUY/SELL/HOLD - always set by phase end
     decision_sources: List[SourceDto] = field(default_factory=list)
     decision_tool_calls: List["ToolCallDto"] = field(default_factory=list)
+    decision_usage_metrics: Dict[str, Any] = field(default_factory=dict)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # PHASE 3: EXECUTION (TRADING)
