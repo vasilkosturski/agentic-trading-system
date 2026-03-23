@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -41,4 +42,14 @@ public class ResearchPhaseDto {
      * Research phase execution time in milliseconds.
      */
     private Long latencyMs;
+
+    // Token usage metrics from SDK
+    private Integer tokensUsed;
+    private Integer inputTokens;
+    private Integer outputTokens;
+    private Integer numTurns;
+    private Integer cachedTokens;
+    private Integer reasoningTokens;
+    private BigDecimal costUsd;
+    private String modelName;
 }

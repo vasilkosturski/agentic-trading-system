@@ -9,6 +9,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -29,23 +30,39 @@ public class DecisionPhaseDto {
     private List<SourceDto> sources;
     private List<ToolCallDto> toolCalls;
     private Long latencyMs;
+    private Integer tokensUsed;
+    private Integer inputTokens;
+    private Integer outputTokens;
+    private Integer numTurns;
+    private Integer cachedTokens;
+    private Integer reasoningTokens;
+    private BigDecimal costUsd;
+    private String modelName;
     private Instant createdAt;
 
     /**
      * Factory method to create DTO from DecisionPhase entity.
      */
     public static DecisionPhaseDto fromEntity(DecisionPhase decisionPhase) {
-        return new DecisionPhaseDto(
-            decisionPhase.getId(),
-            decisionPhase.getRun().getId(),
-            decisionPhase.getDecision(),
-            decisionPhase.getSymbol(),
-            decisionPhase.getQuantity(),
-            decisionPhase.getReasoning(),
-            decisionPhase.getSources(),
-            decisionPhase.getToolCalls(),
-            decisionPhase.getLatencyMs(),
-            decisionPhase.getCreatedAt()
-        );
+        DecisionPhaseDto dto = new DecisionPhaseDto();
+        dto.setDecisionId(decisionPhase.getId());
+        dto.setRunId(decisionPhase.getRun().getId());
+        dto.setDecision(decisionPhase.getDecision());
+        dto.setSymbol(decisionPhase.getSymbol());
+        dto.setQuantity(decisionPhase.getQuantity());
+        dto.setReasoning(decisionPhase.getReasoning());
+        dto.setSources(decisionPhase.getSources());
+        dto.setToolCalls(decisionPhase.getToolCalls());
+        dto.setLatencyMs(decisionPhase.getLatencyMs());
+        dto.setTokensUsed(decisionPhase.getTokensUsed());
+        dto.setInputTokens(decisionPhase.getInputTokens());
+        dto.setOutputTokens(decisionPhase.getOutputTokens());
+        dto.setNumTurns(decisionPhase.getNumTurns());
+        dto.setCachedTokens(decisionPhase.getCachedTokens());
+        dto.setReasoningTokens(decisionPhase.getReasoningTokens());
+        dto.setCostUsd(decisionPhase.getCostUsd());
+        dto.setModelName(decisionPhase.getModelName());
+        dto.setCreatedAt(decisionPhase.getCreatedAt());
+        return dto;
     }
 }

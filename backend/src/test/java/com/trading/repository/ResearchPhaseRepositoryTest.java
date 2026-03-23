@@ -131,11 +131,9 @@ class ResearchPhaseRepositoryTest extends BaseRepositoryTest {
         
         ToolCallDto toolCall1 = new ToolCallDto();
         toolCall1.setTool("brave_search");
-        toolCall1.setDurationMs(1200L);
-        
+
         ToolCallDto toolCall2 = new ToolCallDto();
         toolCall2.setTool("memory_search");
-        toolCall2.setDurationMs(50L);
         
         phase.setToolCalls(List.of(toolCall1, toolCall2));
         
@@ -148,11 +146,9 @@ class ResearchPhaseRepositoryTest extends BaseRepositoryTest {
         
         ToolCallDto loadedCall1 = loaded.getToolCalls().get(0);
         assertThat(loadedCall1.getTool()).isEqualTo("brave_search");
-        assertThat(loadedCall1.getDurationMs()).isEqualTo(1200L);
-        
+
         ToolCallDto loadedCall2 = loaded.getToolCalls().get(1);
         assertThat(loadedCall2.getTool()).isEqualTo("memory_search");
-        assertThat(loadedCall2.getDurationMs()).isEqualTo(50L);
     }
 
     @Test

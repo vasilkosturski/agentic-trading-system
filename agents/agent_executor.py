@@ -79,6 +79,46 @@ from decision_maker import DecisionMaker, DecisionContext
 logger = logging.getLogger(__name__)
 
 
+def _extract_usage_metrics(usage, model_name: str | None = None) -> dict:
+    """Extract token usage metrics from SDK RunResultBase.context_wrapper.usage.
+
+    Args:
+        usage: Usage object from result.context_wrapper.usage
+        model_name: Model name passed to Agent() constructor (fallback if SDK doesn't provide it)
+
+    Returns:
+        Dict with token metric fields matching backend DTOs.
+    """
+    cached = 0
+    if usage.input_tokens_details:
+        cached = getattr(usage.input_tokens_details, 'cached_tokens', 0) or 0
+
+    reasoning = 0
+    if usage.output_tokens_details:
+        reasoning = getattr(usage.output_tokens_details, 'reasoning_tokens', 0) or 0
+
+    # Try SDK first, fall back to the model name we passed to Agent()
+    sdk_model = None
+    if usage.request_usage_entries:
+        sdk_model = getattr(usage.request_usage_entries[0], 'model_name', None)
+    model_name = sdk_model or model_name
+
+    input_tokens = usage.input_tokens or 0
+    output_tokens = usage.output_tokens or 0
+    cost_usd = round((input_tokens * 0.15 + output_tokens * 0.60) / 1_000_000, 6)
+
+    return {
+        "tokensUsed": usage.total_tokens,
+        "inputTokens": input_tokens,
+        "outputTokens": output_tokens,
+        "numTurns": usage.requests,
+        "cachedTokens": cached,
+        "reasoningTokens": reasoning,
+        "modelName": model_name,
+        "costUsd": cost_usd,
+    }
+
+
 class AgentExecutor:
     """Handles agent execution orchestration for trading cycles.
 
@@ -178,6 +218,7 @@ class AgentExecutor:
             ctx.research_sources = research_result.sources
             ctx.research_notes = research_result.notes
             ctx.research_tool_calls = research_result.tool_calls
+            ctx.research_usage_metrics = research_result.usage_metrics
 
             # === DECISION PHASE ===
             decision_result = await self._run_decision_maker(
@@ -188,6 +229,7 @@ class AgentExecutor:
             ctx.decision = decision_result.decision
             ctx.decision_start_time = decision_result.decision_start_time
             ctx.decision_tool_calls = decision_result.tool_calls
+            ctx.decision_usage_metrics = decision_result.usage_metrics
 
             # Build decision sources - track what data informed the decision
             ctx.decision_sources = [
@@ -397,13 +439,17 @@ class AgentExecutor:
             ToolCallDto(
                 tool=pc.name,
                 params=pc.params,
-                durationMs=None,  # SDK doesn't provide individual durations
                 error=pc.is_error if pc.is_error else None,
                 errorMessage=pc.error_message,
             )
             for pc in parsed_calls
         ]
         logger.info(f"🔧 Market Analyst made {len(tool_calls)} tool calls")
+
+        # Extract SDK usage metrics
+        usage = result.context_wrapper.usage
+        usage_metrics = _extract_usage_metrics(usage, model_name=self.analyst.model_name)
+        logger.info(f"📊 Market Analyst usage: {usage_metrics.get('tokensUsed', 0)} tokens, model={usage_metrics.get('modelName')}")
 
         # Prices are now carried directly in CandidateStock objects within
         # research_response.candidates — no brittle tool-output parsing needed.
@@ -421,6 +467,7 @@ class AgentExecutor:
             sources=sources,
             notes=research_response.summary,
             tool_calls=tool_calls,
+            usage_metrics=usage_metrics,
         )
 
     async def _run_decision_maker(
@@ -496,13 +543,17 @@ class AgentExecutor:
             ToolCallDto(
                 tool=pc.name,
                 params=pc.params,
-                durationMs=None,  # SDK doesn't provide individual durations
                 error=pc.is_error if pc.is_error else None,
                 errorMessage=pc.error_message,
             )
             for pc in parsed_calls
         ]
         logger.info(f"🔧 Decision Maker made {len(tool_calls)} tool calls")
+
+        # Extract SDK usage metrics
+        usage = result.context_wrapper.usage
+        usage_metrics = _extract_usage_metrics(usage, model_name=self.decision_maker.model_name)
+        logger.info(f"📊 Decision Maker usage: {usage_metrics.get('tokensUsed', 0)} tokens, model={usage_metrics.get('modelName')}")
 
         # Calculate decision latency
         decision_latency_ms = int(
@@ -514,6 +565,7 @@ class AgentExecutor:
             decision=decision,
             decision_start_time=decision_start_time,
             tool_calls=tool_calls,
+            usage_metrics=usage_metrics,
         )
 
     async def _execute_trade(
@@ -644,6 +696,7 @@ class AgentExecutor:
             notes=ctx.research_notes,
             toolCalls=ctx.research_tool_calls,
             latencyMs=research_latency_ms,
+            **ctx.research_usage_metrics,
         )
 
         decision_data = DecisionPhaseData(
@@ -654,6 +707,7 @@ class AgentExecutor:
             sources=ctx.decision_sources,
             toolCalls=ctx.decision_tool_calls,
             latencyMs=decision_latency_ms,
+            **ctx.decision_usage_metrics,
         )
 
         execution_data = ExecutionPhaseData(

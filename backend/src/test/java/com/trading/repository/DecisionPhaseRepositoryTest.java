@@ -118,12 +118,10 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         ToolCallDto toolCall1 = new ToolCallDto();
         toolCall1.setTool("get_symbol_trade_history");
         toolCall1.setParams(Map.of("symbol", "AAPL", "limit", 10));
-        toolCall1.setDurationMs(150L);
-        
+
         ToolCallDto toolCall2 = new ToolCallDto();
         toolCall2.setTool("get_current_price");
         toolCall2.setParams(Map.of("symbol", "AAPL"));
-        toolCall2.setDurationMs(80L);
         
         phase.setToolCalls(List.of(toolCall1, toolCall2));
         
@@ -136,12 +134,10 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         
         ToolCallDto loadedCall1 = loaded.getToolCalls().get(0);
         assertThat(loadedCall1.getTool()).isEqualTo("get_symbol_trade_history");
-        assertThat(loadedCall1.getDurationMs()).isEqualTo(150L);
         assertThat(loadedCall1.getParams()).containsEntry("symbol", "AAPL");
-        
+
         ToolCallDto loadedCall2 = loaded.getToolCalls().get(1);
         assertThat(loadedCall2.getTool()).isEqualTo("get_current_price");
-        assertThat(loadedCall2.getDurationMs()).isEqualTo(80L);
     }
 
     @Test

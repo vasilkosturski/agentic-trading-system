@@ -160,6 +160,14 @@ public class TradingRunService {
             researchPhase.setResearchNotes(researchDto.getNotes());
             researchPhase.setToolCalls(researchDto.getToolCalls());
             researchPhase.setLatencyMs(researchDto.getLatencyMs());
+            researchPhase.setTokensUsed(researchDto.getTokensUsed());
+            researchPhase.setInputTokens(researchDto.getInputTokens());
+            researchPhase.setOutputTokens(researchDto.getOutputTokens());
+            researchPhase.setNumTurns(researchDto.getNumTurns());
+            researchPhase.setCachedTokens(researchDto.getCachedTokens());
+            researchPhase.setReasoningTokens(researchDto.getReasoningTokens());
+            researchPhase.setCostUsd(researchDto.getCostUsd());
+            researchPhase.setModelName(researchDto.getModelName());
             researchPhaseRepository.save(researchPhase);
         }
 
@@ -172,6 +180,14 @@ public class TradingRunService {
         decisionPhase.setSources(decisionDto.getSources());
         decisionPhase.setToolCalls(decisionDto.getToolCalls());
         decisionPhase.setLatencyMs(decisionDto.getLatencyMs());
+        decisionPhase.setTokensUsed(decisionDto.getTokensUsed());
+        decisionPhase.setInputTokens(decisionDto.getInputTokens());
+        decisionPhase.setOutputTokens(decisionDto.getOutputTokens());
+        decisionPhase.setNumTurns(decisionDto.getNumTurns());
+        decisionPhase.setCachedTokens(decisionDto.getCachedTokens());
+        decisionPhase.setReasoningTokens(decisionDto.getReasoningTokens());
+        decisionPhase.setCostUsd(decisionDto.getCostUsd());
+        decisionPhase.setModelName(decisionDto.getModelName());
         decisionPhaseRepository.save(decisionPhase);
 
         // Create execution phase only for BUY/SELL decisions
