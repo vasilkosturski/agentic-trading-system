@@ -44,13 +44,7 @@ export interface Reasoning {
   historicalContext: string
 }
 
-export interface ResearchPhase {
-  researchId: number
-  candidates: string[]
-  sources: Source[]
-  researchNotes: string
-  toolCalls: ToolCall[]
-  latencyMs: number
+export interface UsageMetrics {
   tokensUsed: number | null
   inputTokens: number | null
   outputTokens: number | null
@@ -59,6 +53,16 @@ export interface ResearchPhase {
   reasoningTokens: number | null
   costUsd: number | null
   modelName: string | null
+}
+
+export interface ResearchPhase {
+  researchId: number
+  candidates: string[]
+  sources: Source[]
+  researchNotes: string
+  toolCalls: ToolCall[]
+  latencyMs: number
+  metrics: UsageMetrics | null
 }
 
 export interface DecisionPhase {
@@ -70,14 +74,7 @@ export interface DecisionPhase {
   sources: Source[]
   toolCalls: ToolCall[]
   latencyMs: number
-  tokensUsed: number | null
-  inputTokens: number | null
-  outputTokens: number | null
-  numTurns: number | null
-  cachedTokens: number | null
-  reasoningTokens: number | null
-  costUsd: number | null
-  modelName: string | null
+  metrics: UsageMetrics | null
 }
 
 export interface TradeDetail {

@@ -1,12 +1,12 @@
 package com.trading.dto.request;
 
+import com.trading.dto.UsageMetricsDto;
 import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.SourceDto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -43,13 +43,8 @@ public class ResearchPhaseDto {
      */
     private Long latencyMs;
 
-    // Token usage metrics from SDK
-    private Integer tokensUsed;
-    private Integer inputTokens;
-    private Integer outputTokens;
-    private Integer numTurns;
-    private Integer cachedTokens;
-    private Integer reasoningTokens;
-    private BigDecimal costUsd;
-    private String modelName;
+    /**
+     * Token usage metrics from SDK (nested object).
+     */
+    private UsageMetricsDto metrics;
 }

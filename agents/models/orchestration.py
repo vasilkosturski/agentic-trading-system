@@ -7,13 +7,14 @@ Each operation has explicit input parameters and returns a typed result.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional, List, Generic, TypeVar, TYPE_CHECKING
+from typing import Optional, List, Generic, TypeVar, TYPE_CHECKING
 
 from pydantic import BaseModel
 
 from models.investment_style import InvestmentStyle
 from models.llm_output import TradingDecision, ResearchResponse
 from models.run_tracking import SourceDto, PhaseStatus
+from models.usage_metrics import UsageMetrics
 from models.api_responses import RecentActivityResponse
 
 if TYPE_CHECKING:
@@ -112,7 +113,7 @@ class ResearchResult:
     sources: List[SourceDto] = field(default_factory=list)
     notes: str = ""
     tool_calls: List["ToolCallDto"] = field(default_factory=list)
-    usage_metrics: Dict[str, Any] = field(default_factory=dict)
+    usage_metrics: Optional[UsageMetrics] = None
 
 
 @dataclass
@@ -121,7 +122,7 @@ class DecisionResult:
     decision: TradingDecision  # Required - throw on failure
     decision_start_time: datetime  # Required - always set before returning
     tool_calls: List["ToolCallDto"] = field(default_factory=list)
-    usage_metrics: Dict[str, Any] = field(default_factory=dict)
+    usage_metrics: Optional[UsageMetrics] = None
 
 
 @dataclass
@@ -183,7 +184,7 @@ class RunContext:
     research_sources: List[SourceDto] = field(default_factory=list)
     research_tool_calls: List["ToolCallDto"] = field(default_factory=list)
     research_notes: str = ""
-    research_usage_metrics: Dict[str, Any] = field(default_factory=dict)
+    research_usage_metrics: Optional[UsageMetrics] = None
 
     # ═══════════════════════════════════════════════════════════════════════════
     # PHASE 2: DECISION MAKER (DECIDING)
@@ -195,7 +196,7 @@ class RunContext:
     decision: Optional[TradingDecision] = None  # BUY/SELL/HOLD - always set by phase end
     decision_sources: List[SourceDto] = field(default_factory=list)
     decision_tool_calls: List["ToolCallDto"] = field(default_factory=list)
-    decision_usage_metrics: Dict[str, Any] = field(default_factory=dict)
+    decision_usage_metrics: Optional[UsageMetrics] = None
 
     # ═══════════════════════════════════════════════════════════════════════════
     # PHASE 3: EXECUTION (TRADING)
