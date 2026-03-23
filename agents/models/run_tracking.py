@@ -13,6 +13,8 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from models.usage_metrics import UsageMetrics
+
 
 class RunPhase(str, Enum):
     """Run phase enum matching backend RunPhase.java"""
@@ -100,15 +102,8 @@ class ResearchPhaseData(BaseModel):
     notes: Optional[str] = None
     toolCalls: List[ToolCallDto] = Field(default_factory=list)
     latencyMs: Optional[int] = None
-    # Token usage metrics from SDK
-    tokensUsed: Optional[int] = None
-    inputTokens: Optional[int] = None
-    outputTokens: Optional[int] = None
-    numTurns: Optional[int] = None
-    cachedTokens: Optional[int] = None
-    reasoningTokens: Optional[int] = None
-    costUsd: Optional[float] = None
-    modelName: Optional[str] = None
+    # Token usage metrics (nested object)
+    metrics: Optional[UsageMetrics] = None
 
 
 class DecisionPhaseData(BaseModel):
@@ -124,15 +119,8 @@ class DecisionPhaseData(BaseModel):
     sources: List[SourceDto] = Field(default_factory=list)
     toolCalls: List[ToolCallDto] = Field(default_factory=list)
     latencyMs: Optional[int] = None
-    # Token usage metrics from SDK
-    tokensUsed: Optional[int] = None
-    inputTokens: Optional[int] = None
-    outputTokens: Optional[int] = None
-    numTurns: Optional[int] = None
-    cachedTokens: Optional[int] = None
-    reasoningTokens: Optional[int] = None
-    costUsd: Optional[float] = None
-    modelName: Optional[str] = None
+    # Token usage metrics (nested object)
+    metrics: Optional[UsageMetrics] = None
 
 
 class ExecutionPhaseData(BaseModel):

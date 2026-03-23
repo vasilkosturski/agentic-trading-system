@@ -36,6 +36,7 @@ from .internal_state import (
     DataAccessRecord,
     MarketConditions,
 )
+from .usage_metrics import UsageMetrics
 from .run_tracking import (
     RunPhase,
     PhaseStatus,
@@ -88,6 +89,8 @@ __all__ = [
     "ResearchQueryRecord",
     "DataAccessRecord",
     "MarketConditions",
+    # Usage Metrics (shared across phases)
+    "UsageMetrics",
     # Run Tracking Models (new Trading Runs API)
     "RunPhase",
     "PhaseStatus",

@@ -1,5 +1,6 @@
 package com.trading.dto.response;
 
+import com.trading.dto.UsageMetricsDto;
 import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.SourceDto;
 import com.trading.entity.ResearchPhase;
@@ -7,7 +8,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -26,14 +26,7 @@ public class ResearchPhaseDto {
     private String researchNotes;
     private List<ToolCallDto> toolCalls;
     private Long latencyMs;
-    private Integer tokensUsed;
-    private Integer inputTokens;
-    private Integer outputTokens;
-    private Integer numTurns;
-    private Integer cachedTokens;
-    private Integer reasoningTokens;
-    private BigDecimal costUsd;
-    private String modelName;
+    private UsageMetricsDto metrics;
     private Instant createdAt;
 
     /**
@@ -48,14 +41,7 @@ public class ResearchPhaseDto {
         dto.setResearchNotes(researchPhase.getResearchNotes());
         dto.setToolCalls(researchPhase.getToolCalls());
         dto.setLatencyMs(researchPhase.getLatencyMs());
-        dto.setTokensUsed(researchPhase.getTokensUsed());
-        dto.setInputTokens(researchPhase.getInputTokens());
-        dto.setOutputTokens(researchPhase.getOutputTokens());
-        dto.setNumTurns(researchPhase.getNumTurns());
-        dto.setCachedTokens(researchPhase.getCachedTokens());
-        dto.setReasoningTokens(researchPhase.getReasoningTokens());
-        dto.setCostUsd(researchPhase.getCostUsd());
-        dto.setModelName(researchPhase.getModelName());
+        dto.setMetrics(UsageMetricsDto.fromEntity(researchPhase.getMetrics()));
         dto.setCreatedAt(researchPhase.getCreatedAt());
         return dto;
     }

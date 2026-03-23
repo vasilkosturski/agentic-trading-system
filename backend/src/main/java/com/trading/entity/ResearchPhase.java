@@ -8,7 +8,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Type;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -66,33 +65,12 @@ public class ResearchPhase {
     @Column(name = "tool_calls", columnDefinition = "jsonb")
     private List<ToolCallDto> toolCalls;
 
-    // Observability metrics
-    @Column(name = "tokens_used")
-    private Integer tokensUsed;
-
-    @Column(name = "input_tokens")
-    private Integer inputTokens;
-
-    @Column(name = "output_tokens")
-    private Integer outputTokens;
-
-    @Column(name = "num_turns")
-    private Integer numTurns;
-
-    @Column(name = "cached_tokens")
-    private Integer cachedTokens;
-
-    @Column(name = "reasoning_tokens")
-    private Integer reasoningTokens;
-
-    @Column(name = "model_name", length = 50)
-    private String modelName;
+    // Observability metrics (embedded — maps to same flat columns)
+    @Embedded
+    private UsageMetrics metrics;
 
     @Column(name = "latency_ms")
     private Long latencyMs;
-
-    @Column(name = "cost_usd", precision = 10, scale = 6)
-    private BigDecimal costUsd;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();

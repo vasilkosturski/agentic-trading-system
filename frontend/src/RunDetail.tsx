@@ -79,21 +79,24 @@ function formatParams(params: Record<string, unknown>): string {
 }
 
 function PhaseMetrics({ phase }: { phase: ResearchPhase | DecisionPhase }) {
-  const hasTokens = phase.inputTokens != null || phase.outputTokens != null
-  if (!hasTokens && !phase.modelName && !phase.numTurns) return null
+  const m = phase.metrics
+  if (!m) return null
+
+  const hasTokens = m.inputTokens != null || m.outputTokens != null
+  if (!hasTokens && !m.modelName && !m.numTurns) return null
 
   return (
     <Group gap="lg" mb="sm">
-      {phase.modelName && <Text size="xs" c="dimmed">Model: {phase.modelName}</Text>}
-      {phase.numTurns != null && <Text size="xs" c="dimmed">Turns: {phase.numTurns}</Text>}
+      {m.modelName && <Text size="xs" c="dimmed">Model: {m.modelName}</Text>}
+      {m.numTurns != null && <Text size="xs" c="dimmed">Turns: {m.numTurns}</Text>}
       {hasTokens && (
         <Text size="xs" c="dimmed">
-          Tokens: {phase.inputTokens?.toLocaleString() ?? '?'} in / {phase.outputTokens?.toLocaleString() ?? '?'} out / {phase.tokensUsed?.toLocaleString() ?? '?'} total
+          Tokens: {m.inputTokens?.toLocaleString() ?? '?'} in / {m.outputTokens?.toLocaleString() ?? '?'} out / {m.tokensUsed?.toLocaleString() ?? '?'} total
         </Text>
       )}
-      {(phase.cachedTokens ?? 0) > 0 && <Text size="xs" c="dimmed">Cached: {phase.cachedTokens!.toLocaleString()}</Text>}
-      {(phase.reasoningTokens ?? 0) > 0 && <Text size="xs" c="dimmed">Reasoning: {phase.reasoningTokens!.toLocaleString()}</Text>}
-      {phase.costUsd != null && <Text size="xs" c="dimmed">Cost: ${phase.costUsd.toFixed(4)}</Text>}
+      {(m.cachedTokens ?? 0) > 0 && <Text size="xs" c="dimmed">Cached: {m.cachedTokens!.toLocaleString()}</Text>}
+      {(m.reasoningTokens ?? 0) > 0 && <Text size="xs" c="dimmed">Reasoning: {m.reasoningTokens!.toLocaleString()}</Text>}
+      {m.costUsd != null && <Text size="xs" c="dimmed">Cost: ${m.costUsd.toFixed(4)}</Text>}
     </Group>
   )
 }
