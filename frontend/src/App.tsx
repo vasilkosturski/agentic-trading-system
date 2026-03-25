@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Table, Badge, Container, Title, Text } from '@mantine/core'
 import type { MantineColor } from '@mantine/core'
 import type { TradingRun, RunStatus, TradeDecision, Agent } from './types.ts'
+import { fetchRuns, fetchAgents } from './api.ts'
+import PortfolioChart from './PortfolioChart.tsx'
 
 function statusColor(status: RunStatus): MantineColor {
   switch (status) {
@@ -45,20 +47,10 @@ function RunsTable() {
 
     async function fetchData() {
       try {
-        const [runsRes, agentsRes] = await Promise.all([
-          fetch('/api/runs', { signal: controller.signal }),
-          fetch('/api/agents', { signal: controller.signal }),
+        const [runsData, agentsData] = await Promise.all([
+          fetchRuns(controller.signal),
+          fetchAgents(controller.signal),
         ])
-
-        if (!runsRes.ok) {
-          throw new Error(`Failed to fetch runs: ${runsRes.status}`)
-        }
-        if (!agentsRes.ok) {
-          throw new Error(`Failed to fetch agents: ${agentsRes.status}`)
-        }
-
-        const runsData = await runsRes.json()
-        const agentsData = await agentsRes.json()
 
         setRuns(runsData.runs ?? [])
         setAgents(agentsData)
@@ -108,6 +100,7 @@ function RunsTable() {
   return (
     <Container size="lg" py="xl">
       <Title order={1} mb="lg">Trading Dashboard</Title>
+      <PortfolioChart />
       <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>

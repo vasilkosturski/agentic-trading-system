@@ -99,3 +99,9 @@ export interface RunDetailResponse {
   decision: DecisionPhase | null
   execution: ExecutionPhase | null
 }
+
+export interface PortfolioSnapshot {
+  agentName: string
+  timestamp: string
+  totalValue: number
+}
