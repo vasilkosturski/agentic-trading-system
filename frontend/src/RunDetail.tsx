@@ -17,12 +17,12 @@ import type {
   RunDetailResponse,
   RunStatus,
   TradeDecision,
-  Agent,
   ResearchPhase,
   DecisionPhase,
   ExecutionPhase,
   ToolCall,
 } from './types.ts'
+import { fetchRunDetail, fetchAgents } from './api.ts'
 
 function statusColor(status: RunStatus | string): MantineColor {
   switch (status) {
@@ -294,20 +294,10 @@ function RunDetail() {
 
     async function fetchDetail() {
       try {
-        const [runRes, agentsRes] = await Promise.all([
-          fetch(`/api/runs/${id}`, { signal: controller.signal }),
-          fetch('/api/agents', { signal: controller.signal }),
+        const [runData, agentsData] = await Promise.all([
+          fetchRunDetail(id!, controller.signal),
+          fetchAgents(controller.signal),
         ])
-
-        if (!runRes.ok) {
-          throw new Error(`Failed to fetch run: ${runRes.status}`)
-        }
-        if (!agentsRes.ok) {
-          throw new Error(`Failed to fetch agents: ${agentsRes.status}`)
-        }
-
-        const runData: RunDetailResponse = await runRes.json()
-        const agentsData: Agent[] = await agentsRes.json()
 
         setData(runData)
         const agent = agentsData.find((a) => a.id === runData.run.agentId)
