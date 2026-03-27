@@ -26,12 +26,6 @@ public class PortfolioService {
 
     /**
      * Get portfolio snapshots with optional filtering by agent name, date range, and limit.
-     *
-     * @param agentName optional agent name filter
-     * @param startDate optional start date for range
-     * @param endDate   optional end date for range
-     * @param limit     optional maximum number of snapshots to return
-     * @return list of portfolio snapshot DTOs ordered by timestamp descending
      */
     public List<PortfolioSnapshotDto> getSnapshots(String agentName, Instant startDate, Instant endDate, Integer limit) {
         List<AccountPortfolioSnapshot> snapshots;
@@ -55,15 +49,15 @@ public class PortfolioService {
             .collect(Collectors.toList());
     }
 
-    /**
-     * Convert entity to DTO. Account and agent are already fetched via JOIN FETCH.
-     * Only maps the 3 fields consumed by the frontend chart.
-     */
     private PortfolioSnapshotDto convertToDto(AccountPortfolioSnapshot snapshot) {
         return new PortfolioSnapshotDto(
             snapshot.getAccount().getAgent().getName(),
             snapshot.getTimestamp(),
-            snapshot.getTotalValue()
+            snapshot.getTotalValue(),
+            snapshot.getCashBalance(),
+            snapshot.getHoldingsValue(),
+            snapshot.getTotalPnl(),
+            snapshot.getTotalReturnPercent()
         );
     }
 }

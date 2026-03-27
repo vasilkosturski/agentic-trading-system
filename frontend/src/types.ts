@@ -104,4 +104,8 @@ export interface PortfolioSnapshot {
   agentName: string
   timestamp: string
   totalValue: number
+  cashBalance: number | null
+  holdingsValue: number | null
+  totalPnl: number | null
+  totalReturnPercent: number | null
 }

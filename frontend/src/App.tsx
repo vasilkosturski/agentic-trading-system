@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Table, Badge, Container, Title, Text } from '@mantine/core'
 import type { MantineColor } from '@mantine/core'
-import type { TradingRun, RunStatus, TradeDecision, Agent } from './types.ts'
-import { fetchRuns, fetchAgents } from './api.ts'
+import type { TradingRun, RunStatus, TradeDecision, Agent, PortfolioSnapshot } from './types.ts'
+import { fetchRuns, fetchAgents, fetchSnapshots } from './api.ts'
 import PortfolioChart from './PortfolioChart.tsx'
+import AgentComparison from './AgentComparison.tsx'
 
 function statusColor(status: RunStatus): MantineColor {
   switch (status) {
@@ -39,6 +40,7 @@ function RunsTable() {
   const navigate = useNavigate()
   const [runs, setRuns] = useState<TradingRun[]>([])
   const [agents, setAgents] = useState<Agent[]>([])
+  const [snapshots, setSnapshots] = useState<PortfolioSnapshot[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -47,13 +49,15 @@ function RunsTable() {
 
     async function fetchData() {
       try {
-        const [runsData, agentsData] = await Promise.all([
+        const [runsData, agentsData, snapshotsData] = await Promise.all([
           fetchRuns(controller.signal),
           fetchAgents(controller.signal),
+          fetchSnapshots(controller.signal),
         ])
 
         setRuns(runsData.runs ?? [])
         setAgents(agentsData)
+        setSnapshots(snapshotsData)
       } catch (err) {
         if (controller.signal.aborted) return
         setError(err instanceof Error ? err.message : 'Unknown error')
@@ -68,7 +72,7 @@ function RunsTable() {
     return () => controller.abort()
   }, [])
 
-  const agentMap = new Map(agents.map((a) => [a.id, a.name]))
+  const agentMap = useMemo(() => new Map(agents.map((a) => [a.id, a.name])), [agents])
 
   if (loading) {
     return (
@@ -100,7 +104,8 @@ function RunsTable() {
   return (
     <Container size="lg" py="xl">
       <Title order={1} mb="lg">Trading Dashboard</Title>
-      <PortfolioChart />
+      <PortfolioChart snapshots={snapshots} />
+      <AgentComparison snapshots={snapshots} />
       <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>

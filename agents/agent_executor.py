@@ -449,7 +449,7 @@ class AgentExecutor:
 
         # Extract SDK usage metrics
         usage = result.context_wrapper.usage
-        usage_metrics = _extract_usage_metrics(usage, model_name=self.analyst.model_name)
+        usage_metrics = _extract_usage_metrics(usage, model_name=market_analyst.model_name)
         logger.info(f"📊 Market Analyst usage: {usage_metrics.tokensUsed} tokens, model={usage_metrics.modelName}")
 
         # Prices are now carried directly in CandidateStock objects within
@@ -553,7 +553,7 @@ class AgentExecutor:
 
         # Extract SDK usage metrics
         usage = result.context_wrapper.usage
-        usage_metrics = _extract_usage_metrics(usage, model_name=self.decision_maker.model_name)
+        usage_metrics = _extract_usage_metrics(usage, model_name=decision_maker.model_name)
         logger.info(f"📊 Decision Maker usage: {usage_metrics.tokensUsed} tokens, model={usage_metrics.modelName}")
 
         # Calculate decision latency
