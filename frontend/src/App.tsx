@@ -104,8 +104,8 @@ function RunsTable() {
   return (
     <Container size="lg" py="xl">
       <Title order={1} mb="lg">Trading Dashboard</Title>
-      <PortfolioChart snapshots={snapshots} />
       <AgentComparison snapshots={snapshots} />
+      <PortfolioChart snapshots={snapshots} />
       <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>
