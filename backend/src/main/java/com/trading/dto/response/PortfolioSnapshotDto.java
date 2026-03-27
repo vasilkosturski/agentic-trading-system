@@ -9,7 +9,6 @@ import java.time.Instant;
 /**
  * DTO for portfolio snapshot returned by API.
  * Used by GET /api/portfolio/snapshots to return historical portfolio data.
- * Contains only the fields consumed by the frontend chart: agentName, timestamp, totalValue.
  */
 @Data
 @NoArgsConstructor
@@ -18,4 +17,8 @@ public class PortfolioSnapshotDto {
     private String agentName;
     private Instant timestamp;
     private Double totalValue;
+    private Double cashBalance;
+    private Double holdingsValue;
+    private Double totalPnl;
+    private Double totalReturnPercent;
 }
