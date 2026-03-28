@@ -398,6 +398,10 @@ class AgentExecutor:
         # Build prompt using OO interface
         research_prompt = market_analyst.build_prompt(research_context)
 
+        # Capture prompts for observability (before agent execution)
+        ctx.market_analyst_system_prompt = market_analyst.agent.instructions
+        ctx.market_analyst_task_prompt = research_prompt
+
         logger.info(f"🔬 Running Market Analyst for {ctx.agent_name}...")
 
         # Run Market Analyst with guardrail retry loop.
@@ -522,6 +526,10 @@ class AgentExecutor:
 
         # Build prompt using OO interface
         decision_prompt = decision_maker.build_prompt(decision_context)
+
+        # Capture prompts for observability (before agent execution)
+        ctx.decision_maker_system_prompt = decision_maker.agent.instructions
+        ctx.decision_maker_task_prompt = decision_prompt
 
         logger.info(f"🧠 Running Decision Maker for {ctx.agent_name}...")
 
@@ -698,6 +706,8 @@ class AgentExecutor:
             toolCalls=ctx.research_tool_calls,
             latencyMs=research_latency_ms,
             metrics=ctx.research_usage_metrics,
+            systemPrompt=ctx.market_analyst_system_prompt,
+            taskPrompt=ctx.market_analyst_task_prompt,
         )
 
         decision_data = DecisionPhaseData(
@@ -709,6 +719,8 @@ class AgentExecutor:
             toolCalls=ctx.decision_tool_calls,
             latencyMs=decision_latency_ms,
             metrics=ctx.decision_usage_metrics,
+            systemPrompt=ctx.decision_maker_system_prompt,
+            taskPrompt=ctx.decision_maker_task_prompt,
         )
 
         execution_data = ExecutionPhaseData(

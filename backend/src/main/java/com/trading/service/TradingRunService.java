@@ -163,6 +163,8 @@ public class TradingRunService {
             if (researchDto.getMetrics() != null) {
                 researchPhase.setMetrics(researchDto.getMetrics().toEntity());
             }
+            researchPhase.setSystemPrompt(researchDto.getSystemPrompt());
+            researchPhase.setTaskPrompt(researchDto.getTaskPrompt());
             researchPhaseRepository.save(researchPhase);
         }
 
@@ -178,6 +180,8 @@ public class TradingRunService {
         if (decisionDto.getMetrics() != null) {
             decisionPhase.setMetrics(decisionDto.getMetrics().toEntity());
         }
+        decisionPhase.setSystemPrompt(decisionDto.getSystemPrompt());
+        decisionPhase.setTaskPrompt(decisionDto.getTaskPrompt());
         decisionPhaseRepository.save(decisionPhase);
 
         // Create execution phase only for BUY/SELL decisions

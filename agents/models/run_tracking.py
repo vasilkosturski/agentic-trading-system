@@ -104,6 +104,9 @@ class ResearchPhaseData(BaseModel):
     latencyMs: Optional[int] = None
     # Token usage metrics (nested object)
     metrics: Optional[UsageMetrics] = None
+    # Agent prompts captured at execution time
+    systemPrompt: Optional[str] = None
+    taskPrompt: Optional[str] = None
 
 
 class DecisionPhaseData(BaseModel):
@@ -121,6 +124,9 @@ class DecisionPhaseData(BaseModel):
     latencyMs: Optional[int] = None
     # Token usage metrics (nested object)
     metrics: Optional[UsageMetrics] = None
+    # Agent prompts captured at execution time
+    systemPrompt: Optional[str] = None
+    taskPrompt: Optional[str] = None
 
 
 class ExecutionPhaseData(BaseModel):

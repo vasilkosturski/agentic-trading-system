@@ -32,7 +32,7 @@ def _dump_result_to_json(
     decision: TradingDecision,
     tool_calls: list,
     system_prompt: str,
-    runtime_prompt: str,
+    task_prompt: str,
 ) -> None:
     """Serialize DecisionMaker result to JSON for manual inspection.
 
@@ -49,7 +49,7 @@ def _dump_result_to_json(
             "test_name": test_name,
             "timestamp": ts,
             "system_prompt": system_prompt,
-            "runtime_prompt": runtime_prompt,
+            "task_prompt": task_prompt,
             "output": decision.model_dump() if decision else None,
             "tool_calls": [asdict(tc) for tc in tool_calls],
         }
@@ -159,7 +159,7 @@ class TestDecisionMakerE2E:
 
         # Capture prompts for JSON dump
         system_prompt = decision_maker.agent.instructions
-        runtime_prompt = prompt
+        task_prompt = prompt
 
         logger.info("Running Decision Maker...")
 
@@ -231,5 +231,5 @@ class TestDecisionMakerE2E:
                 decision=decision,
                 tool_calls=tool_calls,
                 system_prompt=system_prompt,
-                runtime_prompt=runtime_prompt,
+                task_prompt=task_prompt,
             )

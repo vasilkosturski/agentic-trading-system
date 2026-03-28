@@ -63,6 +63,8 @@ export interface ResearchPhase {
   toolCalls: ToolCall[]
   latencyMs: number
   metrics: UsageMetrics | null
+  systemPrompt: string | null
+  taskPrompt: string | null
 }
 
 export interface DecisionPhase {
@@ -75,6 +77,8 @@ export interface DecisionPhase {
   toolCalls: ToolCall[]
   latencyMs: number
   metrics: UsageMetrics | null
+  systemPrompt: string | null
+  taskPrompt: string | null
 }
 
 export interface TradeDetail {

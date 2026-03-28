@@ -61,6 +61,10 @@ public class DecisionPhaseDto {
      */
     private UsageMetricsDto metrics;
 
+    private String systemPrompt;
+
+    private String taskPrompt;
+
     /**
      * Validate decision consistency.
      * BUY/SELL decisions must have symbol and quantity.

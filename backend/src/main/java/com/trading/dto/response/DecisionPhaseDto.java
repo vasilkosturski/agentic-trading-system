@@ -31,6 +31,8 @@ public class DecisionPhaseDto {
     private List<ToolCallDto> toolCalls;
     private Long latencyMs;
     private UsageMetricsDto metrics;
+    private String systemPrompt;
+    private String taskPrompt;
     private Instant createdAt;
 
     /**
@@ -48,6 +50,8 @@ public class DecisionPhaseDto {
         dto.setToolCalls(decisionPhase.getToolCalls());
         dto.setLatencyMs(decisionPhase.getLatencyMs());
         dto.setMetrics(UsageMetricsDto.fromEntity(decisionPhase.getMetrics()));
+        dto.setSystemPrompt(decisionPhase.getSystemPrompt());
+        dto.setTaskPrompt(decisionPhase.getTaskPrompt());
         dto.setCreatedAt(decisionPhase.getCreatedAt());
         return dto;
     }

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
+  Accordion,
   Container,
   Title,
   Text,
   Badge,
+  Code,
   Paper,
   Group,
   Table,
@@ -126,6 +128,46 @@ function ToolCallsTable({ toolCalls }: { toolCalls: ToolCall[] }) {
   )
 }
 
+function PromptsAccordion({
+  label,
+  systemPrompt,
+  taskPrompt,
+}: {
+  label: string
+  systemPrompt: string | null
+  taskPrompt: string | null
+}) {
+  if (!systemPrompt && !taskPrompt) return null
+
+  return (
+    <Accordion variant="separated" mb="sm">
+      <Accordion.Item value="prompts">
+        <Accordion.Control>
+          <Text fw={600} size="sm">{label}</Text>
+        </Accordion.Control>
+        <Accordion.Panel>
+          {systemPrompt && (
+            <>
+              <Text fw={600} size="sm" mb={4}>System Prompt</Text>
+              <Code block style={{ whiteSpace: 'pre-wrap', maxHeight: 400, overflow: 'auto', marginBottom: 12 }}>
+                {systemPrompt}
+              </Code>
+            </>
+          )}
+          {taskPrompt && (
+            <>
+              <Text fw={600} size="sm" mb={4}>Task Prompt</Text>
+              <Code block style={{ whiteSpace: 'pre-wrap', maxHeight: 400, overflow: 'auto' }}>
+                {taskPrompt}
+              </Code>
+            </>
+          )}
+        </Accordion.Panel>
+      </Accordion.Item>
+    </Accordion>
+  )
+}
+
 function ResearchSection({ research }: { research: ResearchPhase | null }) {
   if (!research) {
     return (
@@ -146,6 +188,12 @@ function ResearchSection({ research }: { research: ResearchPhase | null }) {
       </Group>
 
       <PhaseMetrics phase={research} />
+
+      <PromptsAccordion
+        label="Research Instructions"
+        systemPrompt={research.systemPrompt}
+        taskPrompt={research.taskPrompt}
+      />
 
       <Text fw={600} mb={4}>Candidates</Text>
       <Group gap="xs" mb="md">
@@ -199,6 +247,12 @@ function DecisionSection({ decision }: { decision: DecisionPhase | null }) {
       </Group>
 
       <PhaseMetrics phase={decision} />
+
+      <PromptsAccordion
+        label="Decision Instructions"
+        systemPrompt={decision.systemPrompt}
+        taskPrompt={decision.taskPrompt}
+      />
 
       <Group gap="sm" mb="md">
         <Badge color={decisionColor(decision.decision)} variant="light" size="lg">
