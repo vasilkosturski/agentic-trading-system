@@ -27,6 +27,8 @@ public class ResearchPhaseDto {
     private List<ToolCallDto> toolCalls;
     private Long latencyMs;
     private UsageMetricsDto metrics;
+    private String systemPrompt;
+    private String taskPrompt;
     private Instant createdAt;
 
     /**
@@ -42,6 +44,8 @@ public class ResearchPhaseDto {
         dto.setToolCalls(researchPhase.getToolCalls());
         dto.setLatencyMs(researchPhase.getLatencyMs());
         dto.setMetrics(UsageMetricsDto.fromEntity(researchPhase.getMetrics()));
+        dto.setSystemPrompt(researchPhase.getSystemPrompt());
+        dto.setTaskPrompt(researchPhase.getTaskPrompt());
         dto.setCreatedAt(researchPhase.getCreatedAt());
         return dto;
     }

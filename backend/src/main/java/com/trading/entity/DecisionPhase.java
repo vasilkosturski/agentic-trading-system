@@ -80,6 +80,12 @@ public class DecisionPhase {
     @Column(name = "tool_calls", columnDefinition = "jsonb")
     private List<ToolCallDto> toolCalls;
 
+    @Column(name = "system_prompt", columnDefinition = "TEXT")
+    private String systemPrompt;
+
+    @Column(name = "task_prompt", columnDefinition = "TEXT")
+    private String taskPrompt;
+
     // Observability metrics (embedded — maps to same flat columns)
     @Embedded
     private UsageMetrics metrics;

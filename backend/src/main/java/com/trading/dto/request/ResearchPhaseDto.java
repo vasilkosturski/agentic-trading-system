@@ -47,4 +47,8 @@ public class ResearchPhaseDto {
      * Token usage metrics from SDK (nested object).
      */
     private UsageMetricsDto metrics;
+
+    private String systemPrompt;
+
+    private String taskPrompt;
 }

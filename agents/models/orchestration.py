@@ -199,6 +199,14 @@ class RunContext:
     decision_usage_metrics: Optional[UsageMetrics] = None
 
     # ═══════════════════════════════════════════════════════════════════════════
+    # PROMPT CAPTURE (for observability — populated during research/decision)
+    # ═══════════════════════════════════════════════════════════════════════════
+    market_analyst_system_prompt: Optional[str] = None
+    market_analyst_task_prompt: Optional[str] = None
+    decision_maker_system_prompt: Optional[str] = None
+    decision_maker_task_prompt: Optional[str] = None
+
+    # ═══════════════════════════════════════════════════════════════════════════
     # PHASE 3: EXECUTION (TRADING)
     # ═══════════════════════════════════════════════════════════════════════════
     # --- Input: decision from above ---

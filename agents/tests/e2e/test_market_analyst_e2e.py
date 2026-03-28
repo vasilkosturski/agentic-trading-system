@@ -30,7 +30,7 @@ def _dump_result_to_json(
     test_name: str,
     result,
     system_prompt: str = "",
-    runtime_prompt: str = "",
+    task_prompt: str = "",
 ) -> None:
     """Serialize AgentRunResult to JSON for manual inspection.
 
@@ -53,7 +53,7 @@ def _dump_result_to_json(
             "test_name": test_name,
             "timestamp": ts,
             "system_prompt": system_prompt,
-            "runtime_prompt": runtime_prompt,
+            "task_prompt": task_prompt,
             "output": output_data,
             "tool_calls": [asdict(tc) for tc in result.tool_calls],
             "tool_errors": [asdict(tc) for tc in result.tool_errors],
@@ -139,7 +139,7 @@ class TestMarketAnalystE2E:
 
         # Capture prompts for JSON dump
         system_prompt = market_analyst.agent.instructions
-        runtime_prompt = market_analyst.build_prompt(context)
+        task_prompt = market_analyst.build_prompt(context)
 
         # Validate fixtures returned real seeded data (catches pipeline bugs early,
         # before expensive LLM call).
@@ -234,6 +234,6 @@ class TestMarketAnalystE2E:
                 "test_market_analyst_returns_candidates",
                 result,
                 system_prompt=system_prompt,
-                runtime_prompt=runtime_prompt,
+                task_prompt=task_prompt,
             )
 
