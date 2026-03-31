@@ -38,7 +38,7 @@ class TradingSystem:
     # Agent definitions — single source of truth for agent names and config
     AGENT_CONFIGS = [
         {"name": "Warren", "style": InvestmentStyle.VALUE, "balance": 100000.0},
-        {"name": "George", "style": InvestmentStyle.MOMENTUM, "balance": 100000.0},
+        {"name": "George", "style": InvestmentStyle.CONTRARIAN_MACRO, "balance": 100000.0},
         {"name": "Ray", "style": InvestmentStyle.RISK_PARITY, "balance": 100000.0},
         {"name": "Cathie", "style": InvestmentStyle.GROWTH, "balance": 100000.0},
     ]

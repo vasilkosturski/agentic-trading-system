@@ -15,6 +15,6 @@ class InvestmentStyle(StrEnum):
     """
 
     VALUE = "Value Investor"
-    MOMENTUM = "Momentum Trader"
+    CONTRARIAN_MACRO = "Contrarian Macro"
     RISK_PARITY = "Risk Parity"
     GROWTH = "Growth Innovation"

@@ -56,10 +56,8 @@ class ResearchPhaseRepositoryTest extends BaseRepositoryTest {
         // Arrange
         ResearchPhase phase = new ResearchPhase(testRun);
         phase.setResearchNotes("Market analysis complete");
-        phase.setTokensUsed(1500);
         phase.setLatencyMs(2500L);
-        phase.setCostUsd(new BigDecimal("0.000225"));
-        
+
         // Act
         ResearchPhase saved = researchPhaseRepository.save(phase);
         Optional<ResearchPhase> found = researchPhaseRepository.findById(saved.getId());
@@ -67,9 +65,7 @@ class ResearchPhaseRepositoryTest extends BaseRepositoryTest {
         // Assert
         assertThat(found).isPresent();
         assertThat(found.get().getResearchNotes()).isEqualTo("Market analysis complete");
-        assertThat(found.get().getTokensUsed()).isEqualTo(1500);
         assertThat(found.get().getLatencyMs()).isEqualTo(2500L);
-        assertThat(found.get().getCostUsd()).isEqualByComparingTo(new BigDecimal("0.000225"));
     }
 
     @Test

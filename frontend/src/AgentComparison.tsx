@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
-import { Paper, SimpleGrid, Text, Group, Title } from '@mantine/core'
-import type { PortfolioSnapshot } from './types.ts'
+import { Paper, SimpleGrid, Text, Group, Title, Badge, Popover, ActionIcon } from '@mantine/core'
+import { IconInfoCircle } from '@tabler/icons-react'
+import type { PortfolioSnapshot, Agent } from './types.ts'
 import { AGENT_COLORS, AGENT_ORDER } from './constants.ts'
 
 function formatCurrency(value: number | null): string {
@@ -23,11 +24,15 @@ interface AgentSummary {
   totalValue: number
   totalPnl: number | null
   totalReturnPercent: number | null
+  style?: string
+  systemPrompt?: string
 }
 
-/** Extract the latest snapshot per agent from the full snapshots array. */
-function latestPerAgent(snapshots: PortfolioSnapshot[]): AgentSummary[] {
+/** Extract the latest snapshot per agent from the full snapshots array and merge with agent data. */
+function latestPerAgent(snapshots: PortfolioSnapshot[], agents: Agent[]): AgentSummary[] {
   const latest = new Map<string, PortfolioSnapshot>()
+  const agentMap = new Map(agents.map(a => [a.name, a]))
+
   for (const s of snapshots) {
     const existing = latest.get(s.agentName)
     if (!existing || s.timestamp > existing.timestamp) {
@@ -39,29 +44,59 @@ function latestPerAgent(snapshots: PortfolioSnapshot[]): AgentSummary[] {
     .filter((name) => latest.has(name))
     .map((name) => {
       const s = latest.get(name)!
+      const agent = agentMap.get(name)
       return {
         name: s.agentName,
         totalValue: s.totalValue,
         totalPnl: s.totalPnl,
         totalReturnPercent: s.totalReturnPercent,
+        style: agent?.style,
+        systemPrompt: agent?.systemPrompt,
       }
     })
 }
 
-function AgentComparison({ snapshots }: { snapshots: PortfolioSnapshot[] }) {
-  const agents = useMemo(() => latestPerAgent(snapshots), [snapshots])
+function AgentComparison({ snapshots, agents }: { snapshots: PortfolioSnapshot[], agents: Agent[] }) {
+  const agentSummaries = useMemo(() => latestPerAgent(snapshots, agents), [snapshots, agents])
 
-  if (agents.length === 0) return null
+  if (agentSummaries.length === 0) return null
 
   return (
     <Paper p="lg" shadow="xs" mb="lg">
       <Title order={3} mb="md">Agent Performance</Title>
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
-        {agents.map((agent) => {
+        {agentSummaries.map((agent) => {
           const color = AGENT_COLORS[agent.name] ?? 'gray'
           return (
             <Paper key={agent.name} p="md" radius="md" withBorder>
               <Text fw={700} size="lg" c={color} mb="xs">{agent.name}</Text>
+
+              {agent.style && (
+                <Group gap="xs" mb="md">
+                  <Badge variant="light" size="sm">
+                    {agent.style}
+                  </Badge>
+                  {agent.systemPrompt && (
+                    <Popover width={400} position="bottom" withArrow shadow="md">
+                      <Popover.Target>
+                        <ActionIcon
+                          variant="subtle"
+                          size="sm"
+                          style={{ cursor: 'pointer' }}
+                          aria-label="View agent system prompt"
+                        >
+                          <IconInfoCircle size={16} />
+                        </ActionIcon>
+                      </Popover.Target>
+                      <Popover.Dropdown style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                        <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                          {agent.systemPrompt}
+                        </Text>
+                      </Popover.Dropdown>
+                    </Popover>
+                  )}
+                </Group>
+              )}
 
               <Group justify="space-between" mb={4}>
                 <Text size="sm" c="dimmed">Portfolio</Text>

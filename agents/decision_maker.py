@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 # Position sizing limits by investment style (max % of portfolio per position)
 POSITION_SIZING_PCT: dict[InvestmentStyle, int] = {
     InvestmentStyle.VALUE: 15,
-    InvestmentStyle.MOMENTUM: 20,
+    InvestmentStyle.CONTRARIAN_MACRO: 20,
     InvestmentStyle.RISK_PARITY: 15,
     InvestmentStyle.GROWTH: 25,
 }
