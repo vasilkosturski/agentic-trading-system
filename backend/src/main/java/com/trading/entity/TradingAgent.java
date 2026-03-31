@@ -26,7 +26,7 @@ public class TradingAgent {
     
     @Column(name = "style")
     private String style;  // Short style for UI display (e.g., "Value Investor")
-    
+
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
     

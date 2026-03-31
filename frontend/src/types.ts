@@ -22,6 +22,8 @@ export interface TradingRun {
 export interface Agent {
   id: number
   name: string
+  style?: string
+  systemPrompt?: string
 }
 
 export interface Source {

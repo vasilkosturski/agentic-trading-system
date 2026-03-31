@@ -1,40 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Table, Badge, Container, Title, Text } from '@mantine/core'
-import type { MantineColor } from '@mantine/core'
-import type { TradingRun, RunStatus, TradeDecision, Agent, PortfolioSnapshot } from './types.ts'
+import type { TradingRun, Agent, PortfolioSnapshot } from './types.ts'
 import { fetchRuns, fetchAgents, fetchSnapshots } from './api.ts'
+import { statusColor, decisionColor, formatTimestamp } from './utils.ts'
 import PortfolioChart from './PortfolioChart.tsx'
 import AgentComparison from './AgentComparison.tsx'
-
-function statusColor(status: RunStatus): MantineColor {
-  switch (status) {
-    case 'COMPLETED':
-      return 'green'
-    case 'IN_PROGRESS':
-      return 'yellow'
-    case 'FAILED':
-      return 'red'
-  }
-}
-
-function decisionColor(decision: TradeDecision | null): MantineColor {
-  switch (decision) {
-    case 'BUY':
-      return 'green'
-    case 'SELL':
-      return 'red'
-    case 'HOLD':
-      return 'gray'
-    default:
-      return 'gray'
-  }
-}
-
-function formatTimestamp(ts: string | null): string {
-  if (!ts) return '\u2014'
-  return new Date(ts).toLocaleString()
-}
 
 function RunsTable() {
   const navigate = useNavigate()
@@ -104,7 +75,7 @@ function RunsTable() {
   return (
     <Container size="lg" py="xl">
       <Title order={1} mb="lg">Trading Dashboard</Title>
-      <AgentComparison snapshots={snapshots} />
+      <AgentComparison snapshots={snapshots} agents={agents} />
       <PortfolioChart snapshots={snapshots} />
       <Table striped highlightOnHover>
         <Table.Thead>

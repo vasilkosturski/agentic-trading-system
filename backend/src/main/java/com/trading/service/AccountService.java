@@ -26,6 +26,14 @@ public class AccountService {
     private static final double DEFAULT_INITIAL_BALANCE = 100000.0;
     private static final String TOPIC_TRADES = "/topic/runs/trades";
 
+    // Agent name → display style. Values match Python InvestmentStyle enum.
+    private static final Map<String, String> AGENT_STYLES = Map.of(
+        "Warren", "Value Investor",
+        "George", "Contrarian Macro",
+        "Ray", "Risk Parity",
+        "Cathie", "Growth Innovation"
+    );
+
     private final TradingAccountRepository tradingAccountRepository;
     private final AccountTransactionRepository transactionRepository;
     private final AccountHoldingRepository holdingRepository;
@@ -72,29 +80,41 @@ public class AccountService {
      * @return TradingAccount for the agent
      */
     public TradingAccount initializeAgent(String agentName, Double initialBalance) {
-        // Step 1: Check if TradingAgent exists
         Optional<TradingAgent> agentOpt = agentRepository.findByName(agentName);
 
         if (agentOpt.isPresent()) {
-            // Agent exists - check if account exists
             TradingAgent agent = agentOpt.get();
-            Optional<TradingAccount> accountOpt = tradingAccountRepository.findByAgentName(agentName);
+            populateStyle(agent);
 
+            Optional<TradingAccount> accountOpt = tradingAccountRepository.findByAgentName(agentName);
             if (accountOpt.isPresent()) {
-                // Account exists - return it
                 return accountOpt.get();
             }
-            else {
-                return tradingAccountRepository.save(new TradingAccount(agent, initialBalance));
-            }
+            return tradingAccountRepository.save(new TradingAccount(agent, initialBalance));
         }
 
         // Agent doesn't exist - create agent and account
         TradingAgent agent = new TradingAgent(agentName, "Autonomous trading agent");
         agent.setInitialCapital(initialBalance);
+        populateStyle(agent);
         agent = agentRepository.save(agent);
 
         return tradingAccountRepository.save(new TradingAccount(agent, initialBalance));
+    }
+
+    /**
+     * Populate style on the entity if missing.
+     * Only mutates fields -- does NOT persist. The caller is responsible for saving.
+     * Within @Transactional, JPA dirty-checking flushes managed entities automatically;
+     * for new (transient) entities the caller's explicit save() handles persistence.
+     */
+    private void populateStyle(TradingAgent agent) {
+        if (agent.getStyle() == null || agent.getStyle().isEmpty()) {
+            String style = AGENT_STYLES.get(agent.getName());
+            if (style != null) {
+                agent.setStyle(style);
+            }
+        }
     }
 
     /**

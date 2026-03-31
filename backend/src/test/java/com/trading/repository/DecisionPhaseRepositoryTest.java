@@ -61,10 +61,8 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         phase.setDecision(TradeDecision.BUY);
         phase.setSymbol("JPM");
         phase.setQuantity(10);
-        phase.setTokensUsed(2000);
         phase.setLatencyMs(3500L);
-        phase.setCostUsd(new BigDecimal("0.000300"));
-        
+
         // Act
         DecisionPhase saved = decisionPhaseRepository.save(phase);
         Optional<DecisionPhase> found = decisionPhaseRepository.findById(saved.getId());

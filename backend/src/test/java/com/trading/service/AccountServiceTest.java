@@ -175,10 +175,10 @@ class AccountServiceTest {
         assertEquals(initialBalance, result.getBalance());
         assertEquals(newAgent.getId(), result.getAgent().getId());
 
-        // Verify agent was saved with correct properties
+        // Verify agent was saved (unknown agent name, so populateStyle is a no-op)
         ArgumentCaptor<TradingAgent> agentCaptor = ArgumentCaptor.forClass(TradingAgent.class);
         verify(agentRepository, times(1)).save(agentCaptor.capture());
-        
+
         TradingAgent capturedAgent = agentCaptor.getValue();
         assertEquals(agentName, capturedAgent.getName());
         assertEquals("Autonomous trading agent", capturedAgent.getDescription());
@@ -187,10 +187,67 @@ class AccountServiceTest {
         // Verify account was saved with correct agent and balance
         ArgumentCaptor<TradingAccount> accountCaptor = ArgumentCaptor.forClass(TradingAccount.class);
         verify(tradingAccountRepository, times(1)).save(accountCaptor.capture());
-        
+
         TradingAccount capturedAccount = accountCaptor.getValue();
         assertEquals(newAgent.getId(), capturedAccount.getAgent().getId());
         assertEquals(initialBalance, capturedAccount.getBalance());
+    }
+
+    @Test
+    @DisplayName("Should set style for known agent on creation")
+    void testInitializeAgent_KnownAgent_SetsStyle() {
+        // Arrange
+        String agentName = "Warren";
+        Double initialBalance = 100000.0;
+
+        when(agentRepository.findByName(agentName))
+            .thenReturn(Optional.empty());
+
+        TradingAgent savedAgent = new TradingAgent(agentName, "Autonomous trading agent");
+        savedAgent.setId(1L);
+        savedAgent.setStyle("Value Investor");
+        when(agentRepository.save(any(TradingAgent.class)))
+            .thenReturn(savedAgent);
+
+        TradingAccount newAccount = new TradingAccount(savedAgent, initialBalance);
+        newAccount.setId(1L);
+        when(tradingAccountRepository.save(any(TradingAccount.class)))
+            .thenReturn(newAccount);
+
+        // Act
+        accountService.initializeAgent(agentName, initialBalance);
+
+        // Assert - verify style was set before the single save
+        ArgumentCaptor<TradingAgent> agentCaptor = ArgumentCaptor.forClass(TradingAgent.class);
+        verify(agentRepository, times(1)).save(agentCaptor.capture());
+
+        TradingAgent saved = agentCaptor.getValue();
+        assertEquals("Value Investor", saved.getStyle());
+    }
+
+    @Test
+    @DisplayName("Should backfill style for existing agent with missing style")
+    void testInitializeAgent_ExistingAgentMissingStyle_BackfillsStyle() {
+        // Arrange
+        String agentName = "Warren";
+        Double initialBalance = 100000.0;
+
+        TradingAgent existingAgent = new TradingAgent(agentName, "Autonomous trading agent");
+        existingAgent.setId(1L);
+        existingAgent.setStyle(null);
+
+        when(agentRepository.findByName(agentName))
+            .thenReturn(Optional.of(existingAgent));
+        when(tradingAccountRepository.findByAgentName(agentName))
+            .thenReturn(Optional.of(testAccount));
+
+        // Act
+        accountService.initializeAgent(agentName, initialBalance);
+
+        // Assert - verify style was set on the managed entity directly.
+        // No explicit save needed: within @Transactional, JPA dirty-checking flushes changes.
+        verify(agentRepository, never()).save(any());
+        assertEquals("Value Investor", existingAgent.getStyle());
     }
 
     @Test

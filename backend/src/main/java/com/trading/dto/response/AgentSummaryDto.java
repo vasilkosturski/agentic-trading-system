@@ -11,8 +11,9 @@ public class AgentSummaryDto {
     private Long id;
     private String name;
     private String style;
-    private String strategy;
+    private String description;  // Fixed: was incorrectly named 'strategy'
     private boolean active;
     private String lastActivity;
+    private String systemPrompt;  // Full composed system prompt
 }
 
