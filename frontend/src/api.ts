@@ -16,7 +16,7 @@ export function fetchSnapshots(signal?: AbortSignal): Promise<PortfolioSnapshot[
 }
 
 export function fetchRuns(signal?: AbortSignal): Promise<{ runs: TradingRun[] }> {
-  return fetchJson<{ runs: TradingRun[] }>('/api/runs', signal)
+  return fetchJson<{ runs: TradingRun[] }>('/api/runs?limit=20', signal)
 }
 
 export function fetchAgents(signal?: AbortSignal): Promise<Agent[]> {
