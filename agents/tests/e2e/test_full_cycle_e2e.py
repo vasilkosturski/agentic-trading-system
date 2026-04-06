@@ -111,9 +111,11 @@ class TestFullCycleE2E:
         result.decision.validate_consistency()  # Validates action↔symbol↔quantity coherence
 
         # Symbol format (BUY/SELL guaranteed by force_trade)
-        assert result.decision.symbol.isalpha(), f"Symbol should be alphabetic: {result.decision.symbol}"
+        # Allow dots for class shares (e.g., BRK.B, BF.B)
+        symbol_clean = result.decision.symbol.replace(".", "")
+        assert symbol_clean.isalpha(), f"Symbol should be alphabetic (dots allowed): {result.decision.symbol}"
         assert result.decision.symbol.isupper(), f"Symbol should be uppercase: {result.decision.symbol}"
-        assert 1 <= len(result.decision.symbol) <= 5, f"Symbol length should be 1-5: {result.decision.symbol}"
+        assert 1 <= len(result.decision.symbol) <= 6, f"Symbol length should be 1-6: {result.decision.symbol}"
 
         # Structured reasoning fields should be populated for trade decisions
         assert len(result.decision.portfolioContext) > 0, "portfolioContext should be populated for BUY/SELL"

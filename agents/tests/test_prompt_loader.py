@@ -1,289 +1,205 @@
-"""Tests for prompt_loader: TOML-like parser, personality loading, and composition.
+"""Tests for prompt_loader: API-based prompt loading and runtime formatting.
+
+Since prompt_loader now fetches composed prompts from the Java backend API,
+the parser tests are replaced with mocked HTTP tests and format_prompt unit tests.
 
 Covers:
-1. _parse_personality_file() edge cases (single-line, multi-line, colons, blank lines)
-2. load_personality() for all 8 personality files
-3. load_composed_prompt() strict personality substitution
-4. load_prompt_template() end-to-end composition
-5. Missing personality field raises KeyError (strict validation)
+1. load_composed_prompt() with mocked HTTP responses
+2. format_prompt() runtime placeholder substitution
+3. Validation (invalid agent names, backend errors)
+4. get_available_templates() returns expected structure
 """
+
+from unittest.mock import patch, MagicMock
 
 import pytest
 
 from prompt_loader import (
-    _parse_personality_file,
-    load_personality,
-    load_base_template,
     load_composed_prompt,
     load_prompt_template,
     format_prompt,
+    load_and_format_prompt,
+    get_available_templates,
     VALID_AGENT_NAMES,
+    _PartialFormatDict,
 )
 
 
 # ============================================================================
-# 1. _parse_personality_file() parser tests
-# ============================================================================
-
-
-class TestParsePersonalityFile:
-    """Test the custom TOML-like personality parser."""
-
-    def test_single_line_value(self):
-        """Single key: value on the same line."""
-        content = "name: Warren"
-        result = _parse_personality_file(content)
-        assert result == {"name": "Warren"}
-
-    def test_multiple_single_line_values(self):
-        """Multiple single-line key-value pairs."""
-        content = "name: Warren\nstyle: value investing"
-        result = _parse_personality_file(content)
-        assert result == {"name": "Warren", "style": "value investing"}
-
-    def test_multi_line_value(self):
-        """Value that spans multiple lines."""
-        content = "criteria:\n- Strong moats\n- High ROE\n- Low debt"
-        result = _parse_personality_file(content)
-        assert result["criteria"] == "- Strong moats\n- High ROE\n- Low debt"
-
-    def test_colon_in_value(self):
-        """Colons within a value should not start a new key."""
-        content = "hint: Search for: value stocks, undervalued companies"
-        result = _parse_personality_file(content)
-        assert result["hint"] == "Search for: value stocks, undervalued companies"
-
-    def test_blank_line_stripping(self):
-        """Leading/trailing blank lines in multi-line values are stripped."""
-        content = "description:\n\nFirst paragraph.\n\nSecond paragraph.\n\n"
-        result = _parse_personality_file(content)
-        assert result["description"] == "First paragraph.\n\nSecond paragraph."
-
-    def test_empty_value(self):
-        """Key with no value results in empty string."""
-        content = "empty_field:\nnext_key: has value"
-        result = _parse_personality_file(content)
-        assert result["empty_field"] == ""
-        assert result["next_key"] == "has value"
-
-    def test_underscored_keys(self):
-        """Keys with underscores are parsed correctly."""
-        content = "identity_line: You are Warren\nresearch_step_title: Research value"
-        result = _parse_personality_file(content)
-        assert result["identity_line"] == "You are Warren"
-        assert result["research_step_title"] == "Research value"
-
-    def test_empty_content(self):
-        """Empty content returns empty dict."""
-        result = _parse_personality_file("")
-        assert result == {}
-
-    def test_preserves_internal_indentation(self):
-        """Internal indentation within multi-line values is preserved."""
-        content = "bullets:\n   - First item\n   - Second item\n   - Third item"
-        result = _parse_personality_file(content)
-        assert "   - First item" in result["bullets"]
-        assert "   - Second item" in result["bullets"]
-
-    def test_multi_line_value_between_keys(self):
-        """Multi-line value is captured correctly between two keys."""
-        content = (
-            "first: single\n"
-            "second:\n"
-            "line one\n"
-            "line two\n"
-            "third: after"
-        )
-        result = _parse_personality_file(content)
-        assert result["first"] == "single"
-        assert result["second"] == "line one\nline two"
-        assert result["third"] == "after"
-
-
-# ============================================================================
-# 2. load_personality() - all 8 personality files parse correctly
-# ============================================================================
-
-
-class TestLoadPersonality:
-    """Test loading real personality files from disk."""
-
-    @pytest.mark.parametrize(
-        "agent_type,agent_name",
-        [
-            ("market_analyst", "warren"),
-            ("market_analyst", "george"),
-            ("market_analyst", "ray"),
-            ("market_analyst", "cathie"),
-            ("decision_maker", "warren"),
-            ("decision_maker", "george"),
-            ("decision_maker", "ray"),
-            ("decision_maker", "cathie"),
-        ],
-    )
-    def test_all_personality_files_parse(self, agent_type, agent_name):
-        """Every personality file parses without error and returns non-empty dict."""
-        fields = load_personality(agent_type, agent_name)
-        assert isinstance(fields, dict)
-        assert len(fields) > 0, f"No fields parsed from {agent_type}/{agent_name}"
-
-    @pytest.mark.parametrize("agent_type", ["market_analyst", "decision_maker"])
-    def test_required_keys_present(self, agent_type):
-        """Every personality file has the mandatory identity keys."""
-        required_keys = {"identity_line", "identity"}
-        for name in VALID_AGENT_NAMES:
-            fields = load_personality(agent_type, name)
-            missing = required_keys - set(fields.keys())
-            assert not missing, (
-                f"{agent_type}/{name} missing required keys: {missing}"
-            )
-
-    def test_invalid_agent_name_raises(self):
-        """Invalid agent name raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid agent name"):
-            load_personality("market_analyst", "invalid_agent")
-
-    def test_case_insensitive_name(self):
-        """Agent names are case-insensitive."""
-        fields_lower = load_personality("market_analyst", "warren")
-        fields_upper = load_personality("market_analyst", "Warren")
-        assert fields_lower == fields_upper
-
-
-# ============================================================================
-# 3. load_composed_prompt() strict composition
+# 1. load_composed_prompt() with mocked HTTP
 # ============================================================================
 
 
 class TestLoadComposedPrompt:
-    """Test composed prompt generation with strict substitution."""
+    """Test API-based prompt loading with mocked HTTP responses."""
 
-    @pytest.mark.parametrize(
-        "agent_type,agent_name",
-        [
-            ("market_analyst", "warren"),
-            ("market_analyst", "george"),
-            ("market_analyst", "ray"),
-            ("market_analyst", "cathie"),
-            ("decision_maker", "warren"),
-            ("decision_maker", "george"),
-            ("decision_maker", "ray"),
-            ("decision_maker", "cathie"),
-        ],
-    )
-    def test_composes_without_unresolved_personality_placeholders(
-        self, agent_type, agent_name
-    ):
-        """Composed prompt has no unresolved personality placeholders.
+    @patch("prompt_loader.httpx.get")
+    def test_fetches_from_backend_api(self, mock_get):
+        """Calls the correct backend URL."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = "You are Warren, a Value Investor."
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
 
-        After strict substitution, the only remaining {placeholder} should be
-        runtime ones like {datetime}.
-        """
-        composed = load_composed_prompt(agent_type, agent_name)
-        assert isinstance(composed, str)
-        assert len(composed) > 100  # Sanity check: non-trivial output
+        result = load_composed_prompt("decision_maker", "Warren")
 
-        # Verify no personality keys remain unresolved
-        personality = load_personality(agent_type, agent_name)
-        for key in personality:
-            assert f"{{{key}}}" not in composed, (
-                f"Unresolved personality placeholder '{{{key}}}' found in composed prompt"
-            )
+        mock_get.assert_called_once()
+        call_url = mock_get.call_args[0][0]
+        assert "/api/prompts/decision_maker/warren" in call_url
+        assert result == "You are Warren, a Value Investor."
 
-    @pytest.mark.parametrize("agent_type", ["market_analyst", "decision_maker"])
-    def test_datetime_placeholder_preserved(self, agent_type):
-        """Runtime {datetime} placeholder is preserved after personality substitution."""
-        composed = load_composed_prompt(agent_type, "warren")
-        assert "{datetime}" in composed, (
-            "Runtime {datetime} placeholder should be preserved for format_prompt()"
+    @patch("prompt_loader.httpx.get")
+    def test_returns_prompt_text(self, mock_get):
+        """Returns the response body as a string."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = "Test prompt content with {datetime} placeholder"
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        result = load_composed_prompt("market_analyst", "ray")
+        assert result == "Test prompt content with {datetime} placeholder"
+
+    def test_invalid_agent_name_raises_value_error(self):
+        """Invalid agent name raises ValueError without calling backend."""
+        with pytest.raises(ValueError, match="Invalid agent name"):
+            load_composed_prompt("market_analyst", "invalid_agent")
+
+    @patch("prompt_loader.httpx.get")
+    def test_404_raises_file_not_found(self, mock_get):
+        """Backend 404 raises FileNotFoundError."""
+        import httpx
+
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Not Found", request=MagicMock(), response=mock_response
         )
+        mock_get.return_value = mock_response
 
-    def test_missing_personality_field_raises_key_error(self, tmp_path):
-        """Missing personality key in base template raises KeyError."""
-        import prompt_loader
+        with pytest.raises(FileNotFoundError, match="Prompt not found"):
+            load_composed_prompt("decision_maker", "warren")
 
-        # Save original PROMPTS_DIR
-        original_dir = prompt_loader.PROMPTS_DIR
+    @patch("prompt_loader.httpx.get")
+    def test_connection_error_raises_runtime_error(self, mock_get):
+        """Backend unreachable raises RuntimeError."""
+        import httpx
 
-        try:
-            # Create test files with a missing key
-            agent_dir = tmp_path / "market_analyst"
-            agent_dir.mkdir()
+        mock_get.side_effect = httpx.RequestError("Connection refused")
 
-            # Base template references {missing_key}
-            base = agent_dir / "base.txt"
-            base.write_text("{identity_line}\n{missing_key}\n")
-
-            # Personality only has identity_line
-            personality = agent_dir / "warren.personality.txt"
-            personality.write_text("identity_line: Hello\n")
-
-            # Override PROMPTS_DIR
-            prompt_loader.PROMPTS_DIR = tmp_path
-
-            with pytest.raises(KeyError, match="missing_key"):
-                load_composed_prompt("market_analyst", "warren")
-        finally:
-            prompt_loader.PROMPTS_DIR = original_dir
+        with pytest.raises(RuntimeError, match="Cannot reach backend"):
+            load_composed_prompt("decision_maker", "warren")
 
 
 # ============================================================================
-# 4. load_prompt_template() end-to-end
+# 2. format_prompt() runtime substitution
+# ============================================================================
+
+
+class TestFormatPrompt:
+    """Test runtime placeholder substitution."""
+
+    def test_resolves_datetime_placeholder(self):
+        """format_prompt() resolves {datetime}."""
+        template = "Current time: {datetime}"
+        result = format_prompt(template, datetime="2025-06-15 10:00:00")
+        assert "2025-06-15 10:00:00" in result
+        assert "{datetime}" not in result
+
+    def test_auto_fills_datetime_if_not_provided(self):
+        """format_prompt() auto-fills datetime when not explicitly passed."""
+        template = "Time is {datetime}"
+        result = format_prompt(template)
+        assert "{datetime}" not in result
+
+    def test_preserves_unknown_placeholders(self):
+        """Unknown placeholders are preserved (not crash)."""
+        template = "Hello {name}, today is {datetime}"
+        result = format_prompt(template, datetime="2025-01-01")
+        assert "{name}" in result
+        assert "2025-01-01" in result
+
+    def test_partial_format_dict_returns_placeholder_for_missing(self):
+        """_PartialFormatDict returns {key} for missing keys."""
+        d = _PartialFormatDict(a="1")
+        assert d["a"] == "1"
+        assert d["missing"] == "{missing}"
+
+
+# ============================================================================
+# 3. load_prompt_template() and load_and_format_prompt()
 # ============================================================================
 
 
 class TestLoadPromptTemplate:
-    """Test end-to-end template loading."""
+    """Test end-to-end template loading wrappers."""
 
-    def test_end_to_end_composition(self):
-        """load_prompt_template returns a valid template for all agents."""
-        template = load_prompt_template("market_analyst", "Warren")
-        assert isinstance(template, str)
-        assert len(template) > 100
-        # Should still have {datetime} for runtime
-        assert "{datetime}" in template
+    @patch("prompt_loader.httpx.get")
+    def test_load_prompt_template_delegates_to_composed(self, mock_get):
+        """load_prompt_template calls load_composed_prompt."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = "Prompt for {datetime}"
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
 
-    def test_invalid_agent_name_raises(self):
+        result = load_prompt_template("market_analyst", "Warren")
+        assert result == "Prompt for {datetime}"
+
+    def test_load_prompt_template_invalid_name_raises(self):
         """Invalid agent name raises ValueError."""
         with pytest.raises(ValueError, match="Invalid agent name"):
             load_prompt_template("market_analyst", "NotAnAgent")
 
-    def test_format_prompt_resolves_datetime(self):
-        """format_prompt() resolves the {datetime} placeholder."""
-        template = load_prompt_template("market_analyst", "Warren")
-        formatted = format_prompt(template, datetime="2025-06-15 10:00:00")
-        assert "{datetime}" not in formatted
-        assert "2025-06-15 10:00:00" in formatted
+    @patch("prompt_loader.httpx.get")
+    def test_load_and_format_prompt_end_to_end(self, mock_get):
+        """load_and_format_prompt fetches and formats in one call."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = "Hello Warren, time is {datetime}"
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
 
-    def test_format_prompt_auto_datetime(self):
-        """format_prompt() auto-fills datetime if not provided."""
-        template = load_prompt_template("decision_maker", "George")
-        formatted = format_prompt(template)
-        assert "{datetime}" not in formatted
-
-
-# ============================================================================
-# 5. Strict validation: missing personality field
-# ============================================================================
-
-
-class TestStrictValidation:
-    """Test that strict personality substitution catches missing keys."""
-
-    def test_partial_format_dict_still_used_in_format_prompt(self):
-        """format_prompt() uses _PartialFormatDict for runtime (graceful for unknown keys)."""
-        # Template with an unknown runtime placeholder
-        template = "Hello {name}, today is {datetime}"
-        result = format_prompt(template, datetime="2025-01-01")
-        # {name} should be preserved (not crash)
-        assert "{name}" in result
+        result = load_and_format_prompt(
+            "decision_maker", "Warren", datetime="2025-01-01"
+        )
         assert "2025-01-01" in result
+        assert "{datetime}" not in result
 
-    def test_composed_prompt_is_valid_for_format_prompt(self):
-        """Composed prompt can be passed to format_prompt() without errors."""
+
+# ============================================================================
+# 4. get_available_templates()
+# ============================================================================
+
+
+class TestGetAvailableTemplates:
+    """Test template listing."""
+
+    def test_returns_both_agent_types(self):
+        """Returns both market_analyst and decision_maker."""
+        templates = get_available_templates()
+        assert "market_analyst" in templates
+        assert "decision_maker" in templates
+
+    def test_returns_all_agent_names(self):
+        """Each type has all valid agent names."""
+        templates = get_available_templates()
         for agent_type in ["market_analyst", "decision_maker"]:
-            for name in VALID_AGENT_NAMES:
-                template = load_composed_prompt(agent_type, name)
-                # Should not raise -- only {datetime} remains
-                result = format_prompt(template, datetime="2025-01-01 12:00:00")
-                assert "2025-01-01 12:00:00" in result
+            names = set(templates[agent_type])
+            assert names == VALID_AGENT_NAMES
+
+
+# ============================================================================
+# 5. VALID_AGENT_NAMES
+# ============================================================================
+
+
+class TestValidAgentNames:
+    """Test agent name constants."""
+
+    def test_contains_four_agents(self):
+        assert len(VALID_AGENT_NAMES) == 4
+
+    def test_expected_names(self):
+        assert VALID_AGENT_NAMES == {"warren", "george", "ray", "cathie"}

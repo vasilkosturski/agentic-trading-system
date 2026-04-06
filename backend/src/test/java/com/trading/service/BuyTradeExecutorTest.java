@@ -58,7 +58,7 @@ class BuyTradeExecutorTest {
         testAccount.setId(1L);
 
         // Create test price data
-        testPriceData = new MarketService.PriceData(150.0, DataTier.REAL_TIME, Instant.now(), "Finnhub");
+        testPriceData = new MarketService.PriceData(150.0, true, Instant.now(), "Finnhub");
     }
 
     // ========== HAPPY PATH TESTS ==========
@@ -154,7 +154,7 @@ class BuyTradeExecutorTest {
         when(holdingRepository.findActiveHoldingsByAccount(testAccount))
             .thenReturn(Arrays.asList(existingHolding)); // Has existing holding
         when(marketService.getSharePrice(symbol))
-            .thenReturn(new MarketService.PriceData(buyPrice, DataTier.REAL_TIME, Instant.now(), "Finnhub"));
+            .thenReturn(new MarketService.PriceData(buyPrice, true, Instant.now(), "Finnhub"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -204,7 +204,7 @@ class BuyTradeExecutorTest {
         when(holdingRepository.findActiveHoldingsByAccount(testAccount))
             .thenReturn(existingHoldings);
         when(marketService.getSharePrice(symbol))
-            .thenReturn(new MarketService.PriceData(price, DataTier.REAL_TIME, Instant.now(), "Finnhub"));
+            .thenReturn(new MarketService.PriceData(price, true, Instant.now(), "Finnhub"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -436,7 +436,7 @@ class BuyTradeExecutorTest {
         when(holdingRepository.findActiveHoldingsByAccount(testAccount))
             .thenReturn(new ArrayList<>());
         when(marketService.getSharePrice("AAPL"))
-            .thenReturn(new MarketService.PriceData(price, DataTier.REAL_TIME, Instant.now(), "Finnhub"));
+            .thenReturn(new MarketService.PriceData(price, true, Instant.now(), "Finnhub"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -590,7 +590,7 @@ class BuyTradeExecutorTest {
         when(holdingRepository.findActiveHoldingsByAccount(testAccount))
             .thenReturn(new ArrayList<>());
         when(marketService.getSharePrice("AAPL"))
-            .thenReturn(new MarketService.PriceData(price, DataTier.REAL_TIME, Instant.now(), "Finnhub"));
+            .thenReturn(new MarketService.PriceData(price, true, Instant.now(), "Finnhub"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -650,7 +650,7 @@ class BuyTradeExecutorTest {
         when(holdingRepository.findActiveHoldingsByAccount(testAccount))
             .thenReturn(new ArrayList<>());
         when(marketService.getSharePrice("AAPL"))
-            .thenReturn(new MarketService.PriceData(price, DataTier.REAL_TIME, Instant.now(), "Finnhub"));
+            .thenReturn(new MarketService.PriceData(price, true, Instant.now(), "Finnhub"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
