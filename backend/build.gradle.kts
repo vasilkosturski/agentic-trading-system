@@ -45,6 +45,10 @@ dependencies {
     
     // HTTP client
     implementation("org.springframework.boot:spring-boot-starter-webflux")
+
+    // Retry with exponential backoff for external API calls
+    implementation("org.springframework.retry:spring-retry")
+    implementation("org.springframework:spring-aspects")
     
     // Logging
     implementation("ch.qos.logback:logback-classic")

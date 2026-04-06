@@ -56,8 +56,8 @@ public abstract class TradeExecutor {
         logger.info("🔍 DEBUGGING: Requesting real market price for {} from MarketService", symbol);
         MarketService.PriceData priceData = marketService.getSharePrice(symbol);
         Double price = priceData.getPrice();
-        logger.info("💰 DEBUGGING: Received price for {}: ${} from {} ({})",
-            symbol, price, priceData.getDataSource(), priceData.getDataTier());
+        logger.info("💰 DEBUGGING: Received price for {}: ${} from {} (cached: {})",
+            symbol, price, priceData.getSource(), priceData.isCached());
         return price;
     }
 

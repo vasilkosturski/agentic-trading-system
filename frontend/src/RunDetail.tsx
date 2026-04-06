@@ -152,7 +152,7 @@ function ResearchSection({ research }: { research: ResearchPhase | null }) {
     <Paper p="lg" shadow="xs" mb="md">
       <Group justify="space-between" mb="sm">
         <Title order={3}>Research Phase</Title>
-        <Text c="dimmed" size="sm">Completed in {research.latencyMs.toLocaleString()}ms</Text>
+        {research.latencyMs != null && <Text c="dimmed" size="sm">Completed in {research.latencyMs.toLocaleString()}ms</Text>}
       </Group>
 
       <PhaseMetrics phase={research} />
@@ -211,7 +211,9 @@ function DecisionSection({ decision }: { decision: DecisionPhase | null }) {
     <Paper p="lg" shadow="xs" mb="md">
       <Group justify="space-between" mb="sm">
         <Title order={3}>Decision Phase</Title>
-        <Text c="dimmed" size="sm">Completed in {decision.latencyMs.toLocaleString()}ms</Text>
+        {decision.latencyMs != null && (
+          <Text c="dimmed" size="sm">Completed in {decision.latencyMs.toLocaleString()}ms</Text>
+        )}
       </Group>
 
       <PhaseMetrics phase={decision} />
@@ -226,32 +228,36 @@ function DecisionSection({ decision }: { decision: DecisionPhase | null }) {
         <Badge color={decisionColor(decision.decision)} variant="light" size="lg">
           {decision.decision}
         </Badge>
-        <Text fw={600}>{decision.symbol}</Text>
-        <Text c="dimmed">x{decision.quantity} shares</Text>
+        {decision.symbol && <Text fw={600}>{decision.symbol}</Text>}
+        {decision.quantity != null && <Text c="dimmed">x{decision.quantity} shares</Text>}
       </Group>
 
-      <Text fw={600} mb="xs">Reasoning</Text>
+      {decision.reasoning && (
+        <>
+          <Text fw={600} mb="xs">Reasoning</Text>
 
-      <Paper withBorder p="sm" mb="xs">
-        <Text size="sm" fw={600} mb={4}>Research Context</Text>
-        <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-          {decision.reasoning.researchContext}
-        </Text>
-      </Paper>
+          <Paper withBorder p="sm" mb="xs">
+            <Text size="sm" fw={600} mb={4}>Research Context</Text>
+            <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+              {decision.reasoning.researchContext}
+            </Text>
+          </Paper>
 
-      <Paper withBorder p="sm" mb="xs">
-        <Text size="sm" fw={600} mb={4}>Portfolio Context</Text>
-        <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-          {decision.reasoning.portfolioContext}
-        </Text>
-      </Paper>
+          <Paper withBorder p="sm" mb="xs">
+            <Text size="sm" fw={600} mb={4}>Portfolio Context</Text>
+            <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+              {decision.reasoning.portfolioContext}
+            </Text>
+          </Paper>
 
-      <Paper withBorder p="sm" mb="md">
-        <Text size="sm" fw={600} mb={4}>Historical Context</Text>
-        <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-          {decision.reasoning.historicalContext}
-        </Text>
-      </Paper>
+          <Paper withBorder p="sm" mb="md">
+            <Text size="sm" fw={600} mb={4}>Historical Context</Text>
+            <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+              {decision.reasoning.historicalContext}
+            </Text>
+          </Paper>
+        </>
+      )}
 
       <ToolCallsTable toolCalls={decision.toolCalls} />
     </Paper>

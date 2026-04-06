@@ -10,7 +10,7 @@ avoids redundant HTTP calls when the LLM calls multiple tools for the same symbo
 import logging
 import time
 from agents import function_tool
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 # Import centralized configuration
 from config import BACKEND_API_MARKET
@@ -19,7 +19,7 @@ from config import BACKEND_API_MARKET
 from http_client import call_backend, BackendAPIError
 
 # Import type-safe models
-from models import MarketData, PriceMetadata, HistoricalPrice, MarketIndicators
+from models import MarketData, PriceMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -143,61 +143,8 @@ async def get_price_with_metadata(symbol: str) -> PriceMetadata:
         )
 
 
-@function_tool
-async def get_historical_prices(symbol: str, days: int = 30) -> List[HistoricalPrice]:
-    """Get historical stock prices.
-
-    Args:
-        symbol: The stock symbol (e.g., 'AAPL', 'GOOGL', 'TSLA')
-        days: Number of days of history to retrieve (default: 30, max: 365)
-
-    Returns:
-        List of HistoricalPrice models with validated data:
-        [HistoricalPrice(date="2025-01-15", price=150.25), ...]
-    """
-    try:
-        data = await _fetch_market_data(symbol, days=days)
-        return data.historicalPrices
-    except Exception as e:
-        logger.error(f"Failed to get historical prices for {symbol}: {e}")
-        raise Exception(
-            f"Price data unavailable for {symbol}. "
-            "Skip this symbol and continue with other candidates. "
-            "Do NOT retry this symbol."
-        )
-
-
-@function_tool
-async def get_market_indicators(symbol: str) -> MarketIndicators:
-    """Get technical market indicators for a stock.
-
-    Includes moving averages and volatility metrics useful for analysis.
-
-    Args:
-        symbol: The stock symbol (e.g., 'AAPL', 'GOOGL', 'TSLA')
-
-    Returns:
-        MarketIndicators model with validated data:
-        - sma5: 5-day simple moving average
-        - sma20: 20-day simple moving average
-        - volatility: Price volatility measure
-    """
-    try:
-        data = await _fetch_market_data(symbol)
-        return data.indicators
-    except Exception as e:
-        logger.error(f"Failed to get market indicators for {symbol}: {e}")
-        raise Exception(
-            f"Price data unavailable for {symbol}. "
-            "Skip this symbol and continue with other candidates. "
-            "Do NOT retry this symbol."
-        )
-
-
 # All market data tools that agents can use
 MARKET_TOOLS = [
     lookup_share_price,
     get_price_with_metadata,
-    get_historical_prices,
-    get_market_indicators,
 ]
