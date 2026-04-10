@@ -17,6 +17,7 @@ export interface TradingRun {
   symbol: string | null
   startedAt: string
   completedAt: string | null
+  errorMessage?: string | null
 }
 
 export interface Agent {
