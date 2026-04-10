@@ -40,13 +40,12 @@ class RunOutcome(str, Enum):
 # =============================================================================
 
 class PriceMetadata(BaseModel):
-    """Stock price with data quality metadata (from backend API)."""
+    """Stock price with metadata (from backend API)."""
 
     price: float = Field(gt=0, description="Current stock price in USD")
-    dataTier: str = Field(description="Data quality tier from backend (e.g. END_OF_DAY, CACHED, MOCK)")
+    cached: bool = Field(default=False, description="Whether from cache")
     timestamp: datetime = Field(description="Timestamp of price data")
-    dataSource: str = Field(description="Data source name")
-    dataAgeMinutes: int = Field(ge=0, description="Age of data in minutes")
+    source: str = Field(description="Data source description")
 
 
 class HistoricalPrice(BaseModel):
@@ -65,21 +64,12 @@ class MarketIndicators(BaseModel):
 
 
 class MarketData(BaseModel):
-    """Combined market data from consolidated GET /api/market/{symbol} endpoint.
-
-    Contains price with metadata, historical prices, and technical indicators
-    in a single response to minimize HTTP calls.
-    """
+    """Price data from GET /api/market/{symbol} endpoint."""
 
     price: float = Field(gt=0, description="Current stock price in USD")
-    dataTier: str = Field(description="Data quality tier from backend")
+    cached: bool = Field(default=False, description="Whether price came from cache")
     timestamp: datetime = Field(description="Timestamp of price data")
-    dataSource: str = Field(description="Data source description")
-    dataAgeMinutes: int = Field(ge=0, description="Age of data in minutes")
-    historicalPrices: List[HistoricalPrice] = Field(
-        default_factory=list, description="Historical daily prices"
-    )
-    indicators: MarketIndicators = Field(description="Technical indicators")
+    source: str = Field(description="Data source description")
 
 
 class Holding(BaseModel):
