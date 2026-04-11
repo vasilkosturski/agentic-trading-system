@@ -62,7 +62,6 @@ class TestDecisionMakerAgent:
         assert agent.output_type == TradingDecision
 
 
-@pytest.mark.asyncio
 class TestBuildDecisionPrompt:
     """Test decision prompt generation."""
 

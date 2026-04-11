@@ -73,7 +73,7 @@ public class TradingRunController {
     public ResponseEntity<Void> updatePhase(
             @PathVariable Long id,
             @Valid @RequestBody UpdatePhaseRequest request) {
-        tradingRunService.updatePhase(id, request.getPhase());
+        tradingRunService.updatePhase(id, request.getPhase(), request.getErrorMessage());
         return ResponseEntity.ok().build();
     }
 

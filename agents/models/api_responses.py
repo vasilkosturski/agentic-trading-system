@@ -31,7 +31,7 @@ class TradeType(str, Enum):
 class RunOutcome(str, Enum):
     """Outcome of a trading run."""
     COMPLETED = "COMPLETED"
-    ERROR = "ERROR"
+    FAILED = "FAILED"
     IN_PROGRESS = "IN_PROGRESS"
 
 

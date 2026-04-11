@@ -779,11 +779,12 @@ class AgentExecutor:
             outcome=f"Failed: {str(error)}",
         )
 
-        # Update run to ERROR/FAILED state. Do NOT call complete_run() — that
-        # would override FAILED back to COMPLETED. Just set the error phase.
+        # Update run to FAILED state. Do NOT call complete_run() — that
+        # would override FAILED back to COMPLETED. Just set the failed phase.
         if run_id is not None:
             try:
-                await update_phase(run_id, RunPhase.ERROR)
+                error_msg = str(error)[:500] or "Unknown error"
+                await update_phase(run_id, RunPhase.FAILED, error_message=error_msg)
             except Exception as cleanup_err:
                 logger.error(
                     f"Failed to record error state for run {run_id}: {cleanup_err}"

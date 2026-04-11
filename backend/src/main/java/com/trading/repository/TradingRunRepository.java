@@ -29,9 +29,9 @@ public interface TradingRunRepository extends JpaRepository<TradingRun, Long>, J
     List<TradingRun> findByAgentIdAndStatus(Long agentId, RunStatus status);
 
     /**
-     * Find active run for an agent (any phase except COMPLETED/ERROR).
+     * Find active run for an agent (any phase except COMPLETED/FAILED).
      */
-    @Query("SELECT tr FROM TradingRun tr WHERE tr.agent.id = :agentId AND tr.phase NOT IN (com.trading.enums.RunPhase.COMPLETED, com.trading.enums.RunPhase.ERROR)")
+    @Query("SELECT tr FROM TradingRun tr WHERE tr.agent.id = :agentId AND tr.phase NOT IN (com.trading.enums.RunPhase.COMPLETED, com.trading.enums.RunPhase.FAILED)")
     Optional<TradingRun> findActiveRunByAgentId(@Param("agentId") Long agentId);
 
     /**

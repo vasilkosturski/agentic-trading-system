@@ -9,12 +9,12 @@ import java.util.Set;
  *
  * <p>Valid transitions:
  * <pre>
- * INITIALIZING -> RESEARCHING, ERROR
- * RESEARCHING  -> DECIDING, ERROR
- * DECIDING     -> TRADING, COMPLETED (HOLD), ERROR
- * TRADING      -> COMPLETED, ERROR
+ * INITIALIZING -> RESEARCHING, FAILED
+ * RESEARCHING  -> DECIDING, FAILED
+ * DECIDING     -> TRADING, COMPLETED (HOLD), FAILED
+ * TRADING      -> COMPLETED, FAILED
  * COMPLETED    -> (terminal)
- * ERROR        -> ERROR (idempotent)
+ * FAILED       -> FAILED (idempotent)
  * </pre>
  */
 public enum RunPhase {
@@ -33,16 +33,16 @@ public enum RunPhase {
     /** Cycle finished successfully (terminal) */
     COMPLETED,
 
-    /** Cycle encountered error and stopped */
-    ERROR;
+    /** Cycle failed (terminal) */
+    FAILED;
 
     private static final Map<RunPhase, Set<RunPhase>> VALID_TRANSITIONS = Map.of(
-        INITIALIZING, Set.of(RESEARCHING, ERROR),
-        RESEARCHING,  Set.of(DECIDING, ERROR),
-        DECIDING,     Set.of(TRADING, COMPLETED, ERROR),
-        TRADING,      Set.of(COMPLETED, ERROR),
+        INITIALIZING, Set.of(RESEARCHING, FAILED),
+        RESEARCHING,  Set.of(DECIDING, FAILED),
+        DECIDING,     Set.of(TRADING, COMPLETED, FAILED),
+        TRADING,      Set.of(COMPLETED, FAILED),
         COMPLETED,    Set.of(),
-        ERROR,        Set.of(ERROR)
+        FAILED,       Set.of(FAILED)
     );
 
     /**

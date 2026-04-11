@@ -109,6 +109,10 @@ public class TradingRunService {
      * @throws IllegalArgumentException if transition is invalid
      */
     public void updatePhase(Long runId, RunPhase newPhase) {
+        updatePhase(runId, newPhase, null);
+    }
+
+    public void updatePhase(Long runId, RunPhase newPhase, String errorMessage) {
         logger.info("Updating phase for run ID: {} to: {}", runId, newPhase);
 
         TradingRun run = getRun(runId);
@@ -116,7 +120,11 @@ public class TradingRunService {
 
         validatePhaseTransition(currentPhase, newPhase);
 
-        run.updatePhase(newPhase);
+        if (newPhase == RunPhase.FAILED) {
+            run.markAsError(errorMessage);
+        } else {
+            run.updatePhase(newPhase);
+        }
         run = tradingRunRepository.save(run);
 
         logger.info("Run {} phase updated: {} -> {}", runId, currentPhase, newPhase);

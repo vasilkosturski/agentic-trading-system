@@ -111,7 +111,6 @@ def mock_mcp_pool():
 # Test: Initialization
 # ============================================================================
 
-@pytest.mark.asyncio
 class TestAgentExecutorInitialization:
     """Test AgentExecutor initialization."""
 
@@ -240,7 +239,6 @@ class TestAgentExecutorFetchData:
 # ============================================================================
 
 @pytest.mark.asyncio
-@pytest.mark.integration  # Requires complete mock chain; UsageMetrics.modelName validation fails with MagicMock
 class TestAgentExecutorMarketAnalyst:
     """Test _run_market_analyst method."""
 
@@ -265,11 +263,20 @@ class TestAgentExecutorMarketAnalyst:
         mock_analyst_instance.build_prompt.return_value = "test prompt"
         mock_market_analyst_class.create = AsyncMock(return_value=mock_analyst_instance)
 
-        # Setup mock Runner result with empty new_items (no tool calls)
+        # Setup mock Runner result with proper usage metrics
         mock_result = MagicMock()
         mock_result.final_output_as.return_value = sample_research_response
-        mock_result.new_items = []  # No tool calls → no candidate prices extracted
+        mock_result.new_items = []
+        mock_result.context_wrapper.usage.total_tokens = 100
+        mock_result.context_wrapper.usage.input_tokens = 80
+        mock_result.context_wrapper.usage.output_tokens = 20
+        mock_result.context_wrapper.usage.input_tokens_details = None
+        mock_result.context_wrapper.usage.output_tokens_details = None
+        mock_result.context_wrapper.usage.requests = 1
+        mock_result.context_wrapper.usage.request_usage_entries = []
         mock_runner_class.run = AsyncMock(return_value=mock_result)
+
+        mock_analyst_instance.model_name = "gpt-4o"
 
         executor = AgentExecutor(
             sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
@@ -306,7 +313,6 @@ class TestAgentExecutorMarketAnalyst:
 # ============================================================================
 
 @pytest.mark.asyncio
-@pytest.mark.integration  # Requires complete mock chain; UsageMetrics.modelName validation fails with MagicMock
 class TestAgentExecutorDecisionMaker:
     """Test _run_decision_maker method."""
 
@@ -338,10 +344,20 @@ class TestAgentExecutorDecisionMaker:
         mock_dm_instance.build_prompt.return_value = "test prompt"
         mock_decision_maker_class.create = AsyncMock(return_value=mock_dm_instance)
 
-        # Setup mock Runner result
+        # Setup mock Runner result with proper usage metrics
         mock_result = MagicMock()
         mock_result.final_output_as.return_value = sample_decision
+        mock_result.new_items = []
+        mock_result.context_wrapper.usage.total_tokens = 50
+        mock_result.context_wrapper.usage.input_tokens = 40
+        mock_result.context_wrapper.usage.output_tokens = 10
+        mock_result.context_wrapper.usage.input_tokens_details = None
+        mock_result.context_wrapper.usage.output_tokens_details = None
+        mock_result.context_wrapper.usage.requests = 1
+        mock_result.context_wrapper.usage.request_usage_entries = []
         mock_runner_class.run = AsyncMock(return_value=mock_result)
+
+        mock_dm_instance.model_name = "gpt-4o"
 
         executor = AgentExecutor(
             sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
@@ -544,8 +560,9 @@ class TestAgentExecutorErrorHandling:
 
         await executor._handle_cycle_error(Exception("Test error"), ctx)
 
-        # Error handler should call complete_run with error data
-        mock_complete_run.assert_called_once()
+        # Error handler should set phase to ERROR (not call complete_run)
+        mock_update_phase.assert_called_once()
+        mock_complete_run.assert_not_called()
 
     @patch("agent_executor.update_phase")
     async def test_handle_cycle_error_without_context(
@@ -569,7 +586,6 @@ class TestAgentExecutorErrorHandling:
 # ============================================================================
 
 @pytest.mark.asyncio
-@pytest.mark.integration  # Requires complete mock chain; UsageMetrics.modelName validation fails with MagicMock
 class TestAgentExecutorFullCycle:
     """Test full execute_cycle."""
 
@@ -640,25 +656,46 @@ class TestAgentExecutorFullCycle:
         # MarketAnalyst mock
         mock_analyst_instance = MagicMock()
         mock_analyst_instance.agent = MagicMock()
+        mock_analyst_instance.agent.instructions = "test system prompt"
         mock_analyst_instance.build_prompt.return_value = "research prompt"
+        mock_analyst_instance.model_name = "gpt-4o"
         mock_market_analyst_class.create = AsyncMock(return_value=mock_analyst_instance)
 
         # DecisionMaker mock
         mock_dm_instance = MagicMock()
         mock_dm_instance.agent = MagicMock()
+        mock_dm_instance.agent.instructions = "test decision prompt"
         mock_dm_instance.build_prompt.return_value = "decision prompt"
+        mock_dm_instance.model_name = "gpt-4o"
         mock_decision_maker_class.create = AsyncMock(return_value=mock_dm_instance)
 
         # Market Analyst runs through guardrail_retry.Runner
         mock_research_result = MagicMock()
         mock_research_result.final_output_as.return_value = sample_research_response
-        mock_research_result.new_items = []  # No tool calls
+        mock_research_result.new_items = []
+        mock_research_result.context_wrapper.usage.total_tokens = 100
+        mock_research_result.context_wrapper.usage.input_tokens = 80
+        mock_research_result.context_wrapper.usage.output_tokens = 20
+        mock_research_result.context_wrapper.usage.input_tokens_details = None
+        mock_research_result.context_wrapper.usage.output_tokens_details = None
+        mock_research_result.context_wrapper.usage.requests = 1
+        mock_research_result.context_wrapper.usage.request_usage_entries = []
         mock_guardrail_runner_class.run = AsyncMock(return_value=mock_research_result)
+        mock_analyst_instance.model_name = "gpt-4o"
 
         # Decision Maker runs through agent_executor.Runner
         mock_decision_result = MagicMock()
         mock_decision_result.final_output_as.return_value = sample_decision
+        mock_decision_result.new_items = []
+        mock_decision_result.context_wrapper.usage.total_tokens = 50
+        mock_decision_result.context_wrapper.usage.input_tokens = 40
+        mock_decision_result.context_wrapper.usage.output_tokens = 10
+        mock_decision_result.context_wrapper.usage.input_tokens_details = None
+        mock_decision_result.context_wrapper.usage.output_tokens_details = None
+        mock_decision_result.context_wrapper.usage.requests = 1
+        mock_decision_result.context_wrapper.usage.request_usage_entries = []
         mock_runner_class.run = AsyncMock(return_value=mock_decision_result)
+        mock_dm_instance.model_name = "gpt-4o"
 
         # Trade execution
         mock_buy.return_value = MagicMock(tradeId=456)

@@ -168,7 +168,7 @@ class TradingRunControllerTest {
         @Test
         @DisplayName("Valid request returns 200")
         void updatePhase_ValidRequest_Returns200() throws Exception {
-            doNothing().when(tradingRunService).updatePhase(100L, RunPhase.RESEARCHING);
+            doNothing().when(tradingRunService).updatePhase(eq(100L), eq(RunPhase.RESEARCHING), any());
 
             UpdatePhaseRequest request = new UpdatePhaseRequest();
             request.setPhase(RunPhase.RESEARCHING);
@@ -178,14 +178,14 @@ class TradingRunControllerTest {
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-            verify(tradingRunService).updatePhase(100L, RunPhase.RESEARCHING);
+            verify(tradingRunService).updatePhase(eq(100L), eq(RunPhase.RESEARCHING), any());
         }
 
         @Test
         @DisplayName("Run not found returns 404")
         void updatePhase_RunNotFound_Returns404() throws Exception {
             doThrow(new ResourceNotFoundException("Trading run not found with id: 999"))
-                .when(tradingRunService).updatePhase(eq(999L), any(RunPhase.class));
+                .when(tradingRunService).updatePhase(eq(999L), any(RunPhase.class), any());
 
             UpdatePhaseRequest request = new UpdatePhaseRequest();
             request.setPhase(RunPhase.RESEARCHING);
@@ -202,7 +202,7 @@ class TradingRunControllerTest {
         @DisplayName("Invalid phase transition returns 400")
         void updatePhase_InvalidTransition_Returns400() throws Exception {
             doThrow(new IllegalArgumentException("Invalid phase transition from COMPLETED to RESEARCHING"))
-                .when(tradingRunService).updatePhase(eq(100L), any(RunPhase.class));
+                .when(tradingRunService).updatePhase(eq(100L), any(RunPhase.class), any());
 
             UpdatePhaseRequest request = new UpdatePhaseRequest();
             request.setPhase(RunPhase.RESEARCHING);
