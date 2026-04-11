@@ -32,7 +32,7 @@ async def create_run(agent_id: int) -> int:
     return await client.create_run(agent_id)
 
 
-async def update_phase(run_id: int, phase: str) -> None:
+async def update_phase(run_id: int, phase: str, error_message: str | None = None) -> None:
     """Update the phase of a trading run.
 
     PATCH /api/runs/{run_id}/phase with {"phase": phase}
@@ -40,12 +40,13 @@ async def update_phase(run_id: int, phase: str) -> None:
     Args:
         run_id: The run ID to update
         phase: New phase (INITIALIZING, RESEARCHING, DECIDING, TRADING, COMPLETED, ERROR)
+        error_message: Optional error message when transitioning to ERROR phase
 
     Raises:
         BackendAPIError: If phase update fails
     """
     client = get_backend_client()
-    await client.update_phase(run_id, phase)
+    await client.update_phase(run_id, phase, error_message=error_message)
 
 
 async def complete_run(run_id: int, data: CompleteRunData) -> None:

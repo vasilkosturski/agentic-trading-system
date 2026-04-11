@@ -122,7 +122,6 @@ class TestMarketAnalystAgent:
             assert sample_agent_name in agent.instructions
 
 
-@pytest.mark.asyncio
 class TestBuildResearchPrompt:
     """Test research prompt generation."""
 

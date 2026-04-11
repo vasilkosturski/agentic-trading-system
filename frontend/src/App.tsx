@@ -114,7 +114,13 @@ function RunsTable() {
               </Table.Td>
               <Table.Td>{run.symbol ?? '\u2014'}</Table.Td>
               <Table.Td>{formatTimestamp(run.startedAt)}</Table.Td>
-              <Table.Td>{formatTimestamp(run.completedAt)}</Table.Td>
+              <Table.Td>
+                {run.completedAt
+                  ? formatTimestamp(run.completedAt)
+                  : run.status === 'IN_PROGRESS'
+                    ? `Running since ${formatTimestamp(run.startedAt)}`
+                    : '\u2014'}
+              </Table.Td>
             </Table.Tr>
           ))}
         </Table.Tbody>

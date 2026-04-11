@@ -24,4 +24,7 @@ public class UpdatePhaseRequest {
 
     @NotNull(message = "Phase is required")
     private RunPhase phase;
+
+    /** Optional error message when transitioning to ERROR phase. */
+    private String errorMessage;
 }

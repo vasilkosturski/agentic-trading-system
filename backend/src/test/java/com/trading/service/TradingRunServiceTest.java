@@ -330,7 +330,7 @@ class TradingRunServiceTest {
         @DisplayName("ERROR phase cannot transition to any other phase")
         void updatePhase_ErrorToAny_ThrowsIllegalArgumentException() {
             // Arrange - run in ERROR state (terminal)
-            testRun.updatePhase(RunPhase.ERROR);
+            testRun.updatePhase(RunPhase.FAILED);
             when(tradingRunRepository.findById(100L)).thenReturn(Optional.of(testRun));
 
             // Act & Assert

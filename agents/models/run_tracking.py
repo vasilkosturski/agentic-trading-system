@@ -23,7 +23,7 @@ class RunPhase(str, Enum):
     DECIDING = "DECIDING"
     TRADING = "TRADING"
     COMPLETED = "COMPLETED"
-    ERROR = "ERROR"
+    FAILED = "FAILED"
 
 
 class PhaseStatus(str, Enum):

@@ -110,29 +110,21 @@ async def lookup_share_price(symbol: str) -> float:
 
 @function_tool
 async def get_price_with_metadata(symbol: str) -> PriceMetadata:
-    """Get stock price with data quality metadata.
-
-    Provides full context about data freshness and source for informed decision-making.
+    """Get stock price with metadata.
 
     Args:
         symbol: The stock symbol (e.g., 'AAPL', 'GOOGL', 'TSLA')
 
     Returns:
-        PriceMetadata model with validated data:
-        - price: Current price (float)
-        - dataTier: 'REAL_TIME' (Finnhub), 'MOCK' (simulated), or 'CACHED' (from cache)
-        - timestamp: When data was retrieved (ISO format)
-        - dataSource: 'Finnhub API' or 'Mock Data'
-        - dataAgeMinutes: How old the data is
+        PriceMetadata with price, cached flag, timestamp, source.
     """
     try:
         data = await _fetch_market_data(symbol)
         return PriceMetadata(
             price=data.price,
-            dataTier=data.dataTier,
+            cached=data.cached,
             timestamp=data.timestamp,
-            dataSource=data.dataSource,
-            dataAgeMinutes=data.dataAgeMinutes,
+            source=data.source,
         )
     except Exception as e:
         logger.error(f"Failed to get price metadata for {symbol}: {e}")

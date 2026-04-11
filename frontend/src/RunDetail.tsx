@@ -14,6 +14,7 @@ import {
   Alert,
   Loader,
 } from '@mantine/core'
+import { IconAlertCircle } from '@tabler/icons-react'
 import type {
   RunDetailResponse,
   TradeDecision,
@@ -403,6 +404,18 @@ function RunDetail() {
           </Text>
         </div>
       </Group>
+
+      {/* Error Alert for FAILED runs */}
+      {run.status === 'FAILED' && run.errorMessage && (
+        <Alert
+          icon={<IconAlertCircle size={16} />}
+          title="Run Failed"
+          color="red"
+          mb="lg"
+        >
+          {run.errorMessage}
+        </Alert>
+      )}
 
       {/* Phase Sections */}
       <ResearchSection research={research} />

@@ -27,22 +27,22 @@ public class TradingRunDto {
     private String symbol;           // from joined decision_phases
     private Instant startedAt;
     private Instant completedAt;
+    private String errorMessage;
 
     /**
      * Factory method to create DTO from TradingRun entity.
      * Decision and symbol fields remain null (populated via join in listRuns).
      */
     public static TradingRunDto fromEntity(TradingRun run) {
-        return new TradingRunDto(
-            run.getId(),
-            run.getAgent().getId(),
-            run.getStatus(),
-            run.getPhase(),
-            null,  // decision populated via join
-            null,  // symbol populated via join
-            run.getStartedAt(),
-            run.getCompletedAt()
-        );
+        TradingRunDto dto = new TradingRunDto();
+        dto.setRunId(run.getId());
+        dto.setAgentId(run.getAgent().getId());
+        dto.setStatus(run.getStatus());
+        dto.setPhase(run.getPhase());
+        dto.setStartedAt(run.getStartedAt());
+        dto.setCompletedAt(run.getCompletedAt());
+        dto.setErrorMessage(run.getErrorMessage());
+        return dto;
     }
 
     /**
@@ -50,15 +50,11 @@ public class TradingRunDto {
      * Used in listRuns() queries with join.
      */
     public static TradingRunDto fromEntityWithDecision(TradingRun run, DecisionPhase decisionPhase) {
-        return new TradingRunDto(
-            run.getId(),
-            run.getAgent().getId(),
-            run.getStatus(),
-            run.getPhase(),
-            decisionPhase != null ? decisionPhase.getDecision() : null,
-            decisionPhase != null ? decisionPhase.getSymbol() : null,
-            run.getStartedAt(),
-            run.getCompletedAt()
-        );
+        TradingRunDto dto = fromEntity(run);
+        if (decisionPhase != null) {
+            dto.setDecision(decisionPhase.getDecision());
+            dto.setSymbol(decisionPhase.getSymbol());
+        }
+        return dto;
     }
 }

@@ -115,37 +115,40 @@ def _ensure_buildkit_extra_ca_trust():
         return  # Already injected
 
     logger.info("Injecting extra CA into BuildKit container...")
-    subprocess.run(
-        [podman, "exec", container, "mkdir", "-p",
-         "/usr/local/share/ca-certificates"],
-        check=True, capture_output=True,
-    )
-    subprocess.run(
-        [podman, "cp", str(ca_file),
-         f"{container}:/usr/local/share/ca-certificates/extra-ca.crt"],
-        check=True, capture_output=True,
-    )
-    subprocess.run(
-        [podman, "exec", container, "sh", "-c",
-         "apk --no-cache add ca-certificates 2>/dev/null; update-ca-certificates 2>/dev/null"],
-        check=True, capture_output=True,
-    )
-    subprocess.run(
-        [podman, "restart", container],
-        check=True, capture_output=True,
-    )
-    logger.info("BuildKit container now trusts extra CA.")
+    try:
+        subprocess.run(
+            [podman, "exec", container, "mkdir", "-p",
+             "/usr/local/share/ca-certificates"],
+            check=True, capture_output=True,
+        )
+        subprocess.run(
+            [podman, "cp", str(ca_file),
+             f"{container}:/usr/local/share/ca-certificates/extra-ca.crt"],
+            check=True, capture_output=True,
+        )
+        subprocess.run(
+            [podman, "exec", container, "sh", "-c",
+             "apk --no-cache add ca-certificates 2>/dev/null; update-ca-certificates 2>/dev/null"],
+            check=True, capture_output=True,
+        )
+        subprocess.run(
+            [podman, "restart", container],
+            check=True, capture_output=True,
+        )
+        logger.info("BuildKit container now trusts extra CA.")
+    except subprocess.CalledProcessError as e:
+        logger.warning(f"Could not inject CA into BuildKit (non-fatal): {e}")
 
 
 @pytest.fixture(scope="session")
 def docker_compose_command():
-    """Use docker-compose CLI (Go binary) which supports buildkit.
+    """Use podman compose which inherits host CA trust store.
 
-    `podman compose` forcefully sets DOCKER_BUILDKIT=0, falling back to the
-    legacy builder. The docker-compose binary talks to Podman via DOCKER_HOST
-    but uses buildkit for builds.
+    docker-compose uses BuildKit (isolated container) which doesn't have
+    corporate proxy CAs. podman compose uses the native builder which
+    inherits the host's CA trust — works behind Zscaler/corporate proxies.
     """
-    return "docker-compose"
+    return "podman compose"
 
 
 # pytest-docker convention: auto-discovered by name, used by docker_services fixture.

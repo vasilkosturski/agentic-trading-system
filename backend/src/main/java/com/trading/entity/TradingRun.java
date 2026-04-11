@@ -74,14 +74,14 @@ public class TradingRun {
     // Business methods
     public void updatePhase(RunPhase newPhase) {
         this.phase = newPhase;
-        if (newPhase == RunPhase.COMPLETED || newPhase == RunPhase.ERROR) {
+        if (newPhase == RunPhase.COMPLETED || newPhase == RunPhase.FAILED) {
             this.completedAt = Instant.now();
-            this.status = (newPhase == RunPhase.ERROR) ? RunStatus.FAILED : RunStatus.COMPLETED;
+            this.status = (newPhase == RunPhase.FAILED) ? RunStatus.FAILED : RunStatus.COMPLETED;
         }
     }
 
     public void markAsError(String errorMessage) {
-        this.phase = RunPhase.ERROR;
+        this.phase = RunPhase.FAILED;
         this.status = RunStatus.FAILED;
         this.errorMessage = errorMessage;
         this.completedAt = Instant.now();

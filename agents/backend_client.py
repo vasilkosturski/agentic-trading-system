@@ -400,15 +400,19 @@ class BackendClient:
         logger.info(f"Created trading run #{run_id} for agent {agent_id}")
         return run_id
     
-    async def update_phase(self, run_id: int, phase: str) -> None:
+    async def update_phase(self, run_id: int, phase: str, error_message: str | None = None) -> None:
         """Update the phase of a trading run.
-        
+
         Args:
             run_id: The run ID to update
             phase: New phase (INITIALIZING, RESEARCHING, DECIDING, TRADING, COMPLETED, ERROR)
+            error_message: Optional error message when transitioning to ERROR phase
         """
         url = f"{BACKEND_API_TRADING_RUNS}/{run_id}/phase"
-        await self._request("PATCH", url, json_data={"phase": phase})
+        payload: dict = {"phase": phase}
+        if error_message is not None:
+            payload["errorMessage"] = error_message
+        await self._request("PATCH", url, json_data=payload)
         logger.info(f"Updated run #{run_id} to phase {phase}")
     
     async def complete_run(self, run_id: int, data: CompleteRunData) -> None:
