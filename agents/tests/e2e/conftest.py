@@ -82,71 +82,12 @@ def require_brave_api_key():
 # Docker-based Backend (pytest-docker)
 # =============================================================================
 
-@pytest.fixture(scope="session", autouse=True)
-def _ensure_buildkit_extra_ca_trust():
-    """Inject extra CA into BuildKit container if present.
-
-    BuildKit runs in its own container and doesn't inherit the Podman VM's
-    CA trust store. After a `podman system prune`, the CA must be re-injected.
-    This fixture is idempotent — safe to run when no extra CA is configured.
-    """
-    ca_file = Path.home() / "extra-ca.pem"
-    if not ca_file.exists():
-        return  # No extra CA — nothing to do
-
-    podman = "/opt/podman/bin/podman"
-    container = "buildx_buildkit_default"
-
-    # Check if buildkit container exists and is running
-    result = subprocess.run(
-        [podman, "container", "exists", container],
-        capture_output=True,
-    )
-    if result.returncode != 0:
-        return  # Container doesn't exist yet — will be created by compose
-
-    # Check if CA is already injected
-    result = subprocess.run(
-        [podman, "exec", container, "test", "-f",
-         "/usr/local/share/ca-certificates/extra-ca.crt"],
-        capture_output=True,
-    )
-    if result.returncode == 0:
-        return  # Already injected
-
-    logger.info("Injecting extra CA into BuildKit container...")
-    try:
-        subprocess.run(
-            [podman, "exec", container, "mkdir", "-p",
-             "/usr/local/share/ca-certificates"],
-            check=True, capture_output=True,
-        )
-        subprocess.run(
-            [podman, "cp", str(ca_file),
-             f"{container}:/usr/local/share/ca-certificates/extra-ca.crt"],
-            check=True, capture_output=True,
-        )
-        subprocess.run(
-            [podman, "exec", container, "sh", "-c",
-             "apk --no-cache add ca-certificates 2>/dev/null; update-ca-certificates 2>/dev/null"],
-            check=True, capture_output=True,
-        )
-        subprocess.run(
-            [podman, "restart", container],
-            check=True, capture_output=True,
-        )
-        logger.info("BuildKit container now trusts extra CA.")
-    except subprocess.CalledProcessError as e:
-        logger.warning(f"Could not inject CA into BuildKit (non-fatal): {e}")
-
-
 @pytest.fixture(scope="session")
 def docker_compose_command():
-    """Use podman compose which inherits host CA trust store.
+    """Podman compose for E2E tests.
 
-    docker-compose uses BuildKit (isolated container) which doesn't have
-    corporate proxy CAs. podman compose uses the native builder which
-    inherits the host's CA trust — works behind Zscaler/corporate proxies.
+    Uses Podman's native builder which inherits the host CA trust store,
+    avoiding BuildKit certificate issues behind corporate proxies.
     """
     return "podman compose"
 
