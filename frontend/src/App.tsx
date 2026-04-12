@@ -1,32 +1,44 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Table, Badge, Container, Title, Text } from '@mantine/core'
+import { Table, Badge, Container, Title, Text, Loader, Center } from '@mantine/core'
+import { useInView } from 'react-intersection-observer'
 import type { TradingRun, Agent, PortfolioSnapshot } from './types.ts'
 import { fetchRuns, fetchAgents, fetchSnapshots } from './api.ts'
 import { statusColor, decisionColor, formatTimestamp } from './utils.ts'
 import PortfolioChart from './PortfolioChart.tsx'
 import AgentComparison from './AgentComparison.tsx'
 
+const PAGE_SIZE = 20
+
 function RunsTable() {
   const navigate = useNavigate()
   const [runs, setRuns] = useState<TradingRun[]>([])
+  const [totalRuns, setTotalRuns] = useState(0)
   const [agents, setAgents] = useState<Agent[]>([])
   const [snapshots, setSnapshots] = useState<PortfolioSnapshot[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const pageRef = useRef(0)
 
+  const hasMore = runs.length < totalRuns
+
+  const { ref: loadMoreRef, inView } = useInView({ threshold: 0 })
+
+  // Initial load
   useEffect(() => {
     const controller = new AbortController()
 
     async function fetchData() {
       try {
         const [runsData, agentsData, snapshotsData] = await Promise.all([
-          fetchRuns(controller.signal),
+          fetchRuns(0, PAGE_SIZE, controller.signal),
           fetchAgents(controller.signal),
           fetchSnapshots(controller.signal),
         ])
 
         setRuns(runsData.runs ?? [])
+        setTotalRuns(runsData.total ?? 0)
         setAgents(agentsData)
         setSnapshots(snapshotsData)
       } catch (err) {
@@ -42,6 +54,30 @@ function RunsTable() {
     fetchData()
     return () => controller.abort()
   }, [])
+
+  // Load more when sentinel comes into view
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    const nextPage = pageRef.current + 1
+
+    try {
+      const data = await fetchRuns(nextPage, PAGE_SIZE)
+      setRuns((prev) => [...prev, ...(data.runs ?? [])])
+      setTotalRuns(data.total ?? 0)
+      pageRef.current = nextPage
+    } catch (err) {
+      // Silently fail on load-more — user can scroll again
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [loadingMore, hasMore])
+
+  useEffect(() => {
+    if (inView && hasMore && !loadingMore) {
+      loadMore()
+    }
+  }, [inView, hasMore, loadingMore, loadMore])
 
   const agentMap = useMemo(() => new Map(agents.map((a) => [a.id, a.name])), [agents])
 
@@ -125,6 +161,23 @@ function RunsTable() {
           ))}
         </Table.Tbody>
       </Table>
+
+      {/* Infinite scroll sentinel */}
+      {hasMore && (
+        <Center ref={loadMoreRef} py="lg">
+          {loadingMore ? (
+            <Loader size="sm" />
+          ) : (
+            <Text size="sm" c="dimmed">Scroll for more</Text>
+          )}
+        </Center>
+      )}
+
+      {!hasMore && runs.length > PAGE_SIZE && (
+        <Center py="lg">
+          <Text size="sm" c="dimmed">All {totalRuns} runs loaded</Text>
+        </Center>
+      )}
     </Container>
   )
 }
