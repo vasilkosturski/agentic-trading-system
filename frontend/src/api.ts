@@ -15,8 +15,15 @@ export function fetchSnapshots(signal?: AbortSignal): Promise<PortfolioSnapshot[
   return fetchJson<PortfolioSnapshot[]>('/api/portfolio/snapshots', signal)
 }
 
-export function fetchRuns(signal?: AbortSignal): Promise<{ runs: TradingRun[] }> {
-  return fetchJson<{ runs: TradingRun[] }>('/api/runs?limit=20', signal)
+export interface PaginatedRuns {
+  runs: TradingRun[]
+  total: number
+  page: number
+  limit: number
+}
+
+export function fetchRuns(page: number = 0, limit: number = 20, signal?: AbortSignal): Promise<PaginatedRuns> {
+  return fetchJson<PaginatedRuns>(`/api/runs?page=${page}&limit=${limit}`, signal)
 }
 
 export function fetchAgents(signal?: AbortSignal): Promise<Agent[]> {
