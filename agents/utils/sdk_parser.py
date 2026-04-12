@@ -71,7 +71,7 @@ def extract_tool_calls(items: list[RunItem]) -> list[ParsedToolCall]:
                     params[call_id] = None
 
         elif isinstance(item, ToolCallOutputItem):
-            raw = item.raw_item
+            raw = item.raw_item  # type: ignore[assignment]
             call_id = _field(raw, "call_id")
             # SDK serializes output via _convert_tool_output → str or list
             # (list when tool returns structured ToolOutputText/Image/File)

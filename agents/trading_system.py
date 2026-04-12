@@ -91,7 +91,7 @@ class TradingSystem:
                 mcp_pool: MCPPool = {}
                 for mcp_name, params in mcp_params.items():
                     server = await stack.enter_async_context(
-                        MCPServerStdio(params, client_session_timeout_seconds=120)
+                        MCPServerStdio(params, client_session_timeout_seconds=120)  # type: ignore[arg-type]
                     )
                     mcp_pool[mcp_name] = server
                 logger.info(f"✅ MCP pool created for {agent.name}: {list(mcp_pool.keys())}")

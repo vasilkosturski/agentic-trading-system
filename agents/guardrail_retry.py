@@ -66,8 +66,8 @@ async def run_with_guardrail_retry(
 
             # Reconstruct conversation from the exception's run_data.
             # run_data is attached by the SDK when the guardrail fires.
-            input_items = ItemHelpers.input_to_new_input_list(e.run_data.input)
-            for item in e.run_data.new_items:
+            input_items = ItemHelpers.input_to_new_input_list(e.run_data.input)  # type: ignore[union-attr]
+            for item in e.run_data.new_items:  # type: ignore[union-attr]
                 if item.type == "tool_approval_item":
                     continue  # ToolApprovalItems cannot be converted
                 input_items.append(item.to_input_item())

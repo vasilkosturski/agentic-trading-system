@@ -22,6 +22,7 @@ function pnlColor(value: number | null): string {
 interface AgentSummary {
   name: string
   totalValue: number
+  cashBalance: number | null
   totalPnl: number | null
   totalReturnPercent: number | null
   style?: string
@@ -48,6 +49,7 @@ function latestPerAgent(snapshots: PortfolioSnapshot[], agents: Agent[]): AgentS
       return {
         name: s.agentName,
         totalValue: s.totalValue,
+        cashBalance: s.cashBalance,
         totalPnl: s.totalPnl,
         totalReturnPercent: s.totalReturnPercent,
         style: agent?.style,
@@ -101,6 +103,11 @@ function AgentComparison({ snapshots, agents }: { snapshots: PortfolioSnapshot[]
               <Group justify="space-between" mb={4}>
                 <Text size="sm" c="dimmed">Portfolio</Text>
                 <Text size="sm" fw={600}>{formatCurrency(agent.totalValue)}</Text>
+              </Group>
+
+              <Group justify="space-between" mb={4}>
+                <Text size="sm" c="dimmed">Cash</Text>
+                <Text size="sm" fw={600}>{formatCurrency(agent.cashBalance)}</Text>
               </Group>
 
               <Group justify="space-between" mb={4}>

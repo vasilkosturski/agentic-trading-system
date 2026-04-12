@@ -399,7 +399,7 @@ class AgentExecutor:
         research_prompt = market_analyst.build_prompt(research_context)
 
         # Capture prompts for observability (before agent execution)
-        ctx.market_analyst_system_prompt = market_analyst.agent.instructions
+        ctx.market_analyst_system_prompt = market_analyst.agent.instructions  # type: ignore[assignment]
         ctx.market_analyst_task_prompt = research_prompt
 
         logger.info(f"🔬 Running Market Analyst for {ctx.agent_name}...")
@@ -528,7 +528,7 @@ class AgentExecutor:
         decision_prompt = decision_maker.build_prompt(decision_context)
 
         # Capture prompts for observability (before agent execution)
-        ctx.decision_maker_system_prompt = decision_maker.agent.instructions
+        ctx.decision_maker_system_prompt = decision_maker.agent.instructions  # type: ignore[assignment]
         ctx.decision_maker_task_prompt = decision_prompt
 
         logger.info(f"🧠 Running Decision Maker for {ctx.agent_name}...")
