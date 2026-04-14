@@ -1,4 +1,4 @@
-import type { PortfolioSnapshot, TradingRun, Agent, RunDetailResponse } from './types.ts'
+import type { PortfolioSnapshot, TradingRun, Agent, RunDetailResponse, AgentPortfolio } from './types.ts'
 
 /**
  * Shared API client for backend HTTP calls.
@@ -32,4 +32,8 @@ export function fetchAgents(signal?: AbortSignal): Promise<Agent[]> {
 
 export function fetchRunDetail(id: string, signal?: AbortSignal): Promise<RunDetailResponse> {
   return fetchJson<RunDetailResponse>(`/api/runs/${id}`, signal)
+}
+
+export function fetchAgentPortfolio(agentId: number, signal?: AbortSignal): Promise<AgentPortfolio> {
+  return fetchJson<AgentPortfolio>(`/api/accounts/resources/accounts/${agentId}`, signal)
 }

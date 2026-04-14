@@ -515,5 +515,126 @@ class AccountServiceTest {
             assertTrue(message.getRejectionMessage().contains("Insufficient shares"));
         }
     }
-}
 
+    // ==================== Account Report with Prices and P&L Tests ====================
+
+    @Test
+    @DisplayName("Account report includes per-holding current prices and P&L")
+    void testGetAccountReport_IncludesCurrentPrices() {
+        // Arrange
+        String agentName = "TestAgent";
+        AccountHolding holding = new AccountHolding(testAccount, "AAPL", 10, 150.0);
+        List<AccountHolding> holdings = List.of(holding);
+        
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccount(testAccount)).thenReturn(holdings);
+        when(marketService.getSharePrice("AAPL"))
+            .thenReturn(new MarketService.PriceData(160.0, false, java.time.Instant.now(), "Real-time from Finnhub"));
+        when(transactionRepository.countByAccount(testAccount)).thenReturn(1L);
+
+        // Act
+        var report = accountService.getAccountReport(agentName);
+
+        // Assert - portfolio level
+        assertNotNull(report);
+        assertEquals(100000.0, report.getBalance());
+        assertEquals(1600.0, report.getHoldingsValue());  // 10 * 160
+        assertEquals(101600.0, report.getTotalPortfolioValue());  // 100000 + 1600
+        
+        // Assert - per-holding level
+        assertNotNull(report.getHoldings());
+        assertEquals(1, report.getHoldings().size());
+        
+        HoldingDto holdingDto = report.getHoldings().get(0);
+        assertEquals("AAPL", holdingDto.getSymbol());
+        assertEquals(10, holdingDto.getQuantity());
+        assertEquals(150.0, holdingDto.getAveragePrice());
+        
+        // Current price and market values
+        assertEquals(160.0, holdingDto.getCurrentPrice());
+        assertEquals(1600.0, holdingDto.getMarketValue());      // 10 * 160
+        assertEquals(1500.0, holdingDto.getCostBasis());        // 10 * 150
+        assertEquals(100.0, holdingDto.getUnrealizedPnl());     // 1600 - 1500
+        assertEquals(6.67, holdingDto.getGainLossPercent(), 0.01);  // 100/1500 * 100
+        assertEquals(false, holdingDto.getCached());
+        assertNotNull(holdingDto.getPriceTimestamp());
+    }
+
+    @Test
+    @DisplayName("Falls back to average price when MarketService fails")
+    void testGetAccountReport_MarketServiceFails_UsesAveragePrice() {
+        // Arrange
+        String agentName = "TestAgent";
+        AccountHolding holding = new AccountHolding(testAccount, "GOOGL", 5, 2800.0);
+        List<AccountHolding> holdings = List.of(holding);
+        
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccount(testAccount)).thenReturn(holdings);
+        when(marketService.getSharePrice("GOOGL"))
+            .thenThrow(new RuntimeException("Finnhub API timeout"));
+        when(transactionRepository.countByAccount(testAccount)).thenReturn(1L);
+
+        // Act
+        var report = accountService.getAccountReport(agentName);
+
+        // Assert - fallback to average price
+        HoldingDto holdingDto = report.getHoldings().get(0);
+        assertEquals("GOOGL", holdingDto.getSymbol());
+        assertEquals(2800.0, holdingDto.getCurrentPrice());    // Fallback to average
+        assertEquals(14000.0, holdingDto.getMarketValue());   // 5 * 2800
+        assertEquals(14000.0, holdingDto.getCostBasis());     // 5 * 2800
+        assertEquals(0.0, holdingDto.getUnrealizedPnl());     // No P&L on fallback
+        assertEquals(0.0, holdingDto.getGainLossPercent());
+        assertEquals(true, holdingDto.getCached());           // Marked as degraded
+        
+        // Holdings value should still be calculated correctly
+        assertEquals(14000.0, report.getHoldingsValue());
+    }
+
+    @Test
+    @DisplayName("Multiple holdings all have prices and P&L calculated")
+    void testGetAccountReport_MultipleHoldings_AllCalculated() {
+        // Arrange
+        String agentName = "TestAgent";
+        List<AccountHolding> holdings = Arrays.asList(
+            new AccountHolding(testAccount, "AAPL", 10, 150.0),
+            new AccountHolding(testAccount, "GOOGL", 5, 2800.0),
+            new AccountHolding(testAccount, "MSFT", 8, 400.0)
+        );
+        
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccount(testAccount)).thenReturn(holdings);
+        when(marketService.getSharePrice("AAPL"))
+            .thenReturn(new MarketService.PriceData(160.0, false, java.time.Instant.now(), "Real-time"));
+        when(marketService.getSharePrice("GOOGL"))
+            .thenReturn(new MarketService.PriceData(2900.0, true, java.time.Instant.now(), "Cached"));
+        when(marketService.getSharePrice("MSFT"))
+            .thenReturn(new MarketService.PriceData(380.0, false, java.time.Instant.now(), "Real-time"));
+        when(transactionRepository.countByAccount(testAccount)).thenReturn(3L);
+
+        // Act
+        var report = accountService.getAccountReport(agentName);
+
+        // Assert
+        assertEquals(3, report.getHoldings().size());
+        
+        // AAPL: +$100 gain
+        HoldingDto aapl = report.getHoldings().get(0);
+        assertEquals(100.0, aapl.getUnrealizedPnl());
+        assertEquals(6.67, aapl.getGainLossPercent(), 0.01);
+        
+        // GOOGL: +$500 gain
+        HoldingDto googl = report.getHoldings().get(1);
+        assertEquals(500.0, googl.getUnrealizedPnl());
+        assertEquals(3.57, googl.getGainLossPercent(), 0.01);
+        
+        // MSFT: -$160 loss
+        HoldingDto msft = report.getHoldings().get(2);
+        assertEquals(-160.0, msft.getUnrealizedPnl());
+        assertEquals(-5.0, msft.getGainLossPercent(), 0.01);
+        
+        // Portfolio total
+        double expectedHoldingsValue = 1600.0 + 14500.0 + 3040.0;  // 160*10 + 2900*5 + 380*8
+        assertEquals(expectedHoldingsValue, report.getHoldingsValue(), 0.01);
+    }
+}

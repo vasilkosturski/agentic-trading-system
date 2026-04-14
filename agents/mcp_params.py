@@ -43,13 +43,13 @@ def get_mcp_server_params() -> Dict[MCPName, dict]:
     """
     return {
         MCPName.FETCH: {
-            "command": "uvx",
-            "args": ["mcp-server-fetch"]
+            "command": "mcp-server-fetch",
+            "args": []
         },
         MCPName.BRAVE_SEARCH: {
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-brave-search"],
-            "env": {**brave_env, "NPM_CONFIG_LOGLEVEL": "silent"},
+            "command": "mcp-server-brave-search",
+            "args": [],
+            "env": brave_env,
         },
     }
 

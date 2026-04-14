@@ -7,6 +7,7 @@ import '@mantine/charts/styles.css'
 import './index.css'
 import RunsTable from './App.tsx'
 import RunDetail from './RunDetail.tsx'
+import AgentDetail from './AgentDetail.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -15,6 +16,7 @@ createRoot(document.getElementById('root')!).render(
         <Routes>
           <Route path="/" element={<RunsTable />} />
           <Route path="/runs/:id" element={<RunDetail />} />
+          <Route path="/agents/:id" element={<AgentDetail />} />
         </Routes>
       </BrowserRouter>
     </MantineProvider>

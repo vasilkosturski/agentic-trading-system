@@ -27,12 +27,9 @@ ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 # Install uv for Python package management (used by MCP servers)
 RUN pip install uv
 
-# Install correct MCP server packages
+# Install MCP server packages globally (avoids runtime npm/uvx installs that pollute stdout)
 RUN npm install -g @modelcontextprotocol/server-brave-search mcp-memory-libsql
-
-# uvx is already provided by uv package - no separate installation needed
-# Test that uvx is available
-RUN uvx --help || echo "uvx is available via uv package"
+RUN pip install mcp-server-fetch
 
 # Copy requirements and install dependencies
 COPY requirements.txt .
