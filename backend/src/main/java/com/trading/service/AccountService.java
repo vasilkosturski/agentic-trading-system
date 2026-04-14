@@ -302,20 +302,61 @@ public class AccountService {
     }
 
     /**
-     * Convert AccountHolding entities to HoldingDto list.
+     * Convert AccountHolding entities to HoldingDto list with live market prices and P&L calculations.
      * Single source of truth for entity-to-DTO mapping used by getHoldings() and getAccountReport().
+     * 
+     * For each holding:
+     *  - Fetches current price from MarketService (cached 60 minutes)
+     *  - Calculates market value (quantity × currentPrice)
+     *  - Calculates cost basis (quantity × averagePrice)
+     *  - Calculates unrealized P&L (marketValue - costBasis)
+     *  - Calculates P&L percentage with zero-division guard
+     *  - If market data unavailable, falls back to averagePrice for current price
      */
     private List<HoldingDto> toHoldingDtos(List<AccountHolding> holdings) {
         List<HoldingDto> dtos = new ArrayList<>();
         for (AccountHolding holding : holdings) {
-            dtos.add(new HoldingDto(
-                holding.getSymbol(),
-                holding.getQuantity(),
-                holding.getAveragePrice()
-            ));
+            try {
+                // Fetch current market price (cached for 60 minutes)
+                MarketService.PriceData priceData = marketService.getSharePrice(holding.getSymbol());
+                double currentPrice = priceData.getPrice();
+                double marketValue = holding.getQuantity() * currentPrice;
+                double costBasis = holding.getQuantity() * holding.getAveragePrice();
+                double unrealizedPnl = marketValue - costBasis;
+                
+                // Guard against division by zero when calculating percentage
+                double gainLossPercent = (costBasis != 0) 
+                    ? (unrealizedPnl / costBasis) * 100 
+                    : 0.0;
+                
+                dtos.add(new HoldingDto(
+                    holding.getSymbol(),
+                    holding.getQuantity(),
+                    holding.getAveragePrice(),
+                    currentPrice,
+                    marketValue,
+                    costBasis,
+                    unrealizedPnl,
+                    gainLossPercent,
+                    priceData.isCached(),
+                    priceData.getTimestamp()
+                ));
+                
+            } catch (Exception e) {
+                // Fallback: return nulls for price fields so frontend shows "N/A" instead of misleading zeros
+                logger.warn("Failed to get current price for {}: {}. Price fields will be null.",
+                    holding.getSymbol(), e.getMessage());
+
+                dtos.add(new HoldingDto(
+                    holding.getSymbol(),
+                    holding.getQuantity(),
+                    holding.getAveragePrice()
+                ));
+            }
         }
         return dtos;
     }
+
 
     /**
      * Calculate total value of holdings using live market prices.

@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Paper, SimpleGrid, Text, Group, Title, Badge, Popover, ActionIcon } from '@mantine/core'
+import Markdown from 'react-markdown'
 import { IconInfoCircle } from '@tabler/icons-react'
 import type { PortfolioSnapshot, Agent } from './types.ts'
 import { AGENT_COLORS, AGENT_ORDER } from './constants.ts'
@@ -20,6 +22,7 @@ function pnlColor(value: number | null): string {
 }
 
 interface AgentSummary {
+  id: number | null
   name: string
   totalValue: number
   cashBalance: number | null
@@ -47,6 +50,7 @@ function latestPerAgent(snapshots: PortfolioSnapshot[], agents: Agent[]): AgentS
       const s = latest.get(name)!
       const agent = agentMap.get(name)
       return {
+        id: agent?.id ?? null,
         name: s.agentName,
         totalValue: s.totalValue,
         cashBalance: s.cashBalance,
@@ -59,6 +63,7 @@ function latestPerAgent(snapshots: PortfolioSnapshot[], agents: Agent[]): AgentS
 }
 
 function AgentComparison({ snapshots, agents }: { snapshots: PortfolioSnapshot[], agents: Agent[] }) {
+  const navigate = useNavigate()
   const agentSummaries = useMemo(() => latestPerAgent(snapshots, agents), [snapshots, agents])
 
   if (agentSummaries.length === 0) return null
@@ -70,7 +75,16 @@ function AgentComparison({ snapshots, agents }: { snapshots: PortfolioSnapshot[]
         {agentSummaries.map((agent) => {
           const color = AGENT_COLORS[agent.name] ?? 'gray'
           return (
-            <Paper key={agent.name} p="md" radius="md" withBorder>
+            <Paper
+              key={agent.name}
+              p="md"
+              radius="md"
+              withBorder
+              style={{ cursor: agent.id ? 'pointer' : undefined, transition: 'box-shadow 0.15s' }}
+              onMouseEnter={e => { if (agent.id) (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = '' }}
+              onClick={() => { if (agent.id) navigate(`/agents/${agent.id}`) }}
+            >
               <Text fw={700} size="lg" c={color} mb="xs">{agent.name}</Text>
 
               {agent.style && (
@@ -91,9 +105,9 @@ function AgentComparison({ snapshots, agents }: { snapshots: PortfolioSnapshot[]
                         </ActionIcon>
                       </Popover.Target>
                       <Popover.Dropdown style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                        <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-                          {agent.systemPrompt}
-                        </Text>
+                        <div style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
+                          <Markdown>{agent.systemPrompt!}</Markdown>
+                        </div>
                       </Popover.Dropdown>
                     </Popover>
                   )}

@@ -107,6 +107,33 @@ export interface RunDetailResponse {
   execution: ExecutionPhase | null
 }
 
+export interface Holding {
+  symbol: string
+  quantity: number
+  averagePrice: number
+  currentPrice: number | null
+  marketValue: number | null
+  costBasis: number | null
+  unrealizedPnl: number | null
+  gainLossPercent: number | null
+  cached: boolean | null
+  priceTimestamp: string | null
+}
+
+export interface AgentPortfolio {
+  agentName: string
+  balance: number
+  holdingsValue: number
+  totalPortfolioValue: number
+  initialBalance: number
+  totalProfitLoss: number
+  profitLossPercent: number
+  lastUpdated: string | null
+  holdingsCount: number
+  transactionCount: number
+  holdings: Holding[]
+}
+
 export interface PortfolioSnapshot {
   agentName: string
   timestamp: string

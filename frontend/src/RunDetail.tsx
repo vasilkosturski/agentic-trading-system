@@ -6,7 +6,6 @@ import {
   Title,
   Text,
   Badge,
-  Code,
   Paper,
   Group,
   Table,
@@ -14,6 +13,7 @@ import {
   Alert,
   Loader,
 } from '@mantine/core'
+import Markdown from 'react-markdown'
 import { IconAlertCircle } from '@tabler/icons-react'
 import type {
   RunDetailResponse,
@@ -31,16 +31,6 @@ function formatDuration(startedAt: string, completedAt: string | null): string {
   const ms = new Date(completedAt).getTime() - new Date(startedAt).getTime()
   const seconds = (ms / 1000).toFixed(1)
   return `${seconds}s`
-}
-
-function renderMarkdownBold(text: string) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/)
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>
-    }
-    return part
-  })
 }
 
 function formatParams(params: Record<string, unknown>): string {
@@ -118,17 +108,17 @@ function PromptsAccordion({
           {systemPrompt && (
             <>
               <Text fw={600} size="sm" mb={4}>System Prompt</Text>
-              <Code block style={{ whiteSpace: 'pre-wrap', maxHeight: 400, overflow: 'auto', marginBottom: 12 }}>
-                {systemPrompt}
-              </Code>
+              <div style={{ maxHeight: 400, overflow: 'auto', marginBottom: 12 }}>
+                <Markdown>{systemPrompt}</Markdown>
+              </div>
             </>
           )}
           {taskPrompt && (
             <>
               <Text fw={600} size="sm" mb={4}>Task Prompt</Text>
-              <Code block style={{ whiteSpace: 'pre-wrap', maxHeight: 400, overflow: 'auto' }}>
-                {taskPrompt}
-              </Code>
+              <div style={{ maxHeight: 400, overflow: 'auto' }}>
+                <Markdown>{taskPrompt}</Markdown>
+              </div>
             </>
           )}
         </Accordion.Panel>
@@ -172,7 +162,9 @@ function ResearchSection({ research }: { research: ResearchPhase | null }) {
       </Group>
 
       <Text fw={600} mb={4}>Research Notes</Text>
-      <Text mb="md" style={{ whiteSpace: 'pre-wrap' }}>{renderMarkdownBold(research.researchNotes)}</Text>
+      <div style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+        <Markdown>{research.researchNotes}</Markdown>
+      </div>
 
       {webSources.length > 0 && (
         <>
@@ -239,23 +231,23 @@ function DecisionSection({ decision }: { decision: DecisionPhase | null }) {
 
           <Paper withBorder p="sm" mb="xs">
             <Text size="sm" fw={600} mb={4}>Research Context</Text>
-            <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-              {decision.reasoning.researchContext}
-            </Text>
+            <div style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
+              <Markdown>{decision.reasoning.researchContext}</Markdown>
+            </div>
           </Paper>
 
           <Paper withBorder p="sm" mb="xs">
             <Text size="sm" fw={600} mb={4}>Portfolio Context</Text>
-            <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-              {decision.reasoning.portfolioContext}
-            </Text>
+            <div style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
+              <Markdown>{decision.reasoning.portfolioContext}</Markdown>
+            </div>
           </Paper>
 
           <Paper withBorder p="sm" mb="md">
             <Text size="sm" fw={600} mb={4}>Historical Context</Text>
-            <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-              {decision.reasoning.historicalContext}
-            </Text>
+            <div style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
+              <Markdown>{decision.reasoning.historicalContext}</Markdown>
+            </div>
           </Paper>
         </>
       )}
