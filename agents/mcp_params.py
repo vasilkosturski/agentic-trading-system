@@ -8,10 +8,9 @@ Internal MCPs removed:
 
 External MCPs kept:
 - Brave Search → Third-party web search service
-- Memory (libsql) → Third-party memory storage
 - Fetch → Standard web content retrieval
 
-Push notifications server kept as separate process (could also be refactored but lower priority)
+Memory is now stored in PostgreSQL directly via trading_tools.py (no separate MCP needed).
 """
 
 import os

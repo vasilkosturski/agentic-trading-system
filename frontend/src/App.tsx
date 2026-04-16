@@ -7,6 +7,7 @@ import { fetchRuns, fetchAgents, fetchSnapshots } from './api.ts'
 import { statusColor, decisionColor, formatTimestamp } from './utils.ts'
 import PortfolioChart from './PortfolioChart.tsx'
 import AgentComparison from './AgentComparison.tsx'
+import classes from './App.module.css'
 
 const PAGE_SIZE = 20
 
@@ -129,7 +130,7 @@ function RunsTable() {
           {runs.map((run) => (
             <Table.Tr
               key={run.runId}
-              style={{ cursor: 'pointer' }}
+              className={classes.clickableRow}
               onClick={() => navigate(`/runs/${run.runId}`)}
             >
               <Table.Td>{run.runId}</Table.Td>

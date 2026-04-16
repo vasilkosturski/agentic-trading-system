@@ -1,0 +1,28 @@
+.scrollableContent {
+  max-height: 400px;
+  overflow: auto;
+  margin-bottom: 12px;
+}
+
+.scrollableContentLast {
+  max-height: 400px;
+  overflow: auto;
+}
+
+.researchNotes {
+  margin-bottom: var(--mantine-spacing-md);
+}
+
+.sourcesList {
+  margin: 0;
+  padding-left: 20px;
+  margin-bottom: 12px;
+}
+
+.markdownSmall {
+  font-size: var(--mantine-font-size-sm);
+}
+
+.rightAlign {
+  text-align: right;
+}

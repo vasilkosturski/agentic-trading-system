@@ -25,6 +25,7 @@ import type {
 } from './types.ts'
 import { fetchRunDetail, fetchAgents } from './api.ts'
 import { statusColor, decisionColor, formatTimestamp } from './utils.ts'
+import classes from './RunDetail.module.css'
 
 function formatDuration(startedAt: string, completedAt: string | null): string {
   if (!completedAt) return 'In progress'
@@ -108,7 +109,7 @@ function PromptsAccordion({
           {systemPrompt && (
             <>
               <Text fw={600} size="sm" mb={4}>System Prompt</Text>
-              <div style={{ maxHeight: 400, overflow: 'auto', marginBottom: 12 }}>
+              <div className={classes.scrollableContent}>
                 <Markdown>{systemPrompt}</Markdown>
               </div>
             </>
@@ -116,7 +117,7 @@ function PromptsAccordion({
           {taskPrompt && (
             <>
               <Text fw={600} size="sm" mb={4}>Task Prompt</Text>
-              <div style={{ maxHeight: 400, overflow: 'auto' }}>
+              <div className={classes.scrollableContentLast}>
                 <Markdown>{taskPrompt}</Markdown>
               </div>
             </>
@@ -162,14 +163,14 @@ function ResearchSection({ research }: { research: ResearchPhase | null }) {
       </Group>
 
       <Text fw={600} mb={4}>Research Notes</Text>
-      <div style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+      <div className={classes.researchNotes}>
         <Markdown>{research.researchNotes}</Markdown>
       </div>
 
       {webSources.length > 0 && (
         <>
           <Text fw={600} mb={4}>Web Sources</Text>
-          <ul style={{ margin: 0, paddingLeft: 20, marginBottom: 12 }}>
+          <ul className={classes.sourcesList}>
             {webSources.map((s, i) => (
               <li key={i}>
                 {s.url ? (
@@ -231,21 +232,21 @@ function DecisionSection({ decision }: { decision: DecisionPhase | null }) {
 
           <Paper withBorder p="sm" mb="xs">
             <Text size="sm" fw={600} mb={4}>Research Context</Text>
-            <div style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
+            <div className={classes.markdownSmall}>
               <Markdown>{decision.reasoning.researchContext}</Markdown>
             </div>
           </Paper>
 
           <Paper withBorder p="sm" mb="xs">
             <Text size="sm" fw={600} mb={4}>Portfolio Context</Text>
-            <div style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
+            <div className={classes.markdownSmall}>
               <Markdown>{decision.reasoning.portfolioContext}</Markdown>
             </div>
           </Paper>
 
           <Paper withBorder p="sm" mb="md">
             <Text size="sm" fw={600} mb={4}>Historical Context</Text>
-            <div style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
+            <div className={classes.markdownSmall}>
               <Markdown>{decision.reasoning.historicalContext}</Markdown>
             </div>
           </Paper>
@@ -388,7 +389,7 @@ function RunDetail() {
             )}
           </Group>
         </div>
-        <div style={{ textAlign: 'right' }}>
+        <div className={classes.rightAlign}>
           <Text size="sm" c="dimmed">Started: {formatTimestamp(run.startedAt)}</Text>
           <Text size="sm" c="dimmed">Completed: {formatTimestamp(run.completedAt)}</Text>
           <Text size="sm" fw={600}>

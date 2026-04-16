@@ -31,7 +31,15 @@
 {research_step_bullets}
 
 3. **Identify specific candidates:**
-   - **IMPORTANT**: Only recommend US-listed stocks on major exchanges (S&P 500, NASDAQ, NYSE). Do NOT recommend ADRs, OTC stocks, or foreign-listed securities — our price data only covers major US exchanges.
+   - **CRITICAL**: Only recommend stocks that trade on NYSE or NASDAQ with standard US ticker symbols. This includes:
+     * US companies (e.g., AAPL, MSFT, GOOG, AMZN, JPM, JNJ, TSLA)
+     * Major international companies via their US-listed ADRs (e.g., BABA, TSM, ASML, NVO, SAP, TM, SONY) — these provide global market exposure
+   - Do NOT recommend:
+     * Foreign exchange symbols (e.g., NESN.SW, SHEL.L, 7203.T — our data provider only covers US exchanges)
+     * Delisted or merged companies (e.g., CBS → now PARA)
+     * Mutual funds or ETFs with non-standard tickers (e.g., HACAX)
+     * Obscure OTC or micro-cap stocks with limited market data (e.g., MAER, FANUY)
+   - If unsure whether a symbol is valid, prefer a well-known alternative in the same sector.
 {identify_candidates_bullets}
 
 4. **Gather supporting evidence:**

@@ -1,5 +1,6 @@
 package com.trading.service;
 
+import com.trading.exception.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -63,8 +64,8 @@ public class MarketService {
             return priceData;
         }
 
-        throw new RuntimeException("Unable to fetch market data for symbol: " + upperSymbol +
-            ". Finnhub API failed. Check FINNHUB_API_KEY and network connectivity.");
+        throw new ResourceNotFoundException("Symbol not found: " + upperSymbol +
+            ". Finnhub does not have data for this symbol.");
     }
 
     /**
