@@ -1,0 +1,25 @@
+.agentCard {
+  transition: box-shadow 0.15s;
+}
+
+.agentCardClickable {
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+
+.agentCardClickable:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.scrollablePopover {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.markdownSmall {
+  font-size: var(--mantine-font-size-sm);
+}

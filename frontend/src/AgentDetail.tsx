@@ -16,21 +16,8 @@ import Markdown from 'react-markdown'
 import type { AgentPortfolio, Holding } from './types.ts'
 import { fetchAgentPortfolio, fetchAgents } from './api.ts'
 import { AGENT_COLORS } from './constants.ts'
-
-function formatCurrency(value: number | null): string {
-  if (value == null) return '--'
-  return `$${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`
-}
-
-function formatPercent(value: number | null): string {
-  if (value == null) return '--'
-  return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
-}
-
-function pnlColor(value: number | null): string {
-  if (value == null) return 'dimmed'
-  return value >= 0 ? 'teal' : 'red'
-}
+import { formatCurrency, formatPercent, pnlColor } from './utils.ts'
+import classes from './AgentDetail.module.css'
 
 function sortByMarketValue(holdings: Holding[]): Holding[] {
   return [...holdings].sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0))
@@ -152,7 +139,7 @@ function AgentDetail() {
                 <Text fw={600}>System Prompt</Text>
               </Accordion.Control>
               <Accordion.Panel>
-                <div style={{ maxHeight: 500, overflowY: 'auto' }}>
+                <div className={classes.scrollablePrompt}>
                   <Markdown>{systemPrompt}</Markdown>
                 </div>
               </Accordion.Panel>
@@ -174,12 +161,12 @@ function AgentDetail() {
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Symbol</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Shares</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Avg Cost</Table.Th>
-                {hasPrices && <Table.Th style={{ textAlign: 'right' }}>Price</Table.Th>}
-                {hasPrices && <Table.Th style={{ textAlign: 'right' }}>Market Value</Table.Th>}
-                {hasPrices && <Table.Th style={{ textAlign: 'right' }}>P&L</Table.Th>}
-                {hasPrices && <Table.Th style={{ textAlign: 'right' }}>P&L %</Table.Th>}
+                <Table.Th className={classes.rightAlign}>Shares</Table.Th>
+                <Table.Th className={classes.rightAlign}>Avg Cost</Table.Th>
+                {hasPrices && <Table.Th className={classes.rightAlign}>Price</Table.Th>}
+                {hasPrices && <Table.Th className={classes.rightAlign}>Market Value</Table.Th>}
+                {hasPrices && <Table.Th className={classes.rightAlign}>P&L</Table.Th>}
+                {hasPrices && <Table.Th className={classes.rightAlign}>P&L %</Table.Th>}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -188,27 +175,27 @@ function AgentDetail() {
                   <Table.Td>
                     <Text fw={600}>{h.symbol}</Text>
                   </Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{h.quantity}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{formatCurrency(h.averagePrice)}</Table.Td>
+                  <Table.Td className={classes.rightAlign}>{h.quantity}</Table.Td>
+                  <Table.Td className={classes.rightAlign}>{formatCurrency(h.averagePrice)}</Table.Td>
                   {hasPrices && (
-                    <Table.Td style={{ textAlign: 'right' }}>
+                    <Table.Td className={classes.rightAlign}>
                       {h.currentPrice != null ? formatCurrency(h.currentPrice) : <Text c="dimmed" size="sm">N/A</Text>}
                     </Table.Td>
                   )}
                   {hasPrices && (
-                    <Table.Td style={{ textAlign: 'right' }}>
+                    <Table.Td className={classes.rightAlign}>
                       {h.marketValue != null ? <Text fw={600}>{formatCurrency(h.marketValue)}</Text> : <Text c="dimmed" size="sm">N/A</Text>}
                     </Table.Td>
                   )}
                   {hasPrices && (
-                    <Table.Td style={{ textAlign: 'right' }}>
+                    <Table.Td className={classes.rightAlign}>
                       {h.unrealizedPnl != null ? (
                         <Text c={pnlColor(h.unrealizedPnl)} fw={600}>{formatCurrency(h.unrealizedPnl)}</Text>
                       ) : <Text c="dimmed" size="sm">N/A</Text>}
                     </Table.Td>
                   )}
                   {hasPrices && (
-                    <Table.Td style={{ textAlign: 'right' }}>
+                    <Table.Td className={classes.rightAlign}>
                       {h.gainLossPercent != null ? (
                         <Text c={pnlColor(h.gainLossPercent)} fw={600}>{formatPercent(h.gainLossPercent)}</Text>
                       ) : <Text c="dimmed" size="sm">N/A</Text>}

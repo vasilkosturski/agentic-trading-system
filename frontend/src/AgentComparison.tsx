@@ -5,21 +5,8 @@ import Markdown from 'react-markdown'
 import { IconInfoCircle } from '@tabler/icons-react'
 import type { PortfolioSnapshot, Agent } from './types.ts'
 import { AGENT_COLORS, AGENT_ORDER } from './constants.ts'
-
-function formatCurrency(value: number | null): string {
-  if (value == null) return '--'
-  return `$${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`
-}
-
-function formatPercent(value: number | null): string {
-  if (value == null) return '--'
-  return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
-}
-
-function pnlColor(value: number | null): string {
-  if (value == null) return 'dimmed'
-  return value >= 0 ? 'teal' : 'red'
-}
+import { formatCurrency, formatPercent, pnlColor } from './utils.ts'
+import classes from './AgentComparison.module.css'
 
 interface AgentSummary {
   id: number | null
@@ -80,9 +67,7 @@ function AgentComparison({ snapshots, agents }: { snapshots: PortfolioSnapshot[]
               p="md"
               radius="md"
               withBorder
-              style={{ cursor: agent.id ? 'pointer' : undefined, transition: 'box-shadow 0.15s' }}
-              onMouseEnter={e => { if (agent.id) (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = '' }}
+              className={agent.id ? classes.agentCardClickable : classes.agentCard}
               onClick={() => { if (agent.id) navigate(`/agents/${agent.id}`) }}
             >
               <Text fw={700} size="lg" c={color} mb="xs">{agent.name}</Text>
@@ -98,14 +83,14 @@ function AgentComparison({ snapshots, agents }: { snapshots: PortfolioSnapshot[]
                         <ActionIcon
                           variant="subtle"
                           size="sm"
-                          style={{ cursor: 'pointer' }}
+                          className={classes.clickable}
                           aria-label="View agent system prompt"
                         >
                           <IconInfoCircle size={16} />
                         </ActionIcon>
                       </Popover.Target>
-                      <Popover.Dropdown style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                        <div style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
+                      <Popover.Dropdown className={classes.scrollablePopover}>
+                        <div className={classes.markdownSmall}>
                           <Markdown>{agent.systemPrompt!}</Markdown>
                         </div>
                       </Popover.Dropdown>

@@ -28,7 +28,7 @@ ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 RUN pip install uv
 
 # Install MCP server packages globally (avoids runtime npm/uvx installs that pollute stdout)
-RUN npm install -g @modelcontextprotocol/server-brave-search mcp-memory-libsql
+RUN npm install -g @modelcontextprotocol/server-brave-search
 RUN pip install mcp-server-fetch
 
 # Copy requirements and install dependencies
@@ -39,7 +39,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # No longer need mcp-servers directory - using direct function tools instead
-# MCP dependencies for external services (Brave Search, Memory, Fetch) are installed globally above
+# MCP dependencies for external services (Brave Search, Fetch) are installed globally above
 
 # Default command - can be overridden in docker-compose
 CMD ["python", "trading_system.py"]

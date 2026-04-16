@@ -81,7 +81,7 @@ async def _lookup_share_price(symbol: str) -> float:
         data = await _fetch_market_data(symbol)
         return float(data.price)
     except Exception as e:
-        logger.error(f"Failed to get price for {symbol}: {e}")
+        logger.error("Failed to get price for %s: %s", symbol, e)
         raise Exception(
             f"Price data unavailable for {symbol}. "
             "Skip this symbol and continue with other candidates. "
@@ -127,7 +127,7 @@ async def get_price_with_metadata(symbol: str) -> PriceMetadata:
             source=data.source,
         )
     except Exception as e:
-        logger.error(f"Failed to get price metadata for {symbol}: {e}")
+        logger.error("Failed to get price metadata for %s: %s", symbol, e)
         raise Exception(
             f"Price data unavailable for {symbol}. "
             "Skip this symbol and continue with other candidates. "
