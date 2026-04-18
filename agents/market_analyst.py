@@ -42,7 +42,7 @@ import logging
 from dataclasses import dataclass
 from agents import Agent, Runner, Tool, function_tool, output_guardrail, GuardrailFunctionOutput, RunContextWrapper
 from agents.mcp import MCPServer
-from config import Config
+from config import config
 from utils.sdk_parser import extract_tool_calls, get_tool_errors
 from datetime import datetime
 from typing import Optional, Union, List, TYPE_CHECKING
@@ -187,7 +187,7 @@ class MarketAnalyst:
         agent_name: str,
         agent_id: int,
         mcp_pool: "MCPPool",
-        model_name: str = Config.OPENAI_MODEL,
+        model_name: str | None = None,
     ) -> "MarketAnalyst":
         """Create Market Analyst with agent already initialized.
 
@@ -195,11 +195,13 @@ class MarketAnalyst:
             agent_name: Agent name (e.g., "Warren")
             agent_id: Agent ID for backend API calls
             mcp_pool: MCP pool with Brave Search + Fetch servers
-            model_name: Model to use (default: Config.OPENAI_MODEL)
+            model_name: OpenAI model name to use. Defaults to config.OPENAI_MODEL.
 
         Returns:
             MarketAnalyst instance with agent ready to use
         """
+        if model_name is None:
+            model_name = config.OPENAI_MODEL
         instance = cls.__new__(cls)
         instance.agent_name = agent_name
         instance.agent_id = agent_id
@@ -280,7 +282,7 @@ async def create_market_analyst_agent(
     agent_name: str,
     agent_id: int,
     mcp_pool: "MCPPool",
-    model_name: str = Config.OPENAI_MODEL,
+    model_name: str | None = None,
 ) -> Agent[ResearchResponse]:
     """Create Market Analyst agent for research phase.
 
@@ -288,7 +290,7 @@ async def create_market_analyst_agent(
         agent_name: Agent name (e.g., "Warren")
         agent_id: Agent ID for backend API calls (memory endpoints)
         mcp_pool: MCP pool with Brave Search + Fetch servers
-        model_name: Model to use (default: Config.OPENAI_MODEL)
+        model_name: OpenAI model name to use. Defaults to config.OPENAI_MODEL.
 
     Returns:
         Agent configured for research with ResearchResponse output type
@@ -296,6 +298,8 @@ async def create_market_analyst_agent(
     Note:
         Agent personality is loaded from template files (prompts/market_analyst/{agent_name}.txt).
     """
+    if model_name is None:
+        model_name = config.OPENAI_MODEL
     # Load instructions from template file
     instructions = load_and_format_prompt(
         "market_analyst",

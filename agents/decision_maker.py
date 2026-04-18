@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass
 from agents import Agent, Runner, Tool, function_tool
 from agents.mcp import MCPServer
-from config import Config
+from config import config
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
 
@@ -140,7 +140,7 @@ class DecisionMaker:
         agent_name: str,
         agent_id: int,
         mcp_pool: Optional["MCPPool"] = None,
-        model_name: str = Config.OPENAI_MODEL,
+        model_name: str | None = None,
         agent_style: InvestmentStyle = InvestmentStyle.VALUE,
     ) -> "DecisionMaker":
         """Create Decision Maker with agent already initialized.
@@ -149,12 +149,14 @@ class DecisionMaker:
             agent_name: Agent name (e.g., "Warren")
             agent_id: Agent ID for tools that need it
             mcp_pool: Optional MCP pool for additional research
-            model_name: Model to use (default: Config.OPENAI_MODEL)
+            model_name: OpenAI model name to use. Defaults to config.OPENAI_MODEL.
             agent_style: Agent investment style (e.g., "Value Investor")
 
         Returns:
             DecisionMaker instance with agent ready to use
         """
+        if model_name is None:
+            model_name = config.OPENAI_MODEL
         instance = cls.__new__(cls)
         instance.agent_name = agent_name
         instance.agent_id = agent_id
@@ -238,7 +240,7 @@ async def create_decision_maker_agent(
     agent_name: str,
     agent_id: int,
     mcp_pool: Optional["MCPPool"] = None,
-    model_name: str = Config.OPENAI_MODEL,
+    model_name: str | None = None,
     agent_style: InvestmentStyle = InvestmentStyle.VALUE,
 ) -> Agent[TradingDecision]:
     """Create Decision Maker agent for decision phase.
@@ -247,7 +249,7 @@ async def create_decision_maker_agent(
         agent_name: Agent name (e.g., "Warren")
         agent_id: Agent ID for tools that need it
         mcp_pool: Optional MCP pool for additional research
-        model_name: Model to use (default: Config.OPENAI_MODEL)
+        model_name: OpenAI model name to use. Defaults to config.OPENAI_MODEL.
         agent_style: Agent investment style
 
     Returns:
@@ -257,6 +259,8 @@ async def create_decision_maker_agent(
         Agent personality is loaded from template files (prompts/decision_maker/{agent_name}.txt).
         Uses structured output (output_type=TradingDecision) instead of tool callback.
     """
+    if model_name is None:
+        model_name = config.OPENAI_MODEL
     # Load instructions from template file with position sizing parameter
     position_sizing_pct = get_position_sizing_pct(agent_style)
     instructions = load_and_format_prompt(

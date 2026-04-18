@@ -13,7 +13,7 @@ from datetime import datetime
 from agents import trace
 
 from agent_executor import AgentExecutor
-from config import Config
+from config import config
 from models.investment_style import InvestmentStyle
 from mcp_types import MCPName, MCPPool
 
@@ -97,7 +97,7 @@ class SimpleTrader:
     agent_style: InvestmentStyle
     strategy: str
     agent_id: int  # Required - set by TradingSystem.create()
-    model_name: str = Config.OPENAI_MODEL
+    model_name: str = config.OPENAI_MODEL
 
     async def run(self, mcp_pool: MCPPool, force_trade: bool = False):
         """Run a trading cycle. Delegates to module-level function.
