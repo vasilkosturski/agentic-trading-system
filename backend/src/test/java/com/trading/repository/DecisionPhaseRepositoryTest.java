@@ -86,6 +86,7 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         phase.setQuantity(15);
         
         ReasoningDto reasoning = new ReasoningDto();
+        reasoning.setRationale("Buying BAC because strong earnings and value metrics are compelling.");
         reasoning.setPortfolioContext("Current cash: $50,000. Holdings: 5 positions.");
         reasoning.setHistoricalContext("No previous trades in BAC. Last financials trade was GS.");
         reasoning.setResearchContext("Market Analyst identified BAC as top candidate based on earnings.");
@@ -99,6 +100,7 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         // Assert
         ReasoningDto loadedReasoning = loaded.getReasoning();
         assertThat(loadedReasoning).isNotNull();
+        assertThat(loadedReasoning.getRationale()).isEqualTo("Buying BAC because strong earnings and value metrics are compelling.");
         assertThat(loadedReasoning.getPortfolioContext()).isEqualTo("Current cash: $50,000. Holdings: 5 positions.");
         assertThat(loadedReasoning.getHistoricalContext()).isEqualTo("No previous trades in BAC. Last financials trade was GS.");
         assertThat(loadedReasoning.getResearchContext()).isEqualTo("Market Analyst identified BAC as top candidate based on earnings.");

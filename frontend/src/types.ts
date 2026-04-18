@@ -42,6 +42,7 @@ export interface ToolCall {
 }
 
 export interface Reasoning {
+  rationale: string | null
   researchContext: string
   portfolioContext: string
   historicalContext: string
