@@ -6,12 +6,19 @@ import lombok.NoArgsConstructor;
 
 /**
  * DTO for structured reasoning in decision phase.
- * 3-field structured reasoning: portfolio context, historical context, research summary.
+ * 4-field structured reasoning: rationale narrative, portfolio context,
+ * historical context, research summary.
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class ReasoningDto {
+
+    /**
+     * Brief 1-2 sentence narrative explaining the decision.
+     * Example: "Buying JPM because strong earnings beat expectations and value metrics are compelling."
+     */
+    private String rationale;
 
     /**
      * Current portfolio state context.

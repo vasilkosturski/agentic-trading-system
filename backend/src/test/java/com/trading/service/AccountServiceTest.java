@@ -561,13 +561,13 @@ class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("Falls back to average price when MarketService fails")
-    void testGetAccountReport_MarketServiceFails_UsesAveragePrice() {
+    @DisplayName("Returns null price fields when MarketService fails")
+    void testGetAccountReport_MarketServiceFails_NullPriceFields() {
         // Arrange
         String agentName = "TestAgent";
         AccountHolding holding = new AccountHolding(testAccount, "GOOGL", 5, 2800.0);
         List<AccountHolding> holdings = List.of(holding);
-        
+
         when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
         when(holdingRepository.findByAccount(testAccount)).thenReturn(holdings);
         when(marketService.getSharePrice("GOOGL"))
@@ -577,17 +577,18 @@ class AccountServiceTest {
         // Act
         var report = accountService.getAccountReport(agentName);
 
-        // Assert - fallback to average price
+        // Assert - price fields are null so frontend shows "N/A"
         HoldingDto holdingDto = report.getHoldings().get(0);
         assertEquals("GOOGL", holdingDto.getSymbol());
-        assertEquals(2800.0, holdingDto.getCurrentPrice());    // Fallback to average
-        assertEquals(14000.0, holdingDto.getMarketValue());   // 5 * 2800
-        assertEquals(14000.0, holdingDto.getCostBasis());     // 5 * 2800
-        assertEquals(0.0, holdingDto.getUnrealizedPnl());     // No P&L on fallback
-        assertEquals(0.0, holdingDto.getGainLossPercent());
-        assertEquals(true, holdingDto.getCached());           // Marked as degraded
-        
-        // Holdings value should still be calculated correctly
+        assertEquals(5, holdingDto.getQuantity());
+        assertEquals(2800.0, holdingDto.getAveragePrice());
+        assertNull(holdingDto.getCurrentPrice());
+        assertNull(holdingDto.getMarketValue());
+        assertNull(holdingDto.getCostBasis());
+        assertNull(holdingDto.getUnrealizedPnl());
+        assertNull(holdingDto.getGainLossPercent());
+
+        // Holdings value still calculated via calculateHoldingsValue (falls back to averagePrice)
         assertEquals(14000.0, report.getHoldingsValue());
     }
 

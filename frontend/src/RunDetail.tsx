@@ -226,10 +226,17 @@ function DecisionSection({ decision }: { decision: DecisionPhase | null }) {
         {decision.quantity != null && <Text c="dimmed">x{decision.quantity} shares</Text>}
       </Group>
 
+      {decision.reasoning?.rationale && (
+        <>
+          <Text fw={600} mb={4}>Decision Notes</Text>
+          <div className={classes.researchNotes}>
+            <Markdown>{decision.reasoning.rationale}</Markdown>
+          </div>
+        </>
+      )}
+
       {decision.reasoning && (
         <>
-          <Text fw={600} mb="xs">Reasoning</Text>
-
           <Paper withBorder p="sm" mb="xs">
             <Text size="sm" fw={600} mb={4}>Research Context</Text>
             <div className={classes.markdownSmall}>
