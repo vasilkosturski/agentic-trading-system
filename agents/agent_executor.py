@@ -18,7 +18,7 @@ from typing import Optional
 
 from agents import Runner
 
-from config import config, ModelType
+from config import config
 from guardrail_retry import run_with_guardrail_retry
 
 from models import TradingDecision, ResearchResponse, CycleResult, InvestmentStyle
@@ -80,15 +80,13 @@ from decision_maker import DecisionMaker, DecisionContext
 logger = logging.getLogger(__name__)
 
 
-def _extract_usage_metrics(usage, model_name: ModelType | str) -> UsageMetrics:
+def _extract_usage_metrics(usage, model_name: str) -> UsageMetrics:
     """Extract token usage metrics from SDK RunResultBase.context_wrapper.usage.
 
     Args:
         usage: Usage object from result.context_wrapper.usage
-        model_name: Model name or object passed to Agent() constructor
-            (fallback if SDK doesn't provide it). Accepts both str and
-            OpenAIChatCompletionsModel; non-str values are converted via
-            config.model_display_name.
+        model_name: Model name passed to Agent() constructor (fallback if
+            SDK doesn't provide it).
 
     Returns:
         UsageMetrics with token metric fields matching backend DTOs.
@@ -106,14 +104,7 @@ def _extract_usage_metrics(usage, model_name: ModelType | str) -> UsageMetrics:
     if usage.request_usage_entries:
         sdk_model = getattr(usage.request_usage_entries[0], 'model_name', None)
 
-    # Resolve model_name to a display string
-    if sdk_model is not None:
-        resolved_name: str = sdk_model
-    elif isinstance(model_name, str):
-        resolved_name = model_name
-    else:
-        # OpenAIChatCompletionsModel — use config display name
-        resolved_name = config.model_display_name
+    resolved_name: str = sdk_model if sdk_model is not None else model_name
 
     input_tokens = usage.input_tokens or 0
     output_tokens = usage.output_tokens or 0
@@ -153,7 +144,7 @@ class AgentExecutor:
         agent_id: int,
         name: str,
         agent_style: InvestmentStyle,
-        model_name: ModelType | None = None,
+        model_name: str | None = None,
     ):
         """Initialize executor with agent identity.
 
@@ -161,11 +152,10 @@ class AgentExecutor:
             agent_id: Unique agent identifier
             name: Agent name (e.g., "Warren")
             agent_style: Investment style enum value
-            model_name: Model to use for agents (str for OpenAI,
-                OpenAIChatCompletionsModel for DeepSeek). Defaults to config.get_model().
+            model_name: OpenAI model name to use for agents. Defaults to config.OPENAI_MODEL.
         """
         if model_name is None:
-            model_name = config.get_model()
+            model_name = config.OPENAI_MODEL
         # Agent identity (immutable for lifetime of executor)
         self.agent_id = agent_id
         self.name = name

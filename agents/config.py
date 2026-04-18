@@ -9,7 +9,6 @@ Best practices:
 """
 
 import os
-from typing import Optional
 
 
 class Config:
@@ -39,9 +38,9 @@ class Config:
         """Agent metadata API endpoint."""
         return f"{self.BACKEND_BASE_URL}/api/agents"
 
-    # Agent Configuration
+    # OpenAI Configuration
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o")
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-5-mini")
 
     # MCP Servers Configuration
     BRAVE_API_KEY: str = os.getenv("BRAVE_API_KEY", "")
@@ -52,11 +51,11 @@ class Config:
     # Logging Configuration
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize configuration and validate required values."""
         self._validate()
 
-    def _validate(self):
+    def _validate(self) -> None:
         """Validate that required configuration values are set."""
         if not self.OPENAI_API_KEY:
             raise ValueError("OPENAI_API_KEY environment variable is required")

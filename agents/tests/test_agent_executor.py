@@ -522,6 +522,11 @@ class TestAgentExecutorFinalizeRun:
         call_args = mock_complete_run.call_args
         assert call_args[0][0] == 123  # run_id
 
+        # Verify rationale flows through to CompleteRunData
+        complete_data = call_args[0][1]
+        assert complete_data.decision.reasoning is not None
+        assert complete_data.decision.reasoning.rationale == "Strong growth"
+
 
 # ============================================================================
 # Test: Error Handling
