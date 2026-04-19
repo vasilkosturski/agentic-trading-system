@@ -69,7 +69,7 @@ services:
       ENVIRONMENT: "development"
       LOG_LEVEL: "DEBUG"
       CONTINUOUS_MODE: "true"
-      RUN_EVERY_N_MINUTES: "300"
+      RUN_EVERY_N_MINUTES: "480"
       RUN_EVEN_WHEN_MARKET_IS_CLOSED: "true"
     volumes:
       # Mount source code for development
