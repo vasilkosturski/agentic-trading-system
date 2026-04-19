@@ -85,6 +85,7 @@ function AgentComparison({ snapshots, agents }: { snapshots: PortfolioSnapshot[]
                           size="sm"
                           className={classes.clickable}
                           aria-label="View agent system prompt"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <IconInfoCircle size={16} />
                         </ActionIcon>
