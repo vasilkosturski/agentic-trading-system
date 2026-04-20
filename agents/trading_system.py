@@ -19,7 +19,13 @@ from backend_client import close_backend_client
 load_dotenv(override=True)
 
 # Configuration
-RUN_EVERY_N_MINUTES = int(os.getenv("RUN_EVERY_N_MINUTES", "60"))
+# Production: run every 4 hours (240 minutes)
+# Staging: run every 8 hours (480 minutes)
+# No defaults - must be explicitly set in environment
+_run_interval = os.getenv("RUN_EVERY_N_MINUTES")
+if not _run_interval:
+    raise ValueError("RUN_EVERY_N_MINUTES environment variable must be set")
+RUN_EVERY_N_MINUTES = int(_run_interval)
 
 # Configure logging
 logging.basicConfig(

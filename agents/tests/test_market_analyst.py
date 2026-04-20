@@ -7,7 +7,7 @@ The Market Analyst is the first agent in the two-agent flow:
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 from market_analyst import create_market_analyst_agent, build_research_prompt
 from models.llm_output import ResearchResponse
@@ -17,6 +17,7 @@ from models.llm_output import ResearchResponse
 class TestMarketAnalystAgent:
     """Test Market Analyst agent creation and configuration."""
 
+    @pytest.mark.usefixtures('mock_prompt_fetch')
     async def test_create_agent_with_correct_mcp_servers(
         self,
         sample_agent_name,
@@ -47,6 +48,7 @@ class TestMarketAnalystAgent:
         assert agent is not None
         assert agent.name == f"{sample_agent_name}-MarketAnalyst"
 
+    @pytest.mark.usefixtures('mock_prompt_fetch')
     async def test_agent_has_no_trading_tools(
         self,
         sample_agent_name,
@@ -75,6 +77,7 @@ class TestMarketAnalystAgent:
             assert "sell_shares" not in tool_names
             assert "decide_action" not in tool_names
 
+    @pytest.mark.usefixtures('mock_prompt_fetch')
     async def test_output_type_is_research_response(
         self,
         sample_agent_name,
@@ -96,6 +99,7 @@ class TestMarketAnalystAgent:
         # We can't directly access the type at runtime, but verify agent has output_type
         # This is enforced by the Agent[ResearchResponse] generic
 
+    @pytest.mark.usefixtures('mock_prompt_fetch')
     async def test_instructions_include_agent_context(
         self,
         sample_agent_name,

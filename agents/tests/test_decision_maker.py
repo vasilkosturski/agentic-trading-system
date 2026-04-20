@@ -7,9 +7,7 @@ The Decision Maker is the second agent in the two-agent flow:
 - Uses structured output (TradingDecision) instead of tool callback
 """
 
-import json
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from decision_maker import create_decision_maker_agent, build_decision_prompt
 from models import Holding
@@ -20,6 +18,7 @@ from models.llm_output import TradingDecision
 class TestDecisionMakerAgent:
     """Test Decision Maker agent creation and configuration."""
 
+    @pytest.mark.usefixtures('mock_prompt_fetch')
     async def test_create_agent_with_trading_tools(
         self,
         sample_agent_id,
@@ -42,6 +41,7 @@ class TestDecisionMakerAgent:
         # Verify structured output type is TradingDecision
         assert agent.output_type == TradingDecision
 
+    @pytest.mark.usefixtures('mock_prompt_fetch')
     async def test_create_agent_without_mcp_pool(
         self,
         sample_agent_id,
