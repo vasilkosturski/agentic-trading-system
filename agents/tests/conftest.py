@@ -264,6 +264,72 @@ def mock_broadcast_status(mocker):
 
 
 @pytest.fixture
+def mock_prompt_fetch(mocker):
+    """Mock httpx.get in prompt_loader so agent-creation tests don't need a real backend.
+
+    PURPOSE:
+    --------
+    Unit tests need to create agents (Market Analyst, Decision Maker) to verify
+    their configuration without requiring a running backend. This fixture patches
+    prompt_loader.httpx.get to return a synthetic prompt instead of making real
+    HTTP calls to http://localhost:8080/api/prompts/...
+
+    WHY NOT autouse=True:
+    ---------------------
+    This fixture is DELIBERATELY NOT autouse=True. Making it autouse would apply
+    the mock to ALL tests including E2E and integration tests that NEED real HTTP
+    calls to verify the full system end-to-end. That would break E2E tests.
+
+    USAGE PATTERN (explicit request):
+    ---------------------------------
+    Unit tests that need this mock MUST explicitly request it in their test signature:
+
+        async def test_create_agent(mock_prompt_fetch):  # <- explicitly requests fixture
+            agent = await create_market_analyst_agent(...)
+            # Agent is created without hitting real backend
+
+    E2E tests that need real HTTP calls should NOT request this fixture:
+
+        @pytest.mark.e2e
+        async def test_full_cycle_e2e():  # <- NO mock_prompt_fetch parameter
+            # Makes real HTTP calls to backend
+            agent = await create_market_analyst_agent(...)
+
+    SCOPE:
+    ------
+    Function scope (default). Each test that requests this fixture gets isolated
+    mock state. The patch is applied ONLY to tests that explicitly request the
+    fixture via their parameter list.
+
+    CURRENT USAGE:
+    --------------
+    - 6 unit tests explicitly request this fixture (4 in test_market_analyst.py,
+      2 in test_decision_maker.py)
+    - 3 E2E tests do NOT use this fixture (all tests in tests/e2e/)
+    - E2E tests make real HTTP calls and require a running backend
+
+    IMPLEMENTATION DETAILS:
+    -----------------------
+    The production code path hits http://localhost:8080/api/prompts/... via
+    prompt_loader.load_composed_prompt(). This fixture returns a synthetic prompt
+    template so tests can create agents without a running backend.
+
+    The template includes the literal agent name "Warren" (matches sample_agent_name)
+    so `assert sample_agent_name in agent.instructions` passes. Production code only
+    passes {datetime} and {position_sizing_pct} as kwargs — any other placeholder
+    is preserved by prompt_loader._PartialFormatDict.
+    """
+    mock_response = MagicMock()
+    mock_response.text = (
+        "You are Warren, a disciplined investor. "
+        "Current time: {datetime}. "
+        "Position sizing: {position_sizing_pct}%."
+    )
+    mock_response.raise_for_status = MagicMock()
+    return mocker.patch("prompt_loader.httpx.get", return_value=mock_response)
+
+
+@pytest.fixture
 def mock_run_tracking(mocker):
     """Mock run tracking functions (new phase-based API)."""
     create_run = mocker.patch("agent_executor.create_run")
