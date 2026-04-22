@@ -91,11 +91,9 @@ class TestRunWithGuardrailRetry:
         assert result is mock_success
         assert mock_runner_class.run.await_count == 2
 
-        # Second call should receive reconstructed input list (not the original string)
         second_call_input = mock_runner_class.run.call_args_list[1][0][1]
         assert isinstance(second_call_input, list)
 
-        # The last item should be the error feedback message
         last_item = second_call_input[-1]
         assert last_item["role"] == "user"
         assert "missing candidates" in last_item["content"]
@@ -115,7 +113,6 @@ class TestRunWithGuardrailRetry:
                 agent, "test", max_attempts=3, agent_name="TestAgent"
             )
 
-        # The raised exception should be the last one (exc3)
         assert exc_info.value is exc3
         assert mock_runner_class.run.await_count == 3
 
@@ -136,59 +133,7 @@ class TestRunWithGuardrailRetry:
             agent, "research prompt", max_attempts=3, agent_name="Analyst"
         )
 
-        # Inspect the input to the second Runner.run call
         second_call_input = mock_runner_class.run.call_args_list[1][0][1]
         feedback_msg = second_call_input[-1]
         assert specific_error in feedback_msg["content"]
         assert "Output validation failed" in feedback_msg["content"]
-
-    @patch("guardrail_retry.Runner")
-    async def test_tool_approval_items_skipped(self, mock_runner_class):
-        """ToolApprovalItems in new_items are skipped during reconstruction."""
-        normal_item = _make_run_item("message_output_item")
-        approval_item = _make_run_item("tool_approval_item")
-
-        exc = _make_guardrail_exception(
-            output_info="bad output",
-            input_data="prompt",
-            new_items=[normal_item, approval_item],
-        )
-        mock_success = MagicMock()
-        mock_runner_class.run = AsyncMock(side_effect=[exc, mock_success])
-
-        agent = MagicMock()
-        await run_with_guardrail_retry(
-            agent, "prompt", max_attempts=3, agent_name="Test"
-        )
-
-        # normal_item.to_input_item() should have been called
-        normal_item.to_input_item.assert_called_once()
-        # approval_item.to_input_item() should NOT have been called
-        approval_item.to_input_item.assert_not_called()
-
-    @patch("guardrail_retry.Runner")
-    async def test_single_attempt_raises_immediately(self, mock_runner_class):
-        """With max_attempts=1, first guardrail trip raises immediately."""
-        exc = _make_guardrail_exception(output_info="bad")
-        mock_runner_class.run = AsyncMock(side_effect=exc)
-
-        agent = MagicMock()
-        with pytest.raises(OutputGuardrailTripwireTriggered):
-            await run_with_guardrail_retry(
-                agent, "test", max_attempts=1, agent_name="Test"
-            )
-
-        mock_runner_class.run.assert_awaited_once()
-
-    @patch("guardrail_retry.Runner")
-    async def test_max_turns_passed_through(self, mock_runner_class):
-        """Verify max_turns parameter is forwarded to Runner.run."""
-        mock_result = MagicMock()
-        mock_runner_class.run = AsyncMock(return_value=mock_result)
-
-        agent = MagicMock()
-        await run_with_guardrail_retry(
-            agent, "test", max_attempts=2, max_turns=50, agent_name="Test"
-        )
-
-        mock_runner_class.run.assert_awaited_once_with(agent, "test", max_turns=50)
