@@ -94,7 +94,10 @@ async def validate_research_output(
     else:
         no_price = [c.symbol for c in output.candidates if c.price <= 0]
         if no_price:
-            issues.append(f"candidates missing prices: {no_price}")
+            issues.append(
+                f"candidates with unavailable prices (-1.0 sentinel): {no_price}. "
+                "Agent should have excluded these symbols from final candidates list."
+            )
     if not output.webSources:
         issues.append("webSources is empty")
     else:

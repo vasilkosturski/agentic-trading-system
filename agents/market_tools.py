@@ -76,18 +76,29 @@ async def _lookup_share_price(symbol: str) -> float:
     """Internal: Get current price (no decorator).
 
     Used by other modules that need to call this as a regular function.
+
+    Returns:
+        Current stock price in USD, or -1.0 if symbol not found (404)
+
+    Raises:
+        BackendAPIError: For fatal errors (5xx, timeout, rate limits)
+        Exception: For unexpected errors
     """
     try:
         data = await _fetch_market_data(symbol)
         return float(data.price)
+    except BackendAPIError as e:
+        if e.status_code == 404:
+            # Symbol not found - graceful degradation (recoverable)
+            logger.warning("Symbol %s not found in market data (404) - returning sentinel", symbol)
+            return -1.0
+        # All other HTTP errors (429, 5xx) are fatal - let them propagate
+        logger.error("Backend error for %s: %s", symbol, e)
+        raise
     except Exception as e:
-        logger.error("Failed to get price for %s: %s", symbol, e)
-        raise Exception(
-            f"Price data unavailable for {symbol}. "
-            "Skip this symbol and continue with other candidates. "
-            "Do NOT retry this symbol."
-        )
-
+        # Unexpected errors (network, parsing) - also fatal
+        logger.error("Unexpected error fetching %s: %s", symbol, e)
+        raise
 
 @function_tool
 async def lookup_share_price(symbol: str) -> float:

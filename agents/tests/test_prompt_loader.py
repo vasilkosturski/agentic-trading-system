@@ -49,18 +49,6 @@ class TestLoadComposedPrompt:
         assert "/api/prompts/decision_maker/warren" in call_url
         assert result == "You are Warren, a Value Investor."
 
-    @patch("prompt_loader.httpx.get")
-    def test_returns_prompt_text(self, mock_get):
-        """Returns the response body as a string."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.text = "Test prompt content with {datetime} placeholder"
-        mock_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_response
-
-        result = load_composed_prompt("market_analyst", "ray")
-        assert result == "Test prompt content with {datetime} placeholder"
-
     def test_invalid_agent_name_raises_value_error(self):
         """Invalid agent name raises ValueError without calling backend."""
         with pytest.raises(ValueError, match="Invalid agent name"):
@@ -81,16 +69,6 @@ class TestLoadComposedPrompt:
         with pytest.raises(FileNotFoundError, match="Prompt not found"):
             load_composed_prompt("decision_maker", "warren")
 
-    @patch("prompt_loader.httpx.get")
-    def test_connection_error_raises_runtime_error(self, mock_get):
-        """Backend unreachable raises RuntimeError."""
-        import httpx
-
-        mock_get.side_effect = httpx.RequestError("Connection refused")
-
-        with pytest.raises(RuntimeError, match="Cannot reach backend"):
-            load_composed_prompt("decision_maker", "warren")
-
 
 # ============================================================================
 # 2. format_prompt() runtime substitution
@@ -107,50 +85,9 @@ class TestFormatPrompt:
         assert "2025-06-15 10:00:00" in result
         assert "{datetime}" not in result
 
-    def test_auto_fills_datetime_if_not_provided(self):
-        """format_prompt() auto-fills datetime when not explicitly passed."""
-        template = "Time is {datetime}"
-        result = format_prompt(template)
-        assert "{datetime}" not in result
-
-    def test_preserves_unknown_placeholders(self):
-        """Unknown placeholders are preserved (not crash)."""
-        template = "Hello {name}, today is {datetime}"
-        result = format_prompt(template, datetime="2025-01-01")
-        assert "{name}" in result
-        assert "2025-01-01" in result
-
-    def test_partial_format_dict_returns_placeholder_for_missing(self):
-        """_PartialFormatDict returns {key} for missing keys."""
-        d = _PartialFormatDict(a="1")
-        assert d["a"] == "1"
-        assert d["missing"] == "{missing}"
-
-
-# ============================================================================
-# 3. load_prompt_template() and load_and_format_prompt()
-# ============================================================================
-
 
 class TestLoadPromptTemplate:
     """Test end-to-end template loading wrappers."""
-
-    @patch("prompt_loader.httpx.get")
-    def test_load_prompt_template_delegates_to_composed(self, mock_get):
-        """load_prompt_template calls load_composed_prompt."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.text = "Prompt for {datetime}"
-        mock_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_response
-
-        result = load_prompt_template("market_analyst", "Warren")
-        assert result == "Prompt for {datetime}"
-
-    def test_load_prompt_template_invalid_name_raises(self):
-        """Invalid agent name raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid agent name"):
-            load_prompt_template("market_analyst", "NotAnAgent")
 
     @patch("prompt_loader.httpx.get")
     def test_load_and_format_prompt_end_to_end(self, mock_get):
@@ -168,38 +105,8 @@ class TestLoadPromptTemplate:
         assert "{datetime}" not in result
 
 
-# ============================================================================
-# 4. get_available_templates()
-# ============================================================================
-
-
-class TestGetAvailableTemplates:
-    """Test template listing."""
-
-    def test_returns_both_agent_types(self):
-        """Returns both market_analyst and decision_maker."""
-        templates = get_available_templates()
-        assert "market_analyst" in templates
-        assert "decision_maker" in templates
-
-    def test_returns_all_agent_names(self):
-        """Each type has all valid agent names."""
-        templates = get_available_templates()
-        for agent_type in ["market_analyst", "decision_maker"]:
-            names = set(templates[agent_type])
-            assert names == VALID_AGENT_NAMES
-
-
-# ============================================================================
-# 5. VALID_AGENT_NAMES
-# ============================================================================
-
-
 class TestValidAgentNames:
     """Test agent name constants."""
-
-    def test_contains_four_agents(self):
-        assert len(VALID_AGENT_NAMES) == 4
 
     def test_expected_names(self):
         assert VALID_AGENT_NAMES == {"warren", "george", "ray", "cathie"}

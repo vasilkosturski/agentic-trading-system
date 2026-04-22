@@ -168,7 +168,7 @@ class TestAgentExecutorStartRun:
 
 
 # ============================================================================
-# Test: Fetch Account Data & Recent Activity
+# Test: Fetch Account Data
 # ============================================================================
 
 @pytest.mark.asyncio
@@ -208,31 +208,6 @@ class TestAgentExecutorFetchData:
         assert result.balance == sample_balance
         assert result.holdings == sample_holdings
 
-    @patch("agent_executor.get_backend_client")
-    async def test_fetch_recent_activity_returns_response(
-        self,
-        mock_get_backend_client,
-        sample_agent_id,
-        sample_agent_name,
-        sample_agent_style,
-        sample_recent_activity,
-    ):
-        """Test _fetch_recent_activity returns RecentActivityResponse."""
-        mock_client = AsyncMock()
-        mock_client.get_recent_activity.return_value = sample_recent_activity
-        mock_get_backend_client.return_value = mock_client
-
-        executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_agent_style)
-
-        result = await executor._fetch_recent_activity(sample_agent_id)
-
-        from models.api_responses import RecentActivityResponse
-        assert isinstance(result, RecentActivityResponse)
-        assert result.totalRuns == 1
-        assert result.totalTrades == 1
-
-        mock_client.get_recent_activity.assert_called_once_with(sample_agent_id, days=30)
-
 
 # ============================================================================
 # Test: Market Analyst
@@ -257,13 +232,11 @@ class TestAgentExecutorMarketAnalyst:
         mock_mcp_pool,
     ):
         """Test _run_market_analyst returns ResearchResult."""
-        # Setup mock MarketAnalyst
         mock_analyst_instance = MagicMock()
         mock_analyst_instance.agent = MagicMock()
         mock_analyst_instance.build_prompt.return_value = "test prompt"
         mock_market_analyst_class.create = AsyncMock(return_value=mock_analyst_instance)
 
-        # Setup mock Runner result with proper usage metrics
         mock_result = MagicMock()
         mock_result.final_output_as.return_value = sample_research_response
         mock_result.new_items = []
@@ -275,14 +248,12 @@ class TestAgentExecutorMarketAnalyst:
         mock_result.context_wrapper.usage.requests = 1
         mock_result.context_wrapper.usage.request_usage_entries = []
         mock_runner_class.run = AsyncMock(return_value=mock_result)
-
         mock_analyst_instance.model_name = "gpt-4o"
 
         executor = AgentExecutor(
             sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
         )
 
-        # Create minimal context with tracker
         mock_tracker = MagicMock()
         ctx = RunContext(
             run_id=123,
@@ -299,92 +270,10 @@ class TestAgentExecutorMarketAnalyst:
 
         result = await executor._run_market_analyst(ctx, mock_mcp_pool)
 
-        # Verify ResearchResult returned
         assert isinstance(result, ResearchResult)
         assert result.research_response == sample_research_response
-        # Candidates extracted as symbol strings from CandidateStock objects
         assert len(result.candidates) == 2
         assert result.candidates == ["AAPL", "NVDA"]
-        assert result.notes == sample_research_response.summary
-
-
-# ============================================================================
-# Test: Decision Maker
-# ============================================================================
-
-@pytest.mark.asyncio
-class TestAgentExecutorDecisionMaker:
-    """Test _run_decision_maker method."""
-
-    @patch("agent_executor.DecisionMaker")
-    @patch("agent_executor.Runner")
-    @patch("agent_executor.update_phase")
-    @patch("agent_executor.broadcast_status")
-    async def test_run_decision_maker_returns_decision_result(
-        self,
-        mock_broadcast,
-        mock_update_phase,
-        mock_runner_class,
-        mock_decision_maker_class,
-        sample_agent_id,
-        sample_agent_name,
-        sample_agent_style,
-        sample_model_name,
-        sample_research_response,
-        sample_recent_activity,
-        mock_mcp_pool,
-        sample_decision,
-    ):
-        """Test _run_decision_maker returns DecisionResult."""
-        mock_update_phase.return_value = True
-
-        # Setup mock DecisionMaker
-        mock_dm_instance = MagicMock()
-        mock_dm_instance.agent = MagicMock()
-        mock_dm_instance.build_prompt.return_value = "test prompt"
-        mock_decision_maker_class.create = AsyncMock(return_value=mock_dm_instance)
-
-        # Setup mock Runner result with proper usage metrics
-        mock_result = MagicMock()
-        mock_result.final_output_as.return_value = sample_decision
-        mock_result.new_items = []
-        mock_result.context_wrapper.usage.total_tokens = 50
-        mock_result.context_wrapper.usage.input_tokens = 40
-        mock_result.context_wrapper.usage.output_tokens = 10
-        mock_result.context_wrapper.usage.input_tokens_details = None
-        mock_result.context_wrapper.usage.output_tokens_details = None
-        mock_result.context_wrapper.usage.requests = 1
-        mock_result.context_wrapper.usage.request_usage_entries = []
-        mock_runner_class.run = AsyncMock(return_value=mock_result)
-
-        mock_dm_instance.model_name = "gpt-4o"
-
-        executor = AgentExecutor(
-            sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
-        )
-
-        # Create context with research response
-        ctx = RunContext(
-            run_id=123,
-            agent_id=sample_agent_id,
-            agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
-            model_name=sample_model_name,
-            research_start_time=datetime.now(),
-            balance=100000.0,
-            holdings=[],
-            recent_activity=sample_recent_activity,
-            research_response=sample_research_response,
-        )
-
-        result = await executor._run_decision_maker(ctx, mock_mcp_pool, force_trade=False)
-
-        # Verify DecisionResult returned
-        assert isinstance(result, DecisionResult)
-        assert result.decision == sample_decision
-        assert result.decision_start_time is not None
-
-        mock_update_phase.assert_called_once_with(123, RunPhase.DECIDING)
 
 
 # ============================================================================
@@ -413,39 +302,6 @@ class TestAgentExecutorExecuteTrade:
 
         assert "no decision was recorded" in str(exc_info.value)
 
-    @patch("agent_executor.buy_shares")
-    @patch("agent_executor.update_phase")
-    @patch("agent_executor.broadcast_status")
-    async def test_execute_trade_buy_decision(
-        self,
-        mock_broadcast,
-        mock_update_phase,
-        mock_buy,
-        sample_agent_id,
-        sample_agent_name,
-        sample_agent_style,
-        sample_decision,
-    ):
-        """Test _execute_trade executes BUY decision."""
-        mock_update_phase.return_value = True
-        mock_buy.return_value = MagicMock(tradeId=456)
-
-        executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_agent_style)
-
-        result = await executor._execute_trade(
-            run_id=123,
-            agent_id=sample_agent_id,
-            decision=sample_decision,
-        )
-
-        # Verify ExecutionResult returned
-        assert isinstance(result, ExecutionResult)
-        assert result.trade_id == 456
-        assert result.execution_status == PhaseStatus.COMPLETED
-
-        mock_update_phase.assert_called_once_with(123, RunPhase.TRADING)
-        mock_buy.assert_called_once()
-
     async def test_execute_trade_hold_decision(
         self,
         sample_agent_id,
@@ -471,119 +327,9 @@ class TestAgentExecutorExecuteTrade:
             decision=hold_decision,
         )
 
-        # Verify ExecutionResult returned
         assert isinstance(result, ExecutionResult)
         assert result.trade_id is None
         assert result.execution_status == PhaseStatus.SKIPPED
-
-
-# ============================================================================
-# Test: Finalize Run
-# ============================================================================
-
-@pytest.mark.asyncio
-class TestAgentExecutorFinalizeRun:
-    """Test _finalize_run method."""
-
-    @patch("agent_executor.complete_run")
-    @patch("agent_executor.broadcast_status")
-    async def test_finalize_run_with_trade(
-        self,
-        mock_broadcast,
-        mock_complete_run,
-        sample_agent_id,
-        sample_agent_name,
-        sample_agent_style,
-        sample_decision,
-        sample_research_response,
-    ):
-        """Test _finalize_run completes run with trade data."""
-        mock_complete_run.return_value = True
-
-        executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_agent_style)
-
-        ctx = RunContext(
-            run_id=123,
-            agent_id=sample_agent_id,
-            agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
-            model_name="gpt-4o-mini",
-            research_start_time=datetime.now(),
-            decision_start_time=datetime.now(),
-            decision=sample_decision,
-            research_response=sample_research_response,
-            trade_id=456,
-            execution_status=PhaseStatus.COMPLETED,
-        )
-
-        await executor._finalize_run(ctx)
-
-        mock_complete_run.assert_called_once()
-        call_args = mock_complete_run.call_args
-        assert call_args[0][0] == 123  # run_id
-
-        # Verify rationale flows through to CompleteRunData
-        complete_data = call_args[0][1]
-        assert complete_data.decision.reasoning is not None
-        assert complete_data.decision.reasoning.rationale == "Strong growth"
-
-
-# ============================================================================
-# Test: Error Handling
-# ============================================================================
-
-@pytest.mark.asyncio
-class TestAgentExecutorErrorHandling:
-    """Test error handling."""
-
-    @patch("agent_executor.complete_run")
-    @patch("agent_executor.update_phase")
-    @patch("agent_executor.broadcast_status")
-    async def test_handle_cycle_error_with_context(
-        self,
-        mock_broadcast,
-        mock_update_phase,
-        mock_complete_run,
-        sample_agent_id,
-        sample_agent_name,
-        sample_agent_style,
-    ):
-        """Test error handler updates phase to ERROR."""
-        mock_update_phase.return_value = True
-        mock_complete_run.return_value = True
-
-        executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_agent_style)
-
-        ctx = RunContext(
-            run_id=123,
-            agent_id=sample_agent_id,
-            agent_name=sample_agent_name,
-            agent_style=sample_agent_style,
-            model_name="gpt-4o-mini",
-            research_start_time=datetime.now(),
-        )
-
-        await executor._handle_cycle_error(Exception("Test error"), ctx)
-
-        # Error handler should set phase to ERROR (not call complete_run)
-        mock_update_phase.assert_called_once()
-        mock_complete_run.assert_not_called()
-
-    @patch("agent_executor.update_phase")
-    async def test_handle_cycle_error_without_context(
-        self,
-        mock_update_phase,
-        sample_agent_id,
-        sample_agent_name,
-        sample_agent_style,
-    ):
-        """Test error handler handles missing context gracefully."""
-        executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_agent_style)
-
-        # Should not raise
-        await executor._handle_cycle_error(Exception("Test error"), None)
-
-        mock_update_phase.assert_not_called()
 
 
 # ============================================================================

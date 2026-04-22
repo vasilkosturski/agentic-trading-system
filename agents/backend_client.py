@@ -136,6 +136,7 @@ class BackendClient:
             self._owned_client = httpx.AsyncClient(
                 timeout=httpx.Timeout(self._timeout, connect=5.0),
                 limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+                headers={"Accept": "application/json"},
             )
             self._loop_id = current_loop_id
         return self._owned_client
