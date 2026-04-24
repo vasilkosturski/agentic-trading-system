@@ -15,6 +15,7 @@ import com.trading.repository.TradingAccountRepository;
 import com.trading.repository.TradingAgentRepository;
 import com.trading.repository.TradingRunRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -29,6 +30,9 @@ import java.util.stream.Collectors;
  */
 @Service
 public class MemoryService {
+
+    @Value("${trading.public-display-delay-days:7}")
+    private int publicDisplayDelayDays;
 
     @Autowired
     private AccountTransactionRepository transactionRepository;
@@ -65,12 +69,14 @@ public class MemoryService {
             .orElseThrow(() -> new IllegalArgumentException("Agent not found: " + agentName));
 
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
+        Instant cutoffDate = Instant.now().minus(publicDisplayDelayDays, ChronoUnit.DAYS);
 
-        // Get all transactions for this symbol
+        // Get all transactions for this symbol, filtered by delay period
         List<AccountTransaction> transactions = transactionRepository
                 .findByAccountIdAndSymbolOrderByTimestampDesc(account.getId(), symbol)
                 .stream()
                 .filter(t -> t.getTimestamp().isAfter(since))
+                .filter(t -> t.getTimestamp().isBefore(cutoffDate))
                 .collect(Collectors.toList());
 
         // Return empty response — "no history" is valid data, not an error
@@ -123,12 +129,14 @@ public class MemoryService {
         }
 
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
+        Instant cutoffDate = Instant.now().minus(publicDisplayDelayDays, ChronoUnit.DAYS);
 
-        // Get recent runs from the new TradingRun system
+        // Get recent runs from the new TradingRun system, filtered by delay period
         List<TradingRun> recentRuns = tradingRunRepository
                 .findByAgentIdOrderByStartedAtDesc(agent.getId())
                 .stream()
                 .filter(r -> r.getStartedAt().isAfter(since))
+                .filter(r -> r.getStartedAt().isBefore(cutoffDate))
                 .limit(20)  // Limit to last 20 runs
                 .collect(Collectors.toList());
 

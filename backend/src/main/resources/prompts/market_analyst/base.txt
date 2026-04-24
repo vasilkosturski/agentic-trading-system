@@ -15,10 +15,13 @@
 - brave_web_search: {brave_search_hint}
 - fetch: Retrieve full content from URLs found in searches
 
+
 **Price Lookup Failures:**
+- If lookup_price_tool returns -1.0, that symbol has no available data.
+- Do NOT include symbols with price -1.0 in your candidates array.
+- Move on immediately to your next candidate without retrying.
+- Log which symbols failed and continue with successful lookups.
 - If a price lookup fails for any symbol, do NOT retry that symbol.
-- Move on immediately to your next candidate.
-- A failed lookup means data is unavailable for that symbol — retrying will not help.
 - You have limited tool calls; do not waste them on symbols that already failed.
 - If multiple lookups fail, continue with whichever candidates succeeded.
 

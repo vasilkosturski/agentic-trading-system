@@ -12,6 +12,8 @@ import {
   Loader,
   Badge,
 } from '@mantine/core'
+import { IconClock } from '@tabler/icons-react'
+import { formatDistanceToNow } from 'date-fns'
 import Markdown from 'react-markdown'
 import type { AgentPortfolio, Holding } from './types.ts'
 import { fetchAgentPortfolio, fetchAgents } from './api.ts'
@@ -99,9 +101,29 @@ function AgentDetail() {
         {agentStyle && <Badge variant="light" size="lg">{agentStyle}</Badge>}
       </Group>
 
+      {/* Historical Data Disclaimer */}
+      <Paper p="md" bg="yellow.1" mb="lg">
+        <Text size="sm" fw={600}>Historical Data Notice</Text>
+        <Text size="xs">
+          Currently showing data delayed by 7 days. All information below is historical
+          and for educational purposes only.
+        </Text>
+      </Paper>
+
       {/* Portfolio Summary */}
       <Paper p="lg" shadow="xs" mb="lg">
-        <Title order={3} mb="md">Portfolio Summary</Title>
+        <Group align="center" justify="space-between" mb="md">
+          <Title order={3}>Portfolio Summary</Title>
+          {portfolio.lastUpdated && (
+            <Badge
+              color="gray"
+              variant="light"
+              leftSection={<IconClock size={14} />}
+            >
+              {formatDistanceToNow(new Date(portfolio.lastUpdated), { addSuffix: true })}
+            </Badge>
+          )}
+        </Group>
         <Group grow>
           <div>
             <Text size="sm" c="dimmed">Total Value</Text>
@@ -133,10 +155,10 @@ function AgentDetail() {
       {/* System Prompt */}
       {systemPrompt && (
         <Paper p="lg" shadow="xs" mb="lg">
-          <Accordion variant="separated">
+          <Accordion variant="separated" defaultValue="system-prompt">
             <Accordion.Item value="system-prompt">
               <Accordion.Control>
-                <Text fw={600}>System Prompt</Text>
+                <Text fw={600}>Strategy</Text>
               </Accordion.Control>
               <Accordion.Panel>
                 <div className={classes.scrollablePrompt}>

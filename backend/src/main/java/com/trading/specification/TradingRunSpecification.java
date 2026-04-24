@@ -6,6 +6,8 @@ import com.trading.entity.TradingRun;
 import jakarta.persistence.criteria.*;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.Instant;
+
 /**
  * JPA Specification for dynamic TradingRun filtering.
  * Supports filtering by agentId, status, decision, and symbol.
@@ -27,6 +29,19 @@ public class TradingRunSpecification {
             .and(hasStatus(filter.getStatus()))
             .and(hasDecision(filter.getDecision()))
             .and(hasSymbol(filter.getSymbol()));
+    }
+
+    /**
+     * Build specification with date filter for public display delay.
+     * Combines filter criteria with startedAt before cutoff date.
+     */
+    public static Specification<TradingRun> fromFilterWithDateCutoff(RunQueryFilter filter, Instant cutoffDate) {
+        return Specification
+            .where(hasAgentId(filter.getAgentId()))
+            .and(hasStatus(filter.getStatus()))
+            .and(hasDecision(filter.getDecision()))
+            .and(hasSymbol(filter.getSymbol()))
+            .and(startedAtBefore(cutoffDate));
     }
 
     /**
@@ -78,6 +93,19 @@ public class TradingRunSpecification {
             // Join to decision_phases table
             Join<TradingRun, DecisionPhase> decisionJoin = root.join("decision", JoinType.LEFT);
             return cb.equal(cb.upper(decisionJoin.get("symbol")), symbol.toUpperCase().trim());
+        };
+    }
+
+    /**
+     * Filter by startedAt before cutoff date.
+     * Used for publicDisplayDelayDays filtering.
+     */
+    public static Specification<TradingRun> startedAtBefore(Instant cutoffDate) {
+        return (root, query, cb) -> {
+            if (cutoffDate == null) {
+                return null;
+            }
+            return cb.lessThan(root.get("startedAt"), cutoffDate);
         };
     }
 }

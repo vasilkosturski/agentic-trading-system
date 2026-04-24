@@ -13,13 +13,11 @@ import org.slf4j.LoggerFactory;
 import com.trading.exception.ResourceNotFoundException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
 
 @Service
-@Transactional
 public class AccountService {
 
     private static final Logger logger = LoggerFactory.getLogger(AccountService.class);
@@ -104,9 +102,6 @@ public class AccountService {
 
     /**
      * Populate style on the entity if missing.
-     * Only mutates fields -- does NOT persist. The caller is responsible for saving.
-     * Within @Transactional, JPA dirty-checking flushes managed entities automatically;
-     * for new (transient) entities the caller's explicit save() handles persistence.
      */
     private void populateStyle(TradingAgent agent) {
         if (agent.getStyle() == null || agent.getStyle().isEmpty()) {
@@ -135,50 +130,46 @@ public class AccountService {
     }
 
     /**
-     * Buy shares for an agent
-     * Delegates to BuyTradeExecutor for execution
+     * Buy shares for an agent.
+     *
      * @param runId REQUIRED - Every transaction must be linked to an agent run
      * @return TradeResult with transaction details and updated balance
      */
     public TradeResult buyShares(String agentName, String symbol, Integer quantity, Long runId) {
         Long agentId = getAgentIdFromRun(runId);
         try {
-            TradeResult result = buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId);
-            // Update snapshot immediately so dashboard reflects the new trade
+            Double price = marketService.getSharePrice(symbol).getPrice();
+            TradeResult result = buyTradeExecutor.executeBuy(agentName, symbol, quantity, price, runId);
             createPortfolioSnapshot(agentName);
-            // Broadcast successful trade
+
             broadcastTradeExecuted(agentId, runId, "buy", result);
             return result;
         } catch (BusinessRuleException e) {
-            // Broadcast trade rejection
             broadcastTradeRejected(agentId, runId, e);
             throw e;
         }
     }
 
     /**
-     * Sell shares for an agent
-     * Delegates to SellTradeExecutor for execution
+     * Sell shares for an agent.
+     *
      * @param runId REQUIRED - Every transaction must be linked to an agent run
      * @return TradeResult with transaction details and updated balance
      */
     public TradeResult sellShares(String agentName, String symbol, Integer quantity, Long runId) {
         Long agentId = getAgentIdFromRun(runId);
         try {
-            TradeResult result = sellTradeExecutor.executeSell(agentName, symbol, quantity, runId);
-            // Update snapshot immediately so dashboard reflects the new trade
+            Double price = marketService.getSharePrice(symbol).getPrice();
+            TradeResult result = sellTradeExecutor.executeSell(agentName, symbol, quantity, price, runId);
             createPortfolioSnapshot(agentName);
-            // Broadcast successful trade
+
             broadcastTradeExecuted(agentId, runId, "sell", result);
             return result;
         } catch (BusinessRuleException e) {
-            // Broadcast trade rejection
             broadcastTradeRejected(agentId, runId, e);
             throw e;
         }
     }
-
-    // changeStrategy method removed - using hardcoded strategies only
 
     /**
      * Get account report for an agent.
@@ -301,18 +292,6 @@ public class AccountService {
         snapshotRepository.save(snapshot);
     }
 
-    /**
-     * Convert AccountHolding entities to HoldingDto list with live market prices and P&L calculations.
-     * Single source of truth for entity-to-DTO mapping used by getHoldings() and getAccountReport().
-     * 
-     * For each holding:
-     *  - Fetches current price from MarketService (cached 60 minutes)
-     *  - Calculates market value (quantity × currentPrice)
-     *  - Calculates cost basis (quantity × averagePrice)
-     *  - Calculates unrealized P&L (marketValue - costBasis)
-     *  - Calculates P&L percentage with zero-division guard
-     *  - If market data unavailable, falls back to averagePrice for current price
-     */
     private List<HoldingDto> toHoldingDtos(List<AccountHolding> holdings) {
         List<HoldingDto> dtos = new ArrayList<>();
         for (AccountHolding holding : holdings) {
@@ -360,7 +339,6 @@ public class AccountService {
 
     /**
      * Calculate total value of holdings using live market prices.
-     * Extracted method to eliminate duplication across 3 methods.
      * Falls back to average purchase price if market API fails.
      */
     private double calculateHoldingsValue(List<AccountHolding> holdings) {
