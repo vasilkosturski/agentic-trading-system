@@ -4,7 +4,6 @@ import com.trading.dto.response.PortfolioSnapshotDto;
 import com.trading.entity.AccountPortfolioSnapshot;
 import com.trading.repository.AccountPortfolioSnapshotRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -12,10 +11,8 @@ import java.util.stream.Collectors;
 
 /**
  * Service for portfolio snapshot operations.
- * Handles retrieval and conversion of portfolio snapshot data.
  */
 @Service
-@Transactional(readOnly = true)
 public class PortfolioService {
 
     private final AccountPortfolioSnapshotRepository snapshotRepository;
@@ -24,9 +21,6 @@ public class PortfolioService {
         this.snapshotRepository = snapshotRepository;
     }
 
-    /**
-     * Get portfolio snapshots with optional filtering by agent name, date range, and limit.
-     */
     public List<PortfolioSnapshotDto> getSnapshots(String agentName, Instant startDate, Instant endDate, Integer limit) {
         List<AccountPortfolioSnapshot> snapshots;
 

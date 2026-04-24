@@ -78,8 +78,6 @@ class BuyTradeExecutorTest {
             .thenReturn(Optional.of(testAccount));
         when(holdingRepository.findActiveHoldingsByAccount(testAccount))
             .thenReturn(new ArrayList<>()); // No existing holdings
-        when(marketService.getSharePrice(symbol))
-            .thenReturn(testPriceData);
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -92,7 +90,7 @@ class BuyTradeExecutorTest {
             .thenReturn(newHolding);
 
         // Act
-        TradeResult result = buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId);
+        TradeResult result = buyTradeExecutor.executeBuy(agentName, symbol, quantity, 150.0, runId);
 
         // Assert
         assertNotNull(result);
@@ -153,8 +151,6 @@ class BuyTradeExecutorTest {
             .thenReturn(Optional.of(testAccount));
         when(holdingRepository.findActiveHoldingsByAccount(testAccount))
             .thenReturn(Arrays.asList(existingHolding)); // Has existing holding
-        when(marketService.getSharePrice(symbol))
-            .thenReturn(new MarketService.PriceData(buyPrice, true, Instant.now(), "Finnhub"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -165,7 +161,7 @@ class BuyTradeExecutorTest {
             .thenReturn(existingHolding);
 
         // Act
-        TradeResult result = buyTradeExecutor.executeBuy(agentName, symbol, buyQuantity, 1L);
+        TradeResult result = buyTradeExecutor.executeBuy(agentName, symbol, buyQuantity, buyPrice, 1L);
 
         // Assert
         assertNotNull(result);
@@ -203,8 +199,6 @@ class BuyTradeExecutorTest {
             .thenReturn(Optional.of(testAccount));
         when(holdingRepository.findActiveHoldingsByAccount(testAccount))
             .thenReturn(existingHoldings);
-        when(marketService.getSharePrice(symbol))
-            .thenReturn(new MarketService.PriceData(price, true, Instant.now(), "Finnhub"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -217,7 +211,7 @@ class BuyTradeExecutorTest {
             .thenReturn(newHolding);
 
         // Act
-        TradeResult result = buyTradeExecutor.executeBuy(agentName, symbol, quantity, 1L);
+        TradeResult result = buyTradeExecutor.executeBuy(agentName, symbol, quantity, price, 1L);
 
         // Assert
         assertNotNull(result);
@@ -261,8 +255,6 @@ class BuyTradeExecutorTest {
             .thenReturn(Optional.of(testAccount));
         when(holdingRepository.findActiveHoldingsByAccount(testAccount))
             .thenReturn(tenHoldings);
-        when(marketService.getSharePrice(symbol))
-            .thenReturn(testPriceData);
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -273,7 +265,7 @@ class BuyTradeExecutorTest {
             .thenReturn(aaplHolding);
 
         // Act - Should succeed (adding to existing, not new position)
-        TradeResult result = buyTradeExecutor.executeBuy(agentName, symbol, 10, 1L);
+        TradeResult result = buyTradeExecutor.executeBuy(agentName, symbol, 10, 150.0, 1L);
 
         // Assert
         assertNotNull(result);
@@ -294,7 +286,7 @@ class BuyTradeExecutorTest {
 
         // Act & Assert
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId);
+            buyTradeExecutor.executeBuy(agentName, symbol, quantity, 150.0, runId);
         });
 
         assertEquals("runId is required - every transaction must be linked to an agent run",
@@ -322,12 +314,10 @@ class BuyTradeExecutorTest {
             .thenReturn(Optional.of(testAccount));
         when(holdingRepository.findActiveHoldingsByAccount(testAccount))
             .thenReturn(new ArrayList<>());
-        when(marketService.getSharePrice(symbol))
-            .thenReturn(testPriceData);
 
         // Act & Assert
         BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> {
-            buyTradeExecutor.executeBuy(agentName, symbol, quantity, 1L);
+            buyTradeExecutor.executeBuy(agentName, symbol, quantity, 150.0, 1L);
         });
 
         assertTrue(exception.getMessage().contains("Insufficient funds"));
@@ -370,7 +360,7 @@ class BuyTradeExecutorTest {
 
         // Act & Assert
         BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> {
-            buyTradeExecutor.executeBuy(agentName, symbol, 10, 1L);
+            buyTradeExecutor.executeBuy(agentName, symbol, 10, 150.0, 1L);
         });
 
         // Verify error message contains all expected information
@@ -405,7 +395,7 @@ class BuyTradeExecutorTest {
 
         // Act & Assert
         ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
-            buyTradeExecutor.executeBuy(agentName, symbol, quantity, 1L);
+            buyTradeExecutor.executeBuy(agentName, symbol, quantity, 150.0, 1L);
         });
 
         assertEquals("Trading account not found for agent: " + agentName +
@@ -435,8 +425,6 @@ class BuyTradeExecutorTest {
             .thenReturn(Optional.of(testAccount));
         when(holdingRepository.findActiveHoldingsByAccount(testAccount))
             .thenReturn(new ArrayList<>());
-        when(marketService.getSharePrice("AAPL"))
-            .thenReturn(new MarketService.PriceData(price, true, Instant.now(), "Finnhub"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -447,7 +435,7 @@ class BuyTradeExecutorTest {
             .thenReturn(new AccountHolding());
 
         // Act
-        TradeResult result = buyTradeExecutor.executeBuy(agentName, "AAPL", quantity, 1L);
+        TradeResult result = buyTradeExecutor.executeBuy(agentName, "AAPL", quantity, price, 1L);
 
         // Assert
         assertEquals(expectedBalance, result.newBalance());
@@ -490,8 +478,6 @@ class BuyTradeExecutorTest {
             .thenReturn(Optional.of(testAccount));
         when(holdingRepository.findActiveHoldingsByAccount(testAccount))
             .thenReturn(new ArrayList<>());
-        when(marketService.getSharePrice("AAPL"))
-            .thenReturn(testPriceData);
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -502,7 +488,7 @@ class BuyTradeExecutorTest {
             .thenReturn(new AccountHolding());
 
         // Act
-        buyTradeExecutor.executeBuy("Warren", "AAPL", 10, 1L);
+        buyTradeExecutor.executeBuy("Warren", "AAPL", 10, 150.0, 1L);
 
         // Assert - Verify transaction was created with BUY type
         ArgumentCaptor<AccountTransaction> transactionCaptor = ArgumentCaptor.forClass(AccountTransaction.class);
@@ -517,18 +503,16 @@ class BuyTradeExecutorTest {
     }
 
     @Test
-    @DisplayName("Should fetch market price from MarketService")
-    void testExecuteBuy_MarketPriceFetch_CalledCorrectly() {
+    @DisplayName("Should use provided price parameter correctly")
+    void testExecuteBuy_PriceParameter_UsedCorrectly() {
         // Arrange
         String symbol = "AAPL";
-        Double expectedPrice = 150.0;
+        Double providedPrice = 150.0;
 
         when(tradingAccountRepository.findByAgentName("Warren"))
             .thenReturn(Optional.of(testAccount));
         when(holdingRepository.findActiveHoldingsByAccount(testAccount))
             .thenReturn(new ArrayList<>());
-        when(marketService.getSharePrice(symbol))
-            .thenReturn(testPriceData);
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -539,37 +523,34 @@ class BuyTradeExecutorTest {
             .thenReturn(new AccountHolding());
 
         // Act
-        TradeResult result = buyTradeExecutor.executeBuy("Warren", symbol, 10, 1L);
+        TradeResult result = buyTradeExecutor.executeBuy("Warren", symbol, 10, providedPrice, 1L);
 
-        // Assert - Verify MarketService was called with correct symbol
-        verify(marketService).getSharePrice(symbol);
+        // Assert - Verify price parameter was used correctly
+        assertEquals(providedPrice, result.price());
 
-        // Verify price was used correctly
-        assertEquals(expectedPrice, result.price());
-
-        // Verify transaction was created with fetched price
+        // Verify transaction was created with provided price
         ArgumentCaptor<AccountTransaction> transactionCaptor = ArgumentCaptor.forClass(AccountTransaction.class);
         verify(transactionRepository).save(transactionCaptor.capture());
 
         AccountTransaction savedTransaction = transactionCaptor.getValue();
-        assertAll("Transaction should use market price from MarketService",
+        assertAll("Transaction should use provided price parameter",
             () -> assertEquals(testAccount, savedTransaction.getAccount()),
             () -> assertEquals(symbol, savedTransaction.getSymbol()),
             () -> assertEquals(TransactionType.BUY, savedTransaction.getTransactionType()),
             () -> assertEquals(10, savedTransaction.getQuantity()),
-            () -> assertEquals(expectedPrice, savedTransaction.getPrice(), "Price should match market price")
+            () -> assertEquals(providedPrice, savedTransaction.getPrice(), "Price should match provided parameter")
         );
 
-        // Verify holding was created with fetched price
+        // Verify holding was created with provided price
         ArgumentCaptor<AccountHolding> holdingCaptor = ArgumentCaptor.forClass(AccountHolding.class);
         verify(holdingRepository).save(holdingCaptor.capture());
 
         AccountHolding savedHolding = holdingCaptor.getValue();
-        assertAll("Holding should use market price from MarketService",
+        assertAll("Holding should use provided price parameter",
             () -> assertEquals(testAccount, savedHolding.getAccount()),
             () -> assertEquals(symbol, savedHolding.getSymbol()),
             () -> assertEquals(10, savedHolding.getQuantity()),
-            () -> assertEquals(expectedPrice, savedHolding.getAveragePrice(), "Average price should match market price")
+            () -> assertEquals(providedPrice, savedHolding.getAveragePrice(), "Average price should match provided parameter")
         );
     }
 
@@ -589,8 +570,6 @@ class BuyTradeExecutorTest {
             .thenReturn(Optional.of(testAccount));
         when(holdingRepository.findActiveHoldingsByAccount(testAccount))
             .thenReturn(new ArrayList<>());
-        when(marketService.getSharePrice("AAPL"))
-            .thenReturn(new MarketService.PriceData(price, true, Instant.now(), "Finnhub"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -601,7 +580,7 @@ class BuyTradeExecutorTest {
             .thenReturn(new AccountHolding());
 
         // Act
-        TradeResult result = buyTradeExecutor.executeBuy("Warren", "AAPL", quantity, 1L);
+        TradeResult result = buyTradeExecutor.executeBuy("Warren", "AAPL", quantity, price, 1L);
 
         // Assert - Buy should succeed and balance should be exactly $0
         assertNotNull(result);
@@ -649,8 +628,6 @@ class BuyTradeExecutorTest {
             .thenReturn(Optional.of(testAccount));
         when(holdingRepository.findActiveHoldingsByAccount(testAccount))
             .thenReturn(new ArrayList<>());
-        when(marketService.getSharePrice("AAPL"))
-            .thenReturn(new MarketService.PriceData(price, true, Instant.now(), "Finnhub"));
         when(tradingAccountRepository.save(any(TradingAccount.class)))
             .thenReturn(testAccount);
         when(transactionRepository.save(any(AccountTransaction.class)))
@@ -661,7 +638,7 @@ class BuyTradeExecutorTest {
             .thenReturn(new AccountHolding());
 
         // Act
-        TradeResult result = buyTradeExecutor.executeBuy("Warren", "AAPL", quantity, 1L);
+        TradeResult result = buyTradeExecutor.executeBuy("Warren", "AAPL", quantity, price, 1L);
 
         // Assert - Verify fractional amounts handled correctly
         assertEquals(expectedBalance, result.newBalance(), 0.01);

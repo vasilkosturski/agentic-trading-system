@@ -52,6 +52,7 @@ trading:
     start: "09:30"
     end: "16:00"
     timezone: "America/New_York"
+  public-display-delay-days: 7 # Delay for public API responses (legal protection)
 
 # Push Notifications
 notifications:

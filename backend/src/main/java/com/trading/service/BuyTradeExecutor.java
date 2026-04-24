@@ -18,7 +18,6 @@ import java.util.stream.Collectors;
  * Extracted from AccountService for better testability and single responsibility.
  */
 @Service
-@Transactional
 public class BuyTradeExecutor extends TradeExecutor {
 
     private static final Logger logger = LoggerFactory.getLogger(BuyTradeExecutor.class);
@@ -37,57 +36,47 @@ public class BuyTradeExecutor extends TradeExecutor {
     }
 
     /**
-     * Execute a buy trade for an agent
+     * Execute a buy trade for an agent.
+     *
      * @param agentName Name of the agent
      * @param symbol Stock symbol to buy
      * @param quantity Number of shares to buy
+     * @param price Pre-fetched market price
      * @param runId REQUIRED - Every transaction must be linked to an agent run
      * @return TradeResult with symbol, quantity, price, and updated balance
      */
-    public TradeResult executeBuy(String agentName, String symbol, Integer quantity, Long runId) {
+    @Transactional
+    public TradeResult executeBuy(String agentName, String symbol, Integer quantity, Double price, Long runId) {
         if (runId == null) {
             throw new IllegalArgumentException("runId is required - every transaction must be linked to an agent run");
         }
+        if (price == null || price <= 0) {
+            throw new IllegalArgumentException("price must be positive - fetch from MarketService before calling this method");
+        }
 
         TradingAccount account = getAccount(agentName);
-
-        // Check position limit BEFORE buying (max 10 positions per agent)
         validatePositionLimit(account, symbol);
 
-        // Get current market price from MarketService
-        Double price = fetchMarketPrice(symbol);
         Double totalCost = price * quantity;
-
-        // Check if sufficient funds
         validateSufficientFunds(account, symbol, quantity, totalCost);
 
-        // Update account balance
         account.setBalance(account.getBalance() - totalCost);
         TradingAccount savedAccount = tradingAccountRepository.save(account);
 
-        // Create and save transaction - capture ID for audit trail
         AccountTransaction transaction = createTransaction(account, symbol, quantity, price, runId, TransactionType.BUY);
-
-        // Update or create holding
         updateHolding(account, symbol, quantity, price, totalCost, agentName);
 
-        // Return trade details with transaction ID for audit trail
         return new TradeResult(transaction.getId(), symbol, quantity, price, savedAccount.getBalance());
     }
 
-    /**
-     * Validate that adding this position won't exceed the 10 position limit
-     */
     private void validatePositionLimit(TradingAccount account, String symbol) {
         List<AccountHolding> currentHoldings = holdingRepository.findActiveHoldingsByAccount(account);
         long activePositions = currentHoldings.size();
 
-        // Check if adding new position (not adding to existing)
         boolean isNewPosition = currentHoldings.stream()
             .noneMatch(h -> h.getSymbol().equals(symbol));
 
         if (isNewPosition && activePositions >= MAX_POSITIONS_PER_AGENT) {
-            // List current holdings in error message to help agent decide what to sell
             String holdingsList = currentHoldings.stream()
                 .map(h -> h.getSymbol())
                 .collect(Collectors.joining(", "));
@@ -102,9 +91,6 @@ public class BuyTradeExecutor extends TradeExecutor {
         }
     }
 
-    /**
-     * Validate that account has sufficient funds for the purchase
-     */
     private void validateSufficientFunds(TradingAccount account, String symbol, Integer quantity, Double totalCost) {
         if (totalCost > account.getBalance()) {
             throw new BusinessRuleException(
@@ -114,10 +100,6 @@ public class BuyTradeExecutor extends TradeExecutor {
         }
     }
 
-
-    /**
-     * Update or create the holding for this buy trade
-     */
     private void updateHolding(TradingAccount account, String symbol, Integer quantity, Double price, Double totalCost, String agentName) {
         AccountHolding holding = holdingRepository.findByAccountAndSymbol(account, symbol);
 
@@ -132,9 +114,6 @@ public class BuyTradeExecutor extends TradeExecutor {
             agentName, symbol, savedHolding.getId(), savedHolding.getQuantity());
     }
 
-    /**
-     * Update an existing holding with new shares
-     */
     private void updateExistingHolding(AccountHolding holding, Integer quantity, Double totalCost, String agentName, String symbol) {
         logger.info("📊 Updating existing holding for {} - {}: current qty={}, adding qty={}",
             agentName, symbol, holding.getQuantity(), quantity);
@@ -147,9 +126,6 @@ public class BuyTradeExecutor extends TradeExecutor {
         holding.setAveragePrice(newValue / newQuantity);
     }
 
-    /**
-     * Create a new holding for this symbol
-     */
     private AccountHolding createNewHolding(TradingAccount account, String symbol, Integer quantity, Double price, String agentName) {
         logger.info("🆕 Creating NEW holding for {} - {}: qty={}, avgPrice=${}",
             agentName, symbol, quantity, price);

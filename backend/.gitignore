@@ -30,4 +30,4 @@ logs/
 Thumbs.db
 
 # Application specific
-accounts.db
+accounts.db*.bak*

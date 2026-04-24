@@ -5,16 +5,12 @@ import com.trading.exception.ResourceNotFoundException;
 import com.trading.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
 /**
  * Base class for trade executors (buy/sell).
- * Contains shared infrastructure: account lookup, price fetching, transaction creation.
- * Uses constructor injection for better testability and immutability.
  */
-@Transactional
 public abstract class TradeExecutor {
 
     private static final Logger logger = LoggerFactory.getLogger(TradeExecutor.class);
@@ -24,10 +20,6 @@ public abstract class TradeExecutor {
     protected final AccountHoldingRepository holdingRepository;
     protected final MarketService marketService;
 
-    /**
-     * Constructor injection for all dependencies.
-     * Ensures immutability and makes dependencies explicit.
-     */
     protected TradeExecutor(
             TradingAccountRepository tradingAccountRepository,
             AccountTransactionRepository transactionRepository,
@@ -39,9 +31,6 @@ public abstract class TradeExecutor {
         this.marketService = marketService;
     }
 
-    /**
-     * Get trading account for an agent - expects account to already exist
-     */
     protected TradingAccount getAccount(String agentName) {
         return tradingAccountRepository.findByAgentName(agentName)
             .orElseThrow(() -> new ResourceNotFoundException(
@@ -49,9 +38,6 @@ public abstract class TradeExecutor {
                 ". Agent must be initialized before trading operations."));
     }
 
-    /**
-     * Fetch market price for a symbol with debug logging
-     */
     protected Double fetchMarketPrice(String symbol) {
         logger.info("🔍 DEBUGGING: Requesting real market price for {} from MarketService", symbol);
         MarketService.PriceData priceData = marketService.getSharePrice(symbol);
@@ -61,11 +47,6 @@ public abstract class TradeExecutor {
         return price;
     }
 
-    /**
-     * Create and save a transaction record
-     * @param transactionType BUY or SELL - explicit enum value
-     * @return The saved transaction (with generated ID)
-     */
     protected AccountTransaction createTransaction(TradingAccount account, String symbol, Integer quantity,
                                      Double price, Long runId, TransactionType transactionType) {
         AccountTransaction transaction = new AccountTransaction();

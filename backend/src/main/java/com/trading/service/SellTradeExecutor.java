@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
  * Extracted from AccountService for better testability and single responsibility.
  */
 @Service
-@Transactional
 public class SellTradeExecutor extends TradeExecutor {
 
     private static final Logger logger = LoggerFactory.getLogger(SellTradeExecutor.class);
@@ -33,45 +32,38 @@ public class SellTradeExecutor extends TradeExecutor {
     }
 
     /**
-     * Execute a sell trade for an agent
+     * Execute a sell trade for an agent.
+     *
      * @param agentName Name of the agent
      * @param symbol Stock symbol to sell
      * @param quantity Number of shares to sell
+     * @param price Pre-fetched market price
      * @param runId REQUIRED - Every transaction must be linked to an agent run
      * @return TradeResult with symbol, quantity, price, and updated balance
      */
-    public TradeResult executeSell(String agentName, String symbol, Integer quantity, Long runId) {
+    @Transactional
+    public TradeResult executeSell(String agentName, String symbol, Integer quantity, Double price, Long runId) {
         if (runId == null) {
             throw new IllegalArgumentException("runId is required - every transaction must be linked to an agent run");
         }
+        if (price == null || price <= 0) {
+            throw new IllegalArgumentException("price must be positive - fetch from MarketService before calling this method");
+        }
 
         TradingAccount account = getAccount(agentName);
-
-        // Check if we have enough shares
         AccountHolding holding = validateSufficientShares(account, symbol, quantity);
 
-        // Get current market price from MarketService
-        Double price = fetchMarketPrice(symbol);
         Double totalProceeds = price * quantity;
 
-        // Update account balance
         account.setBalance(account.getBalance() + totalProceeds);
         TradingAccount savedAccount = tradingAccountRepository.save(account);
 
-        // Create and save transaction - capture ID for audit trail
         AccountTransaction transaction = createTransaction(account, symbol, quantity, price, runId, TransactionType.SELL);
-
-        // Update holding (reduce quantity or delete if 0)
         updateHolding(holding, quantity, agentName, symbol);
 
-        // Return trade details with transaction ID for audit trail
         return new TradeResult(transaction.getId(), symbol, quantity, price, savedAccount.getBalance());
     }
 
-    /**
-     * Validate that account has sufficient shares to sell
-     * @return The holding if valid
-     */
     private AccountHolding validateSufficientShares(TradingAccount account, String symbol, Integer quantity) {
         AccountHolding holding = holdingRepository.findByAccountAndSymbol(account, symbol);
         if (holding == null || holding.getQuantity() < quantity) {
@@ -84,10 +76,6 @@ public class SellTradeExecutor extends TradeExecutor {
         return holding;
     }
 
-
-    /**
-     * Update holding after sell (reduce quantity or delete if 0)
-     */
     private void updateHolding(AccountHolding holding, Integer quantity, String agentName, String symbol) {
         int newQuantity = holding.getQuantity() - quantity;
 

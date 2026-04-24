@@ -385,10 +385,12 @@ class AccountServiceTest {
             String symbol = "AAPL";
             Integer quantity = 10;
             Long runId = 100L;
-            TradeResult tradeResult = new TradeResult(1L, symbol, quantity, 150.0, 98500.0);
+            Double price = 150.0;
+            TradeResult tradeResult = new TradeResult(1L, symbol, quantity, price, 98500.0);
 
             when(tradingRunRepository.findById(runId)).thenReturn(Optional.of(testRun));
-            when(buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId)).thenReturn(tradeResult);
+            when(marketService.getSharePrice(symbol)).thenReturn(new MarketService.PriceData(price, false, null, "test"));
+            when(buyTradeExecutor.executeBuy(agentName, symbol, quantity, price, runId)).thenReturn(tradeResult);
             when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
             when(holdingRepository.findByAccount(testAccount)).thenReturn(Collections.emptyList());
 
@@ -417,9 +419,11 @@ class AccountServiceTest {
             String symbol = "AAPL";
             Integer quantity = 1000;
             Long runId = 100L;
+            Double price = 150.0;
 
             when(tradingRunRepository.findById(runId)).thenReturn(Optional.of(testRun));
-            when(buyTradeExecutor.executeBuy(agentName, symbol, quantity, runId))
+            when(marketService.getSharePrice(symbol)).thenReturn(new MarketService.PriceData(price, false, null, "test"));
+            when(buyTradeExecutor.executeBuy(agentName, symbol, quantity, price, runId))
                 .thenThrow(new BusinessRuleException(TradeRejectionType.INSUFFICIENT_FUNDS, "Insufficient funds to buy 1000 shares of AAPL"));
 
             // Act & Assert
@@ -461,10 +465,12 @@ class AccountServiceTest {
             String symbol = "AAPL";
             Integer quantity = 5;
             Long runId = 100L;
-            TradeResult tradeResult = new TradeResult(2L, symbol, quantity, 155.0, 100775.0);
+            Double price = 155.0;
+            TradeResult tradeResult = new TradeResult(2L, symbol, quantity, price, 100775.0);
 
             when(tradingRunRepository.findById(runId)).thenReturn(Optional.of(testRun));
-            when(sellTradeExecutor.executeSell(agentName, symbol, quantity, runId)).thenReturn(tradeResult);
+            when(marketService.getSharePrice(symbol)).thenReturn(new MarketService.PriceData(price, false, null, "test"));
+            when(sellTradeExecutor.executeSell(agentName, symbol, quantity, price, runId)).thenReturn(tradeResult);
             when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
             when(holdingRepository.findByAccount(testAccount)).thenReturn(Collections.emptyList());
 
@@ -493,9 +499,11 @@ class AccountServiceTest {
             String symbol = "AAPL";
             Integer quantity = 100;
             Long runId = 100L;
+            Double price = 155.0;
 
             when(tradingRunRepository.findById(runId)).thenReturn(Optional.of(testRun));
-            when(sellTradeExecutor.executeSell(agentName, symbol, quantity, runId))
+            when(marketService.getSharePrice(symbol)).thenReturn(new MarketService.PriceData(price, false, null, "test"));
+            when(sellTradeExecutor.executeSell(agentName, symbol, quantity, price, runId))
                 .thenThrow(new BusinessRuleException(TradeRejectionType.INSUFFICIENT_SHARES, "Insufficient shares to sell 100 of AAPL"));
 
             // Act & Assert
