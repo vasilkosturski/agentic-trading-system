@@ -101,15 +101,6 @@ function AgentDetail() {
         {agentStyle && <Badge variant="light" size="lg">{agentStyle}</Badge>}
       </Group>
 
-      {/* Historical Data Disclaimer */}
-      <Paper p="md" bg="yellow.1" mb="lg">
-        <Text size="sm" fw={600}>Historical Data Notice</Text>
-        <Text size="xs">
-          Currently showing data delayed by 7 days. All information below is historical
-          and for educational purposes only.
-        </Text>
-      </Paper>
-
       {/* Portfolio Summary */}
       <Paper p="lg" shadow="xs" mb="lg">
         <Group align="center" justify="space-between" mb="md">
