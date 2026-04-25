@@ -78,24 +78,25 @@ function AgentComparison({ snapshots, agents }: { snapshots: PortfolioSnapshot[]
                     {agent.style}
                   </Badge>
                   {agent.systemPrompt && (
-                    <Popover width={400} position="bottom" withArrow shadow="md">
-                      <Popover.Target>
-                        <ActionIcon
-                          variant="subtle"
-                          size="sm"
-                          className={classes.clickable}
-                          aria-label="View agent system prompt"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <IconInfoCircle size={16} />
-                        </ActionIcon>
-                      </Popover.Target>
-                      <Popover.Dropdown className={classes.scrollablePopover}>
-                        <div className={classes.markdownSmall}>
-                          <Markdown>{agent.systemPrompt!}</Markdown>
-                        </div>
-                      </Popover.Dropdown>
-                    </Popover>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Popover width={400} position="bottom" withArrow shadow="md">
+                        <Popover.Target>
+                          <ActionIcon
+                            variant="subtle"
+                            size="sm"
+                            className={classes.clickable}
+                            aria-label="View agent system prompt"
+                          >
+                            <IconInfoCircle size={16} />
+                          </ActionIcon>
+                        </Popover.Target>
+                        <Popover.Dropdown className={classes.scrollablePopover}>
+                          <div className={classes.markdownSmall}>
+                            <Markdown>{agent.systemPrompt!}</Markdown>
+                          </div>
+                        </Popover.Dropdown>
+                      </Popover>
+                    </div>
                   )}
                 </Group>
               )}

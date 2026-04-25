@@ -147,12 +147,13 @@ public class TradingRunController {
 
     /**
      * List trading runs with optional filters and pagination.
-     * GET /api/runs?agentId=&status=&decision=&symbol=&page=&size=&sort=
+     * GET /api/runs?agentId=&status=&decision=&symbol=&page=&size=&sort=&showAll=
      *
      * @param agentId optional filter by agent ID
      * @param status optional filter by run status
      * @param decision optional filter by trade decision
      * @param symbol optional filter by symbol
+     * @param showAll optional flag to bypass 7-day delay filter (for debugging)
      * @param page page number (0-based, default 0)
      * @param size page size (default 20)
      * @param sort sort field (default "startedAt")
@@ -165,6 +166,7 @@ public class TradingRunController {
             @RequestParam(required = false) RunStatus status,
             @RequestParam(required = false) TradeDecision decision,
             @RequestParam(required = false) String symbol,
+            @RequestParam(required = false, defaultValue = "false") boolean showAll,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "startedAt") String sort,
@@ -182,7 +184,7 @@ public class TradingRunController {
             : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
 
-        RunListResponseDto result = tradingRunService.listRuns(filter, pageable);
+        RunListResponseDto result = tradingRunService.listRuns(filter, pageable, showAll);
         return ResponseEntity.ok(result);
     }
 }

@@ -238,40 +238,6 @@ public class TradingRunService {
                 ""));
     }
 
-    public RunListResponseDto listRuns(RunQueryFilter filter, Pageable pageable) {
-        // Calculate cutoff date for public display delay
-        Instant cutoffDate = Instant.now().minus(publicDisplayDelayDays, ChronoUnit.DAYS);
-
-        Page<TradingRun> page;
-
-        if (filter != null && filter.hasFilters()) {
-            // Combine filter criteria with date cutoff at database level
-            page = tradingRunRepository.findAll(
-                TradingRunSpecification.fromFilterWithDateCutoff(filter, cutoffDate),
-                pageable
-            );
-        } else {
-            // Apply only date cutoff at database level
-            page = tradingRunRepository.findByStartedAtBefore(cutoffDate, pageable);
-        }
-
-        // Map to DTOs with decision data (no in-memory filtering needed)
-        List<TradingRunDto> runDtos = page.getContent().stream()
-            .map(run -> {
-                DecisionPhase decisionPhase = decisionPhaseRepository.findByRunId(run.getId())
-                    .orElse(null);
-                return TradingRunDto.fromEntityWithDecision(run, decisionPhase);
-            })
-            .toList();
-
-        return new RunListResponseDto(
-            runDtos,
-            page.getTotalElements(),
-            page.getNumber(),
-            page.getSize()
-        );
-    }
-
     private TradingRun getRun(Long runId) {
         return tradingRunRepository.findById(runId)
             .orElseThrow(() -> new ResourceNotFoundException(
@@ -337,5 +303,62 @@ public class TradingRunService {
         messagingTemplate.convertAndSend(TOPIC_DECISIONS, message);
         logger.debug("Broadcast decision_completed for run {}: {} (trade: {})",
             run.getId(), decision, tradeId);
+    }
+
+    /**
+     * List trading runs with optional filtering and pagination (public endpoint).
+     * Always applies 7-day delay filter.
+     */
+    public RunListResponseDto listRuns(RunQueryFilter filter, Pageable pageable) {
+        return listRuns(filter, pageable, false);
+    }
+
+    /**
+     * List trading runs with optional filtering and pagination.
+     * @param showAll If true, bypass 7-day delay filter for debugging
+     */
+    public RunListResponseDto listRuns(RunQueryFilter filter, Pageable pageable, boolean showAll) {
+        logger.debug("Listing runs with filter: {}, pageable: {}, showAll: {}", filter, pageable, showAll);
+
+        Page<TradingRun> page;
+        Instant cutoffDate = Instant.now().minus(publicDisplayDelayDays, ChronoUnit.DAYS);
+
+        if (showAll) {
+            // Debug mode - show all runs without delay filter
+            if (filter != null && filter.hasFilters()) {
+                page = tradingRunRepository.findAll(
+                    TradingRunSpecification.fromFilter(filter),
+                    pageable
+                );
+            } else {
+                page = tradingRunRepository.findAll(pageable);
+            }
+        } else {
+            // Production mode - apply 7-day delay filter at database level
+            if (filter != null && filter.hasFilters()) {
+                page = tradingRunRepository.findAll(
+                    TradingRunSpecification.fromFilterWithDateCutoff(filter, cutoffDate),
+                    pageable
+                );
+            } else {
+                page = tradingRunRepository.findByStartedAtBefore(cutoffDate, pageable);
+            }
+        }
+
+        // Map to DTOs with decision data
+        List<TradingRunDto> runDtos = page.getContent().stream()
+            .map(run -> {
+                DecisionPhase decisionPhase = decisionPhaseRepository.findByRunId(run.getId())
+                    .orElse(null);
+                return TradingRunDto.fromEntityWithDecision(run, decisionPhase);
+            })
+            .toList();
+
+        return new RunListResponseDto(
+            runDtos,
+            page.getTotalElements(),
+            page.getNumber(),
+            page.getSize()
+        );
     }
 }

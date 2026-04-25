@@ -495,7 +495,7 @@ class TradingRunControllerTest {
                 0,
                 20
             );
-            when(tradingRunService.listRuns(isNull(), any())).thenReturn(response);
+            when(tradingRunService.listRuns(isNull(), any(), anyBoolean())).thenReturn(response);
 
             mockMvc.perform(get("/api/runs"))
                 .andExpect(status().isOk())
@@ -514,7 +514,7 @@ class TradingRunControllerTest {
                 0,
                 20
             );
-            when(tradingRunService.listRuns(any(RunQueryFilter.class), any())).thenReturn(response);
+            when(tradingRunService.listRuns(any(RunQueryFilter.class), any(), anyBoolean())).thenReturn(response);
 
             mockMvc.perform(get("/api/runs")
                     .param("agentId", "1")
@@ -524,7 +524,7 @@ class TradingRunControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.runs", hasSize(1)));
 
-            verify(tradingRunService).listRuns(any(RunQueryFilter.class), any());
+            verify(tradingRunService).listRuns(any(RunQueryFilter.class), any(), anyBoolean());
         }
 
         @Test
@@ -536,7 +536,7 @@ class TradingRunControllerTest {
                 2,
                 10
             );
-            when(tradingRunService.listRuns(isNull(), any())).thenReturn(response);
+            when(tradingRunService.listRuns(isNull(), any(), anyBoolean())).thenReturn(response);
 
             mockMvc.perform(get("/api/runs")
                     .param("page", "2")
@@ -556,7 +556,7 @@ class TradingRunControllerTest {
                 0,
                 20
             );
-            when(tradingRunService.listRuns(isNull(), any())).thenReturn(response);
+            when(tradingRunService.listRuns(isNull(), any(), anyBoolean())).thenReturn(response);
 
             mockMvc.perform(get("/api/runs"))
                 .andExpect(status().isOk())
