@@ -22,8 +22,9 @@ export interface PaginatedRuns {
   limit: number
 }
 
-export function fetchRuns(page: number = 0, limit: number = 20, signal?: AbortSignal): Promise<PaginatedRuns> {
-  return fetchJson<PaginatedRuns>(`/api/runs?page=${page}&limit=${limit}`, signal)
+export function fetchRuns(page: number = 0, limit: number = 20, signal?: AbortSignal, showAll: boolean = false): Promise<PaginatedRuns> {
+  const showAllParam = showAll ? '&showAll=true' : ''
+  return fetchJson<PaginatedRuns>(`/api/runs?page=${page}&limit=${limit}${showAllParam}`, signal)
 }
 
 export function fetchAgents(signal?: AbortSignal): Promise<Agent[]> {
