@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Table, Badge, Container, Title, Text, Loader, Center } from '@mantine/core'
 import { useInView } from 'react-intersection-observer'
 import type { TradingRun, Agent, PortfolioSnapshot } from './types.ts'
@@ -13,8 +13,6 @@ const PAGE_SIZE = 20
 
 function RunsTable() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const showAll = searchParams.get('showAll') === 'true'
 
   const [runs, setRuns] = useState<TradingRun[]>([])
   const [totalRuns, setTotalRuns] = useState(0)
@@ -36,7 +34,7 @@ function RunsTable() {
     async function fetchData() {
       try {
         const [runsData, agentsData, snapshotsData] = await Promise.all([
-          fetchRuns(0, PAGE_SIZE, controller.signal, showAll),
+          fetchRuns(0, PAGE_SIZE, controller.signal),
           fetchAgents(controller.signal),
           fetchSnapshots(controller.signal),
         ])
@@ -57,7 +55,7 @@ function RunsTable() {
 
     fetchData()
     return () => controller.abort()
-  }, [showAll])
+  }, [])
 
   // Load more when sentinel comes into view
   const loadMore = useCallback(async () => {
@@ -66,7 +64,7 @@ function RunsTable() {
     const nextPage = pageRef.current + 1
 
     try {
-      const data = await fetchRuns(nextPage, PAGE_SIZE, undefined, showAll)
+      const data = await fetchRuns(nextPage, PAGE_SIZE, undefined)
       setRuns((prev) => [...prev, ...(data.runs ?? [])])
       setTotalRuns(data.total ?? 0)
       pageRef.current = nextPage
@@ -75,7 +73,7 @@ function RunsTable() {
     } finally {
       setLoadingMore(false)
     }
-  }, [loadingMore, hasMore, showAll])
+  }, [loadingMore, hasMore])
 
   useEffect(() => {
     if (inView && hasMore && !loadingMore) {

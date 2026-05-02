@@ -17,6 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
@@ -37,8 +38,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Unit tests for TradingRunController.
  * Uses @WebMvcTest for controller slice testing with mocked service.
+ * Security filters are disabled to test controller logic in isolation.
  */
 @WebMvcTest(TradingRunController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @DisplayName("TradingRunController Tests")
 class TradingRunControllerTest {
 
@@ -563,5 +566,50 @@ class TradingRunControllerTest {
                 .andExpect(jsonPath("$.runs", hasSize(0)))
                 .andExpect(jsonPath("$.total").value(0));
         }
+
+        @Test
+        @DisplayName("Public endpoint always enforces 7-day filter (showAll=false)")
+        void listRuns_AlwaysEnforces7DayFilter() throws Exception {
+            RunListResponseDto response = new RunListResponseDto(
+                Arrays.asList(testRunDto),
+                1L,
+                0,
+                20
+            );
+            // Verify service is called with showAll=false
+            when(tradingRunService.listRuns(isNull(), any(), eq(false))).thenReturn(response);
+
+            mockMvc.perform(get("/api/runs"))
+                .andExpect(status().isOk());
+
+            // Verify service was called with showAll=false (legal protection enabled)
+            verify(tradingRunService).listRuns(isNull(), any(), eq(false));
+        }
+
+        @Test
+        @DisplayName("Public endpoint rejects showAll parameter - always uses false for legal protection")
+        void listRuns_IgnoresShowAllParameter() throws Exception {
+            RunListResponseDto response = new RunListResponseDto(
+                Arrays.asList(testRunDto),
+                1L,
+                0,
+                20
+            );
+            // Service should ALWAYS receive false, even if client sends showAll=true
+            when(tradingRunService.listRuns(isNull(), any(), eq(false))).thenReturn(response);
+
+            // Client attempts to bypass 7-day filter with showAll=true
+            mockMvc.perform(get("/api/runs")
+                    .param("showAll", "true"))
+                .andExpect(status().isOk());
+
+            // Verify service was called with false (not the client's true value)
+            // This proves the security fix: public endpoint ignores showAll parameter
+            verify(tradingRunService).listRuns(isNull(), any(), eq(false));
+            verify(tradingRunService, never()).listRuns(isNull(), any(), eq(true));
+        }
     }
+
+    // Note: Security tests for GET /api/runs/admin are in TradingRunControllerAdminSecurityTest
+    // Separate test class required because @PreAuthorize testing needs security filters enabled
 }
