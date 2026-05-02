@@ -14,3 +14,17 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: () => {},
   }),
 })
+
+// Mock IntersectionObserver for react-intersection-observer
+Object.defineProperty(window, 'IntersectionObserver', {
+  writable: true,
+  value: class IntersectionObserver {
+    constructor() {}
+    disconnect() {}
+    observe() {}
+    takeRecords() {
+      return []
+    }
+    unobserve() {}
+  },
+})
