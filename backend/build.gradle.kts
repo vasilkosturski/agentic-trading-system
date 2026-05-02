@@ -28,6 +28,11 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-websocket")
     implementation("org.springframework.boot:spring-boot-starter-security")
+
+    // JWT support
+    implementation("io.jsonwebtoken:jjwt-api:0.12.3")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.3")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.3")
     
     // Database
     implementation("org.xerial:sqlite-jdbc:3.44.1.0")

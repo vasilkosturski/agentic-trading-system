@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { MantineProvider } from '@mantine/core'
 import '@mantine/core/styles.css'
 import '@mantine/charts/styles.css'
@@ -10,6 +10,8 @@ import RunsTable from './App.tsx'
 import RunDetail from './RunDetail.tsx'
 import AgentDetail from './AgentDetail.tsx'
 import Disclaimer from './Disclaimer.tsx'
+import Login from './Login.tsx'
+import ProtectedRoute from './ProtectedRoute.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -17,7 +19,8 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <AppLayout>
           <Routes>
-            <Route path="/" element={<RunsTable />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<ProtectedRoute><RunsTable /></ProtectedRoute>} />
             <Route path="/runs/:id" element={<RunDetail />} />
             <Route path="/agents/:id" element={<AgentDetail />} />
             <Route path="/disclaimer" element={<Disclaimer />} />

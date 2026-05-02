@@ -1,6 +1,7 @@
 package com.trading.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.trading.config.TestSecurityConfig;
 import com.trading.dto.request.CompleteRunRequest;
 import com.trading.dto.request.CreateRunRequest;
 import com.trading.dto.request.RunQueryFilter;
@@ -20,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -42,6 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(TradingRunController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@Import(TestSecurityConfig.class)
 @DisplayName("TradingRunController Tests")
 class TradingRunControllerTest {
 
