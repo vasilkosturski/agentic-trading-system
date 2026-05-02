@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { isAuthenticated } from './auth'
 

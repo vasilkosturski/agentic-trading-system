@@ -49,8 +49,8 @@ public class JwtTokenProvider {
      * @throws IllegalArgumentException if secret is null, empty, or too short
      */
     public JwtTokenProvider(
-            @Value("${jwt.secret}") String secret,
-            @Value("${jwt.expiration:3600000}") long jwtExpirationMs) {
+            @Value("${JWT_SECRET:${jwt.secret:}}") String secret,
+            @Value("${JWT_EXPIRATION:${jwt.expiration:3600000}}") long jwtExpirationMs) {
         if (secret == null || secret.trim().isEmpty()) {
             throw new IllegalArgumentException(
                 "jwt.secret must be configured in application properties or environment variables. " +
