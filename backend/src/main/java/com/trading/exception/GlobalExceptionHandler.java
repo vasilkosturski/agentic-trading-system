@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.RestClientException;
@@ -79,6 +80,20 @@ public class GlobalExceptionHandler {
         problem.setTitle("Service Unavailable");
         problem.setInstance(java.net.URI.create(request.getRequestURI()));
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem);
+    }
+
+    /**
+     * Handles Spring Security access denied exceptions.
+     * Re-throws the exception so Spring Security's ExceptionTranslationFilter can handle it.
+     * This ensures proper 403 Forbidden responses for @PreAuthorize violations.
+     *
+     * Without this handler, the generic Exception handler below would catch AccessDeniedException
+     * and return 500 Internal Server Error instead of 403 Forbidden.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public void handleAccessDenied(AccessDeniedException ex) throws AccessDeniedException {
+        logger.warn("Access denied: {}", ex.getMessage());
+        throw ex;  // Re-throw for Spring Security to handle
     }
 
     /**

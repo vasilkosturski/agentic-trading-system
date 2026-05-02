@@ -14,6 +14,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -147,18 +148,19 @@ public class TradingRunController {
 
     /**
      * List trading runs with optional filters and pagination.
-     * GET /api/runs?agentId=&status=&decision=&symbol=&page=&size=&sort=&showAll=
+     * Returns only runs from the last 7 days (legal data protection).
+     * For unrestricted access to all runs, use the admin endpoint (requires authentication).
+     * GET /api/runs?agentId=&status=&decision=&symbol=&page=&size=&sort=
      *
      * @param agentId optional filter by agent ID
      * @param status optional filter by run status
      * @param decision optional filter by trade decision
      * @param symbol optional filter by symbol
-     * @param showAll optional flag to bypass 7-day delay filter (for debugging)
      * @param page page number (0-based, default 0)
      * @param size page size (default 20)
      * @param sort sort field (default "startedAt")
      * @param direction sort direction (default "desc")
-     * @return RunListResponseDto with 200 OK
+     * @return RunListResponseDto with 200 OK (limited to last 7 days)
      */
     @GetMapping
     public ResponseEntity<RunListResponseDto> listRuns(
@@ -166,7 +168,6 @@ public class TradingRunController {
             @RequestParam(required = false) RunStatus status,
             @RequestParam(required = false) TradeDecision decision,
             @RequestParam(required = false) String symbol,
-            @RequestParam(required = false, defaultValue = "false") boolean showAll,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "startedAt") String sort,
@@ -184,7 +185,61 @@ public class TradingRunController {
             : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
 
-        RunListResponseDto result = tradingRunService.listRuns(filter, pageable, showAll);
+        // Always enforce 7-day filter for legal data protection on public endpoint
+        RunListResponseDto result = tradingRunService.listRuns(filter, pageable, false);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * List all trading runs for admin users (no date filter).
+     * Requires HTTP Basic Auth with ADMIN role.
+     * GET /api/runs/admin?agentId=&status=&decision=&symbol=&page=&size=&sort=&direction=
+     *
+     * <p>Unlike the public endpoint which enforces a 7-day filter for legal data protection,
+     * this endpoint returns ALL runs regardless of age. Use with caution - this bypasses
+     * the 7-day public display delay for live trading decisions.</p>
+     *
+     * <p>Authentication: This endpoint requires HTTP Basic Auth. The browser will show
+     * a native authentication popup when accessing this URL. Enter admin credentials
+     * to access.</p>
+     *
+     * @param agentId optional filter by agent ID
+     * @param status optional filter by run status
+     * @param decision optional filter by trade decision
+     * @param symbol optional filter by symbol
+     * @param page page number (0-based, default 0)
+     * @param size page size (default 20)
+     * @param sort sort field (default "startedAt")
+     * @param direction sort direction (default "desc")
+     * @return RunListResponseDto with 200 OK (includes all runs, no 7-day filter)
+     * @throws org.springframework.security.access.AccessDeniedException if user doesn't have ADMIN role (returns 403 Forbidden)
+     */
+    @GetMapping("/admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<RunListResponseDto> listAllRuns(
+            @RequestParam(required = false) Long agentId,
+            @RequestParam(required = false) RunStatus status,
+            @RequestParam(required = false) TradeDecision decision,
+            @RequestParam(required = false) String symbol,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "startedAt") String sort,
+            @RequestParam(defaultValue = "desc") String direction) {
+
+        // Build filter
+        RunQueryFilter filter = null;
+        if (agentId != null || status != null || decision != null || symbol != null) {
+            filter = new RunQueryFilter(agentId, status, decision, symbol);
+        }
+
+        // Build pageable
+        Sort.Direction sortDirection = "asc".equalsIgnoreCase(direction)
+            ? Sort.Direction.ASC
+            : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
+
+        // Always pass showAll=true for admin endpoint - no 7-day filter
+        RunListResponseDto result = tradingRunService.listRuns(filter, pageable, true);
         return ResponseEntity.ok(result);
     }
 }
