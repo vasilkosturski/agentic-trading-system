@@ -64,3 +64,8 @@ agents:
     url: ${AGENTS_API_URL:http://agents-service:8000}
     connect-timeout: 30000  # 30 seconds
     read-timeout: 60000     # 60 seconds
+
+# JWT Configuration (for admin authentication)
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:3600000}  # 1 hour default
