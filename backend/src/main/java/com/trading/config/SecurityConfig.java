@@ -52,17 +52,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-
     @Value("${ADMIN_USERNAME:admin}")
     private String adminUsername;
 
     @Value("${ADMIN_PASSWORD:changeme}")
     private String adminPassword;
-
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-    }
 
     /**
      * Configures HTTP security with JWT authentication and stateless sessions.
@@ -77,11 +71,14 @@ public class SecurityConfig {
      * </ul>
      *
      * @param http the HttpSecurity to configure
+     * @param jwtAuthenticationFilter the JWT authentication filter
      * @return the configured SecurityFilterChain
      * @throws Exception if configuration fails
      */
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session
