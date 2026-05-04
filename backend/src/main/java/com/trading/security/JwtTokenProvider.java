@@ -69,12 +69,17 @@ public class JwtTokenProvider {
 
     /**
      * Generate JWT token for authenticated user.
+     * Includes roles in claims for authorization.
      *
      * @param userDetails authenticated user details
      * @return JWT token string
      */
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
+        // Include roles in token claims for authorization
+        claims.put("roles", userDetails.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .toList());
         return createToken(claims, userDetails.getUsername());
     }
 
