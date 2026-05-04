@@ -1,5 +1,5 @@
 import type { PortfolioSnapshot, TradingRun, Agent, RunDetailResponse, AgentPortfolio } from './types.ts'
-import { getToken } from './auth'
+import { getToken, logout } from './auth'
 
 /**
  * Shared API client for backend HTTP calls.
@@ -19,6 +19,21 @@ async function fetchJson<T>(url: string, signal?: AbortSignal, includeAuth: bool
   }
 
   const res = await fetch(url, options)
+
+  // Handle 403 Forbidden - token is invalid/expired or user lacks required roles
+  if (res.status === 403) {
+    // Clear invalid token from localStorage
+    logout()
+
+    // Redirect to login with current URL as returnUrl so user can return after re-authentication
+    const currentPath = window.location.pathname + window.location.search
+    const returnUrl = encodeURIComponent(currentPath)
+    window.location.href = `/login?returnUrl=${returnUrl}`
+
+    // Throw error to stop execution
+    throw new Error(`Failed to fetch ${url}: ${res.status}`)
+  }
+
   if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`)
   return res.json() as Promise<T>
 }
