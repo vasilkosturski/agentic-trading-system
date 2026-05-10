@@ -1,5 +1,7 @@
 package com.trading.security;
 
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -8,6 +10,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -24,11 +27,26 @@ import java.io.IOException;
  *   <li>Extract username from token</li>
  *   <li>Load user details from UserDetailsService</li>
  *   <li>Validate token against user details</li>
- *   <li>Set authentication in SecurityContext if valid</li>
+ *   <li>Set authentication in SecurityContext if valid (and not already set)</li>
  * </ol>
  *
- * <p>If no token or invalid token, filter passes through without setting authentication.
- * Spring Security will then deny access to protected endpoints.
+ * <p>If no token, expired token, or otherwise invalid token, the filter passes through
+ * without setting authentication. Spring Security and method-level authorization will
+ * then decide whether to allow or deny the request. This deliberately makes
+ * expired/malformed/missing tokens behave identically for downstream authorization.
+ *
+ * <p>Exception handling policy:
+ * <ul>
+ *   <li>{@link ExpiredJwtException} - logged at DEBUG (expected client state, e.g.
+ *       stale browser session), chain continues anonymous.</li>
+ *   <li>{@link JwtException} / {@link IllegalArgumentException} - malformed, bad
+ *       signature, unsupported algorithm, or null/empty token - logged at WARN,
+ *       chain continues anonymous.</li>
+ *   <li>{@link UsernameNotFoundException} - subject in token does not match a known
+ *       user - logged at WARN, chain continues anonymous.</li>
+ *   <li>Any other unexpected exception (e.g., DB outage in UserDetailsService) is
+ *       deliberately NOT caught - it propagates so the global handler returns 500.</li>
+ * </ul>
  */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -45,34 +63,39 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        try {
-            // Extract JWT token from Authorization header
-            String jwt = extractJwtFromRequest(request);
+        String jwt = extractJwtFromRequest(request);
 
-            if (jwt != null) {
-                // Extract username from token
+        if (jwt != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            try {
                 String username = jwtTokenProvider.getUsernameFromToken(jwt);
 
-                // Load user details
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                if (username != null) {
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-                // Validate token
-                if (jwtTokenProvider.validateToken(jwt, userDetails)) {
-                    // Create authentication object
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                    // Set authentication in security context
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    if (jwtTokenProvider.validateToken(jwt, userDetails)) {
+                        UsernamePasswordAuthenticationToken authentication =
+                                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    }
                 }
+            } catch (ExpiredJwtException e) {
+                // Expected client state (e.g., stale browser session). Treat as anonymous.
+                logger.debug("JWT expired; treating request as anonymous: " + e.getMessage());
+            } catch (JwtException | IllegalArgumentException e) {
+                // Malformed / invalid signature / unsupported algorithm / null-empty.
+                // Treat as anonymous; surface at WARN since this could indicate tampering or misconfiguration.
+                logger.warn("JWT invalid; treating request as anonymous: " + e.getMessage());
+            } catch (UsernameNotFoundException e) {
+                // Token subject doesn't match a known user. Treat as anonymous.
+                logger.warn("JWT subject not found; treating request as anonymous: " + e.getMessage());
             }
-        } catch (Exception e) {
-            // Log and continue - invalid token should not block the filter chain
-            logger.error("Cannot set user authentication", e);
+            // NOTE: deliberately NOT catching generic Exception. If something truly
+            // unexpected happens (e.g., DB outage in UserDetailsService), let it
+            // propagate so GlobalExceptionHandler returns 500 instead of silently
+            // downgrading the request to anonymous.
         }
 
-        // Continue filter chain
         filterChain.doFilter(request, response);
     }
 

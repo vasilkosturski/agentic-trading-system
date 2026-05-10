@@ -243,6 +243,34 @@ describe('App.tsx - showAll parameter for admin endpoint', () => {
     expect(vi.mocked(api.fetchRuns).mock.calls[0][3]).toBe(true)
   })
 
+  it('never paints "Failed to fetch" error when fetchRuns hangs (403 redirect path)', async () => {
+    // Arrange — simulate the post-fix 403 contract: fetchJson hangs forever
+    // after triggering navigate() so the caller's catch block never runs and
+    // the user sees no flash-of-error before navigation completes.
+    vi.mocked(api.fetchRuns).mockReturnValue(new Promise<never>(() => {}))
+    vi.mocked(api.fetchAgents).mockReturnValue(new Promise<never>(() => {}))
+    vi.mocked(api.fetchSnapshots).mockReturnValue(new Promise<never>(() => {}))
+
+    // Act
+    render(
+      <MantineProvider>
+        <MemoryRouter initialEntries={['/?showAll=true']}>
+          <RunsTable />
+        </MemoryRouter>
+      </MantineProvider>
+    )
+
+    // Wait long enough that any spurious setError catch would have flushed.
+    await new Promise((r) => setTimeout(r, 100))
+
+    // Assert — the user must never see the raw fetch-error string.
+    expect(screen.queryByText(/Failed to fetch/i)).toBeNull()
+    expect(screen.queryByText(/403/)).toBeNull()
+
+    // The loading state should still be visible (we never resolved).
+    expect(screen.getByText(/Loading runs/i)).toBeInTheDocument()
+  })
+
   it('displays runs when showAll=true and calls admin endpoint', async () => {
     // Arrange
     vi.mocked(api.fetchRuns).mockResolvedValue({

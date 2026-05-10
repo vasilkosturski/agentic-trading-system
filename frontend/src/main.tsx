@@ -12,11 +12,13 @@ import AgentDetail from './AgentDetail.tsx'
 import Disclaimer from './Disclaimer.tsx'
 import Login from './Login.tsx'
 import ProtectedRoute from './ProtectedRoute.tsx'
+import NavigatorSetup from './NavigatorSetup.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <MantineProvider>
       <BrowserRouter>
+        <NavigatorSetup />
         <AppLayout>
           <Routes>
             <Route path="/login" element={<Login />} />
