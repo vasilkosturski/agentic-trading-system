@@ -178,4 +178,42 @@ class JwtTokenProviderTest {
             new JwtTokenProvider("12345678901234567890123456789012", TEST_EXPIRATION);
         });
     }
+
+    @Test
+    @DisplayName("Validate token returns false for expired token")
+    void validateToken_WithExpiredToken_ReturnsFalse() {
+        // Arrange: build a provider configured to issue immediately-expired tokens
+        // (negative expiration => exp claim is in the past at issue time).
+        JwtTokenProvider expiredProvider = new JwtTokenProvider(TEST_SECRET, -1000L);
+        UserDetails userDetails = User.builder()
+            .username("admin")
+            .password("password")
+            .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
+            .build();
+        String expiredToken = expiredProvider.generateToken(userDetails);
+
+        // Act: validate via the standard provider (same secret, normal expiration)
+        boolean isValid = jwtTokenProvider.validateToken(expiredToken, userDetails);
+
+        // Assert: validateToken must swallow ExpiredJwtException and return false.
+        assertFalse(isValid);
+    }
+
+    @Test
+    @DisplayName("Extract username from expired token throws ExpiredJwtException")
+    void getUsernameFromToken_WithExpiredToken_ThrowsExpiredJwtException() {
+        // Arrange: an immediately-expired token signed with the same secret.
+        JwtTokenProvider expiredProvider = new JwtTokenProvider(TEST_SECRET, -1000L);
+        UserDetails userDetails = User.builder()
+            .username("admin")
+            .password("password")
+            .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
+            .build();
+        String expiredToken = expiredProvider.generateToken(userDetails);
+
+        // Act & Assert: getUsernameFromToken must surface the typed JJWT exception so
+        // JwtAuthenticationFilter can apply its targeted catch (ExpiredJwtException).
+        assertThrows(io.jsonwebtoken.ExpiredJwtException.class,
+            () -> jwtTokenProvider.getUsernameFromToken(expiredToken));
+    }
 }

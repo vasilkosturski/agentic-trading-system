@@ -1,5 +1,6 @@
 import type { PortfolioSnapshot, TradingRun, Agent, RunDetailResponse, AgentPortfolio } from './types.ts'
 import { getToken, logout } from './auth'
+import { navigate } from './navigation'
 
 /**
  * Shared API client for backend HTTP calls.
@@ -20,18 +21,22 @@ async function fetchJson<T>(url: string, signal?: AbortSignal, includeAuth: bool
 
   const res = await fetch(url, options)
 
-  // Handle 403 Forbidden - token is invalid/expired or user lacks required roles
+  // Handle 403 Forbidden — token is invalid/expired or user lacks required roles.
+  //
+  // We MUST NOT throw here: if we did, every caller's catch block would run
+  // and `setError(err.message)` would paint "Failed to fetch ... 403" before
+  // the SPA navigation completes. Instead we trigger navigate() (which is
+  // synchronous as far as React is concerned — it commits the new route on
+  // the next render) and return a never-resolving promise. The caller's
+  // `await` then never resumes, so its catch never fires; the component
+  // unmounts within a tick when the new route renders, and the AbortController
+  // cleanup in its useEffect tears down the inflight request.
   if (res.status === 403) {
-    // Clear invalid token from localStorage
     logout()
-
-    // Redirect to login with current URL as returnUrl so user can return after re-authentication
     const currentPath = window.location.pathname + window.location.search
     const returnUrl = encodeURIComponent(currentPath)
-    window.location.href = `/login?returnUrl=${returnUrl}`
-
-    // Throw error to stop execution
-    throw new Error(`Failed to fetch ${url}: ${res.status}`)
+    navigate(`/login?returnUrl=${returnUrl}`, { replace: true })
+    return new Promise<never>(() => {})
   }
 
   if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`)
