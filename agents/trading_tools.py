@@ -1,54 +1,19 @@
 #!/usr/bin/env python3
 """
-Direct HTTP trading tools - replaces accounts_server.py MCP proxy
-Uses OpenAI Agents SDK @function_tool decorator for automatic schema generation
+Direct HTTP trading helpers - replaces accounts_server.py MCP proxy.
+
+Trading actions (buy/sell/initialize) are dispatched by code, not by the model.
+No model-visible @function_tool exports live here; see W5 cleanup notes.
 """
 
 import logging
-from agents import function_tool
-from typing import Dict, List, Optional
+from typing import List, Optional
 
-from backend_client import get_backend_client, BackendAPIError
+from backend_client import get_backend_client
 from models import Holding, TradeResult
 from models.api_responses import AccountReport
 
 logger = logging.getLogger(__name__)
-
-
-@function_tool
-async def get_balance(agent_id: int) -> float:
-    """Get the cash balance of the given account.
-
-    Args:
-        agent_id: Backend identifier for the agent
-
-    Returns:
-        Current cash balance in USD as a float
-    """
-    try:
-        return await _get_balance_raw(agent_id)
-    except BackendAPIError as e:
-        logger.error(f"Failed to get balance for agent {agent_id}: {e}")
-        raise Exception(f"Failed to get balance for agent {agent_id}: {str(e)}")
-
-
-@function_tool
-async def get_holdings(agent_id: int) -> Dict[str, int]:
-    """Get the stock holdings of the given account.
-
-    Args:
-        agent_id: Backend identifier for the agent
-
-    Returns:
-        Dictionary mapping stock symbols to quantities owned
-        Example: {'AAPL': 10, 'GOOGL': 5, 'TSLA': 3}
-    """
-    try:
-        holdings = await _get_holdings_raw(agent_id)
-        return {h.symbol: h.quantity for h in holdings}
-    except BackendAPIError as e:
-        logger.error(f"Failed to get holdings for agent {agent_id}: {e}")
-        raise Exception(f"Failed to get holdings for agent {agent_id}: {str(e)}")
 
 
 async def buy_shares(
@@ -77,14 +42,12 @@ async def buy_shares(
         Exception: If insufficient funds, position limit reached, or invalid symbol
     """
     who = agent_name or str(agent_id)
-    try:
-        client = get_backend_client()
-        result = await client.buy_shares(agent_id, symbol, quantity, run_id=runId)
-        logger.info(f"{who} bought {quantity} shares of {symbol}")
-        return result
-    except BackendAPIError as e:
-        logger.error(f"Failed to buy shares for {who}: {e}")
-        raise Exception(f"Failed to buy {quantity} shares of {symbol}: {str(e)}")
+    # W4: BackendAPIError propagates with status code intact for the caller
+    # (agent_executor / orchestrator) to inspect.
+    client = get_backend_client()
+    result = await client.buy_shares(agent_id, symbol, quantity, run_id=runId)
+    logger.info(f"{who} bought {quantity} shares of {symbol}")
+    return result
 
 
 async def sell_shares(
@@ -110,14 +73,11 @@ async def sell_shares(
         Exception: If you don't own enough shares or invalid symbol
     """
     who = agent_name or str(agent_id)
-    try:
-        client = get_backend_client()
-        result = await client.sell_shares(agent_id, symbol, quantity, run_id=runId)
-        logger.info(f"{who} sold {quantity} shares of {symbol}")
-        return result
-    except BackendAPIError as e:
-        logger.error(f"Failed to sell shares for {who}: {e}")
-        raise Exception(f"Failed to sell {quantity} shares of {symbol}: {str(e)}")
+    # W4: BackendAPIError propagates with status code intact (see buy_shares).
+    client = get_backend_client()
+    result = await client.sell_shares(agent_id, symbol, quantity, run_id=runId)
+    logger.info(f"{who} sold {quantity} shares of {symbol}")
+    return result
 
 
 async def initialize_agent(name: str, initial_balance: float = 100000.0) -> int:
@@ -134,12 +94,9 @@ async def initialize_agent(name: str, initial_balance: float = 100000.0) -> int:
     Returns:
         Confirmation message
     """
-    try:
-        client = get_backend_client()
-        return await client.initialize_agent(name, initial_balance)
-    except BackendAPIError as e:
-        logger.error(f"Failed to initialize agent {name}: {e}")
-        raise Exception(f"Failed to initialize agent {name}: {str(e)}")
+    # W4: BackendAPIError propagates with status code intact (see buy_shares).
+    client = get_backend_client()
+    return await client.initialize_agent(name, initial_balance)
 
 
 # Helper functions for system use (not agent tools)

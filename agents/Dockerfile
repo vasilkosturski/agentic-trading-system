@@ -4,6 +4,13 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
+# Cache-bust the cert-injection layers based on cert content. The build script
+# computes SHA256 of ~/zscaler-ca.pem and passes it as --build-arg
+# EXTRA_CA_FINGERPRINT=<sha> (or "none" when no cert is present). Declaring the
+# ARG IMMEDIATELY before the COPY/import steps means any change to the cert
+# content invalidates the cache for those steps and they re-run.
+ARG EXTRA_CA_FINGERPRINT=none
+
 # Optionally trust extra CA
 COPY extra-ca.pe[m] /tmp/
 
@@ -13,10 +20,17 @@ RUN apt-get update && apt-get install -y \
     npm \
     curl \
     ca-certificates \
-    && if [ -f /tmp/extra-ca.pem ]; then \
+    && if [ -s /tmp/extra-ca.pem ]; then \
          cp /tmp/extra-ca.pem /usr/local/share/ca-certificates/extra-ca.crt && \
          update-ca-certificates && \
+         test -L /etc/ssl/certs/extra-ca.pem && \
+         echo "extra-ca successfully imported into system trust store (fingerprint=${EXTRA_CA_FINGERPRINT})" && \
          rm /tmp/extra-ca.pem; \
+       elif [ "${EXTRA_CA_FINGERPRINT}" != "none" ]; then \
+         echo "FATAL: EXTRA_CA_FINGERPRINT=${EXTRA_CA_FINGERPRINT} but /tmp/extra-ca.pem is non-empty/missing in build context" >&2; \
+         exit 1; \
+       else \
+         rm -f /tmp/extra-ca.pem; \
        fi \
     && rm -rf /var/lib/apt/lists/*
 
@@ -31,9 +45,12 @@ RUN pip install uv
 RUN npm install -g @modelcontextprotocol/server-brave-search
 RUN pip install mcp-server-fetch
 
-# Copy requirements and install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy project metadata and install dependencies from pyproject.toml
+# pyproject.toml is the single source of truth (W8: requirements.txt removed).
+# Copy it BEFORE the pip install so Docker can cache the dependency layer
+# independently of source-code changes.
+COPY pyproject.toml .
+RUN pip install --no-cache-dir .
 
 # Copy agents source code
 COPY . .
