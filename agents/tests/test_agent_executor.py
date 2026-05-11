@@ -254,7 +254,6 @@ class TestAgentExecutorMarketAnalyst:
             sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
         )
 
-        mock_tracker = MagicMock()
         ctx = RunContext(
             run_id=123,
             agent_id=sample_agent_id,
@@ -265,7 +264,6 @@ class TestAgentExecutorMarketAnalyst:
             balance=100000.0,
             holdings=[],
             recent_activity=sample_recent_activity,
-            tracker=mock_tracker,
         )
 
         result = await executor._run_market_analyst(ctx, mock_mcp_pool)
@@ -352,10 +350,8 @@ class TestAgentExecutorFullCycle:
     @patch("agent_executor._get_account_report_raw")
     @patch("agent_executor.initialize_agent")
     @patch("agent_executor.broadcast_status")
-    @patch("agent_executor.ToolTracker")
     async def test_execute_cycle_success_with_buy(
         self,
-        mock_tracker_class,
         mock_broadcast,
         mock_initialize,
         mock_get_report,
@@ -400,9 +396,6 @@ class TestAgentExecutorFullCycle:
         mock_create_run.return_value = 123
         mock_update_phase.return_value = True
         mock_complete_run.return_value = True
-
-        mock_tracker_instance = MagicMock()
-        mock_tracker_class.return_value = mock_tracker_instance
 
         # MarketAnalyst mock
         mock_analyst_instance = MagicMock()

@@ -1,77 +1,159 @@
-"""Tests for prompt_loader: API-based prompt loading and runtime formatting.
+"""Tests for prompt_loader: async API-based prompt loading with in-process cache.
 
-Since prompt_loader now fetches composed prompts from the Java backend API,
-the parser tests are replaced with mocked HTTP tests and format_prompt unit tests.
+prompt_loader.load_composed_prompt is now an async function that routes through
+BackendClient._request and caches results per (agent_type, agent_name) for the
+lifetime of the process.
 
 Covers:
-1. load_composed_prompt() with mocked HTTP responses
-2. format_prompt() runtime placeholder substitution
-3. Validation (invalid agent names, backend errors)
-4. get_available_templates() returns expected structure
+1. load_composed_prompt() routes through BackendClient._request (no direct httpx.get)
+2. Per-(agent_type, agent_name) cache prevents repeat HTTP calls
+3. format_prompt() runtime placeholder substitution
+4. Validation (invalid agent names, backend errors)
+5. get_available_templates() returns expected structure
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from prompt_loader import (
+    _PROMPT_CACHE,
+    _PartialFormatDict,
+    VALID_AGENT_NAMES,
+    clear_prompt_cache,
+    format_prompt,
+    get_available_templates,
+    load_and_format_prompt,
     load_composed_prompt,
     load_prompt_template,
-    format_prompt,
-    load_and_format_prompt,
-    get_available_templates,
-    VALID_AGENT_NAMES,
-    _PartialFormatDict,
 )
 
 
+@pytest.fixture(autouse=True)
+def _reset_prompt_cache():
+    """Ensure each test starts with an empty in-process prompt cache."""
+    clear_prompt_cache()
+    yield
+    clear_prompt_cache()
+
+
+def _make_response(text: str, status_code: int = 200) -> MagicMock:
+    """Build a MagicMock that mimics httpx.Response for our async path."""
+    mock = MagicMock(spec=httpx.Response)
+    mock.text = text
+    mock.status_code = status_code
+    return mock
+
+
 # ============================================================================
-# 1. load_composed_prompt() with mocked HTTP
+# 1. load_composed_prompt() routes through BackendClient._request (async)
 # ============================================================================
 
 
 class TestLoadComposedPrompt:
-    """Test API-based prompt loading with mocked HTTP responses."""
+    """Test API-based prompt loading via BackendClient._request."""
 
-    @patch("prompt_loader.httpx.get")
-    def test_fetches_from_backend_api(self, mock_get):
-        """Calls the correct backend URL."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.text = "You are Warren, a Value Investor."
-        mock_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_response
+    @pytest.mark.asyncio
+    async def test_routes_through_backend_client_request(self):
+        """Calls BackendClient._request with the correct URL — not httpx.get directly."""
+        mock_request = AsyncMock(return_value=_make_response("You are Warren."))
+        with patch("prompt_loader._get_backend_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client._request = mock_request
+            mock_get_client.return_value = mock_client
 
-        result = load_composed_prompt("decision_maker", "Warren")
+            result = await load_composed_prompt("decision_maker", "Warren")
 
-        mock_get.assert_called_once()
-        call_url = mock_get.call_args[0][0]
-        assert "/api/prompts/decision_maker/warren" in call_url
-        assert result == "You are Warren, a Value Investor."
+            assert result == "You are Warren."
+            mock_request.assert_awaited_once()
+            args, kwargs = mock_request.call_args
+            # _request signature: (method, url, *, params=None, json_data=None)
+            method = args[0] if args else kwargs.get("method")
+            url = args[1] if len(args) > 1 else kwargs.get("url")
+            assert method == "GET"
+            assert "/api/prompts/decision_maker/warren" in url
 
-    def test_invalid_agent_name_raises_value_error(self):
+    @pytest.mark.asyncio
+    async def test_invalid_agent_name_raises_value_error(self):
         """Invalid agent name raises ValueError without calling backend."""
         with pytest.raises(ValueError, match="Invalid agent name"):
-            load_composed_prompt("market_analyst", "invalid_agent")
-
-    @patch("prompt_loader.httpx.get")
-    def test_404_raises_file_not_found(self, mock_get):
-        """Backend 404 raises FileNotFoundError."""
-        import httpx
-
-        mock_response = MagicMock()
-        mock_response.status_code = 404
-        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
-            "Not Found", request=MagicMock(), response=mock_response
-        )
-        mock_get.return_value = mock_response
-
-        with pytest.raises(FileNotFoundError, match="Prompt not found"):
-            load_composed_prompt("decision_maker", "warren")
+            await load_composed_prompt("market_analyst", "invalid_agent")
 
 
 # ============================================================================
-# 2. format_prompt() runtime substitution
+# 2. In-process cache: a 2nd call for the same key does NOT re-fetch.
+# ============================================================================
+
+
+class TestPromptCache:
+    """Verify the per-(agent_type, agent_name) cache."""
+
+    @pytest.mark.asyncio
+    async def test_second_call_does_not_trigger_second_http_call(self):
+        """Second call for the same (agent_type, agent_name) is served from cache."""
+        mock_request = AsyncMock(return_value=_make_response("cached prompt"))
+        with patch("prompt_loader._get_backend_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client._request = mock_request
+            mock_get_client.return_value = mock_client
+
+            first = await load_composed_prompt("market_analyst", "Warren")
+            second = await load_composed_prompt("market_analyst", "Warren")
+
+            assert first == "cached prompt"
+            assert second == "cached prompt"
+            # CRITICAL: the HTTP layer was hit exactly once.
+            assert mock_request.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_different_keys_each_fetch_once(self):
+        """Distinct (agent_type, agent_name) tuples each trigger their own fetch."""
+        mock_request = AsyncMock(
+            side_effect=[
+                _make_response("warren-analyst"),
+                _make_response("warren-decider"),
+                _make_response("george-analyst"),
+            ]
+        )
+        with patch("prompt_loader._get_backend_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client._request = mock_request
+            mock_get_client.return_value = mock_client
+
+            a = await load_composed_prompt("market_analyst", "Warren")
+            b = await load_composed_prompt("decision_maker", "Warren")
+            c = await load_composed_prompt("market_analyst", "George")
+
+            # Re-fetch the first key — must hit cache.
+            a2 = await load_composed_prompt("market_analyst", "Warren")
+
+            assert (a, b, c, a2) == (
+                "warren-analyst",
+                "warren-decider",
+                "george-analyst",
+                "warren-analyst",
+            )
+            assert mock_request.await_count == 3
+
+    @pytest.mark.asyncio
+    async def test_cache_key_is_case_insensitive_on_agent_name(self):
+        """'Warren' and 'warren' resolve to the same cache slot."""
+        mock_request = AsyncMock(return_value=_make_response("p"))
+        with patch("prompt_loader._get_backend_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client._request = mock_request
+            mock_get_client.return_value = mock_client
+
+            await load_composed_prompt("market_analyst", "Warren")
+            await load_composed_prompt("market_analyst", "warren")
+            await load_composed_prompt("market_analyst", "WARREN")
+
+            assert mock_request.await_count == 1
+
+
+# ============================================================================
+# 3. format_prompt() runtime substitution
 # ============================================================================
 
 
@@ -79,34 +161,36 @@ class TestFormatPrompt:
     """Test runtime placeholder substitution."""
 
     def test_resolves_datetime_placeholder(self):
-        """format_prompt() resolves {datetime}."""
         template = "Current time: {datetime}"
         result = format_prompt(template, datetime="2025-06-15 10:00:00")
         assert "2025-06-15 10:00:00" in result
         assert "{datetime}" not in result
 
 
-class TestLoadPromptTemplate:
-    """Test end-to-end template loading wrappers."""
+# ============================================================================
+# 4. End-to-end async wrapper still works.
+# ============================================================================
 
-    @patch("prompt_loader.httpx.get")
-    def test_load_and_format_prompt_end_to_end(self, mock_get):
-        """load_and_format_prompt fetches and formats in one call."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.text = "Hello Warren, time is {datetime}"
-        mock_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_response
 
-        result = load_and_format_prompt(
-            "decision_maker", "Warren", datetime="2025-01-01"
+class TestLoadAndFormatPrompt:
+    @pytest.mark.asyncio
+    async def test_end_to_end(self):
+        mock_request = AsyncMock(
+            return_value=_make_response("Hello Warren, time is {datetime}")
         )
-        assert "2025-01-01" in result
-        assert "{datetime}" not in result
+        with patch("prompt_loader._get_backend_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client._request = mock_request
+            mock_get_client.return_value = mock_client
+
+            result = await load_and_format_prompt(
+                "decision_maker", "Warren", datetime="2025-01-01"
+            )
+
+            assert "2025-01-01" in result
+            assert "{datetime}" not in result
 
 
 class TestValidAgentNames:
-    """Test agent name constants."""
-
     def test_expected_names(self):
         assert VALID_AGENT_NAMES == {"warren", "george", "ray", "cathie"}

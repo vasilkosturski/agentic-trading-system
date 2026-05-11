@@ -141,6 +141,7 @@ def require_backend(docker_ip, docker_services) -> str:
     import config as config_module
     import market_tools as market_tools_module
     import backend_client as backend_client_module
+    import prompt_loader as prompt_loader_module
 
     config_module.BACKEND_BASE_URL = url
     config_module.BACKEND_API_MARKET = f"{url}/api/market"
@@ -154,6 +155,10 @@ def require_backend(docker_ip, docker_services) -> str:
     backend_client_module.BACKEND_BASE_URL = url
     backend_client_module.BACKEND_API_ACCOUNTS = f"{url}/api/accounts"
     backend_client_module.BACKEND_API_TRADING_RUNS = f"{url}/api/runs"
+
+    # prompt_loader captures BACKEND_URL at import time from os.getenv,
+    # so patch it directly to route prompt fetches to the Docker backend.
+    prompt_loader_module.BACKEND_URL = url
 
     return url
 
