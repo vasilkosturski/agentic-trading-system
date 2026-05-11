@@ -72,11 +72,39 @@ class TradingSystem:
         logger.info(f"✅ TradingSystem created with {len(agents)} agents")
         return cls(agents)
     
+    async def _run_agent_with_own_mcp(self, agent: SimpleTrader, force_trade: bool):
+        """Each agent gets its own MCP pool to avoid stdio interleaving.
+
+        Extracted to a method (rather than an inner closure) so the per-agent
+        runner can be patched in tests for run_all_agents without spinning up
+        real MCP stdio servers.
+        """
+        async with AsyncExitStack() as stack:
+            mcp_params = get_mcp_server_params()
+            mcp_pool: MCPPool = {}
+            for mcp_name, params in mcp_params.items():
+                server = await stack.enter_async_context(
+                    MCPServerStdio(params, client_session_timeout_seconds=120)  # type: ignore[arg-type]
+                )
+                mcp_pool[mcp_name] = server
+            logger.info(f"✅ MCP pool created for {agent.name}: {list(mcp_pool.keys())}")
+            await agent.run(mcp_pool, force_trade=force_trade)
+
     async def run_all_agents(self, force_one_trade=False):
-        """Run all four agents concurrently
+        """Run all four agents concurrently.
+
+        Returns:
+            dict[str, int]: ``{"success": N, "failure": M}`` cycle metrics so
+            callers (continuous trading loop, manual-trigger path) can record
+            per-cycle outcomes without re-deriving them from logs.
+
+        Per-agent failures never escape: ``asyncio.gather(return_exceptions=True)``
+        captures each exception, this method logs it at ERROR with the
+        ``agent_name`` structured extra, and execution of the other agents
+        continues as before.
 
         Args:
-            force_one_trade: If True, randomly pick one agent to force a trade
+            force_one_trade: If True, randomly pick one agent to force a trade.
         """
         logger.info("🚀 Starting all four autonomous trading agents...")
 
@@ -90,27 +118,33 @@ class TradingSystem:
             forced_agent = random.choice(self.agents).name
             logger.info(f"🎯 Manual trigger: Forcing {forced_agent} to make a trade this cycle")
 
-        async def run_agent_with_own_mcp(agent: SimpleTrader, force_trade: bool):
-            """Each agent gets its own MCP pool to avoid stdio interleaving."""
-            async with AsyncExitStack() as stack:
-                mcp_params = get_mcp_server_params()
-                mcp_pool: MCPPool = {}
-                for mcp_name, params in mcp_params.items():
-                    server = await stack.enter_async_context(
-                        MCPServerStdio(params, client_session_timeout_seconds=120)  # type: ignore[arg-type]
-                    )
-                    mcp_pool[mcp_name] = server
-                logger.info(f"✅ MCP pool created for {agent.name}: {list(mcp_pool.keys())}")
-                await agent.run(mcp_pool, force_trade=force_trade)
-
-        # Run all agents concurrently, each with its own MCP servers
+        # Run all agents concurrently, each with its own MCP servers.
+        # NOTE: results is *intentionally* bound — we iterate zip(self.agents, results)
+        # below to log per-agent Exception results and tally cycle metrics.
         tasks = [
-            run_agent_with_own_mcp(agent, force_trade=(agent.name == forced_agent))
+            self._run_agent_with_own_mcp(agent, force_trade=(agent.name == forced_agent))
             for agent in self.agents
         ]
-        await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        logger.info("✅ All agents completed their trading cycle")
+        success = 0
+        failure = 0
+        for agent, result in zip(self.agents, results):
+            if isinstance(result, BaseException):
+                failure += 1
+                logger.error(
+                    f"Agent {agent.name} failed during trading cycle: {result!r}",
+                    extra={"agent_name": agent.name},
+                    exc_info=result,
+                )
+            else:
+                success += 1
+
+        logger.info(
+            f"✅ All agents completed their trading cycle "
+            f"(success={success}, failure={failure})"
+        )
+        return {"success": success, "failure": failure}
     
     def print_agent_summary(self):
         """Print a summary of all agents"""
@@ -135,11 +169,17 @@ async def run_continuous_trading():
     # Create flag to track if a cycle is currently running (thread-safe dict)
     cycle_running_flag = {'running': False}
 
+    # Capture the running event loop so the Flask handler thread can schedule
+    # callbacks back onto it via loop.call_soon_threadsafe. Passing the loop
+    # explicitly avoids reaching into the undocumented asyncio.Event._loop.
+    loop = asyncio.get_running_loop()
+
     # Start the API server for manual cycle triggers (proper encapsulation, no globals!)
     api_server = TradingAPIServer(
         trading_system=system,
         manual_cycle_event=manual_cycle_event,
-        cycle_running_flag=cycle_running_flag
+        cycle_running_flag=cycle_running_flag,
+        loop=loop,
     )
     api_server.run(port=8000)
 

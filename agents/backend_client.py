@@ -30,6 +30,12 @@ import logging
 from typing import Any, Dict, Optional
 
 import httpx
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from config import (
     BACKEND_BASE_URL,
@@ -42,6 +48,27 @@ from models.run_tracking import CompleteRunData
 from exceptions import BackendAPIError
 
 logger = logging.getLogger(__name__)
+
+
+# Retry decorator for idempotent backend calls.
+#
+# Applied ONLY to read/idempotent endpoints (account reports, recent activity,
+# run lifecycle CRUD).  Trade endpoints (buy_shares / sell_shares) are
+# intentionally NOT decorated until the backend supports idempotency keys —
+# otherwise a transient timeout that already reached the server could result
+# in duplicate trade execution.
+#
+# Strategy:
+#   - up to 3 total attempts (stop_after_attempt(3))
+#   - exponential backoff with jitter (1s, 2s, 4s, ... capped at 16s)
+#   - retry only on httpx network/timeout errors; HTTP 4xx/5xx propagate as
+#     BackendAPIError and are NOT retried (those are not transient)
+_retry_on_transient = retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential_jitter(initial=1, max=16),
+    retry=retry_if_exception_type((httpx.TimeoutException, httpx.RequestError)),
+    reraise=True,
+)
 
 
 class BackendClient:
@@ -263,6 +290,7 @@ class BackendClient:
                 return agent_id
         raise BackendAPIError(f"Agent {name} not found in registry after 400 response")
     
+    @_retry_on_transient
     async def get_account_report(self, agent_id: int) -> AccountReport:
         """Get full account report with balance, holdings, and portfolio metrics.
 
@@ -356,6 +384,7 @@ class BackendClient:
         response = await self._request("GET", url, params=params)
         return SymbolHistoryResponse.model_validate_json(response.text)
 
+    @_retry_on_transient
     async def get_recent_activity(
         self, agent_id: int, days: int = 7
     ) -> RecentActivityResponse:
@@ -378,6 +407,7 @@ class BackendClient:
 
     # ========== Run Tracking Operations ==========
     
+    @_retry_on_transient
     async def create_run(self, agent_id: int) -> int:
         """Create a new trading run.
         
@@ -401,6 +431,7 @@ class BackendClient:
         logger.info(f"Created trading run #{run_id} for agent {agent_id}")
         return run_id
     
+    @_retry_on_transient
     async def update_phase(self, run_id: int, phase: str, error_message: str | None = None) -> None:
         """Update the phase of a trading run.
 
@@ -416,6 +447,7 @@ class BackendClient:
         await self._request("PATCH", url, json_data=payload)
         logger.info(f"Updated run #{run_id} to phase {phase}")
     
+    @_retry_on_transient
     async def complete_run(self, run_id: int, data: CompleteRunData) -> None:
         """Complete a trading run with all phase data.
         

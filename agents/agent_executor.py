@@ -66,9 +66,6 @@ from status_broadcaster import (
     PHASE_ERROR,
 )
 
-# Import tool tracking
-from tool_tracking import ToolTracker
-
 # Import SDK parsing for tool call extraction
 from utils.sdk_parser import extract_tool_calls
 from models.run_tracking import ToolCallDto
@@ -207,7 +204,6 @@ class AgentExecutor:
                 agent_style=self.agent_style,
                 model_name=self.model_name,
                 research_start_time=research_start_time,
-                tracker=ToolTracker(run_id),
                 balance=account_data.balance,
                 holdings=account_data.holdings,
                 recent_activity=recent_activity,
@@ -372,14 +368,20 @@ class AgentExecutor:
         """
         research_start_time = datetime.now()
 
-        # Log portfolio access
+        # Log portfolio access (inline observability — preserves the
+        # "Portfolio data fetched" semantic that the previously-removed
+        # parallel tracking system used to record.)
         portfolio_data = {
             "balance": round(ctx.balance, 2),
             "holdings_count": len(ctx.holdings),
             "symbols": [h.symbol for h in ctx.holdings] if ctx.holdings else []
         }
-        if ctx.tracker:
-            ctx.tracker.log_data_access("Portfolio", json.dumps(portfolio_data))
+        logger.debug(
+            "Portfolio data fetched: balance=$%.2f, positions=%d, symbols=%s",
+            ctx.balance,
+            len(ctx.holdings),
+            portfolio_data["symbols"],
+        )
 
         # Create Market Analyst using async factory pattern
         market_analyst = await MarketAnalyst.create(

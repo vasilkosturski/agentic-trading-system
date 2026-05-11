@@ -63,10 +63,12 @@ async def broadcast_status_async(
             if response.status_code not in [204, 200]:
                 logger.warning(f"Status broadcast failed with status {response.status_code}")
 
-    except httpx.TimeoutException:
-        logger.warning(f"Status broadcast timed out for {agent_name}")
-    except Exception as e:
-        # Never fail trading logic due to status broadcast issues
+    except httpx.HTTPError as e:
+        # Never fail trading logic due to HTTP-level status broadcast issues.
+        # Narrow to httpx.HTTPError so asyncio.CancelledError and genuine
+        # programming errors (e.g. RuntimeError) are not silently swallowed.
+        # httpx.TimeoutException is a subclass of HTTPError, so timeouts are
+        # still handled here.
         logger.warning(f"Failed to broadcast status for {agent_name}: {e}")
 
 

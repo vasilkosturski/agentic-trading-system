@@ -262,8 +262,9 @@ async def create_decision_maker_agent(
     if model_name is None:
         model_name = config.OPENAI_MODEL
     # Load instructions from template file with position sizing parameter
+    # (async + cached — see prompt_loader)
     position_sizing_pct = get_position_sizing_pct(agent_style)
-    instructions = load_and_format_prompt(
+    instructions = await load_and_format_prompt(
         "decision_maker",
         agent_name,
         datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

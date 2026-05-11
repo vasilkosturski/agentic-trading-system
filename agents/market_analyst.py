@@ -303,8 +303,8 @@ async def create_market_analyst_agent(
     """
     if model_name is None:
         model_name = config.OPENAI_MODEL
-    # Load instructions from template file
-    instructions = load_and_format_prompt(
+    # Load instructions from template file (async + cached — see prompt_loader)
+    instructions = await load_and_format_prompt(
         "market_analyst",
         agent_name,
         datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

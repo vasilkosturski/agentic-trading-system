@@ -15,7 +15,13 @@ logger = logging.getLogger(__name__)
 class TradingAPIServer:
     """Encapsulates the Flask API server and its dependencies."""
 
-    def __init__(self, trading_system, manual_cycle_event, cycle_running_flag):
+    def __init__(
+        self,
+        trading_system,
+        manual_cycle_event: asyncio.Event,
+        cycle_running_flag,
+        loop: asyncio.AbstractEventLoop,
+    ):
         """
         Initialize the API server with dependencies.
 
@@ -23,10 +29,15 @@ class TradingAPIServer:
             trading_system: The TradingSystem instance
             manual_cycle_event: asyncio.Event to signal manual cycle triggers
             cycle_running_flag: dict with 'running' boolean to track cycle state
+            loop: The asyncio event loop running in the main thread. Captured
+                explicitly so the Flask handler thread can schedule
+                ``manual_cycle_event.set`` via ``loop.call_soon_threadsafe``
+                without relying on the undocumented ``Event._loop`` attribute.
         """
         self.trading_system = trading_system
         self.manual_cycle_event = manual_cycle_event
         self.cycle_running_flag = cycle_running_flag
+        self._loop = loop
         self.app = Flask(__name__)
         self._setup_routes()
     
@@ -51,9 +62,11 @@ class TradingAPIServer:
                     "status": "ALREADY_RUNNING"
                 }), 409  # 409 Conflict
 
-            # Signal the event to trigger a cycle immediately
-            # Use call_soon_threadsafe to safely signal from Flask thread to async loop
-            self.manual_cycle_event._loop.call_soon_threadsafe(self.manual_cycle_event.set)
+            # Signal the event to trigger a cycle immediately.
+            # Use the explicitly-captured loop's call_soon_threadsafe to safely
+            # schedule Event.set() from the Flask handler thread onto the
+            # asyncio loop running in the main thread.
+            self._loop.call_soon_threadsafe(self.manual_cycle_event.set)
             logger.info("✅ Manual trading cycle triggered successfully")
 
             return jsonify({
