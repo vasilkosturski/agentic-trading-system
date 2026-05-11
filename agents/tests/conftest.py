@@ -206,7 +206,7 @@ def mock_backend_api(mock_aiohttp, sample_balance, sample_holdings, sample_accou
         payload={
             "agentName": "Warren",
             "balance": sample_balance,
-            "holdings": [h.dict() for h in sample_holdings],
+            "holdings": [h.model_dump() for h in sample_holdings],
             "holdingsValue": sum(h.quantity * h.averagePrice for h in sample_holdings),
             "totalPortfolioValue": sample_balance + sum(h.quantity * h.averagePrice for h in sample_holdings),
             "initialBalance": 130000.0,
@@ -265,14 +265,15 @@ def mock_broadcast_status(mocker):
 
 @pytest.fixture
 def mock_prompt_fetch(mocker):
-    """Mock httpx.get in prompt_loader so agent-creation tests don't need a real backend.
+    """Mock the backend prompt fetch so agent-creation tests don't need a real backend.
 
     PURPOSE:
     --------
     Unit tests need to create agents (Market Analyst, Decision Maker) to verify
     their configuration without requiring a running backend. This fixture patches
-    prompt_loader.httpx.get to return a synthetic prompt instead of making real
-    HTTP calls to http://localhost:8080/api/prompts/...
+    ``prompt_loader._get_backend_client`` so the async ``load_composed_prompt``
+    call returns a synthetic prompt instead of making real HTTP calls to
+    ``http://localhost:8080/api/prompts/...``.
 
     WHY NOT autouse=True:
     ---------------------
@@ -319,14 +320,30 @@ def mock_prompt_fetch(mocker):
     passes {datetime} and {position_sizing_pct} as kwargs — any other placeholder
     is preserved by prompt_loader._PartialFormatDict.
     """
-    mock_response = MagicMock()
-    mock_response.text = (
+    # The in-process cache in prompt_loader survives across tests; clear it
+    # so neighbouring tests can't leak state.
+    from prompt_loader import clear_prompt_cache
+    clear_prompt_cache()
+
+    synthetic_prompt = (
         "You are Warren, a disciplined investor. "
         "Current time: {datetime}. "
         "Position sizing: {position_sizing_pct}%."
     )
-    mock_response.raise_for_status = MagicMock()
-    return mocker.patch("prompt_loader.httpx.get", return_value=mock_response)
+
+    mock_response = MagicMock()
+    mock_response.text = synthetic_prompt
+
+    mock_request = AsyncMock(return_value=mock_response)
+    mock_client = MagicMock()
+    mock_client._request = mock_request
+
+    patcher = mocker.patch(
+        "prompt_loader._get_backend_client", return_value=mock_client
+    )
+
+    yield patcher
+    clear_prompt_cache()
 
 
 @pytest.fixture
@@ -346,15 +363,6 @@ def mock_run_tracking(mocker):
         "update_phase": update_phase,
         "complete_run": complete_run,
     }
-
-
-@pytest.fixture
-def mock_tool_tracker(mocker):
-    """Mock ToolTracker."""
-    mock_class = mocker.patch("agent_executor.ToolTracker")
-    mock_instance = MagicMock()
-    mock_class.return_value = mock_instance
-    return mock_instance
 
 
 # =============================================================================

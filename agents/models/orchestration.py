@@ -19,7 +19,6 @@ from models.api_responses import RecentActivityResponse
 
 if TYPE_CHECKING:
     from models.run_tracking import ToolCallDto
-    from tool_tracking import ToolTracker
     from models import Holding
     from utils.sdk_parser import ParsedToolCall
 
@@ -176,7 +175,6 @@ class RunContext:
     balance: float = 0.0
     holdings: List["Holding"] = field(default_factory=list)
     recent_activity: Optional[RecentActivityResponse] = None
-    tracker: Optional["ToolTracker"] = None
 
     # --- Output ---
     research_response: Optional[ResearchResponse] = None
