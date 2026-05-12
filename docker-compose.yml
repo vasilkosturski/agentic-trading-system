@@ -48,7 +48,12 @@ services:
     ports:
       - "8080:8080"
     networks:
-      - trading-network
+      trading-network:
+        # Alias matches the K3s Service name so frontend/nginx.conf's static
+        # `proxy_pass http://backend-service:8080/api/` works in BOTH compose and K3s.
+        # Without this, compose-only DNS resolves "backend" but not "backend-service".
+        aliases:
+          - backend-service
     depends_on:
       postgres:
         condition: service_healthy
