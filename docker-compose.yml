@@ -40,6 +40,11 @@ services:
       DB_PASSWORD: trading_password
       # Market data API keys
       FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+      # Auth — JwtTokenProvider rejects empty/missing JWT_SECRET so .env must reach the JVM
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
     ports:
       - "8080:8080"
     networks:
@@ -87,7 +92,7 @@ services:
     # Run the production autonomous trading system
     command: python trading_system.py
 
-  # React Frontend (Dev Mode)
+  # React Frontend (production nginx image — built from frontend/Dockerfile)
   frontend:
     build:
       context: ./frontend
@@ -95,7 +100,8 @@ services:
     container_name: agentic-trading-frontend
     restart: unless-stopped
     ports:
-      - "5173:5173"
+      # Container nginx listens on 80; map to host 5173 to keep the dev URL stable.
+      - "5173:80"
     volumes:
       - ./frontend:/app
       - /app/node_modules
