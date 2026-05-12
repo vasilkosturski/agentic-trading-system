@@ -21,9 +21,7 @@ services:
       retries: 10
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: localhost/agentic-trading-backend:e2e
     env_file:
       - .env
     environment:

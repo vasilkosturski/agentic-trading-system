@@ -7,7 +7,7 @@ No model-visible @function_tool exports live here; see W5 cleanup notes.
 """
 
 import logging
-from typing import List, Optional
+from typing import List
 
 from backend_client import get_backend_client
 from models import Holding, TradeResult
@@ -20,8 +20,8 @@ async def buy_shares(
     agent_id: int,
     symbol: str,
     quantity: int,
-    runId: Optional[int] = None,
-    agent_name: Optional[str] = None
+    runId: int | None = None,
+    agent_name: str | None = None
 ) -> TradeResult:
     """Buy shares of a stock.
 
@@ -54,8 +54,8 @@ async def sell_shares(
     agent_id: int,
     symbol: str,
     quantity: int,
-    runId: Optional[int] = None,
-    agent_name: Optional[str] = None
+    runId: int | None = None,
+    agent_name: str | None = None
 ) -> TradeResult:
     """Sell shares of a stock.
 

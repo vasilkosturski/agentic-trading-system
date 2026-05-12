@@ -5,8 +5,6 @@ duplicating 8 flat metric fields. Serializes to camelCase to match
 Java backend DTOs.
 """
 
-from typing import Optional
-
 from pydantic import BaseModel
 
 
@@ -21,5 +19,5 @@ class UsageMetrics(BaseModel):
     numTurns: int = 0
     cachedTokens: int = 0
     reasoningTokens: int = 0
-    modelName: Optional[str] = None
+    modelName: str | None = None
     costUsd: float = 0.0

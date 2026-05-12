@@ -457,3 +457,289 @@ class TestAgentExecutorFullCycle:
         assert result.run_id == 123
 
 
+# ============================================================================
+# Test: Error-path branches (I11) — BackendAPIError, MaxTurnsExceeded,
+#                                   _handle_cycle_error
+# ============================================================================
+
+
+@pytest.mark.asyncio
+class TestAgentExecutorErrorPaths:
+    """Error-path coverage for AgentExecutor (I11).
+
+    These tests exercise branches not covered by the happy-path tests above:
+      * ``_start_run`` propagates ``BackendAPIError`` from ``create_run``.
+      * ``execute_cycle`` routes phase errors through ``_handle_cycle_error``
+        which broadcasts an ERROR status and re-raises.
+      * ``execute_cycle`` propagates ``MaxTurnsExceeded`` from the market
+        analyst run with the run marked FAILED.
+      * ``_handle_cycle_error`` with ``ctx=None`` (failure before context was
+        built) must NOT touch ``update_phase`` since no run exists yet.
+      * ``_handle_cycle_error`` swallows secondary cleanup errors from
+        ``update_phase`` so the original exception is still re-raised.
+    """
+
+    @patch("agent_executor.initialize_agent")
+    @patch("agent_executor.create_run")
+    @patch("agent_executor.broadcast_status")
+    async def test_start_run_propagates_backend_api_error(
+        self,
+        mock_broadcast,
+        mock_create_run,
+        mock_initialize,
+        sample_agent_id,
+        sample_agent_name,
+        sample_agent_style,
+    ):
+        """_start_run must surface BackendAPIError from create_run unchanged."""
+        from exceptions import BackendAPIError
+
+        mock_initialize.return_value = None
+        mock_create_run.side_effect = BackendAPIError(
+            "POST /api/runs failed", status_code=500
+        )
+
+        executor = AgentExecutor(
+            sample_agent_id, sample_agent_name, sample_agent_style
+        )
+
+        with pytest.raises(BackendAPIError) as exc_info:
+            await executor._start_run()
+
+        assert exc_info.value.status_code == 500
+
+    @patch("agent_executor.update_phase")
+    @patch("agent_executor.complete_run")
+    @patch("agent_executor.create_run")
+    @patch("agent_executor.get_backend_client")
+    @patch("agent_executor._get_account_report_raw")
+    @patch("agent_executor.initialize_agent")
+    @patch("agent_executor.broadcast_status")
+    async def test_execute_cycle_propagates_recent_activity_backend_error(
+        self,
+        mock_broadcast,
+        mock_initialize,
+        mock_get_report,
+        mock_get_backend_client,
+        mock_create_run,
+        mock_complete_run,
+        mock_update_phase,
+        sample_agent_id,
+        sample_agent_name,
+        sample_agent_style,
+        sample_model_name,
+        mock_mcp_pool,
+    ):
+        """If _fetch_recent_activity raises BackendAPIError, the orchestrator
+        must call _handle_cycle_error (PHASE_ERROR broadcast + mark FAILED)
+        and re-raise the original exception."""
+        from exceptions import BackendAPIError
+        from models.api_responses import AccountReport
+
+        mock_initialize.return_value = None
+        mock_get_report.return_value = AccountReport(
+            agentName=sample_agent_name,
+            balance=100000.0,
+            holdingsValue=0.0,
+            totalPortfolioValue=100000.0,
+            initialBalance=100000.0,
+            totalProfitLoss=0.0,
+            profitLossPercent=0.0,
+            holdingsCount=0,
+            transactionCount=0,
+            holdings=[],
+        )
+
+        # Backend client get_recent_activity blows up with an API error.
+        mock_client = AsyncMock()
+        mock_client.get_recent_activity.side_effect = BackendAPIError(
+            "GET /api/runs/recent failed", status_code=502
+        )
+        mock_get_backend_client.return_value = mock_client
+
+        mock_create_run.return_value = 999
+        mock_update_phase.return_value = True
+        mock_complete_run.return_value = True
+
+        executor = AgentExecutor(
+            sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
+        )
+
+        with pytest.raises(BackendAPIError) as exc_info:
+            await executor.execute_cycle(mcp_pool=mock_mcp_pool, force_trade=False)
+
+        assert exc_info.value.status_code == 502
+        # _handle_cycle_error must broadcast PHASE_ERROR for the agent.
+        # ctx is None at this point (failure happened before RunContext was
+        # built), so run_id falls back to None and update_phase must still be
+        # invoked at most for the earlier RESEARCHING transition — never for
+        # FAILED because run_id was set when _start_run completed.
+        error_broadcasts = [
+            call for call in mock_broadcast.call_args_list
+            if call.args[2] == "FAILED"
+        ]
+        assert error_broadcasts, "expected PHASE_ERROR broadcast on failure"
+        # complete_run must NOT have been called — the orchestrator deliberately
+        # avoids overriding a failed run back to COMPLETED.
+        mock_complete_run.assert_not_called()
+
+    @patch("agent_executor.complete_run")
+    @patch("agent_executor.DecisionMaker")
+    @patch("agent_executor.MarketAnalyst")
+    @patch("guardrail_retry.Runner")
+    @patch("agent_executor.update_phase")
+    @patch("agent_executor.create_run")
+    @patch("agent_executor.get_backend_client")
+    @patch("agent_executor._get_account_report_raw")
+    @patch("agent_executor.initialize_agent")
+    @patch("agent_executor.broadcast_status")
+    async def test_execute_cycle_propagates_max_turns_exceeded_from_research(
+        self,
+        mock_broadcast,
+        mock_initialize,
+        mock_get_report,
+        mock_get_backend_client,
+        mock_create_run,
+        mock_update_phase,
+        mock_guardrail_runner_class,
+        mock_market_analyst_class,
+        mock_decision_maker_class,
+        mock_complete_run,
+        sample_agent_id,
+        sample_agent_name,
+        sample_agent_style,
+        sample_model_name,
+        sample_recent_activity,
+        mock_mcp_pool,
+    ):
+        """MaxTurnsExceeded raised inside the Market Analyst run must propagate
+        out of execute_cycle after _handle_cycle_error records the failure."""
+        from agents.exceptions import MaxTurnsExceeded
+        from models.api_responses import AccountReport
+
+        mock_initialize.return_value = None
+        mock_get_report.return_value = AccountReport(
+            agentName=sample_agent_name,
+            balance=100000.0,
+            holdingsValue=0.0,
+            totalPortfolioValue=100000.0,
+            initialBalance=100000.0,
+            totalProfitLoss=0.0,
+            profitLossPercent=0.0,
+            holdingsCount=0,
+            transactionCount=0,
+            holdings=[],
+        )
+        mock_client = AsyncMock()
+        mock_client.get_recent_activity.return_value = sample_recent_activity
+        mock_get_backend_client.return_value = mock_client
+        mock_create_run.return_value = 555
+        mock_update_phase.return_value = True
+        mock_complete_run.return_value = True
+
+        mock_analyst_instance = MagicMock()
+        mock_analyst_instance.agent = MagicMock()
+        mock_analyst_instance.agent.instructions = "sys"
+        mock_analyst_instance.build_prompt.return_value = "prompt"
+        mock_analyst_instance.model_name = "gpt-4o"
+        mock_market_analyst_class.create = AsyncMock(return_value=mock_analyst_instance)
+
+        # Guardrail retry runner blows up with MaxTurnsExceeded.
+        mock_guardrail_runner_class.run = AsyncMock(
+            side_effect=MaxTurnsExceeded("agent looped too long")
+        )
+
+        executor = AgentExecutor(
+            sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
+        )
+
+        with pytest.raises(MaxTurnsExceeded):
+            await executor.execute_cycle(mcp_pool=mock_mcp_pool, force_trade=False)
+
+        # The error must have been recorded against the existing run (run_id=555)
+        # via update_phase(FAILED, error_message=...). Find that call.
+        failed_calls = [
+            call for call in mock_update_phase.call_args_list
+            if len(call.args) >= 2 and getattr(call.args[1], "name", None) == "FAILED"
+        ]
+        assert failed_calls, "expected update_phase(run_id, RunPhase.FAILED) on MaxTurnsExceeded"
+        # complete_run must NOT be called — failed runs are not "completed".
+        mock_complete_run.assert_not_called()
+        # DecisionMaker.create must NOT have been called — research crashed first.
+        mock_decision_maker_class.create.assert_not_called()
+
+    @patch("agent_executor.update_phase")
+    @patch("agent_executor.broadcast_status")
+    async def test_handle_cycle_error_without_ctx_skips_update_phase(
+        self,
+        mock_broadcast,
+        mock_update_phase,
+        sample_agent_id,
+        sample_agent_name,
+        sample_agent_style,
+    ):
+        """When ctx is None (failure before run creation), _handle_cycle_error
+        must broadcast PHASE_ERROR but NOT call update_phase(FAILED) because
+        there is no run_id to mark failed."""
+        executor = AgentExecutor(
+            sample_agent_id, sample_agent_name, sample_agent_style
+        )
+
+        await executor._handle_cycle_error(
+            RuntimeError("init failure"), ctx=None
+        )
+
+        # Error must have been broadcast for the agent's name/id.
+        mock_broadcast.assert_called_once()
+        broadcast_args = mock_broadcast.call_args.args
+        assert broadcast_args[0] == sample_agent_id
+        assert broadcast_args[1] == sample_agent_name
+        assert broadcast_args[2] == "FAILED"  # PHASE_ERROR -> RunPhase.FAILED
+
+        # update_phase must NOT have been called - no run exists.
+        mock_update_phase.assert_not_called()
+
+    @patch("agent_executor.update_phase")
+    @patch("agent_executor.broadcast_status")
+    async def test_handle_cycle_error_swallows_cleanup_error(
+        self,
+        mock_broadcast,
+        mock_update_phase,
+        sample_agent_id,
+        sample_agent_name,
+        sample_agent_style,
+        sample_model_name,
+        sample_recent_activity,
+    ):
+        """If update_phase itself raises during error recording, _handle_cycle_error
+        must log and continue — the original exception is the one that matters.
+        The method itself returns normally (caller re-raises the original error)."""
+        from exceptions import BackendAPIError
+
+        mock_update_phase.side_effect = BackendAPIError(
+            "patch /phase failed", status_code=503
+        )
+
+        executor = AgentExecutor(
+            sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
+        )
+
+        ctx = RunContext(
+            run_id=777,
+            agent_id=sample_agent_id,
+            agent_name=sample_agent_name,
+            agent_style=sample_agent_style,
+            model_name=sample_model_name,
+            research_start_time=datetime.now(),
+            balance=100000.0,
+            holdings=[],
+            recent_activity=sample_recent_activity,
+        )
+
+        # Must return normally — never raise from _handle_cycle_error itself.
+        await executor._handle_cycle_error(RuntimeError("cycle boom"), ctx=ctx)
+
+        # update_phase WAS attempted (even though it failed).
+        mock_update_phase.assert_called_once()
+        # The error broadcast still happened.
+        assert mock_broadcast.call_count >= 1

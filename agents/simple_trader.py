@@ -7,7 +7,7 @@ with a run() interface for TradingSystem compatibility.
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from agents import trace
@@ -97,7 +97,7 @@ class SimpleTrader:
     agent_style: InvestmentStyle
     strategy: str
     agent_id: int  # Required - set by TradingSystem.create()
-    model_name: str = config.OPENAI_MODEL
+    model_name: str = field(default_factory=lambda: config.OPENAI_MODEL)
 
     async def run(self, mcp_pool: MCPPool, force_trade: bool = False):
         """Run a trading cycle. Delegates to module-level function.

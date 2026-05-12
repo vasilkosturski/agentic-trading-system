@@ -6,6 +6,7 @@ Runs alongside the continuous trading system using proper encapsulation.
 
 import asyncio
 import logging
+import time
 from flask import Flask, jsonify
 from threading import Thread
 
@@ -88,6 +89,5 @@ class TradingAPIServer:
         logger.info(f"🌐 API server thread started on port {port}")
         
         # Give Flask a moment to start
-        import time
         time.sleep(2)
         logger.info(f"✅ Flask server should be running on http://0.0.0.0:{port}")

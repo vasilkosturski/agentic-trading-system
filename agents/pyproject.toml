@@ -19,6 +19,7 @@ dependencies = [
     "pydantic>=2.13.4",
     "aiohttp>=3.13.5",
     "httpx>=0.28.1",
+    "h2>=4.0.0",
     "mcp>=1.27.0,<2",
     "requests>=2.33.1",
     "flask>=3.1.3",
@@ -29,7 +30,7 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
+    "pytest-asyncio>=1.0,<2.0",
     "pytest-mock>=3.15.0",
     "pytest-docker>=3.1.0",
     "aioresponses>=0.7.8",
@@ -44,6 +45,15 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
+# Function-scope event loops match BackendClient's loop-aware singleton
+# (see agents/backend_client.py "loop-local singleton" invariant).  Each
+# test gets its own asyncio event loop; BackendClient detects the loop-ID
+# change and recreates its underlying httpx.AsyncClient on the new loop.
+# This prevents cross-test event-loop leakage and the classic
+# "RuntimeError: Event loop is closed" failure mode caused by sockets
+# bound to a dead loop from a previous test.
+# Refs: pytest-asyncio per-function loop scope
+#   https://pytest-asyncio.readthedocs.io/en/stable/how-to-guides/change_default_fixture_loop.html
 asyncio_default_fixture_loop_scope = "function"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",

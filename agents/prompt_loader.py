@@ -33,6 +33,7 @@ import os
 from datetime import datetime
 from typing import Dict, Literal, Tuple
 
+from agent_registry import VALID_AGENT_NAMES
 from backend_client import BackendClient, get_backend_client
 
 logger = logging.getLogger(__name__)
@@ -43,8 +44,9 @@ BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8080")
 # Valid agent types
 AgentType = Literal["market_analyst", "decision_maker"]
 
-# Valid agent names (lowercase for API calls)
-VALID_AGENT_NAMES = {"warren", "george", "ray", "cathie"}
+# ``VALID_AGENT_NAMES`` is re-exported from ``agent_registry`` so existing
+# imports (``from prompt_loader import VALID_AGENT_NAMES``) keep working
+# without duplicating the literal roster here.
 
 
 # ---------------------------------------------------------------------------

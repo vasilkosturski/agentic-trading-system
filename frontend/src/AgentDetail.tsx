@@ -12,7 +12,7 @@ import {
   Loader,
   Badge,
 } from '@mantine/core'
-import { IconClock } from '@tabler/icons-react'
+import { IconClock, IconAlertTriangle } from '@tabler/icons-react'
 import { formatDistanceToNow } from 'date-fns'
 import Markdown from 'react-markdown'
 import type { AgentPortfolio, Holding } from './types.ts'
@@ -100,6 +100,20 @@ function AgentDetail() {
         <Title order={1} c={color}>{agentName}</Title>
         {agentStyle && <Badge variant="light" size="lg">{agentStyle}</Badge>}
       </Group>
+
+      {/* Historical Data Notice */}
+      <Paper p="md" shadow="xs" mb="lg" bg="yellow.1" withBorder>
+        <Group align="flex-start" gap="sm" wrap="nowrap">
+          <IconAlertTriangle size={20} color="var(--mantine-color-yellow-8)" />
+          <div>
+            <Text fw={600} mb={4}>Historical Data Notice</Text>
+            <Text size="sm">
+              All trading data shown here is delayed by 7 days. This platform is for
+              educational purposes only and does not constitute financial advice.
+            </Text>
+          </div>
+        </Group>
+      </Paper>
 
       {/* Portfolio Summary */}
       <Paper p="lg" shadow="xs" mb="lg">

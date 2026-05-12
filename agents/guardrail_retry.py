@@ -65,9 +65,17 @@ async def run_with_guardrail_retry(
             )
 
             # Reconstruct conversation from the exception's run_data.
-            # run_data is attached by the SDK when the guardrail fires.
-            input_items = ItemHelpers.input_to_new_input_list(e.run_data.input)  # type: ignore[union-attr]
-            for item in e.run_data.new_items:  # type: ignore[union-attr]
+            # The SDK always attaches run_data when a guardrail tripwire fires;
+            # if it's missing, something is wrong upstream and we cannot
+            # rebuild the conversation -- fail loudly instead of papering over.
+            if e.run_data is None:
+                raise RuntimeError(
+                    "OutputGuardrailTripwireTriggered raised without run_data; "
+                    "cannot reconstruct conversation for retry"
+                ) from e
+
+            input_items = ItemHelpers.input_to_new_input_list(e.run_data.input)
+            for item in e.run_data.new_items:
                 if item.type == "tool_approval_item":
                     continue  # ToolApprovalItems cannot be converted
                 input_items.append(item.to_input_item())

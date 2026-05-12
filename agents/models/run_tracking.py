@@ -9,7 +9,7 @@ Uses camelCase field names to match Java naming convention directly.
 """
 
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal
 
 from pydantic import BaseModel, Field
 
@@ -49,9 +49,9 @@ class SourceDto(BaseModel):
     - system_context: Has description (internal tool usage)
     """
     type: Literal["web", "system_context"]
-    title: Optional[str] = None
-    url: Optional[str] = None
-    description: Optional[str] = None
+    title: str | None = None
+    url: str | None = None
+    description: str | None = None
 
     @classmethod
     def web(cls, title: str, url: str) -> "SourceDto":
@@ -75,9 +75,9 @@ class ToolCallDto(BaseModel):
     - errorMessage: Truncated error output (max 500 chars)
     """
     tool: str
-    params: Optional[Dict[str, Any]] = None
-    error: Optional[bool] = None
-    errorMessage: Optional[str] = None
+    params: Dict[str, Any] | None = None
+    error: bool | None = None
+    errorMessage: str | None = None
 
 
 class ReasoningDto(BaseModel):
@@ -87,10 +87,10 @@ class ReasoningDto(BaseModel):
     4-field structured reasoning: rationale narrative, portfolio context,
     historical context, research summary.
     """
-    rationale: Optional[str] = None
-    portfolioContext: Optional[str] = None
-    historicalContext: Optional[str] = None
-    researchContext: Optional[str] = None
+    rationale: str | None = None
+    portfolioContext: str | None = None
+    historicalContext: str | None = None
+    researchContext: str | None = None
 
 
 class ResearchPhaseData(BaseModel):
@@ -101,14 +101,14 @@ class ResearchPhaseData(BaseModel):
     """
     candidates: List[str] = Field(default_factory=list)
     sources: List[SourceDto] = Field(default_factory=list)
-    notes: Optional[str] = None
+    notes: str | None = None
     toolCalls: List[ToolCallDto] = Field(default_factory=list)
-    latencyMs: Optional[int] = None
+    latencyMs: int | None = None
     # Token usage metrics (nested object)
-    metrics: Optional[UsageMetrics] = None
+    metrics: UsageMetrics | None = None
     # Agent prompts captured at execution time
-    systemPrompt: Optional[str] = None
-    taskPrompt: Optional[str] = None
+    systemPrompt: str | None = None
+    taskPrompt: str | None = None
 
 
 class DecisionPhaseData(BaseModel):
@@ -118,17 +118,17 @@ class DecisionPhaseData(BaseModel):
     Contains all data collected during the DECIDING phase.
     """
     decision: TradeDecision
-    symbol: Optional[str] = None
-    quantity: Optional[int] = None
-    reasoning: Optional[ReasoningDto] = None
+    symbol: str | None = None
+    quantity: int | None = None
+    reasoning: ReasoningDto | None = None
     sources: List[SourceDto] = Field(default_factory=list)
     toolCalls: List[ToolCallDto] = Field(default_factory=list)
-    latencyMs: Optional[int] = None
+    latencyMs: int | None = None
     # Token usage metrics (nested object)
-    metrics: Optional[UsageMetrics] = None
+    metrics: UsageMetrics | None = None
     # Agent prompts captured at execution time
-    systemPrompt: Optional[str] = None
-    taskPrompt: Optional[str] = None
+    systemPrompt: str | None = None
+    taskPrompt: str | None = None
 
 
 class ExecutionPhaseData(BaseModel):
@@ -137,9 +137,9 @@ class ExecutionPhaseData(BaseModel):
     Matches backend ExecutionPhaseDto.java.
     Contains all data collected during the TRADING phase.
     """
-    tradeId: Optional[int] = None
-    status: Optional[PhaseStatus] = None
-    errorDetails: Optional[str] = None
+    tradeId: int | None = None
+    status: PhaseStatus | None = None
+    errorDetails: str | None = None
 
 
 class CompleteRunData(BaseModel):
@@ -148,9 +148,9 @@ class CompleteRunData(BaseModel):
     Matches backend CompleteRunRequest.java.
     Nested structure with explicit phase DTOs for self-documenting API.
     """
-    research: Optional[ResearchPhaseData] = None
+    research: ResearchPhaseData | None = None
     decision: DecisionPhaseData
-    execution: Optional[ExecutionPhaseData] = None
+    execution: ExecutionPhaseData | None = None
 
     def to_json_dict(self) -> Dict[str, Any]:
         """Serialize to dict for API."""

@@ -45,7 +45,7 @@ from agents.mcp import MCPServer
 from config import config
 from utils.sdk_parser import extract_tool_calls, get_tool_errors
 from datetime import datetime
-from typing import Optional, Union, List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING
 
 # Import model for structured output
 from models.llm_output import ResearchResponse
@@ -130,7 +130,7 @@ class MarketAnalystContext:
     agent_style: InvestmentStyle
     balance: float
     holdings: List["Holding"]
-    recent_activity: Optional[RecentActivityResponse] = None
+    recent_activity: RecentActivityResponse | None = None
     max_positions: int = 10
 
     @property
@@ -312,7 +312,7 @@ async def create_market_analyst_agent(
 
     # Create price lookup tool for budget verification
     @function_tool
-    async def lookup_price_tool(symbol: str) -> Union[dict, ToolError]:
+    async def lookup_price_tool(symbol: str) -> dict | ToolError:
         """Get current market price to check if candidates fit budget constraints.
 
         Args:

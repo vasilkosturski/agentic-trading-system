@@ -7,7 +7,6 @@ Callers should use asyncio.create_task() for fire-and-forget behavior.
 import asyncio
 import httpx
 from datetime import datetime, timezone
-from typing import Optional
 from config import BACKEND_BASE_URL
 from models.run_tracking import RunPhase
 import logging
@@ -29,7 +28,7 @@ async def broadcast_status_async(
     phase: str,
     message: str,
     progress: int,
-    outcome: Optional[str] = None
+    outcome: str | None = None
 ) -> None:
     """
     Broadcast agent status update to backend (async, non-blocking).
@@ -78,7 +77,7 @@ def broadcast_status(
     phase: str,
     message: str,
     progress: int,
-    outcome: Optional[str] = None
+    outcome: str | None = None
 ) -> None:
     """
     Fire-and-forget status broadcast (convenience wrapper).
