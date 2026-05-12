@@ -14,7 +14,6 @@ Architecture:
 import json
 import logging
 from datetime import datetime
-from typing import Optional
 
 from agents import Runner
 
@@ -176,7 +175,7 @@ class AgentExecutor:
         Architecture: Sequential operations with explicit parameters and typed results.
         Orchestrator assembles results into RunContext for tracking.
         """
-        ctx: Optional[RunContext] = None
+        ctx: RunContext | None = None
 
         print(
             f"🤖 {self.name} starting portfolio review at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
@@ -587,7 +586,7 @@ class AgentExecutor:
         self,
         run_id: int,
         agent_id: int,
-        decision: Optional[TradingDecision],
+        decision: TradingDecision | None,
     ) -> ExecutionResult:
         """Execute BUY/SELL/HOLD decision.
 
@@ -761,7 +760,7 @@ class AgentExecutor:
             outcome=outcome_message,
         )
 
-    async def _handle_cycle_error(self, error: Exception, ctx: Optional[RunContext]) -> None:
+    async def _handle_cycle_error(self, error: Exception, ctx: RunContext | None) -> None:
         """Handle cycle execution error.
 
         Best-effort error recording — never masks the original exception.

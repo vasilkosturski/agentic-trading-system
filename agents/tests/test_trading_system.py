@@ -149,3 +149,96 @@ async def test_run_all_agents_all_failure_logs_each_and_no_raise(
         if r.levelno == logging.ERROR and getattr(r, "agent_name", None) is not None
     )
     assert error_agent_names == ["Cathie", "George", "Ray", "Warren"]
+
+
+# ============================================================================
+# Additional scheduler / orchestration coverage (I11)
+# ============================================================================
+
+
+def test_init_stores_agents_list(four_agents):
+    """Constructor must keep the supplied agents list intact and accessible."""
+    system = TradingSystem(four_agents)
+    assert system.agents is four_agents
+    assert len(system.agents) == 4
+
+
+def test_agent_configs_zips_names_with_styles_in_registry_order():
+    """``AGENT_CONFIGS`` must align with ``AGENT_NAMES`` 1:1 — drift between
+    the name registry and per-persona style/balance config would silently
+    mis-assign personas at startup, so this test guards against re-ordering.
+    """
+    from agent_registry import AGENT_NAMES
+
+    configs = TradingSystem.AGENT_CONFIGS
+
+    assert len(configs) == len(AGENT_NAMES)
+    for cfg, expected_name in zip(configs, AGENT_NAMES):
+        assert cfg["name"] == expected_name
+        assert "style" in cfg
+        assert "balance" in cfg
+        assert isinstance(cfg["balance"], (int, float))
+        assert cfg["balance"] > 0
+
+
+def test_print_agent_summary_runs_without_error(system, four_agents, capsys):
+    """The roster banner is logged on every cycle — it must never crash, and
+    each agent's name must appear in stdout so operators can see who's loaded.
+    """
+    # Must not raise
+    system.print_agent_summary()
+
+    out = capsys.readouterr().out
+    for agent in four_agents:
+        assert agent.name in out
+
+
+async def test_run_all_agents_force_one_trade_forces_exactly_one_agent(
+    system, four_agents
+):
+    """When ``force_one_trade=True``, exactly one of the four agents must be
+    invoked with ``force_trade=True`` and the other three with
+    ``force_trade=False`` — never zero, never two.
+    """
+    captured_calls: list[tuple[str, bool]] = []
+
+    async def capturing_runner(agent, force_trade):
+        captured_calls.append((agent.name, force_trade))
+
+    with patch.object(
+        TradingSystem, "_run_agent_with_own_mcp", side_effect=capturing_runner
+    ):
+        result = await system.run_all_agents(force_one_trade=True)
+
+    # All four agents were invoked
+    assert len(captured_calls) == 4
+    assert sorted(name for name, _ in captured_calls) == [
+        "Cathie", "George", "Ray", "Warren"
+    ]
+
+    forced_count = sum(1 for _, forced in captured_calls if forced)
+    assert forced_count == 1, (
+        f"force_one_trade=True must force exactly one agent; got {forced_count} "
+        f"(calls={captured_calls})"
+    )
+    # And the cycle still reports success counts for the run
+    assert result == {"success": 4, "failure": 0}
+
+
+async def test_run_all_agents_no_force_passes_force_trade_false_to_every_agent(
+    system, four_agents
+):
+    """The default path (``force_one_trade=False``) must NEVER force any agent
+    — every agent is called with ``force_trade=False``."""
+    captured_calls: list[tuple[str, bool]] = []
+
+    async def capturing_runner(agent, force_trade):
+        captured_calls.append((agent.name, force_trade))
+
+    with patch.object(
+        TradingSystem, "_run_agent_with_own_mcp", side_effect=capturing_runner
+    ):
+        await system.run_all_agents(force_one_trade=False)
+
+    assert len(captured_calls) == 4
+    assert all(forced is False for _, forced in captured_calls), captured_calls

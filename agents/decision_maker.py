@@ -13,7 +13,7 @@ from agents import Agent, Runner, Tool, function_tool
 from agents.mcp import MCPServer
 from config import config
 from datetime import datetime
-from typing import Optional, List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING
 
 # Import models
 from models.llm_output import TradingDecision, ResearchResponse
@@ -83,7 +83,7 @@ class DecisionContext:
     research_response: ResearchResponse
     balance: float
     holdings: List["Holding"]
-    recent_activity: Optional[RecentActivityResponse] = None
+    recent_activity: RecentActivityResponse | None = None
     force_trade: bool = False
     max_positions: int = 10
 
@@ -125,7 +125,7 @@ class DecisionMaker:
     # Class-level type annotations (PEP 526) for type checker support
     agent_name: str
     agent_id: int
-    mcp_pool: Optional["MCPPool"]
+    mcp_pool: "MCPPool | None"
     model_name: str
     agent_style: InvestmentStyle
     agent: Agent[TradingDecision]
@@ -139,7 +139,7 @@ class DecisionMaker:
         cls,
         agent_name: str,
         agent_id: int,
-        mcp_pool: Optional["MCPPool"] = None,
+        mcp_pool: "MCPPool | None" = None,
         model_name: str | None = None,
         agent_style: InvestmentStyle = InvestmentStyle.VALUE,
     ) -> "DecisionMaker":
@@ -239,7 +239,7 @@ class DecisionMaker:
 async def create_decision_maker_agent(
     agent_name: str,
     agent_id: int,
-    mcp_pool: Optional["MCPPool"] = None,
+    mcp_pool: "MCPPool | None" = None,
     model_name: str | None = None,
     agent_style: InvestmentStyle = InvestmentStyle.VALUE,
 ) -> Agent[TradingDecision]:

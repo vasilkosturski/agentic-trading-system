@@ -117,6 +117,26 @@ class TestRunWithGuardrailRetry:
         assert mock_runner_class.run.await_count == 3
 
     @patch("guardrail_retry.Runner")
+    async def test_raises_when_run_data_is_none(self, mock_runner_class):
+        """When the SDK raises the tripwire without run_data attached, the
+        retry helper must raise a clear RuntimeError instead of an opaque
+        AttributeError. This locks in the explicit guard that replaces the
+        old `# type: ignore[union-attr]` markers."""
+        exc = _make_guardrail_exception(
+            output_info="missing candidates",
+            new_items=[_make_run_item()],
+        )
+        exc.run_data = None  # simulate SDK leaving run_data unset
+
+        mock_runner_class.run = AsyncMock(side_effect=exc)
+
+        agent = MagicMock()
+        with pytest.raises(RuntimeError, match="run_data"):
+            await run_with_guardrail_retry(
+                agent, "test", max_attempts=3, agent_name="TestAgent"
+            )
+
+    @patch("guardrail_retry.Runner")
     async def test_error_info_in_feedback(self, mock_runner_class):
         """Verify output_info from guardrail appears in retry feedback message."""
         specific_error = "Candidates list must not be empty and all symbols must be uppercase"

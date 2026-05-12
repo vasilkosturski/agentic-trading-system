@@ -4,15 +4,24 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serializable;
+
 /**
  * DTO for source attribution in research and decision phases.
  * Per design doc: web sources (verifiable URLs) or system_context (internal tool usage).
+ *
+ * Implements {@link Serializable} because Hibernate 6.6 (Spring Boot 3.5) requires
+ * JSONB-mapped entity attributes to be Serializable for the default JsonSerializer
+ * dirty-checking path.
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class SourceDto {
-    
+public class SourceDto implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+
     /**
      * Source type: "web" or "system_context"
      */

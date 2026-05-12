@@ -95,3 +95,83 @@ def test_trigger_cycle_rejects_when_already_running(
 
     assert response.status_code == 409
     mock_loop.call_soon_threadsafe.assert_not_called()
+
+
+# ============================================================================
+# Additional manual_cycle / health endpoint coverage (I11)
+# ============================================================================
+
+
+def test_init_stores_all_dependencies(
+    api_server, mock_loop, manual_cycle_event, cycle_running_flag
+):
+    """The constructor must store every collaborator as an attribute so the
+    Flask handler thread can reach the trading system, the event, and the
+    cycle-running flag without touching globals."""
+    assert api_server._loop is mock_loop
+    assert api_server.manual_cycle_event is manual_cycle_event
+    assert api_server.cycle_running_flag is cycle_running_flag
+    # ``trading_system`` is the MagicMock supplied in the fixture
+    assert api_server.trading_system is not None
+    # Flask app is wired up and ready
+    assert api_server.app is not None
+
+
+def test_health_endpoint_returns_200_with_expected_body(api_server):
+    """``GET /health`` is a load-balancer probe — it must return 200 with a
+    machine-readable JSON status payload identifying this service."""
+    client = api_server.app.test_client()
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body == {"status": "healthy", "service": "trading-agents-api"}
+
+
+def test_trigger_cycle_success_body_shape(
+    api_server, mock_loop, cycle_running_flag
+):
+    """On 202 the body must include both a human message and the
+    machine-readable status flag ``TRIGGERED`` so the frontend can
+    differentiate this from the 409 ALREADY_RUNNING path."""
+    cycle_running_flag["running"] = False
+
+    client = api_server.app.test_client()
+    response = client.post("/api/trigger-cycle")
+
+    assert response.status_code == 202
+    body = response.get_json()
+    assert body["status"] == "TRIGGERED"
+    assert "message" in body
+    assert isinstance(body["message"], str) and body["message"]
+
+
+def test_trigger_cycle_409_body_shape(
+    api_server, mock_loop, cycle_running_flag
+):
+    """On 409 the body must carry status ``ALREADY_RUNNING`` so callers can
+    distinguish a duplicate-trigger rejection from any other failure."""
+    cycle_running_flag["running"] = True
+
+    client = api_server.app.test_client()
+    response = client.post("/api/trigger-cycle")
+
+    assert response.status_code == 409
+    body = response.get_json()
+    assert body["status"] == "ALREADY_RUNNING"
+    assert "message" in body
+    assert isinstance(body["message"], str) and body["message"]
+
+
+def test_health_does_not_touch_loop_or_event(
+    api_server, mock_loop, manual_cycle_event, cycle_running_flag
+):
+    """The health probe is a read-only check — it must NOT schedule anything
+    on the loop or touch the manual-cycle event."""
+    client = api_server.app.test_client()
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    mock_loop.call_soon_threadsafe.assert_not_called()
+    assert not manual_cycle_event.is_set()
+    assert cycle_running_flag == {"running": False}

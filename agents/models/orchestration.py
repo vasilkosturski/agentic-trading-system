@@ -7,7 +7,7 @@ Each operation has explicit input parameters and returns a typed result.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List, Generic, TypeVar, TYPE_CHECKING
+from typing import List, Generic, TypeVar, TYPE_CHECKING
 
 from pydantic import BaseModel
 
@@ -91,7 +91,7 @@ class SourceType(str, Enum):
 
 class CycleResult(BaseModel):
     """Result of a complete trading cycle."""
-    decision: Optional[TradingDecision] = None
+    decision: TradingDecision | None = None
     trade_count: int
     run_id: int
 
@@ -112,7 +112,7 @@ class ResearchResult:
     sources: List[SourceDto] = field(default_factory=list)
     notes: str = ""
     tool_calls: List["ToolCallDto"] = field(default_factory=list)
-    usage_metrics: Optional[UsageMetrics] = None
+    usage_metrics: UsageMetrics | None = None
 
 
 @dataclass
@@ -121,15 +121,15 @@ class DecisionResult:
     decision: TradingDecision  # Required - throw on failure
     decision_start_time: datetime  # Required - always set before returning
     tool_calls: List["ToolCallDto"] = field(default_factory=list)
-    usage_metrics: Optional[UsageMetrics] = None
+    usage_metrics: UsageMetrics | None = None
 
 
 @dataclass
 class ExecutionResult:
     """Result of trade execution."""
     execution_status: PhaseStatus  # Required - always set
-    trade_id: Optional[int] = None  # None for HOLD actions
-    execution_error: Optional[str] = None
+    trade_id: int | None = None  # None for HOLD actions
+    execution_error: str | None = None
 
 
 @dataclass
@@ -174,44 +174,44 @@ class RunContext:
     research_start_time: datetime
     balance: float = 0.0
     holdings: List["Holding"] = field(default_factory=list)
-    recent_activity: Optional[RecentActivityResponse] = None
+    recent_activity: RecentActivityResponse | None = None
 
     # --- Output ---
-    research_response: Optional[ResearchResponse] = None
+    research_response: ResearchResponse | None = None
     research_candidates: List[str] = field(default_factory=list)
     research_sources: List[SourceDto] = field(default_factory=list)
     research_tool_calls: List["ToolCallDto"] = field(default_factory=list)
     research_notes: str = ""
-    research_usage_metrics: Optional[UsageMetrics] = None
+    research_usage_metrics: UsageMetrics | None = None
 
     # ═══════════════════════════════════════════════════════════════════════════
     # PHASE 2: DECISION MAKER (DECIDING)
     # ═══════════════════════════════════════════════════════════════════════════
     # --- Input: inherits research output above ---
-    decision_start_time: Optional[datetime] = None
+    decision_start_time: datetime | None = None
 
     # --- Output ---
-    decision: Optional[TradingDecision] = None  # BUY/SELL/HOLD - always set by phase end
+    decision: TradingDecision | None = None  # BUY/SELL/HOLD - always set by phase end
     decision_sources: List[SourceDto] = field(default_factory=list)
     decision_tool_calls: List["ToolCallDto"] = field(default_factory=list)
-    decision_usage_metrics: Optional[UsageMetrics] = None
+    decision_usage_metrics: UsageMetrics | None = None
 
     # ═══════════════════════════════════════════════════════════════════════════
     # PROMPT CAPTURE (for observability — populated during research/decision)
     # ═══════════════════════════════════════════════════════════════════════════
-    market_analyst_system_prompt: Optional[str] = None
-    market_analyst_task_prompt: Optional[str] = None
-    decision_maker_system_prompt: Optional[str] = None
-    decision_maker_task_prompt: Optional[str] = None
+    market_analyst_system_prompt: str | None = None
+    market_analyst_task_prompt: str | None = None
+    decision_maker_system_prompt: str | None = None
+    decision_maker_task_prompt: str | None = None
 
     # ═══════════════════════════════════════════════════════════════════════════
     # PHASE 3: EXECUTION (TRADING)
     # ═══════════════════════════════════════════════════════════════════════════
     # --- Input: decision from above ---
     # --- Output ---
-    trade_id: Optional[int] = None  # Set if trade executed
-    execution_status: Optional[PhaseStatus] = None  # COMPLETED/FAILED/SKIPPED
-    execution_error: Optional[str] = None  # Error details if failed
+    trade_id: int | None = None  # Set if trade executed
+    execution_status: PhaseStatus | None = None  # COMPLETED/FAILED/SKIPPED
+    execution_error: str | None = None  # Error details if failed
 
 
 class HoldingsSummary(BaseModel):

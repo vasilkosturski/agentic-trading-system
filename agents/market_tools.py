@@ -10,7 +10,6 @@ avoids redundant HTTP calls when the LLM calls multiple tools for the same symbo
 import logging
 from agents import function_tool
 from cachetools import TTLCache
-from typing import Optional
 
 # Import centralized configuration
 from config import BACKEND_API_MARKET
@@ -37,7 +36,7 @@ _CACHE_TTL_SECONDS = 300
 _market_data_cache: TTLCache = TTLCache(maxsize=500, ttl=_CACHE_TTL_SECONDS)
 
 
-def _get_cached(symbol: str) -> Optional[MarketData]:
+def _get_cached(symbol: str) -> MarketData | None:
     """Return cached MarketData if present and not expired.
 
     TTLCache transparently treats expired entries as missing, so this is just

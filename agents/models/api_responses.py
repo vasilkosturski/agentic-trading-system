@@ -7,7 +7,7 @@ These use Pydantic BaseModel because they validate data from external APIs
 from datetime import datetime
 from datetime import date as DateType
 from enum import Enum
-from typing import List, Optional
+from typing import List
 from pydantic import BaseModel, Field
 
 
@@ -97,7 +97,7 @@ class AccountReport(BaseModel):
     initialBalance: float = Field(gt=0, description="Starting balance")
     totalProfitLoss: float = Field(description="Total P&L in USD")
     profitLossPercent: float = Field(description="P&L as percentage")
-    lastUpdated: Optional[str] = Field(default=None, description="Last activity timestamp")
+    lastUpdated: str | None = Field(default=None, description="Last activity timestamp")
     holdingsCount: int = Field(ge=0, description="Number of stock positions")
     transactionCount: int = Field(ge=0, description="Total number of trades")
     holdings: List[Holding] = Field(default_factory=list, description="Detailed holdings list")
@@ -132,11 +132,11 @@ class ActivityRun(BaseModel):
 
     date: datetime = Field(description="Date/time of the run")
     outcome: RunOutcome = Field(description="Run outcome: COMPLETED, ERROR, or IN_PROGRESS")
-    summary: Optional[str] = Field(default=None, description="Brief summary of the run")
-    fullReasoning: Optional[str] = Field(default=None, description="Complete reasoning")
-    researchSources: Optional[str] = Field(default=None, description="JSON string of web sources")
-    historicalContext: Optional[str] = Field(default=None, description="JSON string of historical insights")
-    trades: Optional[list[ActivityTrade]] = Field(default=None, description="Trades made in this run")
+    summary: str | None = Field(default=None, description="Brief summary of the run")
+    fullReasoning: str | None = Field(default=None, description="Complete reasoning")
+    researchSources: str | None = Field(default=None, description="JSON string of web sources")
+    historicalContext: str | None = Field(default=None, description="JSON string of historical insights")
+    trades: list[ActivityTrade] | None = Field(default=None, description="Trades made in this run")
 
 
 class RecentActivityResponse(BaseModel):
@@ -198,9 +198,9 @@ class SymbolHistoryResponse(BaseModel):
     symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
     agentName: str = Field(description="Name of the trading agent")
     days: int = Field(gt=0, description="Number of days of history")
-    currentPosition: Optional[SymbolPosition] = Field(default=None, description="Current position if any")
+    currentPosition: SymbolPosition | None = Field(default=None, description="Current position if any")
     trades: list[SymbolTrade] = Field(default_factory=list, description="List of trades")
-    summary: Optional[TradingSummary] = Field(default=None, description="Trading summary")
+    summary: TradingSummary | None = Field(default=None, description="Trading summary")
 
 
 class PriceLookupResponse(BaseModel):

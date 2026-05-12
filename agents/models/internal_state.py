@@ -6,7 +6,7 @@ for internal-only data.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, List, Any, Dict
+from typing import List, Any, Dict
 from datetime import datetime
 
 
@@ -14,7 +14,7 @@ from datetime import datetime
 class ExecutorState:
     """Internal state for AgentExecutor during a trading cycle."""
 
-    run_id: Optional[int] = None
+    run_id: int | None = None
     trade_count: int = 0
     # Note: last_decision stored directly in AgentExecutor, not in this dataclass
     # This dataclass is for simple scalar state only

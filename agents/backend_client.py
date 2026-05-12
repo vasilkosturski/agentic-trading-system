@@ -26,8 +26,9 @@ Lifecycle strategy — "loop-local singleton with optional DI":
     issues can occur.
 """
 
+import asyncio
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import httpx
 from tenacity import (
@@ -95,7 +96,7 @@ class BackendClient:
 
     def __init__(
         self,
-        client: Optional[httpx.AsyncClient] = None,
+        client: httpx.AsyncClient | None = None,
         timeout: float = 30.0,
     ):
         """Initialize the backend client.
@@ -109,10 +110,10 @@ class BackendClient:
             timeout: Default request timeout in seconds.  Only used when no
                 external *client* is provided.
         """
-        self._external_client: Optional[httpx.AsyncClient] = client
-        self._owned_client: Optional[httpx.AsyncClient] = None
+        self._external_client: httpx.AsyncClient | None = client
+        self._owned_client: httpx.AsyncClient | None = None
         self._timeout = timeout
-        self._loop_id: Optional[int] = None
+        self._loop_id: int | None = None
 
     def _get_client(self) -> httpx.AsyncClient:
         """Return the ``httpx.AsyncClient`` to use for the next request.
@@ -153,15 +154,24 @@ class BackendClient:
         # Thread-safety note: This check-then-assign looks like a TOCTOU race,
         # but it is safe. asyncio uses cooperative scheduling — coroutines only
         # yield at `await` points, and this method has none, so it runs atomically.
-        import asyncio
         try:
             current_loop_id = id(asyncio.get_running_loop())
         except RuntimeError:
             current_loop_id = None
 
         if self._owned_client is None or self._owned_client.is_closed or self._loop_id != current_loop_id:
+            # HTTP/2 enabled: backend runs on Traefik 2.x which negotiates h2 over
+            # ALPN. Multiplexing concurrent agent requests over a single TCP
+            # connection reduces head-of-line blocking and connection overhead.
+            # Requires the optional `h2` dependency (see pyproject.toml extras).
+            # Phase-granular timeouts: fail fast on connect/pool acquisition,
+            # but allow longer reads for the backend's heavier endpoints (e.g.
+            # account reports). See tasks/python-agents-info-fixes/notes/
+            # research/03-i3-granular-timeout.md and httpx docs:
+            # https://www.python-httpx.org/advanced/timeouts/
             self._owned_client = httpx.AsyncClient(
-                timeout=httpx.Timeout(self._timeout, connect=5.0),
+                http2=True,
+                timeout=httpx.Timeout(connect=5.0, read=15.0, write=10.0, pool=5.0),
                 limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
                 headers={"Accept": "application/json"},
             )
@@ -184,8 +194,8 @@ class BackendClient:
         method: str,
         url: str,
         *,
-        params: Optional[Dict[str, Any]] = None,
-        json_data: Optional[Dict[str, Any]] = None,
+        params: Dict[str, Any] | None = None,
+        json_data: Dict[str, Any] | None = None,
     ) -> httpx.Response:
         """Make HTTP request to backend API.
         
@@ -305,14 +315,14 @@ class BackendClient:
         """
         url = f"{BACKEND_BASE_URL}/api/accounts/resources/accounts/{agent_id}"
         response = await self._request("GET", url)
-        return AccountReport.model_validate(response.json())
+        return AccountReport.model_validate_json(response.text)
 
     async def buy_shares(
         self,
         agent_id: int,
         symbol: str,
         quantity: int,
-        run_id: Optional[int] = None,
+        run_id: int | None = None,
     ) -> TradeResult:
         """Buy shares of a stock.
         
@@ -332,14 +342,14 @@ class BackendClient:
             "quantity": quantity,
             "runId": run_id
         })
-        return TradeResult(**response.json())
+        return TradeResult.model_validate_json(response.text)
     
     async def sell_shares(
         self,
         agent_id: int,
         symbol: str,
         quantity: int,
-        run_id: Optional[int] = None,
+        run_id: int | None = None,
     ) -> TradeResult:
         """Sell shares of a stock.
         
@@ -359,7 +369,7 @@ class BackendClient:
             "quantity": quantity,
             "runId": run_id
         })
-        return TradeResult(**response.json())
+        return TradeResult.model_validate_json(response.text)
     
     # ========== Memory / History Operations ==========
 
@@ -460,8 +470,35 @@ class BackendClient:
         logger.info(f"Completed run #{run_id} with decision={data.decision.decision}")
 
 
-# Module-level singleton for backward compatibility
-_default_client: Optional[BackendClient] = None
+# Module-level singleton for backward compatibility.
+#
+# Concurrency invariant — "mutations only from asyncio task context":
+#   The mutating accessors below (``get_backend_client`` / ``close_backend_client``)
+#   are intentionally synchronous functions that perform plain attribute reads and
+#   writes on this module-level slot.  They are safe ONLY because they are always
+#   invoked from within an asyncio task — i.e. from coroutine call sites that run
+#   on a single event-loop thread under cooperative scheduling.  Between two
+#   consecutive Python bytecodes within these functions there is no ``await``,
+#   so no other coroutine can interleave and observe a half-initialized state;
+#   the check-then-assign in ``get_backend_client`` is therefore race-free in
+#   practice without any explicit lock.
+#
+#   This invariant must hold at every call site:
+#     - DO call ``get_backend_client()`` from coroutines / async request
+#       handlers / asyncio.run() entry points.  These run on the loop thread.
+#     - DO NOT call it from raw OS threads (e.g. ``threading.Thread``,
+#       ``concurrent.futures.ThreadPoolExecutor`` workers, or signal handlers).
+#       Two preemptive threads racing on ``_default_client is None`` could both
+#       construct a ``BackendClient`` and one would leak, and worse, each thread
+#       might bind sockets to a different event loop — reintroducing exactly the
+#       cross-loop bug the loop-aware singleton in ``BackendClient._get_client``
+#       is designed to prevent (see httpx#2959 reference above).
+#
+#   If a sync/threaded caller ever needs access, wrap it with
+#   ``asyncio.run_coroutine_threadsafe(...)`` against the main loop, or guard
+#   this slot with an ``asyncio.Lock`` / ``threading.Lock``.  Do not silently
+#   relax the invariant.
+_default_client: BackendClient | None = None
 
 
 def get_backend_client() -> BackendClient:
@@ -490,8 +527,8 @@ async def call_backend(
     method: str,
     url: str,
     *,
-    params: Optional[Dict[str, Any]] = None,
-    json_data: Optional[Dict[str, Any]] = None,
+    params: Dict[str, Any] | None = None,
+    json_data: Dict[str, Any] | None = None,
 ) -> httpx.Response:
     """Legacy function for backward compatibility.
 

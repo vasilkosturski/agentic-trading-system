@@ -1,6 +1,6 @@
 """Custom exceptions for the trading agent system."""
 
-from typing import Optional, List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from utils.sdk_parser import ParsedToolCall
@@ -32,7 +32,7 @@ class BackendAPIError(Exception):
     - Invalid responses (malformed JSON, missing expected fields)
     """
 
-    def __init__(self, message: str, status_code: Optional[int] = None):
+    def __init__(self, message: str, status_code: int | None = None):
         super().__init__(message)
         self.status_code = status_code
 

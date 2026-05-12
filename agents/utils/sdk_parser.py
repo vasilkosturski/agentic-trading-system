@@ -14,7 +14,7 @@ Error detection covers two patterns:
 
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from agents.items import RunItem, ToolCallItem, ToolCallOutputItem
 
@@ -30,9 +30,9 @@ class ParsedToolCall:
     name: str
     call_id: str
     output: str
-    params: Optional[Dict[str, Any]] = None
+    params: Dict[str, Any] | None = None
     is_error: bool = False
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
 
 def _field(obj: Any, key: str) -> Any:
@@ -51,7 +51,7 @@ def extract_tool_calls(items: list[RunItem]) -> list[ParsedToolCall]:
     """
     tool_calls: List[ParsedToolCall] = []
     names: Dict[str, str] = {}
-    params: Dict[str, Optional[Dict[str, Any]]] = {}
+    params: Dict[str, Dict[str, Any] | None] = {}
 
     for item in items:
         if isinstance(item, ToolCallItem):
@@ -100,7 +100,7 @@ def extract_tool_calls(items: list[RunItem]) -> list[ParsedToolCall]:
 _SDK_ERROR_PREFIX = "an error occurred while running the tool"
 
 
-def _detect_tool_error(output: str) -> tuple[bool, Optional[str]]:
+def _detect_tool_error(output: str) -> tuple[bool, str | None]:
     """Detect tool errors from two sources.
 
     1. **SDK default prefix**: When a tool raises an exception, the SDK's

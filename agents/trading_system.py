@@ -3,11 +3,13 @@
 import asyncio
 import logging
 import os
+import random
 from contextlib import AsyncExitStack
 from typing import List
 from dotenv import load_dotenv
 
 from agents.mcp import MCPServerStdio
+from agent_registry import AGENT_NAMES
 from simple_trader import SimpleTrader
 from models.investment_style import InvestmentStyle
 from api_server import TradingAPIServer
@@ -34,6 +36,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Per-agent investment style + starting balance live at module scope rather
+# than as class-body locals so the AGENT_CONFIGS list comprehension below can
+# close over them (list comprehensions inside a class body don't see the
+# class's other class-level names).
+_AGENT_STYLES = (
+    InvestmentStyle.VALUE,            # Warren
+    InvestmentStyle.CONTRARIAN_MACRO, # George
+    InvestmentStyle.RISK_PARITY,      # Ray
+    InvestmentStyle.GROWTH,           # Cathie
+)
+_DEFAULT_STARTING_BALANCE = 100000.0
+
+
 class TradingSystem:
     """Main trading system that orchestrates all four autonomous agents"""
     
@@ -41,12 +56,13 @@ class TradingSystem:
         """Initialize with pre-configured agents (use create() factory method)"""
         self.agents = agents
     
-    # Agent definitions — single source of truth for agent names and config
+    # Per-agent config table. The agent NAMES live in
+    # ``agent_registry.AGENT_NAMES`` (single source of truth); this table
+    # zips each name with its persona-specific style + starting balance
+    # (defined at module scope above, in registry order).
     AGENT_CONFIGS = [
-        {"name": "Warren", "style": InvestmentStyle.VALUE, "balance": 100000.0},
-        {"name": "George", "style": InvestmentStyle.CONTRARIAN_MACRO, "balance": 100000.0},
-        {"name": "Ray", "style": InvestmentStyle.RISK_PARITY, "balance": 100000.0},
-        {"name": "Cathie", "style": InvestmentStyle.GROWTH, "balance": 100000.0},
+        {"name": name, "style": style, "balance": _DEFAULT_STARTING_BALANCE}
+        for name, style in zip(AGENT_NAMES, _AGENT_STYLES)
     ]
 
     @classmethod
@@ -114,7 +130,6 @@ class TradingSystem:
         # If manual trigger, force one random agent to trade
         forced_agent = None
         if force_one_trade:
-            import random
             forced_agent = random.choice(self.agents).name
             logger.info(f"🎯 Manual trigger: Forcing {forced_agent} to make a trade this cycle")
 
