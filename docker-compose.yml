@@ -25,7 +25,11 @@ services:
       retries: 5
 
   # Spring Boot Backend API
-  backend:
+  # Service key is `backend-service` (NOT `backend`) so the compose service DNS
+  # name matches the K3s Service name. frontend/nginx.conf's static
+  # `proxy_pass http://backend-service:8080/api/` then works in BOTH environments
+  # without needing network aliases (which podman-compose ignores).
+  backend-service:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -48,12 +52,7 @@ services:
     ports:
       - "8080:8080"
     networks:
-      trading-network:
-        # Alias matches the K3s Service name so frontend/nginx.conf's static
-        # `proxy_pass http://backend-service:8080/api/` works in BOTH compose and K3s.
-        # Without this, compose-only DNS resolves "backend" but not "backend-service".
-        aliases:
-          - backend-service
+      - trading-network
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,7 +73,7 @@ services:
       # Match K3s environment variables exactly
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       BRAVE_API_KEY: ${BRAVE_API_KEY:-}
-      BACKEND_URL: "http://backend:8080"
+      BACKEND_URL: "http://backend-service:8080"
       DATABASE_URL: "postgresql://trading_user:trading_password@postgres:5432/agentic_trading"
       ENVIRONMENT: "development"
       LOG_LEVEL: "DEBUG"
@@ -90,7 +89,7 @@ services:
     networks:
       - trading-network
     depends_on:
-      backend:
+      backend-service:
         condition: service_healthy
     ports:
       - "8000:8000"  # API server for manual cycle triggers
@@ -113,7 +112,7 @@ services:
     networks:
       - trading-network
     depends_on:
-      backend:
+      backend-service:
         condition: service_healthy
 
 

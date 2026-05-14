@@ -113,6 +113,12 @@ class ResearchResult:
     notes: str = ""
     tool_calls: List["ToolCallDto"] = field(default_factory=list)
     usage_metrics: UsageMetrics | None = None
+    # Wall-clock latency of the market analyst phase in milliseconds.
+    # Set by _run_market_analyst so _finalize_run has a single source of
+    # truth (the alternative — recomputing from decision_start_time minus
+    # research_start_time — drifts by the time spent in _run_decision_maker
+    # setup before decision_start_time was sampled).
+    research_latency_ms: int = 0
 
 
 @dataclass
@@ -176,25 +182,19 @@ class RunContext:
     holdings: List["Holding"] = field(default_factory=list)
     recent_activity: RecentActivityResponse | None = None
 
-    # --- Output ---
-    research_response: ResearchResponse | None = None
-    research_candidates: List[str] = field(default_factory=list)
-    research_sources: List[SourceDto] = field(default_factory=list)
-    research_tool_calls: List["ToolCallDto"] = field(default_factory=list)
-    research_notes: str = ""
-    research_usage_metrics: UsageMetrics | None = None
+    # --- Output (typed result, populated by _run_market_analyst) ---
+    research: ResearchResult | None = None
 
     # ═══════════════════════════════════════════════════════════════════════════
     # PHASE 2: DECISION MAKER (DECIDING)
     # ═══════════════════════════════════════════════════════════════════════════
     # --- Input: inherits research output above ---
-    decision_start_time: datetime | None = None
-
-    # --- Output ---
-    decision: TradingDecision | None = None  # BUY/SELL/HOLD - always set by phase end
+    # --- Output (typed result, populated by _run_decision_maker) ---
+    decision_result: DecisionResult | None = None
+    # decision_sources is assembled in execute_cycle from cross-phase data
+    # (research webSources + portfolio/activity system context), so it lives
+    # here rather than inside DecisionResult.
     decision_sources: List[SourceDto] = field(default_factory=list)
-    decision_tool_calls: List["ToolCallDto"] = field(default_factory=list)
-    decision_usage_metrics: UsageMetrics | None = None
 
     # ═══════════════════════════════════════════════════════════════════════════
     # PROMPT CAPTURE (for observability — populated during research/decision)
@@ -208,10 +208,8 @@ class RunContext:
     # PHASE 3: EXECUTION (TRADING)
     # ═══════════════════════════════════════════════════════════════════════════
     # --- Input: decision from above ---
-    # --- Output ---
-    trade_id: int | None = None  # Set if trade executed
-    execution_status: PhaseStatus | None = None  # COMPLETED/FAILED/SKIPPED
-    execution_error: str | None = None  # Error details if failed
+    # --- Output (typed result, populated by execute_cycle) ---
+    execution_result: ExecutionResult | None = None
 
 
 class HoldingsSummary(BaseModel):

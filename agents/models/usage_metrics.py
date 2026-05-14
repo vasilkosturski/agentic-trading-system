@@ -20,4 +20,4 @@ class UsageMetrics(BaseModel):
     cachedTokens: int = 0
     reasoningTokens: int = 0
     modelName: str | None = None
-    costUsd: float = 0.0
+    costUsd: float | None = None
