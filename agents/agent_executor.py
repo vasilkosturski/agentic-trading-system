@@ -14,8 +14,10 @@ Architecture:
 import json
 import logging
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-from agents import Runner
+from agents import Runner, Usage, RunResult
 
 from config import config
 from guardrail_retry import run_with_guardrail_retry
@@ -75,8 +77,68 @@ from decision_maker import DecisionMaker, DecisionContext
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Module constants
+# ---------------------------------------------------------------------------
+# Grouped by domain. Untyped int literals match the project convention from
+# `decision_maker.py:51` (`DEFAULT_POSITION_SIZING_PCT = 15`).
 
-def _extract_usage_metrics(usage, model_name: str) -> UsageMetrics:
+# Agent run limits
+RESEARCH_MAX_ATTEMPTS = 3
+AGENT_MAX_TURNS = 30
+MAX_POSITIONS = 10
+
+# Data fetch limits
+RECENT_ACTIVITY_LOOKBACK_DAYS = 30
+
+# String truncation limits
+MAX_REASONING_FIELD_LEN = 2000
+MAX_ERROR_MESSAGE_LEN = 500
+
+# Model pricing — (input_per_1m_usd, output_per_1m_usd) per 1,000,000 tokens.
+# Loaded once at import time from a vendored LiteLLM pricing JSON
+# (model_prices.json sibling file). Unknown models log a warning once and
+# serialize costUsd as null so analytics don't silently aggregate wrong values.
+#
+# Why vendored: OpenAI doesn't expose pricing via API
+# (openai/openai-python#2074 still open). LiteLLM's
+# `model_prices_and_context_window.json` is the de-facto industry source,
+# community-maintained, covers all major providers. Vendoring it makes
+# pricing refreshes a one-line curl + PR diff. See MODEL_PRICES_README.md.
+_PRICING_JSON_PATH = Path(__file__).parent / "model_prices.json"
+
+
+def _load_model_pricing(path: Path = _PRICING_JSON_PATH) -> dict[str, tuple[float, float]]:
+    """Load (input_per_1m_usd, output_per_1m_usd) pairs from a vendored LiteLLM
+    pricing JSON. Skips entries that don't define both cost keys (e.g. the
+    JSON's first "sample_spec" placeholder).
+
+    LiteLLM stores `input_cost_per_token` / `output_cost_per_token` as USD
+    per single token, so we multiply by 1_000_000 to match this module's
+    per-1M-token convention. To refresh:
+
+        curl -sL https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json \\
+            -o agentic-trading-system/agents/model_prices.json
+    """
+    with path.open() as f:
+        data: dict[str, Any] = json.load(f)
+    pricing: dict[str, tuple[float, float]] = {}
+    for name, entry in data.items():
+        if not isinstance(entry, dict):
+            continue
+        in_per_token = entry.get("input_cost_per_token")
+        out_per_token = entry.get("output_cost_per_token")
+        if in_per_token is None or out_per_token is None:
+            continue
+        pricing[name] = (in_per_token * 1_000_000, out_per_token * 1_000_000)
+    return pricing
+
+
+MODEL_PRICING: dict[str, tuple[float, float]] = _load_model_pricing()
+_UNKNOWN_MODELS_WARNED: set[str] = set()
+
+
+def _extract_usage_metrics(usage: Usage, model_name: str) -> UsageMetrics:
     """Extract token usage metrics from SDK RunResultBase.context_wrapper.usage.
 
     Args:
@@ -104,7 +166,20 @@ def _extract_usage_metrics(usage, model_name: str) -> UsageMetrics:
 
     input_tokens = usage.input_tokens or 0
     output_tokens = usage.output_tokens or 0
-    cost_usd = round((input_tokens * 0.15 + output_tokens * 0.60) / 1_000_000, 6)
+
+    pricing = MODEL_PRICING.get(resolved_name)
+    cost_usd: float | None
+    if pricing is None:
+        if resolved_name not in _UNKNOWN_MODELS_WARNED:
+            logger.warning(
+                f"No pricing entry for model {resolved_name!r}; costUsd will be None. "
+                f"Refresh agents/model_prices.json (see MODEL_PRICES_README.md)."
+            )
+            _UNKNOWN_MODELS_WARNED.add(resolved_name)
+        cost_usd = None
+    else:
+        input_per_m, output_per_m = pricing
+        cost_usd = round((input_tokens * input_per_m + output_tokens * output_per_m) / 1_000_000, 6)
 
     return UsageMetrics(
         tokensUsed=usage.total_tokens,
@@ -133,6 +208,11 @@ class AgentExecutor:
     - RunContext created at start with guaranteed non-None values
     - Context passed through all operations explicitly
     - No instance variables for per-run state (only agent identity)
+
+    Concurrency: single cycle per executor instance at a time. Do not call
+    execute_cycle concurrently on the same instance. The orchestrator
+    pattern in trading_system.py creates one AgentExecutor per agent and
+    fans out via asyncio.gather — that is the supported parallelism model.
     """
 
     def __init__(
@@ -177,7 +257,7 @@ class AgentExecutor:
         """
         ctx: RunContext | None = None
 
-        print(
+        logger.info(
             f"🤖 {self.name} starting portfolio review at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
 
@@ -213,12 +293,7 @@ class AgentExecutor:
                 ctx=ctx,
                 mcp_pool=mcp_pool,
             )
-            ctx.research_response = research_result.research_response
-            ctx.research_candidates = research_result.candidates
-            ctx.research_sources = research_result.sources
-            ctx.research_notes = research_result.notes
-            ctx.research_tool_calls = research_result.tool_calls
-            ctx.research_usage_metrics = research_result.usage_metrics
+            ctx.research = research_result
 
             # === DECISION PHASE ===
             decision_result = await self._run_decision_maker(
@@ -226,15 +301,12 @@ class AgentExecutor:
                 mcp_pool=mcp_pool,
                 force_trade=force_trade,
             )
-            ctx.decision = decision_result.decision
-            ctx.decision_start_time = decision_result.decision_start_time
-            ctx.decision_tool_calls = decision_result.tool_calls
-            ctx.decision_usage_metrics = decision_result.usage_metrics
+            ctx.decision_result = decision_result
 
             # Build decision sources - track what data informed the decision
             ctx.decision_sources = [
                 # Research sources passed to decision maker
-                *[SourceDto.web(title=s.title, url=s.url) for s in ctx.research_response.webSources],
+                *[SourceDto.web(title=s.title, url=s.url) for s in ctx.research.research_response.webSources],
                 # Internal data accessed
                 SourceDto.system_context(f"Portfolio: ${ctx.balance:,.2f}, {len(ctx.holdings)} positions"),
                 SourceDto.system_context(f"Recent activity: {len(ctx.recent_activity.runs) if ctx.recent_activity else 0} runs"),
@@ -242,36 +314,68 @@ class AgentExecutor:
 
             # === EXECUTION PHASE ===
             # Only execute trade for BUY/SELL decisions, skip for HOLD
-            if ctx.decision.action in (TradeDecision.BUY, TradeDecision.SELL):
-                execution_result = await self._execute_trade(
+            if ctx.decision_result.decision.action in (TradeDecision.BUY, TradeDecision.SELL):
+                ctx.execution_result = await self._execute_trade(
                     run_id=ctx.run_id,
                     agent_id=ctx.agent_id,
-                    decision=ctx.decision,
+                    decision=ctx.decision_result.decision,
                 )
-                ctx.trade_id = execution_result.trade_id
-                ctx.execution_status = execution_result.execution_status
-                ctx.execution_error = execution_result.execution_error
             else:
                 # HOLD decision - skip execution phase
-                ctx.execution_status = PhaseStatus.SKIPPED
+                ctx.execution_result = ExecutionResult(
+                    execution_status=PhaseStatus.SKIPPED,
+                    trade_id=None,
+                    execution_error=None,
+                )
 
             # === FINALIZATION ===
             await self._finalize_run(ctx)
 
-            print(
+            logger.info(
                 f"✅ {self.name} completed portfolio review at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             )
 
             # Derive trade_count from trade_id presence (1 if executed, 0 otherwise)
             return CycleResult(
-                decision=ctx.decision,
-                trade_count=1 if ctx.trade_id else 0,
+                decision=ctx.decision_result.decision,
+                trade_count=1 if ctx.execution_result.trade_id else 0,
                 run_id=ctx.run_id,
             )
 
         except Exception as e:
             await self._handle_cycle_error(e, ctx)
             raise
+
+    def _extract_run_telemetry(
+        self,
+        result: RunResult,
+        model_name: str,
+        agent_label: str,
+    ) -> tuple[list[ToolCallDto], UsageMetrics]:
+        """Extract tool calls + usage metrics from an SDK RunResult and log both.
+
+        Used by `_run_market_analyst` and `_run_decision_maker` to keep both
+        agent runners structurally symmetric.
+        """
+        parsed_calls = extract_tool_calls(result.new_items)
+        tool_calls = [
+            ToolCallDto(
+                tool=pc.name,
+                params=pc.params,
+                error=pc.is_error if pc.is_error else None,
+                errorMessage=pc.error_message,
+            )
+            for pc in parsed_calls
+        ]
+        logger.info(f"🔧 {agent_label} made {len(tool_calls)} tool calls")
+
+        usage = result.context_wrapper.usage
+        usage_metrics = _extract_usage_metrics(usage, model_name=model_name)
+        logger.info(
+            f"📊 {agent_label} usage: {usage_metrics.tokensUsed} tokens, "
+            f"model={usage_metrics.modelName}"
+        )
+        return tool_calls, usage_metrics
 
     async def _start_run(self) -> int:
         """Initialize agent and create run, transition to RESEARCHING.
@@ -322,15 +426,11 @@ class AgentExecutor:
             AccountData with balance and holdings
 
         Raises:
-            RuntimeError: If fetching fails
+            BackendAPIError: If the backend request fails.
         """
-        try:
-            report = await _get_account_report_raw(agent_id)
-            return AccountData(balance=report.balance, holdings=report.holdings)
-        except Exception as e:
-            raise RuntimeError(
-                f"Failed to fetch account data for agent {agent_id}: {e}"
-            )
+        # _get_account_report_raw throws BackendAPIError on failure
+        report = await _get_account_report_raw(agent_id)
+        return AccountData(balance=report.balance, holdings=report.holdings)
 
     async def _fetch_recent_activity(self, agent_id: int) -> RecentActivityResponse:
         """Fetch recent trading activity for context.
@@ -346,7 +446,7 @@ class AgentExecutor:
         """
         # BackendClient.get_recent_activity throws BackendAPIError on failure
         client = get_backend_client()
-        result = await client.get_recent_activity(agent_id, days=30)
+        result = await client.get_recent_activity(agent_id, days=RECENT_ACTIVITY_LOOKBACK_DAYS)
 
         logger.info(f"📊 Context prepared: {result.computed_total_runs} runs, {result.computed_total_trades} trades (30 days)")
         return result
@@ -397,14 +497,26 @@ class AgentExecutor:
             balance=ctx.balance,
             holdings=ctx.holdings,
             recent_activity=ctx.recent_activity,
-            max_positions=10,
+            max_positions=MAX_POSITIONS,
         )
 
         # Build prompt using OO interface
         research_prompt = market_analyst.build_prompt(research_context)
 
-        # Capture prompts for observability (before agent execution)
-        ctx.market_analyst_system_prompt = market_analyst.agent.instructions  # type: ignore[assignment]
+        # Capture prompts for observability (before agent execution).
+        # Agent.instructions is typed `str | Callable[..., str] | None` by the
+        # SDK; the project's RunContext field is `str | None`. Sibling agents
+        # currently always set instructions to a str (see MarketAnalyst.create
+        # / DecisionMaker.create) so the str branch is always taken at runtime.
+        # The isinstance narrow + debug log keep prompt capture safe AND
+        # observable if anyone swaps to dynamic-callable instructions later.
+        instructions = market_analyst.agent.instructions
+        if not isinstance(instructions, str) and instructions is not None:
+            logger.debug(
+                "market_analyst.agent.instructions is callable, not str — "
+                "skipping prompt capture for observability"
+            )
+        ctx.market_analyst_system_prompt = instructions if isinstance(instructions, str) else None
         ctx.market_analyst_task_prompt = research_prompt
 
         logger.info(f"🔬 Running Market Analyst for {ctx.agent_name}...")
@@ -415,8 +527,8 @@ class AgentExecutor:
         result = await run_with_guardrail_retry(
             market_analyst.agent,
             research_prompt,
-            max_attempts=3,
-            max_turns=30,
+            max_attempts=RESEARCH_MAX_ATTEMPTS,
+            max_turns=AGENT_MAX_TURNS,
             agent_name=ctx.agent_name,
         )
 
@@ -443,23 +555,10 @@ class AgentExecutor:
         )
         logger.info(f"📊 Market Analyst completed in {research_latency_ms}ms")
 
-        # Extract tool calls from SDK result
-        parsed_calls = extract_tool_calls(result.new_items)
-        tool_calls = [
-            ToolCallDto(
-                tool=pc.name,
-                params=pc.params,
-                error=pc.is_error if pc.is_error else None,
-                errorMessage=pc.error_message,
-            )
-            for pc in parsed_calls
-        ]
-        logger.info(f"🔧 Market Analyst made {len(tool_calls)} tool calls")
-
-        # Extract SDK usage metrics
-        usage = result.context_wrapper.usage
-        usage_metrics = _extract_usage_metrics(usage, model_name=market_analyst.model_name)
-        logger.info(f"📊 Market Analyst usage: {usage_metrics.tokensUsed} tokens, model={usage_metrics.modelName}")
+        # Extract tool calls + usage metrics (DRY helper — see _extract_run_telemetry)
+        tool_calls, usage_metrics = self._extract_run_telemetry(
+            result, model_name=market_analyst.model_name, agent_label="Market Analyst"
+        )
 
         # Prices are now carried directly in CandidateStock objects within
         # research_response.candidates — no brittle tool-output parsing needed.
@@ -478,6 +577,7 @@ class AgentExecutor:
             notes=research_response.summary,
             tool_calls=tool_calls,
             usage_metrics=usage_metrics,
+            research_latency_ms=research_latency_ms,
         )
 
     async def _run_decision_maker(
@@ -514,32 +614,39 @@ class AgentExecutor:
             agent_style=ctx.agent_style,
         )
 
-        # Type narrowing: research_response is guaranteed set by _run_market_analyst
-        assert ctx.research_response is not None, "research_response must be set before decision phase"
+        # Type narrowing: research is guaranteed set by _run_market_analyst
+        assert ctx.research is not None, "research must be set before decision phase"
 
         # Build typed context (class converts to strings internally)
         decision_context = DecisionContext(
             agent_name=ctx.agent_name,
             agent_style=ctx.agent_style,
-            research_response=ctx.research_response,
+            research_response=ctx.research.research_response,
             balance=ctx.balance,
             holdings=ctx.holdings,
             recent_activity=ctx.recent_activity,
             force_trade=force_trade,
-            max_positions=10,
+            max_positions=MAX_POSITIONS,
         )
 
         # Build prompt using OO interface
         decision_prompt = decision_maker.build_prompt(decision_context)
 
-        # Capture prompts for observability (before agent execution)
-        ctx.decision_maker_system_prompt = decision_maker.agent.instructions  # type: ignore[assignment]
+        # Capture prompts for observability (before agent execution).
+        # See _run_market_analyst for the rationale behind the isinstance narrow.
+        instructions = decision_maker.agent.instructions
+        if not isinstance(instructions, str) and instructions is not None:
+            logger.debug(
+                "decision_maker.agent.instructions is callable, not str — "
+                "skipping prompt capture for observability"
+            )
+        ctx.decision_maker_system_prompt = instructions if isinstance(instructions, str) else None
         ctx.decision_maker_task_prompt = decision_prompt
 
         logger.info(f"🧠 Running Decision Maker for {ctx.agent_name}...")
 
         # Run Decision Maker agent - get structured output directly
-        result = await Runner.run(decision_maker.agent, decision_prompt, max_turns=30)
+        result = await Runner.run(decision_maker.agent, decision_prompt, max_turns=AGENT_MAX_TURNS)
 
         # Extract TradingDecision - type-safe using SDK's final_output_as()
         try:
@@ -551,23 +658,10 @@ class AgentExecutor:
 
         logger.info(f"✅ Decision Maker: {decision.action} {decision.symbol or ''}")
 
-        # Extract tool calls from SDK result
-        parsed_calls = extract_tool_calls(result.new_items)
-        tool_calls = [
-            ToolCallDto(
-                tool=pc.name,
-                params=pc.params,
-                error=pc.is_error if pc.is_error else None,
-                errorMessage=pc.error_message,
-            )
-            for pc in parsed_calls
-        ]
-        logger.info(f"🔧 Decision Maker made {len(tool_calls)} tool calls")
-
-        # Extract SDK usage metrics
-        usage = result.context_wrapper.usage
-        usage_metrics = _extract_usage_metrics(usage, model_name=decision_maker.model_name)
-        logger.info(f"📊 Decision Maker usage: {usage_metrics.tokensUsed} tokens, model={usage_metrics.modelName}")
+        # Extract tool calls + usage metrics (DRY helper — see _extract_run_telemetry)
+        tool_calls, usage_metrics = self._extract_run_telemetry(
+            result, model_name=decision_maker.model_name, agent_label="Decision Maker"
+        )
 
         # Calculate decision latency
         decision_latency_ms = int(
@@ -586,75 +680,59 @@ class AgentExecutor:
         self,
         run_id: int,
         agent_id: int,
-        decision: TradingDecision | None,
+        decision: TradingDecision,
     ) -> ExecutionResult:
-        """Execute BUY/SELL/HOLD decision.
+        """Execute BUY/SELL decision. HOLD is filtered by caller in execute_cycle.
 
         Args:
             run_id: Run ID for tracking
             agent_id: Agent ID for trading
-            decision: Trading decision to execute
+            decision: Trading decision to execute (must be BUY or SELL)
 
         Returns:
             ExecutionResult with execution results
         """
-        # Validate we have a decision
-        if not decision:
-            raise RuntimeError(
-                f"Agent {agent_id} reached execution phase but no decision was recorded. "
-                "Decision Maker agent should have returned a structured TradingDecision."
-            )
+        action = decision.action
+        symbol = decision.symbol
+        quantity = decision.quantity
 
-        logger.info(f"✅ Validated decision: {decision.action} {decision.symbol or ''}")
+        logger.info(f"✅ Validated decision: {action} {symbol or ''}")
         logger.info(f"🟡 ABOUT TO EXECUTE: decision={decision}")
+        logger.info(f"🟢 EXECUTING: {action} {quantity} shares of {symbol}")
+
+        # Update to TRADING phase
+        await update_phase(run_id, RunPhase.TRADING)
+
+        # Broadcast: TRADING
+        broadcast_status(agent_id, self.name, PHASE_TRADING, "Executing trade", 90)
 
         trade_id = None
-        execution_status = None
-        execution_error = None
+        execution_status: PhaseStatus
+        execution_error: str | None = None
 
-        if decision.action in (TradeDecision.BUY, TradeDecision.SELL):
-            action = decision.action
-            symbol = decision.symbol
-            quantity = decision.quantity
-
-            logger.info(f"🟢 EXECUTING: {action} {quantity} shares of {symbol}")
-
-            # Update to TRADING phase
-            await update_phase(run_id, RunPhase.TRADING)
-
-            # Broadcast: TRADING
-            broadcast_status(
-                agent_id, self.name, PHASE_TRADING, "Executing trade", 90
-            )
-
-            try:
-                if action == TradeDecision.BUY:
-                    result = await buy_shares(
-                        agent_id,
-                        symbol,
-                        quantity,
-                        runId=run_id,
-                        agent_name=self.name,
-                    )
-                else:
-                    result = await sell_shares(
-                        agent_id,
-                        symbol,
-                        quantity,
-                        runId=run_id,
-                        agent_name=self.name,
-                    )
-
-                execution_status = PhaseStatus.COMPLETED
-                trade_id = result.tradeId
-
-            except Exception as trade_err:
-                logger.error(f"Trade execution failed: {trade_err}")
-                execution_status = PhaseStatus.FAILED
-                execution_error = str(trade_err)
-        else:
-            # HOLD decision - no trade execution
-            execution_status = PhaseStatus.SKIPPED
+        try:
+            if action == TradeDecision.BUY:
+                result = await buy_shares(
+                    agent_id,
+                    symbol,
+                    quantity,
+                    runId=run_id,
+                    agent_name=self.name,
+                )
+            else:  # SELL
+                result = await sell_shares(
+                    agent_id,
+                    symbol,
+                    quantity,
+                    runId=run_id,
+                    agent_name=self.name,
+                )
+            execution_status = PhaseStatus.COMPLETED
+            trade_id = result.tradeId
+        except Exception as trade_err:
+            logger.error(f"Trade execution failed: {trade_err}")
+            execution_status = PhaseStatus.FAILED
+            execution_error = str(trade_err)
 
         return ExecutionResult(
             execution_status=execution_status,
@@ -669,35 +747,36 @@ class AgentExecutor:
             ctx: RunContext with all data to persist
 
         Preconditions (enforced via assertions):
-            - decision_start_time: set before decision phase
-            - decision: set by _run_decision_maker
-            - research_response: set by _run_market_analyst
+            - research: set by _run_market_analyst
+            - decision_result: set by _run_decision_maker
+            - execution_result: set by execute_cycle (BUY/SELL branch or HOLD short-circuit)
         """
         # Fail-fast assertions - document and enforce preconditions
-        assert ctx.decision_start_time is not None, "decision_start_time must be set"
-        assert ctx.decision is not None, "decision must be set"
-        assert ctx.research_response is not None, "research_response must be set"
+        assert ctx.research is not None, "research must be set"
+        assert ctx.decision_result is not None, "decision_result must be set"
+        assert ctx.execution_result is not None, "execution_result must be set"
 
-        # Calculate latencies
+        # Calculate latencies — research_latency_ms is single-source-of-truth
+        # on ResearchResult (set by _run_market_analyst from its own wall clock),
+        # avoiding drift vs the previous recompute that subtracted research_start
+        # from decision_start (which omits time spent in _run_decision_maker setup).
         decision_latency_ms = int(
-            (datetime.now() - ctx.decision_start_time).total_seconds() * 1000
+            (datetime.now() - ctx.decision_result.decision_start_time).total_seconds() * 1000
         )
-        research_latency_ms = int(
-            (ctx.decision_start_time - ctx.research_start_time).total_seconds() * 1000
-        )
+        research_latency_ms = ctx.research.research_latency_ms
 
-        # Extract decision details (decision guaranteed by _run_decision_maker fail-fast)
-        decision = ctx.decision
+        # Extract decision details (decision_result guaranteed by _run_decision_maker fail-fast)
+        decision = ctx.decision_result.decision
         trade_decision = TradeDecision(decision.action.value)
         symbol = decision.symbol if decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
         quantity = decision.quantity if decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
 
         # Build reasoning DTO with direct 1:1 field mapping from TradingDecision.
         reasoning = ReasoningDto(
-            rationale=decision.rationale[:2000] if decision.rationale else None,
-            portfolioContext=decision.portfolioContext[:2000] if decision.portfolioContext else None,
-            historicalContext=decision.historicalContext[:2000] if decision.historicalContext else None,
-            researchContext=decision.researchContext[:2000] if decision.researchContext else None,
+            rationale=decision.rationale[:MAX_REASONING_FIELD_LEN] if decision.rationale else None,
+            portfolioContext=decision.portfolioContext[:MAX_REASONING_FIELD_LEN] if decision.portfolioContext else None,
+            historicalContext=decision.historicalContext[:MAX_REASONING_FIELD_LEN] if decision.historicalContext else None,
+            researchContext=decision.researchContext[:MAX_REASONING_FIELD_LEN] if decision.researchContext else None,
         )
 
         logger.info(
@@ -706,12 +785,12 @@ class AgentExecutor:
 
         # Build nested phase DTOs
         research_data = ResearchPhaseData(
-            candidates=ctx.research_candidates,
-            sources=ctx.research_sources,
-            notes=ctx.research_notes,
-            toolCalls=ctx.research_tool_calls,
+            candidates=ctx.research.candidates,
+            sources=ctx.research.sources,
+            notes=ctx.research.notes,
+            toolCalls=ctx.research.tool_calls,
             latencyMs=research_latency_ms,
-            metrics=ctx.research_usage_metrics,
+            metrics=ctx.research.usage_metrics,
             systemPrompt=ctx.market_analyst_system_prompt,
             taskPrompt=ctx.market_analyst_task_prompt,
         )
@@ -722,17 +801,17 @@ class AgentExecutor:
             quantity=quantity,
             reasoning=reasoning,
             sources=ctx.decision_sources,
-            toolCalls=ctx.decision_tool_calls,
+            toolCalls=ctx.decision_result.tool_calls,
             latencyMs=decision_latency_ms,
-            metrics=ctx.decision_usage_metrics,
+            metrics=ctx.decision_result.usage_metrics,
             systemPrompt=ctx.decision_maker_system_prompt,
             taskPrompt=ctx.decision_maker_task_prompt,
         )
 
         execution_data = ExecutionPhaseData(
-            tradeId=ctx.trade_id,
-            status=ctx.execution_status,
-            errorDetails=ctx.execution_error,
+            tradeId=ctx.execution_result.trade_id,
+            status=ctx.execution_result.execution_status,
+            errorDetails=ctx.execution_result.execution_error,
         )
 
         # Build CompleteRunData with nested structure
@@ -745,12 +824,19 @@ class AgentExecutor:
         # Complete the run via API
         await complete_run(ctx.run_id, complete_data)
 
-        # Broadcast: COMPLETED
-        outcome_message = (
-            "Completed - 1 trade executed"
-            if ctx.trade_id
-            else "Completed - No trades (HOLD decision)"
-        )
+        # Broadcast: COMPLETED — outcome_message branches on execution_status
+        # so a FAILED BUY/SELL isn't mislabeled as 'No trades (HOLD decision)'
+        # (the prior implementation branched on trade_id truthiness, which
+        # collapsed FAILED and SKIPPED into the same message).
+        status = ctx.execution_result.execution_status
+        if status == PhaseStatus.COMPLETED:
+            outcome_message = "Completed - 1 trade executed"
+        elif status == PhaseStatus.SKIPPED:
+            outcome_message = "Completed - No trades (HOLD decision)"
+        elif status == PhaseStatus.FAILED:
+            outcome_message = "Completed - Trade attempted but failed"
+        else:
+            outcome_message = f"Completed - Unknown status: {status}"
         broadcast_status(
             ctx.agent_id,
             ctx.agent_name,
@@ -789,7 +875,7 @@ class AgentExecutor:
         # would override FAILED back to COMPLETED. Just set the failed phase.
         if run_id is not None:
             try:
-                error_msg = str(error)[:500] or "Unknown error"
+                error_msg = str(error)[:MAX_ERROR_MESSAGE_LEN] or "Unknown error"
                 await update_phase(run_id, RunPhase.FAILED, error_message=error_msg)
             except Exception as cleanup_err:
                 logger.error(
