@@ -1252,7 +1252,7 @@ class TestLoadModelPricing:
         """Loader returns a dict containing gpt-4o-mini and gpt-5-mini with
         positive non-zero (input, output) per-1M tuples — guards against an
         empty/corrupt vendored file."""
-        from agent_executor import _load_model_pricing
+        from pricing import _load_model_pricing
 
         pricing = _load_model_pricing()
 
@@ -1280,7 +1280,7 @@ class TestLoadModelPricing:
         and `output_cost_per_token` — covers LiteLLM's leading "sample_spec"
         placeholder plus any future malformed entries. Multiplies per-token
         values by 1_000_000 to match the per-1M convention."""
-        from agent_executor import _load_model_pricing
+        from pricing import _load_model_pricing
 
         fake_json = {
             "sample_spec": {
@@ -1875,3 +1875,31 @@ class TestAgentExecutorCompletionMessageOnFailure:
             f"Wrong PHASE_COMPLETED outcome kwarg for FAILED BUY. Expected "
             f"'Completed - Trade attempted but failed', got: {outcome_kwarg!r}"
         )
+
+
+# ============================================================================
+# Test: pricing.py module extraction (refactor Task 1)
+# ============================================================================
+#
+# Pins the contract that the model-pricing block has been extracted from
+# agent_executor.py into its own pricing module. agent_executor still
+# re-exports MODEL_PRICING and _UNKNOWN_MODELS_WARNED for backwards
+# compatibility within the package.
+
+
+def test_pricing_module_exports_model_pricing():
+    """Pricing constants live in their own module after Task 1 extraction."""
+    from pricing import MODEL_PRICING, _UNKNOWN_MODELS_WARNED, _load_model_pricing
+
+    assert isinstance(MODEL_PRICING, dict), (
+        "MODEL_PRICING must be a dict mapping model name to pricing tuple"
+    )
+    assert "gpt-4o-mini" in MODEL_PRICING, (
+        "MODEL_PRICING should include gpt-4o-mini as a known model"
+    )
+    assert isinstance(_UNKNOWN_MODELS_WARNED, set), (
+        "_UNKNOWN_MODELS_WARNED must be a set for warning dedupe"
+    )
+    assert callable(_load_model_pricing), (
+        "_load_model_pricing must be callable (loads pricing from JSON)"
+    )
