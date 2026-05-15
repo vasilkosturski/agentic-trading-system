@@ -15,11 +15,15 @@ import json
 import logging
 from datetime import datetime
 
-from agents import Runner, Usage, RunResult
+from agents import Runner
 
 from config import config
 from guardrail_retry import run_with_guardrail_retry
-from pricing import MODEL_PRICING, _UNKNOWN_MODELS_WARNED
+# Re-exported so existing references via ``agent_executor._UNKNOWN_MODELS_WARNED``
+# (e.g. legacy test fixtures) continue to resolve. Telemetry helpers below
+# import these directly from ``pricing``.
+from pricing import MODEL_PRICING, _UNKNOWN_MODELS_WARNED  # noqa: F401
+from telemetry import extract_usage_metrics, extract_run_telemetry  # noqa: F401
 
 from models import TradingDecision, ResearchResponse, CycleResult, InvestmentStyle
 from models.orchestration import (
@@ -41,8 +45,6 @@ from models.run_tracking import (
     SourceDto,
     TradeDecision,
 )
-from models.usage_metrics import UsageMetrics
-
 # Import direct function tools
 from trading_tools import (
     initialize_agent,
@@ -65,10 +67,6 @@ from status_broadcaster import (
     PHASE_COMPLETED,
     PHASE_ERROR,
 )
-
-# Import SDK parsing for tool call extraction
-from utils.sdk_parser import extract_tool_calls
-from models.run_tracking import ToolCallDto
 
 # Import two-agent architecture (OO classes with typed inputs)
 from market_analyst import MarketAnalyst, MarketAnalystContext
@@ -94,65 +92,13 @@ RECENT_ACTIVITY_LOOKBACK_DAYS = 30
 MAX_REASONING_FIELD_LEN = 2000
 MAX_ERROR_MESSAGE_LEN = 500
 
-# Pricing constants live in pricing.py (extracted in refactor Task 1).
-# Re-exported via the `from pricing import ...` statement at the top of
-# this module, so existing references like `agent_executor.MODEL_PRICING`
-# continue to resolve.
-
-
-def _extract_usage_metrics(usage: Usage, model_name: str) -> UsageMetrics:
-    """Extract token usage metrics from SDK RunResultBase.context_wrapper.usage.
-
-    Args:
-        usage: Usage object from result.context_wrapper.usage
-        model_name: Model name passed to Agent() constructor (fallback if
-            SDK doesn't provide it).
-
-    Returns:
-        UsageMetrics with token metric fields matching backend DTOs.
-    """
-    cached = 0
-    if usage.input_tokens_details:
-        cached = getattr(usage.input_tokens_details, 'cached_tokens', 0) or 0
-
-    reasoning = 0
-    if usage.output_tokens_details:
-        reasoning = getattr(usage.output_tokens_details, 'reasoning_tokens', 0) or 0
-
-    # Try SDK first, fall back to the model name we passed to Agent()
-    sdk_model = None
-    if usage.request_usage_entries:
-        sdk_model = getattr(usage.request_usage_entries[0], 'model_name', None)
-
-    resolved_name: str = sdk_model if sdk_model is not None else model_name
-
-    input_tokens = usage.input_tokens or 0
-    output_tokens = usage.output_tokens or 0
-
-    pricing = MODEL_PRICING.get(resolved_name)
-    cost_usd: float | None
-    if pricing is None:
-        if resolved_name not in _UNKNOWN_MODELS_WARNED:
-            logger.warning(
-                f"No pricing entry for model {resolved_name!r}; costUsd will be None. "
-                f"Refresh agents/model_prices.json (see MODEL_PRICES_README.md)."
-            )
-            _UNKNOWN_MODELS_WARNED.add(resolved_name)
-        cost_usd = None
-    else:
-        input_per_m, output_per_m = pricing
-        cost_usd = round((input_tokens * input_per_m + output_tokens * output_per_m) / 1_000_000, 6)
-
-    return UsageMetrics(
-        tokensUsed=usage.total_tokens,
-        inputTokens=input_tokens,
-        outputTokens=output_tokens,
-        numTurns=usage.requests,
-        cachedTokens=cached,
-        reasoningTokens=reasoning,
-        modelName=resolved_name,
-        costUsd=cost_usd,
-    )
+# Pricing constants live in pricing.py (extracted in refactor Task 1) and
+# telemetry helpers (extract_usage_metrics + extract_run_telemetry) live in
+# telemetry.py (extracted in refactor Task 2). Both modules' symbols are
+# re-exported via the ``from pricing import ...`` / ``from telemetry import
+# ...`` statements at the top of this module so existing references like
+# ``agent_executor.MODEL_PRICING`` or
+# ``agent_executor._UNKNOWN_MODELS_WARNED`` continue to resolve.
 
 
 class AgentExecutor:
@@ -307,37 +253,6 @@ class AgentExecutor:
         except Exception as e:
             await self._handle_cycle_error(e, ctx)
             raise
-
-    def _extract_run_telemetry(
-        self,
-        result: RunResult,
-        model_name: str,
-        agent_label: str,
-    ) -> tuple[list[ToolCallDto], UsageMetrics]:
-        """Extract tool calls + usage metrics from an SDK RunResult and log both.
-
-        Used by `_run_market_analyst` and `_run_decision_maker` to keep both
-        agent runners structurally symmetric.
-        """
-        parsed_calls = extract_tool_calls(result.new_items)
-        tool_calls = [
-            ToolCallDto(
-                tool=pc.name,
-                params=pc.params,
-                error=pc.is_error if pc.is_error else None,
-                errorMessage=pc.error_message,
-            )
-            for pc in parsed_calls
-        ]
-        logger.info(f"🔧 {agent_label} made {len(tool_calls)} tool calls")
-
-        usage = result.context_wrapper.usage
-        usage_metrics = _extract_usage_metrics(usage, model_name=model_name)
-        logger.info(
-            f"📊 {agent_label} usage: {usage_metrics.tokensUsed} tokens, "
-            f"model={usage_metrics.modelName}"
-        )
-        return tool_calls, usage_metrics
 
     async def _start_run(self) -> int:
         """Initialize agent and create run, transition to RESEARCHING.
@@ -517,8 +432,8 @@ class AgentExecutor:
         )
         logger.info(f"📊 Market Analyst completed in {research_latency_ms}ms")
 
-        # Extract tool calls + usage metrics (DRY helper — see _extract_run_telemetry)
-        tool_calls, usage_metrics = self._extract_run_telemetry(
+        # Extract tool calls + usage metrics (DRY helper — see telemetry.extract_run_telemetry)
+        tool_calls, usage_metrics = extract_run_telemetry(
             result, model_name=market_analyst.model_name, agent_label="Market Analyst"
         )
 
@@ -620,8 +535,8 @@ class AgentExecutor:
 
         logger.info(f"✅ Decision Maker: {decision.action} {decision.symbol or ''}")
 
-        # Extract tool calls + usage metrics (DRY helper — see _extract_run_telemetry)
-        tool_calls, usage_metrics = self._extract_run_telemetry(
+        # Extract tool calls + usage metrics (DRY helper — see telemetry.extract_run_telemetry)
+        tool_calls, usage_metrics = extract_run_telemetry(
             result, model_name=decision_maker.model_name, agent_label="Decision Maker"
         )
 

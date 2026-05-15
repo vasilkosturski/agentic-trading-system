@@ -1085,15 +1085,15 @@ class TestAgentExecutorCycleLoggerBehavior:
 
 
 class TestExtractUsageMetricsPricing:
-    """Pin behaviour of the MODEL_PRICING lookup in _extract_usage_metrics."""
+    """Pin behaviour of the MODEL_PRICING lookup in extract_usage_metrics."""
 
     @pytest.fixture(autouse=True)
     def _reset_warned_set(self):
         """Clear the module-level dedupe set between tests for isolation."""
-        import agent_executor
-        agent_executor._UNKNOWN_MODELS_WARNED.clear()
+        import pricing
+        pricing._UNKNOWN_MODELS_WARNED.clear()
         yield
-        agent_executor._UNKNOWN_MODELS_WARNED.clear()
+        pricing._UNKNOWN_MODELS_WARNED.clear()
 
     @staticmethod
     def _make_usage_mock(input_tokens: int, output_tokens: int, model_name: str | None):
@@ -1101,7 +1101,7 @@ class TestExtractUsageMetricsPricing:
 
         ``model_name=None`` simulates an SDK response with no request entries —
         callers will then fall back to the ``model_name`` argument passed to
-        ``_extract_usage_metrics``.
+        ``extract_usage_metrics``.
         """
         usage = MagicMock()
         usage.input_tokens = input_tokens
@@ -1124,7 +1124,7 @@ class TestExtractUsageMetricsPricing:
         Uses the table's published rate (0.15, 0.60) per 1M tokens to verify
         the formula and the lookup, not a single magic number.
         """
-        from agent_executor import _extract_usage_metrics
+        from telemetry import extract_usage_metrics
 
         usage = self._make_usage_mock(
             input_tokens=1_000_000,
@@ -1132,7 +1132,7 @@ class TestExtractUsageMetricsPricing:
             model_name="gpt-4o-mini",
         )
 
-        metrics = _extract_usage_metrics(usage, model_name="ignored-fallback")
+        metrics = extract_usage_metrics(usage, model_name="ignored-fallback")
 
         # 1_000_000 * 0.15 / 1_000_000 = 0.15
         # 500_000   * 0.60 / 1_000_000 = 0.30
@@ -1149,7 +1149,7 @@ class TestExtractUsageMetricsPricing:
         Asserting on $1.25 specifically catches the regression where the
         table is added but a call site still routes through the old formula.
         """
-        from agent_executor import _extract_usage_metrics
+        from telemetry import extract_usage_metrics
 
         usage = self._make_usage_mock(
             input_tokens=1_000_000,
@@ -1157,7 +1157,7 @@ class TestExtractUsageMetricsPricing:
             model_name="gpt-5-mini",
         )
 
-        metrics = _extract_usage_metrics(usage, model_name="ignored-fallback")
+        metrics = extract_usage_metrics(usage, model_name="ignored-fallback")
 
         assert metrics.costUsd == 1.25
         assert metrics.modelName == "gpt-5-mini"
@@ -1165,7 +1165,7 @@ class TestExtractUsageMetricsPricing:
     def test_unknown_model_returns_none_and_logs_warning(self, caplog):
         """Unknown model → costUsd is None AND a WARNING log is emitted."""
         import logging
-        from agent_executor import _extract_usage_metrics
+        from telemetry import extract_usage_metrics
 
         usage = self._make_usage_mock(
             input_tokens=100_000,
@@ -1173,21 +1173,21 @@ class TestExtractUsageMetricsPricing:
             model_name="some-future-unknown-model",
         )
 
-        with caplog.at_level(logging.WARNING, logger="agent_executor"):
-            metrics = _extract_usage_metrics(usage, model_name="ignored-fallback")
+        with caplog.at_level(logging.WARNING, logger="telemetry"):
+            metrics = extract_usage_metrics(usage, model_name="ignored-fallback")
 
         assert metrics.costUsd is None
         assert metrics.modelName == "some-future-unknown-model"
 
         warning_records = [
             r for r in caplog.records
-            if r.name == "agent_executor"
+            if r.name == "telemetry"
             and r.levelno == logging.WARNING
             and "No pricing entry" in r.getMessage()
             and "some-future-unknown-model" in r.getMessage()
         ]
         assert warning_records, (
-            "Expected a WARNING log on the agent_executor logger containing "
+            "Expected a WARNING log on the telemetry logger containing "
             "'No pricing entry' and the unknown model name; got: "
             f"{[(r.name, r.levelname, r.getMessage()) for r in caplog.records]}"
         )
@@ -1200,7 +1200,7 @@ class TestExtractUsageMetricsPricing:
         every trading cycle.
         """
         import logging
-        from agent_executor import _extract_usage_metrics
+        from telemetry import extract_usage_metrics
 
         usage1 = self._make_usage_mock(
             input_tokens=100, output_tokens=50, model_name="dedupe-test-model"
@@ -1209,16 +1209,16 @@ class TestExtractUsageMetricsPricing:
             input_tokens=200, output_tokens=75, model_name="dedupe-test-model"
         )
 
-        with caplog.at_level(logging.WARNING, logger="agent_executor"):
-            m1 = _extract_usage_metrics(usage1, model_name="ignored")
-            m2 = _extract_usage_metrics(usage2, model_name="ignored")
+        with caplog.at_level(logging.WARNING, logger="telemetry"):
+            m1 = extract_usage_metrics(usage1, model_name="ignored")
+            m2 = extract_usage_metrics(usage2, model_name="ignored")
 
         assert m1.costUsd is None
         assert m2.costUsd is None
 
         warning_records = [
             r for r in caplog.records
-            if r.name == "agent_executor"
+            if r.name == "telemetry"
             and r.levelno == logging.WARNING
             and "No pricing entry" in r.getMessage()
             and "dedupe-test-model" in r.getMessage()
@@ -1571,16 +1571,16 @@ class TestAgentExecutorPromptCaptureNarrowing:
 
 
 class TestAgentExecutorExtractRunTelemetry:
-    """Pin behaviour of the _extract_run_telemetry helper directly."""
+    """Pin behaviour of the extract_run_telemetry helper directly."""
 
     @pytest.fixture(autouse=True)
     def _reset_warned_set(self):
         """Clear the module-level dedupe set so unknown-model warnings don't
         leak across tests in this module."""
-        import agent_executor
-        agent_executor._UNKNOWN_MODELS_WARNED.clear()
+        import pricing
+        pricing._UNKNOWN_MODELS_WARNED.clear()
         yield
-        agent_executor._UNKNOWN_MODELS_WARNED.clear()
+        pricing._UNKNOWN_MODELS_WARNED.clear()
 
     @staticmethod
     def _make_run_result_mock(num_tool_calls: int):
@@ -1591,7 +1591,7 @@ class TestAgentExecutorExtractRunTelemetry:
         exercised independently of the SDK's item parsing.
 
         ``context_wrapper.usage`` carries the Usage-shaped attribute surface
-        that ``_extract_usage_metrics`` reads at runtime.
+        that ``extract_usage_metrics`` reads at runtime.
         """
         result = MagicMock()
         # new_items: opaque list passed through to extract_tool_calls (patched).
@@ -1621,10 +1621,6 @@ class TestAgentExecutorExtractRunTelemetry:
 
     def test_extract_run_telemetry_returns_tuple_with_tool_calls_and_metrics(
         self,
-        sample_agent_id,
-        sample_agent_name,
-        sample_agent_style,
-        sample_model_name,
         caplog,
     ):
         """The helper must return (list[ToolCallDto], UsageMetrics) with the
@@ -1634,10 +1630,7 @@ class TestAgentExecutorExtractRunTelemetry:
         import logging
         from models.run_tracking import ToolCallDto
         from models.usage_metrics import UsageMetrics
-
-        executor = AgentExecutor(
-            sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
-        )
+        from telemetry import extract_run_telemetry
 
         # Build a result mock with 2 tool calls and a known usage shape.
         mock_result = self._make_run_result_mock(num_tool_calls=2)
@@ -1651,10 +1644,10 @@ class TestAgentExecutorExtractRunTelemetry:
 
         # Patch extract_tool_calls so we control the parsed-call list directly.
         with patch(
-            "agent_executor.extract_tool_calls", return_value=parsed_calls
+            "telemetry.extract_tool_calls", return_value=parsed_calls
         ) as mock_extract:
-            with caplog.at_level(logging.INFO, logger="agent_executor"):
-                tool_calls, usage_metrics = executor._extract_run_telemetry(
+            with caplog.at_level(logging.INFO, logger="telemetry"):
+                tool_calls, usage_metrics = extract_run_telemetry(
                     mock_result,
                     model_name="gpt-4o-mini",
                     agent_label="Test Agent",
@@ -1690,7 +1683,7 @@ class TestAgentExecutorExtractRunTelemetry:
         # Two observability log lines must be emitted with the agent label.
         ae_info = [
             r for r in caplog.records
-            if r.name == "agent_executor" and r.levelno == logging.INFO
+            if r.name == "telemetry" and r.levelno == logging.INFO
         ]
         made_records = [
             r for r in ae_info
@@ -1704,12 +1697,12 @@ class TestAgentExecutorExtractRunTelemetry:
             and "model=gpt-4o-mini" in r.getMessage()
         ]
         assert made_records, (
-            "Expected an INFO log on agent_executor with 'Test Agent made N tool "
+            "Expected an INFO log on telemetry with 'Test Agent made N tool "
             "calls'; got: "
             f"{[(r.name, r.levelname, r.getMessage()) for r in caplog.records]}"
         )
         assert usage_records, (
-            "Expected an INFO log on agent_executor with 'Test Agent usage: …'; "
+            "Expected an INFO log on telemetry with 'Test Agent usage: …'; "
             "got: "
             f"{[(r.name, r.levelname, r.getMessage()) for r in caplog.records]}"
         )
@@ -1902,4 +1895,25 @@ def test_pricing_module_exports_model_pricing():
     )
     assert callable(_load_model_pricing), (
         "_load_model_pricing must be callable (loads pricing from JSON)"
+    )
+
+
+# ============================================================================
+# Test: telemetry.py module extraction (refactor Task 2)
+# ============================================================================
+#
+# Pins the contract that extract_usage_metrics (was _extract_usage_metrics)
+# and extract_run_telemetry (was a method on AgentExecutor that didn't use
+# self) live in a new telemetry module after Task 2 extraction.
+
+
+def test_telemetry_module_exports_functions():
+    """Telemetry helpers live in their own module after Task 2 extraction."""
+    from telemetry import extract_usage_metrics, extract_run_telemetry
+
+    assert callable(extract_usage_metrics), (
+        "extract_usage_metrics must be callable (SDK Usage → UsageMetrics)"
+    )
+    assert callable(extract_run_telemetry), (
+        "extract_run_telemetry must be callable (RunResult → tool calls + metrics)"
     )
