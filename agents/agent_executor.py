@@ -24,6 +24,7 @@ from guardrail_retry import run_with_guardrail_retry
 # import these directly from ``pricing``.
 from pricing import MODEL_PRICING, _UNKNOWN_MODELS_WARNED  # noqa: F401
 from telemetry import extract_usage_metrics, extract_run_telemetry  # noqa: F401
+from run_lifecycle import RunLifecycle
 
 from models import TradingDecision, ResearchResponse, CycleResult, InvestmentStyle
 from models.orchestration import (
@@ -45,23 +46,33 @@ from models.run_tracking import (
     SourceDto,
     TradeDecision,
 )
-# Import direct function tools
+# Import direct function tools.
+# `initialize_agent` is no longer called directly here (Task 4 routed
+# `_start_run` through `RunLifecycle.start()`); kept until Task 5 cleans
+# up the run_tracking / status_broadcaster surface.
 from trading_tools import (
-    initialize_agent,
+    initialize_agent,  # noqa: F401
     buy_shares,
     sell_shares,
     _get_account_report_raw,
 )
 from backend_client import get_backend_client
 
-# Import new run tracking
-from run_tracking import create_run, update_phase, complete_run
+# Import new run tracking.
+# `create_run` is now invoked via `RunLifecycle.start()` (Task 4) and is
+# unused here; kept until the remaining inline call sites
+# (_run_decision_maker / _execute_trade / _finalize_run /
+# _handle_cycle_error) are migrated in Task 5.
+from run_tracking import create_run, update_phase, complete_run  # noqa: F401
 
-# Import status broadcasting
+# Import status broadcasting.
+# `PHASE_INITIALIZING` / `PHASE_RESEARCHING` are now used only inside
+# `RunLifecycle.start()` (Task 4) so they're unused here; kept until
+# Task 5 finishes routing the remaining four call sites.
 from status_broadcaster import (
     broadcast_status,
-    PHASE_INITIALIZING,
-    PHASE_RESEARCHING,
+    PHASE_INITIALIZING,  # noqa: F401
+    PHASE_RESEARCHING,  # noqa: F401
     PHASE_DECIDING,
     PHASE_TRADING,
     PHASE_COMPLETED,
@@ -174,8 +185,11 @@ class AgentExecutor:
             # Set timing at orchestrator level (not buried in helper)
             research_start_time = datetime.now()
             
-            # Initialize agent and create run
-            run_id = await self._start_run()
+            # Initialize agent and create run via the lifecycle service.
+            # The same instance will drive DECIDING, TRADING, COMPLETED,
+            # and ERROR transitions in later tasks of the decomposition.
+            lifecycle = RunLifecycle(self.agent_id, self.name)
+            run_id = await lifecycle.start()
             
             # Fetch account data once (reused by both agents)
             account_data = await self._fetch_account_data(self.agent_id)
@@ -257,38 +271,24 @@ class AgentExecutor:
     async def _start_run(self) -> int:
         """Initialize agent and create run, transition to RESEARCHING.
 
+        Thin wrapper around `RunLifecycle.start()` — preserved for the
+        existing `TestAgentExecutorStartRun` tests that call
+        `executor._start_run()` directly. `execute_cycle` no longer
+        invokes this method; it constructs its own `RunLifecycle` and
+        calls `lifecycle.start()` directly so the same lifecycle
+        instance can drive the remaining transitions (Task 5+).
+
+        Scheduled for deletion in Task 10 of the decomposition plan.
+
         Returns:
             run_id from backend
 
         Raises:
-            RuntimeError: If agent_id is not set or run creation fails
+            RuntimeError: If agent_id is not set
+            BackendAPIError: If create_run or update_phase fails
         """
-        # Initialize agent account (direct function call, not through agent)
-        await initialize_agent(self.name)
-
-        if self.agent_id is None:
-            raise RuntimeError(
-                f"Agent id not set for {self.name}. Use TradingSystem.create() to instantiate."
-            )
-
-        # Broadcast: INITIALIZING
-        broadcast_status(
-            self.agent_id, self.name, PHASE_INITIALIZING, "Starting trading cycle", 0
-        )
-
-        # Create run via API (POST /api/runs)
-        # create_run now throws BackendAPIError on failure
-        run_id = await create_run(self.agent_id)
-
-        # Update to RESEARCHING phase
-        await update_phase(run_id, RunPhase.RESEARCHING)
-
-        # Broadcast: RESEARCHING
-        broadcast_status(
-            self.agent_id, self.name, PHASE_RESEARCHING, "Researching market", 20
-        )
-
-        return run_id
+        lifecycle = RunLifecycle(self.agent_id, self.name)
+        return await lifecycle.start()
 
     async def _fetch_account_data(self, agent_id: int) -> AccountData:
         """Fetch balance and holdings once for the cycle.

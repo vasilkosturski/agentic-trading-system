@@ -162,15 +162,17 @@ class PriceCacheServiceTest {
     }
 
     @Test
-    @DisplayName("getPrice() swallows repository exceptions on cache write (best-effort)")
+    @DisplayName("getPrice() swallows ConcurrencyFailureException on cache write (concurrent upsert)")
     @SuppressWarnings("unchecked")
-    void getPrice_swallowsRepositoryExceptionOnWrite() {
+    void getPrice_swallowsConcurrencyFailureOnWrite() {
         when(priceCacheRepository.findBySymbol("AAPL")).thenReturn(Optional.empty());
 
         var quote = new PriceCacheService.FinnhubQuoteResponse(123.45, 0, 0, 0, 0, 0, 0, 0L);
         doReturn(quote).when(restTemplate).getForObject(anyString(), any(Class.class));
 
-        doThrow(new RuntimeException("DB hiccup"))
+        // CannotAcquireLockException extends ConcurrencyFailureException - exactly the kind
+        // of concurrent-upsert race we still want to tolerate silently.
+        doThrow(new org.springframework.dao.CannotAcquireLockException("lost the race"))
             .when(priceCacheRepository).upsert(anyString(), anyDouble(), any(Instant.class), anyString());
 
         MarketService.PriceData result = priceCacheService.getPrice("AAPL");
@@ -179,5 +181,22 @@ class PriceCacheServiceTest {
         assertEquals(123.45, result.getPrice());
         assertFalse(result.isCached());
         assertEquals("Real-time quote from Finnhub", result.getSource());
+    }
+
+    @Test
+    @DisplayName("getPrice() does NOT swallow unexpected RuntimeException on cache write")
+    @SuppressWarnings("unchecked")
+    void getPrice_propagatesUnexpectedRuntimeExceptionOnWrite() {
+        when(priceCacheRepository.findBySymbol("AAPL")).thenReturn(Optional.empty());
+
+        var quote = new PriceCacheService.FinnhubQuoteResponse(123.45, 0, 0, 0, 0, 0, 0, 0L);
+        doReturn(quote).when(restTemplate).getForObject(anyString(), any(Class.class));
+
+        // After narrowing the catch, an arbitrary RuntimeException (e.g. TransactionRequiredException
+        // wrapped as InvalidDataAccessApiUsageException) must propagate so regressions stay visible.
+        doThrow(new RuntimeException("DB hiccup"))
+            .when(priceCacheRepository).upsert(anyString(), anyDouble(), any(Instant.class), anyString());
+
+        assertThrows(RuntimeException.class, () -> priceCacheService.getPrice("AAPL"));
     }
 }
