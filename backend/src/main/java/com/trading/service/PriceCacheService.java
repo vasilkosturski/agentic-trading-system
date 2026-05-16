@@ -74,13 +74,14 @@ public class PriceCacheService {
         try {
             priceCacheRepository.upsert(symbol, fresh, now, "Finnhub");
             logger.debug("Saved price to DB cache: {} = ${}", symbol, fresh);
-        } catch (Exception e) {
-            // Swallow errors (deadlock, concurrent update, etc.) - price will be fetched again next time
-            if (e.getMessage() != null && e.getMessage().contains("deadlock")) {
-                logger.warn("Deadlock updating cache for {} - continuing without cache", symbol);
-            } else {
-                logger.debug("Cache update skipped for {} (likely concurrent update): {}", symbol, e.getMessage());
-            }
+        } catch (org.springframework.dao.ConcurrencyFailureException e) {
+            // Concurrent upsert lost the race (CannotAcquireLockException, DeadlockLoserDataAccessException,
+            // PessimisticLockingFailureException etc. all extend ConcurrencyFailureException); the other
+            // writer's value is now in the cache. Skipping is the correct behavior - price will be served
+            // from cache on the next call. Logged at WARN with the exception class name so future
+            // regressions (e.g. TransactionRequiredException) stay visible instead of being swallowed.
+            logger.warn("Concurrent cache upsert for {}: {} - continuing without our value",
+                    symbol, e.getClass().getSimpleName());
         }
         return new MarketService.PriceData(fresh, false, now, "Real-time quote from Finnhub");
     }

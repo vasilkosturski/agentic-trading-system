@@ -133,10 +133,10 @@ class TestAgentExecutorInitialization:
 class TestAgentExecutorStartRun:
     """Test _start_run method."""
 
-    @patch("agent_executor.initialize_agent")
-    @patch("agent_executor.create_run")
-    @patch("agent_executor.update_phase")
-    @patch("agent_executor.broadcast_status")
+    @patch("run_lifecycle.initialize_agent")
+    @patch("run_lifecycle.create_run")
+    @patch("run_lifecycle.update_phase")
+    @patch("run_lifecycle.broadcast_status")
     async def test_start_run_returns_run_id(
         self,
         mock_broadcast,
@@ -147,7 +147,12 @@ class TestAgentExecutorStartRun:
         sample_agent_name,
         sample_agent_style,
     ):
-        """Test _start_run creates run and returns run_id."""
+        """Test _start_run creates run and returns run_id.
+
+        After Task 4 the underlying calls happen one layer down inside
+        `RunLifecycle.start()`, so patches must target `run_lifecycle.*`
+        rather than `agent_executor.*`.
+        """
         mock_initialize.return_value = None
         mock_create_run.return_value = 123
         mock_update_phase.return_value = True
@@ -454,9 +459,9 @@ class TestAgentExecutorErrorPaths:
         ``update_phase`` so the original exception is still re-raised.
     """
 
-    @patch("agent_executor.initialize_agent")
-    @patch("agent_executor.create_run")
-    @patch("agent_executor.broadcast_status")
+    @patch("run_lifecycle.initialize_agent")
+    @patch("run_lifecycle.create_run")
+    @patch("run_lifecycle.broadcast_status")
     async def test_start_run_propagates_backend_api_error(
         self,
         mock_broadcast,
@@ -466,7 +471,12 @@ class TestAgentExecutorErrorPaths:
         sample_agent_name,
         sample_agent_style,
     ):
-        """_start_run must surface BackendAPIError from create_run unchanged."""
+        """_start_run must surface BackendAPIError from create_run unchanged.
+
+        After Task 4 the BackendAPIError originates inside
+        `RunLifecycle.start()`; `_start_run` is a thin wrapper that lets
+        it propagate untouched, so patches target `run_lifecycle.*`.
+        """
         from exceptions import BackendAPIError
 
         mock_initialize.return_value = None
