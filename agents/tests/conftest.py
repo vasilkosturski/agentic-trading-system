@@ -275,6 +275,14 @@ def _redirect_run_lifecycle_to_agent_executor(monkeypatch):
     `return_value` / `side_effect` settings take effect through the
     lifecycle code path too.
 
+    After Task 5 (final cleanup) deleted the unused `create_run`,
+    `update_phase`, `complete_run`, `initialize_agent`, and
+    `broadcast_status` imports from `agent_executor`, the forwarders use
+    a fallback to the real `run_lifecycle.<symbol>` value when the symbol
+    is no longer accessible via `agent_executor`. Tests that still patch
+    at `agent_executor.<symbol>` continue to work because the patcher
+    installs the attribute on the module for the test duration.
+
     Skipping the forwarder for any test that *does* set its own
     `run_lifecycle.<symbol>` patch is handled implicitly: that test's
     `@patch` decorator overrides our `monkeypatch.setattr` (unittest
@@ -283,8 +291,22 @@ def _redirect_run_lifecycle_to_agent_executor(monkeypatch):
     import agent_executor
     import run_lifecycle
 
+    # Capture the real run_lifecycle.<symbol> values BEFORE installing
+    # forwarders so the fallback can reach the actual production functions
+    # when agent_executor no longer re-exports them.
+    _real = {
+        name: getattr(run_lifecycle, name)
+        for name in (
+            "create_run",
+            "update_phase",
+            "complete_run",
+            "initialize_agent",
+            "broadcast_status",
+        )
+    }
+
     async def _forward_async(name, *args, **kwargs):
-        target = getattr(agent_executor, name)
+        target = getattr(agent_executor, name, _real[name])
         result = target(*args, **kwargs)
         # ``target`` may be the real coroutine function, or an AsyncMock
         # / MagicMock installed by a test. Coroutines and AsyncMock both
@@ -294,7 +316,7 @@ def _redirect_run_lifecycle_to_agent_executor(monkeypatch):
         return result
 
     def _forward_sync(name, *args, **kwargs):
-        return getattr(agent_executor, name)(*args, **kwargs)
+        return getattr(agent_executor, name, _real[name])(*args, **kwargs)
 
     async def _create_run(*a, **k):
         return await _forward_async("create_run", *a, **k)

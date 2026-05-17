@@ -42,42 +42,16 @@ from models.run_tracking import (
     PhaseStatus,
     ReasoningDto,
     ResearchPhaseData,
-    RunPhase,
     SourceDto,
     TradeDecision,
 )
 # Import direct function tools.
-# `initialize_agent` is no longer called directly here (Task 4 routed
-# `_start_run` through `RunLifecycle.start()`); kept until Task 5 cleans
-# up the run_tracking / status_broadcaster surface.
 from trading_tools import (
-    initialize_agent,  # noqa: F401
     buy_shares,
     sell_shares,
     _get_account_report_raw,
 )
 from backend_client import get_backend_client
-
-# Import new run tracking.
-# `create_run` is now invoked via `RunLifecycle.start()` (Task 4) and is
-# unused here; kept until the remaining inline call sites
-# (_run_decision_maker / _execute_trade / _finalize_run /
-# _handle_cycle_error) are migrated in Task 5.
-from run_tracking import create_run, update_phase, complete_run  # noqa: F401
-
-# Import status broadcasting.
-# `PHASE_INITIALIZING` / `PHASE_RESEARCHING` are now used only inside
-# `RunLifecycle.start()` (Task 4) so they're unused here; kept until
-# Task 5 finishes routing the remaining four call sites.
-from status_broadcaster import (
-    broadcast_status,
-    PHASE_INITIALIZING,  # noqa: F401
-    PHASE_RESEARCHING,  # noqa: F401
-    PHASE_DECIDING,
-    PHASE_TRADING,
-    PHASE_COMPLETED,
-    PHASE_ERROR,
-)
 
 # Import two-agent architecture (OO classes with typed inputs)
 from market_analyst import MarketAnalyst, MarketAnalystContext
@@ -180,15 +154,17 @@ class AgentExecutor:
             f"🤖 {self.name} starting portfolio review at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
 
+        # Construct lifecycle BEFORE the try: block so it's in scope for the
+        # except: handler that calls _handle_cycle_error. RunLifecycle() is a
+        # pure dataclass-style instantiation and can't raise — the only
+        # outbound I/O is in lifecycle.start() below.
+        lifecycle = RunLifecycle(self.agent_id, self.name)
+
         try:
             # === INITIALIZATION ===
             # Set timing at orchestrator level (not buried in helper)
             research_start_time = datetime.now()
-            
-            # Initialize agent and create run via the lifecycle service.
-            # The same instance will drive DECIDING, TRADING, COMPLETED,
-            # and ERROR transitions in later tasks of the decomposition.
-            lifecycle = RunLifecycle(self.agent_id, self.name)
+
             run_id = await lifecycle.start()
             
             # Fetch account data once (reused by both agents)
@@ -222,6 +198,7 @@ class AgentExecutor:
                 ctx=ctx,
                 mcp_pool=mcp_pool,
                 force_trade=force_trade,
+                lifecycle=lifecycle,
             )
             ctx.decision_result = decision_result
 
@@ -241,6 +218,7 @@ class AgentExecutor:
                     run_id=ctx.run_id,
                     agent_id=ctx.agent_id,
                     decision=ctx.decision_result.decision,
+                    lifecycle=lifecycle,
                 )
             else:
                 # HOLD decision - skip execution phase
@@ -251,7 +229,7 @@ class AgentExecutor:
                 )
 
             # === FINALIZATION ===
-            await self._finalize_run(ctx)
+            await self._finalize_run(ctx, lifecycle)
 
             logger.info(
                 f"✅ {self.name} completed portfolio review at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
@@ -265,7 +243,7 @@ class AgentExecutor:
             )
 
         except Exception as e:
-            await self._handle_cycle_error(e, ctx)
+            await self._handle_cycle_error(e, ctx, lifecycle)
             raise
 
     async def _start_run(self) -> int:
@@ -462,6 +440,7 @@ class AgentExecutor:
         ctx: RunContext,
         mcp_pool,
         force_trade: bool,
+        lifecycle: RunLifecycle,
     ) -> DecisionResult:
         """Run Decision Maker agent for trading decision.
 
@@ -469,18 +448,13 @@ class AgentExecutor:
             ctx: RunContext with research results and account data
             mcp_pool: MCP pool for creating agent
             force_trade: If True, agent must make BUY/SELL (no HOLD)
+            lifecycle: RunLifecycle instance driving phase transitions
 
         Returns:
             DecisionResult with decision and timing
         """
-        # Update to DECIDING phase
-        await update_phase(ctx.run_id, RunPhase.DECIDING)
+        await lifecycle.transition_to_deciding(ctx.run_id)
         decision_start_time = datetime.now()
-
-        # Broadcast: DECIDING
-        broadcast_status(
-            ctx.agent_id, ctx.agent_name, PHASE_DECIDING, "Making investment decision", 70
-        )
 
         # Create Decision Maker using async factory pattern
         decision_maker = await DecisionMaker.create(
@@ -558,6 +532,7 @@ class AgentExecutor:
         run_id: int,
         agent_id: int,
         decision: TradingDecision,
+        lifecycle: RunLifecycle,
     ) -> ExecutionResult:
         """Execute BUY/SELL decision. HOLD is filtered by caller in execute_cycle.
 
@@ -577,11 +552,7 @@ class AgentExecutor:
         logger.info(f"🟡 ABOUT TO EXECUTE: decision={decision}")
         logger.info(f"🟢 EXECUTING: {action} {quantity} shares of {symbol}")
 
-        # Update to TRADING phase
-        await update_phase(run_id, RunPhase.TRADING)
-
-        # Broadcast: TRADING
-        broadcast_status(agent_id, self.name, PHASE_TRADING, "Executing trade", 90)
+        await lifecycle.transition_to_trading(run_id)
 
         trade_id = None
         execution_status: PhaseStatus
@@ -617,11 +588,12 @@ class AgentExecutor:
             execution_error=execution_error,
         )
 
-    async def _finalize_run(self, ctx: RunContext) -> None:
+    async def _finalize_run(self, ctx: RunContext, lifecycle: RunLifecycle) -> None:
         """Complete run with all data.
 
         Args:
             ctx: RunContext with all data to persist
+            lifecycle: RunLifecycle instance driving phase transitions
 
         Preconditions (enforced via assertions):
             - research: set by _run_market_analyst
@@ -698,13 +670,10 @@ class AgentExecutor:
             execution=execution_data,
         )
 
-        # Complete the run via API
-        await complete_run(ctx.run_id, complete_data)
-
-        # Broadcast: COMPLETED — outcome_message branches on execution_status
-        # so a FAILED BUY/SELL isn't mislabeled as 'No trades (HOLD decision)'
-        # (the prior implementation branched on trade_id truthiness, which
-        # collapsed FAILED and SKIPPED into the same message).
+        # outcome_message branches on execution_status so a FAILED BUY/SELL
+        # isn't mislabeled as 'No trades (HOLD decision)' (the prior
+        # implementation branched on trade_id truthiness, which collapsed
+        # FAILED and SKIPPED into the same message).
         status = ctx.execution_result.execution_status
         if status == PhaseStatus.COMPLETED:
             outcome_message = "Completed - 1 trade executed"
@@ -714,16 +683,15 @@ class AgentExecutor:
             outcome_message = "Completed - Trade attempted but failed"
         else:
             outcome_message = f"Completed - Unknown status: {status}"
-        broadcast_status(
-            ctx.agent_id,
-            ctx.agent_name,
-            PHASE_COMPLETED,
-            outcome_message,
-            100,
-            outcome=outcome_message,
-        )
 
-    async def _handle_cycle_error(self, error: Exception, ctx: RunContext | None) -> None:
+        await lifecycle.complete(ctx.run_id, complete_data, outcome_message)
+
+    async def _handle_cycle_error(
+        self,
+        error: Exception,
+        ctx: RunContext | None,
+        lifecycle: RunLifecycle,
+    ) -> None:
         """Handle cycle execution error.
 
         Best-effort error recording — never masks the original exception.
@@ -731,31 +699,8 @@ class AgentExecutor:
         Args:
             error: Exception that occurred
             ctx: RunContext if available (may be None if Phase 1 failed)
+            lifecycle: RunLifecycle instance to delegate failure recording to
         """
-        agent_id = ctx.agent_id if ctx else self.agent_id
-        agent_name = ctx.agent_name if ctx else self.name
         run_id = ctx.run_id if ctx else None
-
-        logger.error(f"Cycle error for {agent_name}: {error}")
-
-        # Broadcast: ERROR
-        broadcast_status(
-            agent_id,
-            agent_name,
-            PHASE_ERROR,
-            f"Error: {str(error)}",
-            0,
-            outcome=f"Failed: {str(error)}",
-        )
-
-        # Update run to FAILED state. Do NOT call complete_run() — that
-        # would override FAILED back to COMPLETED. Just set the failed phase.
-        if run_id is not None:
-            try:
-                error_msg = str(error)[:MAX_ERROR_MESSAGE_LEN] or "Unknown error"
-                await update_phase(run_id, RunPhase.FAILED, error_message=error_msg)
-            except Exception as cleanup_err:
-                logger.error(
-                    f"Failed to record error state for run {run_id}: {cleanup_err}"
-                )
+        await lifecycle.fail(run_id, error)
 
