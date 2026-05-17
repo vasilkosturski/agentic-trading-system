@@ -2,11 +2,12 @@
 
 import json
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
 from agent_executor import AgentExecutor
+from run_lifecycle import RunLifecycle
 from models.investment_style import InvestmentStyle
 from models.orchestration import (
     CycleResult,
@@ -318,18 +319,18 @@ class TestAgentExecutorMarketAnalyst:
 class TestAgentExecutorFullCycle:
     """Test full execute_cycle."""
 
-    @patch("agent_executor.complete_run")
+    @patch("run_lifecycle.complete_run")
     @patch("agent_executor.buy_shares")
     @patch("agent_executor.DecisionMaker")
     @patch("agent_executor.MarketAnalyst")
     @patch("agent_executor.Runner")
     @patch("guardrail_retry.Runner")
-    @patch("agent_executor.update_phase")
-    @patch("agent_executor.create_run")
+    @patch("run_lifecycle.update_phase")
+    @patch("run_lifecycle.create_run")
     @patch("agent_executor.get_backend_client")
     @patch("agent_executor._get_account_report_raw")
-    @patch("agent_executor.initialize_agent")
-    @patch("agent_executor.broadcast_status")
+    @patch("run_lifecycle.initialize_agent")
+    @patch("run_lifecycle.broadcast_status")
     async def test_execute_cycle_success_with_buy(
         self,
         mock_broadcast,
@@ -493,13 +494,13 @@ class TestAgentExecutorErrorPaths:
 
         assert exc_info.value.status_code == 500
 
-    @patch("agent_executor.update_phase")
-    @patch("agent_executor.complete_run")
-    @patch("agent_executor.create_run")
+    @patch("run_lifecycle.update_phase")
+    @patch("run_lifecycle.complete_run")
+    @patch("run_lifecycle.create_run")
     @patch("agent_executor.get_backend_client")
     @patch("agent_executor._get_account_report_raw")
-    @patch("agent_executor.initialize_agent")
-    @patch("agent_executor.broadcast_status")
+    @patch("run_lifecycle.initialize_agent")
+    @patch("run_lifecycle.broadcast_status")
     async def test_execute_cycle_propagates_recent_activity_backend_error(
         self,
         mock_broadcast,
@@ -568,16 +569,16 @@ class TestAgentExecutorErrorPaths:
         # avoids overriding a failed run back to COMPLETED.
         mock_complete_run.assert_not_called()
 
-    @patch("agent_executor.complete_run")
+    @patch("run_lifecycle.complete_run")
     @patch("agent_executor.DecisionMaker")
     @patch("agent_executor.MarketAnalyst")
     @patch("guardrail_retry.Runner")
-    @patch("agent_executor.update_phase")
-    @patch("agent_executor.create_run")
+    @patch("run_lifecycle.update_phase")
+    @patch("run_lifecycle.create_run")
     @patch("agent_executor.get_backend_client")
     @patch("agent_executor._get_account_report_raw")
-    @patch("agent_executor.initialize_agent")
-    @patch("agent_executor.broadcast_status")
+    @patch("run_lifecycle.initialize_agent")
+    @patch("run_lifecycle.broadcast_status")
     async def test_execute_cycle_propagates_max_turns_exceeded_from_research(
         self,
         mock_broadcast,
@@ -653,57 +654,44 @@ class TestAgentExecutorErrorPaths:
         # DecisionMaker.create must NOT have been called — research crashed first.
         mock_decision_maker_class.create.assert_not_called()
 
-    @patch("agent_executor.update_phase")
-    @patch("agent_executor.broadcast_status")
     async def test_handle_cycle_error_without_ctx_skips_update_phase(
         self,
-        mock_broadcast,
-        mock_update_phase,
         sample_agent_id,
         sample_agent_name,
         sample_agent_style,
     ):
         """When ctx is None (failure before run creation), _handle_cycle_error
-        must broadcast PHASE_ERROR but NOT call update_phase(FAILED) because
-        there is no run_id to mark failed."""
+        must delegate to lifecycle.fail with run_id=None (lifecycle handles the
+        skip-update-phase contract — verified separately in test_run_lifecycle.py)."""
+        mock_lifecycle = Mock(spec=RunLifecycle)
+        mock_lifecycle.fail = AsyncMock()
+
         executor = AgentExecutor(
             sample_agent_id, sample_agent_name, sample_agent_style
         )
+        err = RuntimeError("init failure")
 
-        await executor._handle_cycle_error(
-            RuntimeError("init failure"), ctx=None
-        )
+        await executor._handle_cycle_error(err, ctx=None, lifecycle=mock_lifecycle)
 
-        # Error must have been broadcast for the agent's name/id.
-        mock_broadcast.assert_called_once()
-        broadcast_args = mock_broadcast.call_args.args
-        assert broadcast_args[0] == sample_agent_id
-        assert broadcast_args[1] == sample_agent_name
-        assert broadcast_args[2] == "FAILED"  # PHASE_ERROR -> RunPhase.FAILED
+        # Boundary contract: _handle_cycle_error must call lifecycle.fail with
+        # run_id=None when ctx is None.
+        mock_lifecycle.fail.assert_called_once_with(None, err)
 
-        # update_phase must NOT have been called - no run exists.
-        mock_update_phase.assert_not_called()
-
-    @patch("agent_executor.update_phase")
-    @patch("agent_executor.broadcast_status")
     async def test_handle_cycle_error_swallows_cleanup_error(
         self,
-        mock_broadcast,
-        mock_update_phase,
         sample_agent_id,
         sample_agent_name,
         sample_agent_style,
         sample_model_name,
         sample_recent_activity,
     ):
-        """If update_phase itself raises during error recording, _handle_cycle_error
-        must log and continue — the original exception is the one that matters.
-        The method itself returns normally (caller re-raises the original error)."""
-        from exceptions import BackendAPIError
-
-        mock_update_phase.side_effect = BackendAPIError(
-            "patch /phase failed", status_code=503
-        )
+        """_handle_cycle_error delegates to lifecycle.fail. The actual
+        swallowed-cleanup-error contract lives inside RunLifecycle.fail and is
+        verified by test_run_lifecycle.py:test_fail_swallows_cleanup_errors_and_does_not_raise.
+        This test pins the boundary: _handle_cycle_error calls lifecycle.fail
+        with the right args and does not raise."""
+        mock_lifecycle = Mock(spec=RunLifecycle)
+        mock_lifecycle.fail = AsyncMock()
 
         executor = AgentExecutor(
             sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
@@ -721,13 +709,12 @@ class TestAgentExecutorErrorPaths:
             recent_activity=sample_recent_activity,
         )
 
-        # Must return normally — never raise from _handle_cycle_error itself.
-        await executor._handle_cycle_error(RuntimeError("cycle boom"), ctx=ctx)
+        err = RuntimeError("cycle boom")
 
-        # update_phase WAS attempted (even though it failed).
-        mock_update_phase.assert_called_once()
-        # The error broadcast still happened.
-        assert mock_broadcast.call_count >= 1
+        # Must return normally — never raise from _handle_cycle_error itself.
+        await executor._handle_cycle_error(err, ctx=ctx, lifecycle=mock_lifecycle)
+
+        mock_lifecycle.fail.assert_called_once_with(777, err)
 
 
 # ============================================================================
@@ -786,13 +773,15 @@ class TestAgentExecutorModuleConstants:
 
         # Call-site fragments that must appear verbatim after the refactor.
         # If any of these are missing, a call site is still using a literal.
+        # Note: [:MAX_ERROR_MESSAGE_LEN] was removed when _handle_cycle_error
+        # was collapsed to delegate to RunLifecycle.fail — the truncation now
+        # lives in run_lifecycle.py (verified by test_run_lifecycle.py).
         required_fragments = [
             "max_positions=MAX_POSITIONS",  # _run_market_analyst + _run_decision_maker
             "max_attempts=RESEARCH_MAX_ATTEMPTS",  # run_with_guardrail_retry
             "max_turns=AGENT_MAX_TURNS",  # guardrail retry + Runner.run
             "days=RECENT_ACTIVITY_LOOKBACK_DAYS",  # get_recent_activity
             "[:MAX_REASONING_FIELD_LEN]",  # four reasoning truncations
-            "[:MAX_ERROR_MESSAGE_LEN]",  # error message truncation
         ]
         for fragment in required_fragments:
             assert fragment in source, (
@@ -944,18 +933,18 @@ class TestAgentExecutorCycleLoggerMigration:
 class TestAgentExecutorCycleLoggerBehavior:
     """Pin behavioral evidence that cycle-start/end emit INFO log records."""
 
-    @patch("agent_executor.complete_run")
+    @patch("run_lifecycle.complete_run")
     @patch("agent_executor.buy_shares")
     @patch("agent_executor.DecisionMaker")
     @patch("agent_executor.MarketAnalyst")
     @patch("agent_executor.Runner")
     @patch("guardrail_retry.Runner")
-    @patch("agent_executor.update_phase")
-    @patch("agent_executor.create_run")
+    @patch("run_lifecycle.update_phase")
+    @patch("run_lifecycle.create_run")
     @patch("agent_executor.get_backend_client")
     @patch("agent_executor._get_account_report_raw")
-    @patch("agent_executor.initialize_agent")
-    @patch("agent_executor.broadcast_status")
+    @patch("run_lifecycle.initialize_agent")
+    @patch("run_lifecycle.broadcast_status")
     async def test_execute_cycle_emits_start_and_end_info_logs(
         self,
         mock_broadcast,
@@ -1481,7 +1470,7 @@ class TestAgentExecutorPromptCaptureNarrowing:
         )
 
     @patch("agent_executor.DecisionMaker")
-    @patch("agent_executor.update_phase")
+    @patch("run_lifecycle.update_phase")
     @patch("agent_executor.Runner")
     async def test_decision_maker_callable_instructions_capture_is_none_with_debug_log(
         self,
@@ -1546,9 +1535,12 @@ class TestAgentExecutorPromptCaptureNarrowing:
             research=ResearchResult(research_response=sample_research_response),
         )
 
+        mock_lifecycle = MagicMock(spec=RunLifecycle)
+
         with caplog.at_level(logging.DEBUG, logger="agent_executor"):
             await executor._run_decision_maker(
-                ctx=ctx, mcp_pool=mock_mcp_pool, force_trade=False
+                ctx=ctx, mcp_pool=mock_mcp_pool, force_trade=False,
+                lifecycle=mock_lifecycle,
             )
 
         assert ctx.decision_maker_system_prompt is None
@@ -1734,18 +1726,18 @@ class TestAgentExecutorExtractRunTelemetry:
 class TestAgentExecutorCompletionMessageOnFailure:
     """Pin the FAILED-execution completion-message branch."""
 
-    @patch("agent_executor.complete_run")
+    @patch("run_lifecycle.complete_run")
     @patch("agent_executor.buy_shares")
     @patch("agent_executor.DecisionMaker")
     @patch("agent_executor.MarketAnalyst")
     @patch("agent_executor.Runner")
     @patch("guardrail_retry.Runner")
-    @patch("agent_executor.update_phase")
-    @patch("agent_executor.create_run")
+    @patch("run_lifecycle.update_phase")
+    @patch("run_lifecycle.create_run")
     @patch("agent_executor.get_backend_client")
     @patch("agent_executor._get_account_report_raw")
-    @patch("agent_executor.initialize_agent")
-    @patch("agent_executor.broadcast_status")
+    @patch("run_lifecycle.initialize_agent")
+    @patch("run_lifecycle.broadcast_status")
     async def test_failed_buy_emits_trade_attempted_but_failed_message(
         self,
         mock_broadcast,
