@@ -11,14 +11,10 @@ Architecture:
 - Fail-fast error handling (no silent fallbacks)
 """
 
-import json
 import logging
 from datetime import datetime
 
-from agents import Runner
-
 from config import config
-from guardrail_retry import run_with_guardrail_retry
 # Re-exported so existing references via ``agent_executor._UNKNOWN_MODELS_WARNED``
 # (e.g. legacy test fixtures) continue to resolve. Telemetry helpers below
 # import these directly from ``pricing``.
@@ -26,12 +22,10 @@ from pricing import MODEL_PRICING, _UNKNOWN_MODELS_WARNED  # noqa: F401
 from telemetry import extract_usage_metrics, extract_run_telemetry  # noqa: F401
 from run_lifecycle import RunLifecycle
 
-from models import TradingDecision, ResearchResponse, CycleResult, InvestmentStyle
+from models import TradingDecision, CycleResult, InvestmentStyle
 from models.orchestration import (
     AccountData,
     RunContext,
-    ResearchResult,
-    DecisionResult,
     ExecutionResult,
 )
 from models.api_responses import RecentActivityResponse
@@ -53,9 +47,10 @@ from trading_tools import (
 )
 from backend_client import get_backend_client
 
-# Import two-agent architecture (OO classes with typed inputs)
-from market_analyst import MarketAnalyst, MarketAnalystContext
-from decision_maker import DecisionMaker, DecisionContext
+# Two-agent architecture imports lived here until Tasks 6 and 7 of the
+# decomposition plan lifted them into phase modules. ``MarketAnalyst`` now
+# lives behind ``phases.research_phase.run_research_phase``; ``DecisionMaker``
+# now lives behind ``phases.decision_phase.run_decision_phase``.
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +79,15 @@ MAX_ERROR_MESSAGE_LEN = 500
 # ...`` statements at the top of this module so existing references like
 # ``agent_executor.MODEL_PRICING`` or
 # ``agent_executor._UNKNOWN_MODELS_WARNED`` continue to resolve.
+
+# Phase-module imports (extracted in Task 6+ of the decomposition plan).
+# These imports are placed AFTER the module-constants block above so that
+# phases.research_phase can `from agent_executor import MAX_POSITIONS, ...`
+# without triggering a circular import — by the time Python begins
+# initializing phases.research_phase, the names it needs are already bound
+# on this module.
+from phases.research_phase import run_research_phase  # noqa: E402
+from phases.decision_phase import run_decision_phase  # noqa: E402
 
 
 class AgentExecutor:
@@ -187,14 +191,14 @@ class AgentExecutor:
             )
 
             # === RESEARCH PHASE ===
-            research_result = await self._run_market_analyst(
+            research_result = await run_research_phase(
                 ctx=ctx,
                 mcp_pool=mcp_pool,
             )
             ctx.research = research_result
 
             # === DECISION PHASE ===
-            decision_result = await self._run_decision_maker(
+            decision_result = await run_decision_phase(
                 ctx=ctx,
                 mcp_pool=mcp_pool,
                 force_trade=force_trade,
@@ -305,227 +309,6 @@ class AgentExecutor:
 
         logger.info(f"📊 Context prepared: {result.computed_total_runs} runs, {result.computed_total_trades} trades (30 days)")
         return result
-
-    async def _run_market_analyst(
-        self,
-        ctx: RunContext,
-        mcp_pool,
-    ) -> ResearchResult:
-        """Run Market Analyst agent for research.
-
-        Args:
-            ctx: RunContext with agent info and account data
-            mcp_pool: MCP pool for creating agent
-
-        Returns:
-            ResearchResult with research findings
-        """
-        research_start_time = datetime.now()
-
-        # Log portfolio access (inline observability — preserves the
-        # "Portfolio data fetched" semantic that the previously-removed
-        # parallel tracking system used to record.)
-        portfolio_data = {
-            "balance": round(ctx.balance, 2),
-            "holdings_count": len(ctx.holdings),
-            "symbols": [h.symbol for h in ctx.holdings] if ctx.holdings else []
-        }
-        logger.debug(
-            "Portfolio data fetched: balance=$%.2f, positions=%d, symbols=%s",
-            ctx.balance,
-            len(ctx.holdings),
-            portfolio_data["symbols"],
-        )
-
-        # Create Market Analyst using async factory pattern
-        market_analyst = await MarketAnalyst.create(
-            agent_name=ctx.agent_name,
-            agent_id=ctx.agent_id,
-            mcp_pool=mcp_pool,
-            model_name=ctx.model_name,
-        )
-
-        # Build typed context (class converts to strings internally)
-        research_context = MarketAnalystContext(
-            agent_name=ctx.agent_name,
-            agent_style=ctx.agent_style,
-            balance=ctx.balance,
-            holdings=ctx.holdings,
-            recent_activity=ctx.recent_activity,
-            max_positions=MAX_POSITIONS,
-        )
-
-        # Build prompt using OO interface
-        research_prompt = market_analyst.build_prompt(research_context)
-
-        # Capture prompts for observability (before agent execution).
-        # Agent.instructions is typed `str | Callable[..., str] | None` by the
-        # SDK; the project's RunContext field is `str | None`. Sibling agents
-        # currently always set instructions to a str (see MarketAnalyst.create
-        # / DecisionMaker.create) so the str branch is always taken at runtime.
-        # The isinstance narrow + debug log keep prompt capture safe AND
-        # observable if anyone swaps to dynamic-callable instructions later.
-        instructions = market_analyst.agent.instructions
-        if not isinstance(instructions, str) and instructions is not None:
-            logger.debug(
-                "market_analyst.agent.instructions is callable, not str — "
-                "skipping prompt capture for observability"
-            )
-        ctx.market_analyst_system_prompt = instructions if isinstance(instructions, str) else None
-        ctx.market_analyst_task_prompt = research_prompt
-
-        logger.info(f"🔬 Running Market Analyst for {ctx.agent_name}...")
-
-        # Run Market Analyst with guardrail retry loop.
-        # If the output guardrail rejects the response, the retry function
-        # reconstructs the conversation and retries so the LLM can self-correct.
-        result = await run_with_guardrail_retry(
-            market_analyst.agent,
-            research_prompt,
-            max_attempts=RESEARCH_MAX_ATTEMPTS,
-            max_turns=AGENT_MAX_TURNS,
-            agent_name=ctx.agent_name,
-        )
-
-        # Extract ResearchResponse - type-safe using SDK's final_output_as()
-        try:
-            research_response = result.final_output_as(ResearchResponse)
-        except TypeError as e:
-            raise RuntimeError(
-                f"Market Analyst for {ctx.agent_name} failed to produce ResearchResponse: {e}"
-            ) from e
-
-        # Build sources list
-        sources = [
-            SourceDto.web(title=source.title, url=source.url)
-            for source in research_response.webSources
-        ]
-        # Add system context source for portfolio
-        sources.append(SourceDto.system_context(f"Portfolio context: {json.dumps(portfolio_data)}"))
-        sources.append(SourceDto.system_context("Retrieved 30-day trading activity history"))
-
-        # Calculate research latency
-        research_latency_ms = int(
-            (datetime.now() - research_start_time).total_seconds() * 1000
-        )
-        logger.info(f"📊 Market Analyst completed in {research_latency_ms}ms")
-
-        # Extract tool calls + usage metrics (DRY helper — see telemetry.extract_run_telemetry)
-        tool_calls, usage_metrics = extract_run_telemetry(
-            result, model_name=market_analyst.model_name, agent_label="Market Analyst"
-        )
-
-        # Prices are now carried directly in CandidateStock objects within
-        # research_response.candidates — no brittle tool-output parsing needed.
-        # Extract symbol strings for DB storage (backend expects list[str]).
-        candidate_symbols = [c.symbol for c in research_response.candidates]
-
-        logger.info(
-            f"✅ Market Analyst found {len(candidate_symbols)} candidates "
-            f"with prices, {len(sources)} sources"
-        )
-
-        return ResearchResult(
-            research_response=research_response,
-            candidates=candidate_symbols,
-            sources=sources,
-            notes=research_response.summary,
-            tool_calls=tool_calls,
-            usage_metrics=usage_metrics,
-            research_latency_ms=research_latency_ms,
-        )
-
-    async def _run_decision_maker(
-        self,
-        ctx: RunContext,
-        mcp_pool,
-        force_trade: bool,
-        lifecycle: RunLifecycle,
-    ) -> DecisionResult:
-        """Run Decision Maker agent for trading decision.
-
-        Args:
-            ctx: RunContext with research results and account data
-            mcp_pool: MCP pool for creating agent
-            force_trade: If True, agent must make BUY/SELL (no HOLD)
-            lifecycle: RunLifecycle instance driving phase transitions
-
-        Returns:
-            DecisionResult with decision and timing
-        """
-        await lifecycle.transition_to_deciding(ctx.run_id)
-        decision_start_time = datetime.now()
-
-        # Create Decision Maker using async factory pattern
-        decision_maker = await DecisionMaker.create(
-            agent_name=ctx.agent_name,
-            agent_id=ctx.agent_id,
-            mcp_pool=mcp_pool,
-            model_name=ctx.model_name,
-            agent_style=ctx.agent_style,
-        )
-
-        # Type narrowing: research is guaranteed set by _run_market_analyst
-        assert ctx.research is not None, "research must be set before decision phase"
-
-        # Build typed context (class converts to strings internally)
-        decision_context = DecisionContext(
-            agent_name=ctx.agent_name,
-            agent_style=ctx.agent_style,
-            research_response=ctx.research.research_response,
-            balance=ctx.balance,
-            holdings=ctx.holdings,
-            recent_activity=ctx.recent_activity,
-            force_trade=force_trade,
-            max_positions=MAX_POSITIONS,
-        )
-
-        # Build prompt using OO interface
-        decision_prompt = decision_maker.build_prompt(decision_context)
-
-        # Capture prompts for observability (before agent execution).
-        # See _run_market_analyst for the rationale behind the isinstance narrow.
-        instructions = decision_maker.agent.instructions
-        if not isinstance(instructions, str) and instructions is not None:
-            logger.debug(
-                "decision_maker.agent.instructions is callable, not str — "
-                "skipping prompt capture for observability"
-            )
-        ctx.decision_maker_system_prompt = instructions if isinstance(instructions, str) else None
-        ctx.decision_maker_task_prompt = decision_prompt
-
-        logger.info(f"🧠 Running Decision Maker for {ctx.agent_name}...")
-
-        # Run Decision Maker agent - get structured output directly
-        result = await Runner.run(decision_maker.agent, decision_prompt, max_turns=AGENT_MAX_TURNS)
-
-        # Extract TradingDecision - type-safe using SDK's final_output_as()
-        try:
-            decision = result.final_output_as(TradingDecision)
-        except TypeError as e:
-            raise RuntimeError(
-                f"Decision Maker for {ctx.agent_name} failed to produce TradingDecision: {e}"
-            ) from e
-
-        logger.info(f"✅ Decision Maker: {decision.action} {decision.symbol or ''}")
-
-        # Extract tool calls + usage metrics (DRY helper — see telemetry.extract_run_telemetry)
-        tool_calls, usage_metrics = extract_run_telemetry(
-            result, model_name=decision_maker.model_name, agent_label="Decision Maker"
-        )
-
-        # Calculate decision latency
-        decision_latency_ms = int(
-            (datetime.now() - decision_start_time).total_seconds() * 1000
-        )
-        logger.info(f"📊 Decision Maker completed in {decision_latency_ms}ms")
-
-        return DecisionResult(
-            decision=decision,
-            decision_start_time=decision_start_time,
-            tool_calls=tool_calls,
-            usage_metrics=usage_metrics,
-        )
 
     async def _execute_trade(
         self,
