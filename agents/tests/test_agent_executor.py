@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 
 from agent_executor import AgentExecutor
+from phases.research_phase import run_research_phase
+from phases.decision_phase import run_decision_phase
 from run_lifecycle import RunLifecycle
 from models.investment_style import InvestmentStyle
 from models.orchestration import (
@@ -254,7 +256,7 @@ class TestAgentExecutorFetchData:
 class TestAgentExecutorMarketAnalyst:
     """Test _run_market_analyst method."""
 
-    @patch("agent_executor.MarketAnalyst")
+    @patch("phases.research_phase.MarketAnalyst")
     @patch("guardrail_retry.Runner")
     async def test_run_market_analyst_returns_research_result(
         self,
@@ -287,9 +289,8 @@ class TestAgentExecutorMarketAnalyst:
         mock_runner_class.run = AsyncMock(return_value=mock_result)
         mock_analyst_instance.model_name = "gpt-4o"
 
-        executor = AgentExecutor(
-            sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
-        )
+        # No AgentExecutor instance needed — run_research_phase is a
+        # module-level function (Task 6 of the decomposition plan).
 
         ctx = RunContext(
             run_id=123,
@@ -303,7 +304,7 @@ class TestAgentExecutorMarketAnalyst:
             recent_activity=sample_recent_activity,
         )
 
-        result = await executor._run_market_analyst(ctx, mock_mcp_pool)
+        result = await run_research_phase(ctx, mock_mcp_pool)
 
         assert isinstance(result, ResearchResult)
         assert result.research_response == sample_research_response
@@ -321,9 +322,9 @@ class TestAgentExecutorFullCycle:
 
     @patch("run_lifecycle.complete_run")
     @patch("agent_executor.buy_shares")
-    @patch("agent_executor.DecisionMaker")
-    @patch("agent_executor.MarketAnalyst")
-    @patch("agent_executor.Runner")
+    @patch("phases.decision_phase.DecisionMaker")
+    @patch("phases.research_phase.MarketAnalyst")
+    @patch("phases.decision_phase.Runner")
     @patch("guardrail_retry.Runner")
     @patch("run_lifecycle.update_phase")
     @patch("run_lifecycle.create_run")
@@ -408,7 +409,7 @@ class TestAgentExecutorFullCycle:
         mock_guardrail_runner_class.run = AsyncMock(return_value=mock_research_result)
         mock_analyst_instance.model_name = "gpt-4o"
 
-        # Decision Maker runs through agent_executor.Runner
+        # Decision Maker runs through phases.decision_phase.Runner
         mock_decision_result = MagicMock()
         mock_decision_result.final_output_as.return_value = sample_decision
         mock_decision_result.new_items = []
@@ -570,8 +571,8 @@ class TestAgentExecutorErrorPaths:
         mock_complete_run.assert_not_called()
 
     @patch("run_lifecycle.complete_run")
-    @patch("agent_executor.DecisionMaker")
-    @patch("agent_executor.MarketAnalyst")
+    @patch("phases.decision_phase.DecisionMaker")
+    @patch("phases.research_phase.MarketAnalyst")
     @patch("guardrail_retry.Runner")
     @patch("run_lifecycle.update_phase")
     @patch("run_lifecycle.create_run")
@@ -765,11 +766,24 @@ class TestAgentExecutorModuleConstants:
 
         This guards against a partial refactor where the constant is defined
         but a call site still has the raw number.
+
+        Note: Task 6 of the decomposition lifted _run_market_analyst into
+        phases/research_phase.py — the max_attempts=RESEARCH_MAX_ATTEMPTS
+        call site moved with it. Task 7 lifted _run_decision_maker into
+        phases/decision_phase.py — the max_positions=MAX_POSITIONS and
+        max_turns=AGENT_MAX_TURNS call sites at the decision-maker site
+        moved with it. The test now scans all three modules so the
+        invariant survives the phase-module extractions.
         """
         import inspect
         import agent_executor
+        from phases import research_phase, decision_phase
 
-        source = inspect.getsource(agent_executor)
+        source = (
+            inspect.getsource(agent_executor)
+            + inspect.getsource(research_phase)
+            + inspect.getsource(decision_phase)
+        )
 
         # Call-site fragments that must appear verbatim after the refactor.
         # If any of these are missing, a call site is still using a literal.
@@ -935,9 +949,9 @@ class TestAgentExecutorCycleLoggerBehavior:
 
     @patch("run_lifecycle.complete_run")
     @patch("agent_executor.buy_shares")
-    @patch("agent_executor.DecisionMaker")
-    @patch("agent_executor.MarketAnalyst")
-    @patch("agent_executor.Runner")
+    @patch("phases.decision_phase.DecisionMaker")
+    @patch("phases.research_phase.MarketAnalyst")
+    @patch("phases.decision_phase.Runner")
     @patch("guardrail_retry.Runner")
     @patch("run_lifecycle.update_phase")
     @patch("run_lifecycle.create_run")
@@ -1338,7 +1352,7 @@ class TestAgentExecutorPromptCaptureNarrowing:
         ``logger.debug`` message is emitted so the swap is visible in logs.
     """
 
-    @patch("agent_executor.MarketAnalyst")
+    @patch("phases.research_phase.MarketAnalyst")
     @patch("guardrail_retry.Runner")
     async def test_market_analyst_string_instructions_captured_on_ctx(
         self,
@@ -1373,9 +1387,8 @@ class TestAgentExecutorPromptCaptureNarrowing:
         mock_result.context_wrapper.usage.request_usage_entries = []
         mock_runner_class.run = AsyncMock(return_value=mock_result)
 
-        executor = AgentExecutor(
-            sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
-        )
+        # No AgentExecutor instance needed — run_research_phase is a
+        # module-level function (Task 6 of the decomposition plan).
 
         ctx = RunContext(
             run_id=123,
@@ -1389,12 +1402,12 @@ class TestAgentExecutorPromptCaptureNarrowing:
             recent_activity=sample_recent_activity,
         )
 
-        await executor._run_market_analyst(ctx, mock_mcp_pool)
+        await run_research_phase(ctx, mock_mcp_pool)
 
         # The string flowed through unchanged.
         assert ctx.market_analyst_system_prompt == "you are a market analyst"
 
-    @patch("agent_executor.MarketAnalyst")
+    @patch("phases.research_phase.MarketAnalyst")
     @patch("guardrail_retry.Runner")
     async def test_market_analyst_callable_instructions_capture_is_none_with_debug_log(
         self,
@@ -1434,9 +1447,8 @@ class TestAgentExecutorPromptCaptureNarrowing:
         mock_result.context_wrapper.usage.request_usage_entries = []
         mock_runner_class.run = AsyncMock(return_value=mock_result)
 
-        executor = AgentExecutor(
-            sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
-        )
+        # No AgentExecutor instance needed — run_research_phase is a
+        # module-level function (Task 6 of the decomposition plan).
 
         ctx = RunContext(
             run_id=123,
@@ -1450,28 +1462,31 @@ class TestAgentExecutorPromptCaptureNarrowing:
             recent_activity=sample_recent_activity,
         )
 
-        with caplog.at_level(logging.DEBUG, logger="agent_executor"):
-            await executor._run_market_analyst(ctx, mock_mcp_pool)
+        with caplog.at_level(logging.DEBUG, logger="phases.research_phase"):
+            await run_research_phase(ctx, mock_mcp_pool)
 
         # The function object must not leak through to the context.
         assert ctx.market_analyst_system_prompt is None
 
         # A debug log entry must announce the callable-branch was taken.
+        # After Task 6 of the decomposition plan the function was lifted out
+        # of agent_executor.py into phases/research_phase.py — the logger
+        # name follows that move.
         callable_debug_records = [
             r for r in caplog.records
-            if r.name == "agent_executor"
+            if r.name == "phases.research_phase"
             and r.levelno == logging.DEBUG
             and "market_analyst.agent.instructions is callable" in r.getMessage()
         ]
         assert callable_debug_records, (
-            "Expected a DEBUG log on agent_executor announcing the callable "
-            "branch was hit; got none. caplog records: "
+            "Expected a DEBUG log on phases.research_phase announcing the "
+            "callable branch was hit; got none. caplog records: "
             f"{[(r.name, r.levelname, r.getMessage()) for r in caplog.records]}"
         )
 
-    @patch("agent_executor.DecisionMaker")
+    @patch("phases.decision_phase.DecisionMaker")
     @patch("run_lifecycle.update_phase")
-    @patch("agent_executor.Runner")
+    @patch("phases.decision_phase.Runner")
     async def test_decision_maker_callable_instructions_capture_is_none_with_debug_log(
         self,
         mock_runner_class,
@@ -1537,8 +1552,12 @@ class TestAgentExecutorPromptCaptureNarrowing:
 
         mock_lifecycle = MagicMock(spec=RunLifecycle)
 
-        with caplog.at_level(logging.DEBUG, logger="agent_executor"):
-            await executor._run_decision_maker(
+        # No AgentExecutor instance needed — run_decision_phase is a
+        # module-level function (Task 7 of the decomposition).
+        _ = executor  # silence unused-var without changing fixture wiring
+
+        with caplog.at_level(logging.DEBUG, logger="phases.decision_phase"):
+            await run_decision_phase(
                 ctx=ctx, mcp_pool=mock_mcp_pool, force_trade=False,
                 lifecycle=mock_lifecycle,
             )
@@ -1547,12 +1566,12 @@ class TestAgentExecutorPromptCaptureNarrowing:
 
         callable_debug_records = [
             r for r in caplog.records
-            if r.name == "agent_executor"
+            if r.name == "phases.decision_phase"
             and r.levelno == logging.DEBUG
             and "decision_maker.agent.instructions is callable" in r.getMessage()
         ]
         assert callable_debug_records, (
-            "Expected a DEBUG log on agent_executor announcing the callable "
+            "Expected a DEBUG log on phases.decision_phase announcing the callable "
             "branch was hit at the Decision Maker site; got none. caplog records: "
             f"{[(r.name, r.levelname, r.getMessage()) for r in caplog.records]}"
         )
@@ -1728,9 +1747,9 @@ class TestAgentExecutorCompletionMessageOnFailure:
 
     @patch("run_lifecycle.complete_run")
     @patch("agent_executor.buy_shares")
-    @patch("agent_executor.DecisionMaker")
-    @patch("agent_executor.MarketAnalyst")
-    @patch("agent_executor.Runner")
+    @patch("phases.decision_phase.DecisionMaker")
+    @patch("phases.research_phase.MarketAnalyst")
+    @patch("phases.decision_phase.Runner")
     @patch("guardrail_retry.Runner")
     @patch("run_lifecycle.update_phase")
     @patch("run_lifecycle.create_run")
@@ -1820,7 +1839,7 @@ class TestAgentExecutorCompletionMessageOnFailure:
         mock_research_result.context_wrapper.usage.request_usage_entries = []
         mock_guardrail_runner_class.run = AsyncMock(return_value=mock_research_result)
 
-        # Decision Maker runs through agent_executor.Runner → BUY decision
+        # Decision Maker runs through phases.decision_phase.Runner → BUY decision
         mock_decision_result = MagicMock()
         mock_decision_result.final_output_as.return_value = sample_decision
         mock_decision_result.new_items = []
