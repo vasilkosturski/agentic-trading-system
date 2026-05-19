@@ -772,17 +772,20 @@ class TestAgentExecutorModuleConstants:
         call site moved with it. Task 7 lifted _run_decision_maker into
         phases/decision_phase.py — the max_positions=MAX_POSITIONS and
         max_turns=AGENT_MAX_TURNS call sites at the decision-maker site
-        moved with it. The test now scans all three modules so the
+        moved with it. Task 9 lifted _finalize_run into
+        phases/finalization.py — the [:MAX_REASONING_FIELD_LEN] call
+        sites moved with it. The test now scans all four modules so the
         invariant survives the phase-module extractions.
         """
         import inspect
         import agent_executor
-        from phases import research_phase, decision_phase
+        from phases import research_phase, decision_phase, finalization
 
         source = (
             inspect.getsource(agent_executor)
             + inspect.getsource(research_phase)
             + inspect.getsource(decision_phase)
+            + inspect.getsource(finalization)
         )
 
         # Call-site fragments that must appear verbatim after the refactor.
