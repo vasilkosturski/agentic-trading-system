@@ -321,7 +321,7 @@ class TestAgentExecutorFullCycle:
     """Test full execute_cycle."""
 
     @patch("run_lifecycle.complete_run")
-    @patch("agent_executor.buy_shares")
+    @patch("phases.execution_phase.buy_shares")
     @patch("phases.decision_phase.DecisionMaker")
     @patch("phases.research_phase.MarketAnalyst")
     @patch("phases.decision_phase.Runner")
@@ -948,7 +948,7 @@ class TestAgentExecutorCycleLoggerBehavior:
     """Pin behavioral evidence that cycle-start/end emit INFO log records."""
 
     @patch("run_lifecycle.complete_run")
-    @patch("agent_executor.buy_shares")
+    @patch("phases.execution_phase.buy_shares")
     @patch("phases.decision_phase.DecisionMaker")
     @patch("phases.research_phase.MarketAnalyst")
     @patch("phases.decision_phase.Runner")
@@ -1746,7 +1746,7 @@ class TestAgentExecutorCompletionMessageOnFailure:
     """Pin the FAILED-execution completion-message branch."""
 
     @patch("run_lifecycle.complete_run")
-    @patch("agent_executor.buy_shares")
+    @patch("phases.execution_phase.buy_shares")
     @patch("phases.decision_phase.DecisionMaker")
     @patch("phases.research_phase.MarketAnalyst")
     @patch("phases.decision_phase.Runner")

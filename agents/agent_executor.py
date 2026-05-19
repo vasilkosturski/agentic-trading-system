@@ -22,7 +22,7 @@ from pricing import MODEL_PRICING, _UNKNOWN_MODELS_WARNED  # noqa: F401
 from telemetry import extract_usage_metrics, extract_run_telemetry  # noqa: F401
 from run_lifecycle import RunLifecycle
 
-from models import TradingDecision, CycleResult, InvestmentStyle
+from models import CycleResult, InvestmentStyle
 from models.orchestration import (
     AccountData,
     RunContext,
@@ -40,11 +40,9 @@ from models.run_tracking import (
     TradeDecision,
 )
 # Import direct function tools.
-from trading_tools import (
-    buy_shares,
-    sell_shares,
-    _get_account_report_raw,
-)
+# `buy_shares` / `sell_shares` moved with `_execute_trade` into
+# `phases/execution_phase.py` (Task 8 of the decomposition plan).
+from trading_tools import _get_account_report_raw
 from backend_client import get_backend_client
 
 # Two-agent architecture imports lived here until Tasks 6 and 7 of the
@@ -88,6 +86,7 @@ MAX_ERROR_MESSAGE_LEN = 500
 # on this module.
 from phases.research_phase import run_research_phase  # noqa: E402
 from phases.decision_phase import run_decision_phase  # noqa: E402
+from phases.execution_phase import run_execution_phase  # noqa: E402
 
 
 class AgentExecutor:
@@ -218,9 +217,10 @@ class AgentExecutor:
             # === EXECUTION PHASE ===
             # Only execute trade for BUY/SELL decisions, skip for HOLD
             if ctx.decision_result.decision.action in (TradeDecision.BUY, TradeDecision.SELL):
-                ctx.execution_result = await self._execute_trade(
+                ctx.execution_result = await run_execution_phase(
                     run_id=ctx.run_id,
                     agent_id=ctx.agent_id,
+                    agent_name=self.name,
                     decision=ctx.decision_result.decision,
                     lifecycle=lifecycle,
                 )
@@ -309,67 +309,6 @@ class AgentExecutor:
 
         logger.info(f"📊 Context prepared: {result.computed_total_runs} runs, {result.computed_total_trades} trades (30 days)")
         return result
-
-    async def _execute_trade(
-        self,
-        run_id: int,
-        agent_id: int,
-        decision: TradingDecision,
-        lifecycle: RunLifecycle,
-    ) -> ExecutionResult:
-        """Execute BUY/SELL decision. HOLD is filtered by caller in execute_cycle.
-
-        Args:
-            run_id: Run ID for tracking
-            agent_id: Agent ID for trading
-            decision: Trading decision to execute (must be BUY or SELL)
-
-        Returns:
-            ExecutionResult with execution results
-        """
-        action = decision.action
-        symbol = decision.symbol
-        quantity = decision.quantity
-
-        logger.info(f"✅ Validated decision: {action} {symbol or ''}")
-        logger.info(f"🟡 ABOUT TO EXECUTE: decision={decision}")
-        logger.info(f"🟢 EXECUTING: {action} {quantity} shares of {symbol}")
-
-        await lifecycle.transition_to_trading(run_id)
-
-        trade_id = None
-        execution_status: PhaseStatus
-        execution_error: str | None = None
-
-        try:
-            if action == TradeDecision.BUY:
-                result = await buy_shares(
-                    agent_id,
-                    symbol,
-                    quantity,
-                    runId=run_id,
-                    agent_name=self.name,
-                )
-            else:  # SELL
-                result = await sell_shares(
-                    agent_id,
-                    symbol,
-                    quantity,
-                    runId=run_id,
-                    agent_name=self.name,
-                )
-            execution_status = PhaseStatus.COMPLETED
-            trade_id = result.tradeId
-        except Exception as trade_err:
-            logger.error(f"Trade execution failed: {trade_err}")
-            execution_status = PhaseStatus.FAILED
-            execution_error = str(trade_err)
-
-        return ExecutionResult(
-            execution_status=execution_status,
-            trade_id=trade_id,
-            execution_error=execution_error,
-        )
 
     async def _finalize_run(self, ctx: RunContext, lifecycle: RunLifecycle) -> None:
         """Complete run with all data.
