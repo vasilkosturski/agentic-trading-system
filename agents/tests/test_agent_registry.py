@@ -24,10 +24,10 @@ def test_agent_registry_exposes_canonical_names():
 
 
 def test_prompt_loader_reuses_registry_set():
-    """prompt_loader.VALID_AGENT_NAMES is the same object as the registry set
+    """infra.prompt_loader.VALID_AGENT_NAMES is the same object as the registry set
     (i.e. imported, not re-listed)."""
     from agent_registry import VALID_AGENT_NAMES as registry_set
-    from prompt_loader import VALID_AGENT_NAMES as loader_set
+    from infra.prompt_loader import VALID_AGENT_NAMES as loader_set
 
     assert loader_set is registry_set
 
@@ -51,7 +51,7 @@ def test_prompt_loader_does_not_re_list_agent_names_as_literals():
     arg value) does not trip the check — only code-level string literals
     in a set/list do.
     """
-    text = (AGENTS_DIR / "prompt_loader.py").read_text()
+    text = (AGENTS_DIR / "infra" / "prompt_loader.py").read_text()
     text_no_imports = re.sub(r"^(from|import)\s+.*$", "", text, flags=re.MULTILINE)
     # Detect the original duplicated roster shape: a set/list literal that
     # contains all four lowercase names as quoted strings.
@@ -65,7 +65,7 @@ def test_prompt_loader_does_not_re_list_agent_names_as_literals():
         re.IGNORECASE | re.DOTALL,
     )
     assert roster_re.search(text_no_imports) is None, (
-        "prompt_loader.py still contains a literal set/list of the four "
+        "infra/prompt_loader.py still contains a literal set/list of the four "
         "canonical agent names — it should import VALID_AGENT_NAMES from "
         "agent_registry instead."
     )

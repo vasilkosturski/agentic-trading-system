@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-import status_broadcaster
+import backend.status_broadcaster as status_broadcaster
 
 
 def _patch_async_client(mocker, client_mock):

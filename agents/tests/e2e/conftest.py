@@ -139,9 +139,9 @@ def require_backend(docker_ip, docker_services) -> str:
     # Without this, agent tools try to connect to localhost:8080 instead
     # of the Docker backend's random port.
     import config as config_module
-    import market_tools as market_tools_module
-    import backend_client as backend_client_module
-    import prompt_loader as prompt_loader_module
+    import tools.market_tools as market_tools_module
+    import backend.client as backend_client_module
+    import infra.prompt_loader as prompt_loader_module
 
     config_module.BACKEND_BASE_URL = url
     config_module.BACKEND_API_MARKET = f"{url}/api/market"

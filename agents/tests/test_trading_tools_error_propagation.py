@@ -24,7 +24,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from agents.tool_context import ToolContext
-from exceptions import BackendAPIError
+from infra.exceptions import BackendAPIError
 
 
 # ---------------------------------------------------------------------------
@@ -39,14 +39,14 @@ class TestPlainHelpersPropagateBackendAPIError:
     """
 
     async def test_buy_shares_propagates_backend_api_error(self):
-        from trading_tools import buy_shares
+        from tools.trading_tools import buy_shares
 
         mock_client = MagicMock()
         mock_client.buy_shares = AsyncMock(
             side_effect=BackendAPIError("Insufficient funds", status_code=400)
         )
 
-        with patch("trading_tools.get_backend_client", return_value=mock_client):
+        with patch("tools.trading_tools.get_backend_client", return_value=mock_client):
             with pytest.raises(BackendAPIError) as exc_info:
                 await buy_shares(agent_id=1, symbol="AAPL", quantity=10)
 
@@ -54,14 +54,14 @@ class TestPlainHelpersPropagateBackendAPIError:
         assert "Insufficient funds" in str(exc_info.value)
 
     async def test_sell_shares_propagates_backend_api_error(self):
-        from trading_tools import sell_shares
+        from tools.trading_tools import sell_shares
 
         mock_client = MagicMock()
         mock_client.sell_shares = AsyncMock(
             side_effect=BackendAPIError("Position too small", status_code=400)
         )
 
-        with patch("trading_tools.get_backend_client", return_value=mock_client):
+        with patch("tools.trading_tools.get_backend_client", return_value=mock_client):
             with pytest.raises(BackendAPIError) as exc_info:
                 await sell_shares(agent_id=1, symbol="AAPL", quantity=10)
 
@@ -69,14 +69,14 @@ class TestPlainHelpersPropagateBackendAPIError:
         assert "Position too small" in str(exc_info.value)
 
     async def test_initialize_agent_propagates_backend_api_error(self):
-        from trading_tools import initialize_agent
+        from tools.trading_tools import initialize_agent
 
         mock_client = MagicMock()
         mock_client.initialize_agent = AsyncMock(
             side_effect=BackendAPIError("Backend unavailable", status_code=503)
         )
 
-        with patch("trading_tools.get_backend_client", return_value=mock_client):
+        with patch("tools.trading_tools.get_backend_client", return_value=mock_client):
             with pytest.raises(BackendAPIError) as exc_info:
                 await initialize_agent(name="Warren", initial_balance=100000.0)
 
@@ -93,11 +93,11 @@ class TestFetchMarketDataPropagatesBackendAPIError:
 
     async def test_fetch_market_data_propagates_backend_api_error(self):
         # Reset module cache so the test-injected mock is exercised.
-        import market_tools
+        import tools.market_tools as market_tools
 
         market_tools._market_data_cache.clear()
 
-        with patch("market_tools.call_backend", new_callable=AsyncMock) as mock_call:
+        with patch("tools.market_tools.call_backend", new_callable=AsyncMock) as mock_call:
             mock_call.side_effect = BackendAPIError(
                 "Backend timeout", status_code=504
             )
@@ -130,13 +130,13 @@ class TestFunctionToolsSurfaceBackendAPIErrorThroughSDK:
     """
 
     async def test_get_price_with_metadata_surfaces_status_code(self):
-        import market_tools
-        from market_tools import get_price_with_metadata
+        import tools.market_tools as market_tools
+        from tools.market_tools import get_price_with_metadata
 
         market_tools._market_data_cache.clear()
 
         with patch(
-            "market_tools.call_backend", new_callable=AsyncMock
+            "tools.market_tools.call_backend", new_callable=AsyncMock
         ) as mock_call:
             mock_call.side_effect = BackendAPIError(
                 "Rate limited", status_code=429

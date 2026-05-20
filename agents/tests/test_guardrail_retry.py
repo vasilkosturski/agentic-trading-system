@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from agents.exceptions import OutputGuardrailTripwireTriggered
-from guardrail_retry import run_with_guardrail_retry
+from ai_agents.guardrail_retry import run_with_guardrail_retry
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ def _make_run_item(item_type: str = "message_output_item"):
 class TestRunWithGuardrailRetry:
     """Tests for run_with_guardrail_retry."""
 
-    @patch("guardrail_retry.Runner")
+    @patch("ai_agents.guardrail_retry.Runner")
     async def test_success_first_attempt(self, mock_runner_class):
         """Runner.run succeeds on first call -- returns result, no retry."""
         mock_result = MagicMock()
@@ -72,7 +72,7 @@ class TestRunWithGuardrailRetry:
             agent, "test prompt", max_turns=30
         )
 
-    @patch("guardrail_retry.Runner")
+    @patch("ai_agents.guardrail_retry.Runner")
     async def test_retry_on_guardrail_trip(self, mock_runner_class):
         """First call raises OutputGuardrailTripwireTriggered, second succeeds."""
         exc = _make_guardrail_exception(
@@ -98,7 +98,7 @@ class TestRunWithGuardrailRetry:
         assert last_item["role"] == "user"
         assert "missing candidates" in last_item["content"]
 
-    @patch("guardrail_retry.Runner")
+    @patch("ai_agents.guardrail_retry.Runner")
     async def test_max_attempts_exhausted(self, mock_runner_class):
         """All attempts raise -- re-raises the last exception."""
         exc1 = _make_guardrail_exception(output_info="error 1")
@@ -116,7 +116,7 @@ class TestRunWithGuardrailRetry:
         assert exc_info.value is exc3
         assert mock_runner_class.run.await_count == 3
 
-    @patch("guardrail_retry.Runner")
+    @patch("ai_agents.guardrail_retry.Runner")
     async def test_raises_when_run_data_is_none(self, mock_runner_class):
         """When the SDK raises the tripwire without run_data attached, the
         retry helper must raise a clear RuntimeError instead of an opaque
@@ -136,7 +136,7 @@ class TestRunWithGuardrailRetry:
                 agent, "test", max_attempts=3, agent_name="TestAgent"
             )
 
-    @patch("guardrail_retry.Runner")
+    @patch("ai_agents.guardrail_retry.Runner")
     async def test_error_info_in_feedback(self, mock_runner_class):
         """Verify output_info from guardrail appears in retry feedback message."""
         specific_error = "Candidates list must not be empty and all symbols must be uppercase"

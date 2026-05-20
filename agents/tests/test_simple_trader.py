@@ -10,7 +10,7 @@ import pytest
 
 from config import config
 from models.investment_style import InvestmentStyle
-from simple_trader import SimpleTrader
+from ai_agents.simple_trader import SimpleTrader
 
 
 def test_model_name_default_reads_current_config_value(monkeypatch):

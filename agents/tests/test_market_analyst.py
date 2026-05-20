@@ -9,7 +9,7 @@ The Market Analyst is the first agent in the two-agent flow:
 import pytest
 from unittest.mock import MagicMock
 
-from market_analyst import create_market_analyst_agent, build_research_prompt
+from ai_agents.market_analyst import create_market_analyst_agent, build_research_prompt
 from models.llm_output import ResearchResponse
 
 
@@ -26,7 +26,7 @@ class TestMarketAnalystAgent:
         sample_model_name,
     ):
         """Test Market Analyst gets Brave Search + Fetch MCPs."""
-        from mcp_types import MCPName
+        from mcp_helpers.types import MCPName
 
         mock_brave_server = MagicMock()
         mock_fetch_server = MagicMock()

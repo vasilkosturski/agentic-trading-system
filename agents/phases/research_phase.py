@@ -16,12 +16,12 @@ import json
 import logging
 from datetime import datetime
 
-from guardrail_retry import run_with_guardrail_retry
-from market_analyst import MarketAnalyst, MarketAnalystContext
+from ai_agents.guardrail_retry import run_with_guardrail_retry
+from ai_agents.market_analyst import MarketAnalyst, MarketAnalystContext
 from models import ResearchResponse
 from models.orchestration import ResearchResult, RunContext
 from models.run_tracking import SourceDto
-from telemetry import extract_run_telemetry
+from infra.telemetry import extract_run_telemetry
 
 # Constants live in agent_executor.py for now; Task 10 of the
 # decomposition plan may reconcile if a shared constants module emerges.
@@ -98,7 +98,7 @@ async def run_research_phase(
     instructions = market_analyst.agent.instructions
     if not isinstance(instructions, str) and instructions is not None:
         logger.debug(
-            "market_analyst.agent.instructions is callable, not str — "
+            "ai_agents.market_analyst.agent.instructions is callable, not str — "
             "skipping prompt capture for observability"
         )
     ctx.market_analyst_system_prompt = instructions if isinstance(instructions, str) else None

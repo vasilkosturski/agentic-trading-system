@@ -16,10 +16,10 @@ import pytest
 from agents import Runner
 from agents.mcp import MCPServerStdio
 
-from decision_maker import DecisionMaker, DecisionContext
+from ai_agents.decision_maker import DecisionMaker, DecisionContext
 from models.llm_output import TradeAction, TradingDecision, ResearchResponse, WebSource, CandidateStock
-from mcp_types import MCPPool
-from mcp_params import get_mcp_server_params
+from mcp_helpers.types import MCPPool
+from mcp_helpers.params import get_mcp_server_params
 from utils.sdk_parser import extract_tool_calls
 
 logger = logging.getLogger("e2e_tests.decision_maker")

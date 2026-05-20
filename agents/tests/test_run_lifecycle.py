@@ -13,9 +13,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from run_lifecycle import RunLifecycle
+from backend.run_lifecycle import RunLifecycle
 from models.run_tracking import CompleteRunData, RunPhase
-from status_broadcaster import (
+from backend.status_broadcaster import (
     PHASE_COMPLETED,
     PHASE_DECIDING,
     PHASE_ERROR,
@@ -39,10 +39,10 @@ def lifecycle() -> RunLifecycle:
 # Test 1: start() success path emits two broadcasts in order
 # ---------------------------------------------------------------------------
 
-@patch("run_lifecycle.broadcast_status")
-@patch("run_lifecycle.update_phase", new_callable=AsyncMock)
-@patch("run_lifecycle.create_run", new_callable=AsyncMock)
-@patch("run_lifecycle.initialize_agent", new_callable=AsyncMock)
+@patch("backend.run_lifecycle.broadcast_status")
+@patch("backend.run_lifecycle.update_phase", new_callable=AsyncMock)
+@patch("backend.run_lifecycle.create_run", new_callable=AsyncMock)
+@patch("backend.run_lifecycle.initialize_agent", new_callable=AsyncMock)
 async def test_start_initializes_agent_creates_run_and_emits_two_broadcasts(
     mock_initialize_agent: AsyncMock,
     mock_create_run: AsyncMock,
@@ -73,10 +73,10 @@ async def test_start_initializes_agent_creates_run_and_emits_two_broadcasts(
 # Test 2: start() raises RuntimeError if agent_id is falsy
 # ---------------------------------------------------------------------------
 
-@patch("run_lifecycle.broadcast_status")
-@patch("run_lifecycle.update_phase", new_callable=AsyncMock)
-@patch("run_lifecycle.create_run", new_callable=AsyncMock)
-@patch("run_lifecycle.initialize_agent", new_callable=AsyncMock)
+@patch("backend.run_lifecycle.broadcast_status")
+@patch("backend.run_lifecycle.update_phase", new_callable=AsyncMock)
+@patch("backend.run_lifecycle.create_run", new_callable=AsyncMock)
+@patch("backend.run_lifecycle.initialize_agent", new_callable=AsyncMock)
 async def test_start_raises_runtime_error_if_agent_id_falsy(
     mock_initialize_agent: AsyncMock,
     mock_create_run: AsyncMock,
@@ -107,8 +107,8 @@ async def test_transition_to_deciding_emits_phase_update_then_broadcast(
     parent.update_phase = AsyncMock()
     parent.broadcast_status = MagicMock()
 
-    with patch("run_lifecycle.update_phase", parent.update_phase), \
-         patch("run_lifecycle.broadcast_status", parent.broadcast_status):
+    with patch("backend.run_lifecycle.update_phase", parent.update_phase), \
+         patch("backend.run_lifecycle.broadcast_status", parent.broadcast_status):
         await lifecycle.transition_to_deciding(run_id=42)
 
     parent.update_phase.assert_awaited_once_with(42, RunPhase.DECIDING)
@@ -133,8 +133,8 @@ async def test_transition_to_trading_emits_phase_update_then_broadcast(
     parent.update_phase = AsyncMock()
     parent.broadcast_status = MagicMock()
 
-    with patch("run_lifecycle.update_phase", parent.update_phase), \
-         patch("run_lifecycle.broadcast_status", parent.broadcast_status):
+    with patch("backend.run_lifecycle.update_phase", parent.update_phase), \
+         patch("backend.run_lifecycle.broadcast_status", parent.broadcast_status):
         await lifecycle.transition_to_trading(run_id=42)
 
     parent.update_phase.assert_awaited_once_with(42, RunPhase.TRADING)
@@ -150,8 +150,8 @@ async def test_transition_to_trading_emits_phase_update_then_broadcast(
 # Test 5: complete() calls complete_run then broadcasts COMPLETED
 # ---------------------------------------------------------------------------
 
-@patch("run_lifecycle.broadcast_status")
-@patch("run_lifecycle.complete_run", new_callable=AsyncMock)
+@patch("backend.run_lifecycle.broadcast_status")
+@patch("backend.run_lifecycle.complete_run", new_callable=AsyncMock)
 async def test_complete_calls_complete_run_then_broadcasts_completed(
     mock_complete_run: AsyncMock,
     mock_broadcast_status: MagicMock,
@@ -174,8 +174,8 @@ async def test_complete_calls_complete_run_then_broadcasts_completed(
 # Test 6: fail() with run_id logs, broadcasts ERROR, and updates phase to FAILED
 # ---------------------------------------------------------------------------
 
-@patch("run_lifecycle.broadcast_status")
-@patch("run_lifecycle.update_phase", new_callable=AsyncMock)
+@patch("backend.run_lifecycle.broadcast_status")
+@patch("backend.run_lifecycle.update_phase", new_callable=AsyncMock)
 async def test_fail_with_run_id_logs_broadcasts_error_and_updates_phase_failed(
     mock_update_phase: AsyncMock,
     mock_broadcast_status: MagicMock,
@@ -209,8 +209,8 @@ async def test_fail_with_run_id_logs_broadcasts_error_and_updates_phase_failed(
 # Test 7: fail() with no run_id still broadcasts but skips update_phase
 # ---------------------------------------------------------------------------
 
-@patch("run_lifecycle.broadcast_status")
-@patch("run_lifecycle.update_phase", new_callable=AsyncMock)
+@patch("backend.run_lifecycle.broadcast_status")
+@patch("backend.run_lifecycle.update_phase", new_callable=AsyncMock)
 async def test_fail_with_no_run_id_broadcasts_but_skips_update_phase(
     mock_update_phase: AsyncMock,
     mock_broadcast_status: MagicMock,
@@ -228,8 +228,8 @@ async def test_fail_with_no_run_id_broadcasts_but_skips_update_phase(
 # Test 8: fail() swallows cleanup errors and does NOT raise
 # ---------------------------------------------------------------------------
 
-@patch("run_lifecycle.broadcast_status")
-@patch("run_lifecycle.update_phase", new_callable=AsyncMock)
+@patch("backend.run_lifecycle.broadcast_status")
+@patch("backend.run_lifecycle.update_phase", new_callable=AsyncMock)
 async def test_fail_swallows_cleanup_errors_and_does_not_raise(
     mock_update_phase: AsyncMock,
     mock_broadcast_status: MagicMock,

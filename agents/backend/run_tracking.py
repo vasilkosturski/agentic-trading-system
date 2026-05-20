@@ -10,7 +10,7 @@ Uses BackendClient for centralized HTTP handling.
 All functions let exceptions propagate for consistent error handling.
 """
 
-from backend_client import get_backend_client
+from backend.client import get_backend_client
 from models.run_tracking import CompleteRunData
 
 

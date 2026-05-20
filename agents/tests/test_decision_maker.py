@@ -9,7 +9,7 @@ The Decision Maker is the second agent in the two-agent flow:
 
 import pytest
 
-from decision_maker import create_decision_maker_agent, build_decision_prompt
+from ai_agents.decision_maker import create_decision_maker_agent, build_decision_prompt
 from models import Holding
 from models.llm_output import TradingDecision
 

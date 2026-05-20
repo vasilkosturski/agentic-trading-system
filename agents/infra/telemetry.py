@@ -26,7 +26,7 @@ import logging
 
 from agents import Usage, RunResult
 
-from pricing import MODEL_PRICING, _UNKNOWN_MODELS_WARNED
+from infra.pricing import MODEL_PRICING, _UNKNOWN_MODELS_WARNED
 from models.usage_metrics import UsageMetrics
 from models.run_tracking import ToolCallDto
 from utils.sdk_parser import extract_tool_calls

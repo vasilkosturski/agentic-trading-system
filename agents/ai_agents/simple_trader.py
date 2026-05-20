@@ -15,7 +15,7 @@ from agents import trace
 from agent_executor import AgentExecutor
 from config import config
 from models.investment_style import InvestmentStyle
-from mcp_types import MCPName, MCPPool
+from mcp_helpers.types import MCPName, MCPPool
 
 logger = logging.getLogger(__name__)
 

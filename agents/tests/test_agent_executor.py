@@ -9,7 +9,7 @@ import pytest
 from agent_executor import AgentExecutor
 from phases.research_phase import run_research_phase
 from phases.decision_phase import run_decision_phase
-from run_lifecycle import RunLifecycle
+from backend.run_lifecycle import RunLifecycle
 from models.investment_style import InvestmentStyle
 from models.orchestration import (
     CycleResult,
@@ -184,7 +184,7 @@ class TestAgentExecutorFetchData:
         the file's fail-fast philosophy. The typed exception (with status_code)
         must survive so callers and logs see the real cause.
         """
-        from exceptions import BackendAPIError
+        from infra.exceptions import BackendAPIError
 
         mock_get_report.side_effect = BackendAPIError(
             "GET /api/agents/1/account-report failed", status_code=500
@@ -211,7 +211,7 @@ class TestAgentExecutorMarketAnalyst:
     """Test _run_market_analyst method."""
 
     @patch("phases.research_phase.MarketAnalyst")
-    @patch("guardrail_retry.Runner")
+    @patch("ai_agents.guardrail_retry.Runner")
     async def test_run_market_analyst_returns_research_result(
         self,
         mock_runner_class,
@@ -274,18 +274,18 @@ class TestAgentExecutorMarketAnalyst:
 class TestAgentExecutorFullCycle:
     """Test full execute_cycle."""
 
-    @patch("run_lifecycle.complete_run")
+    @patch("backend.run_lifecycle.complete_run")
     @patch("phases.execution_phase.buy_shares")
     @patch("phases.decision_phase.DecisionMaker")
     @patch("phases.research_phase.MarketAnalyst")
     @patch("phases.decision_phase.Runner")
-    @patch("guardrail_retry.Runner")
-    @patch("run_lifecycle.update_phase")
-    @patch("run_lifecycle.create_run")
+    @patch("ai_agents.guardrail_retry.Runner")
+    @patch("backend.run_lifecycle.update_phase")
+    @patch("backend.run_lifecycle.create_run")
     @patch("agent_executor.get_backend_client")
     @patch("agent_executor._get_account_report_raw")
-    @patch("run_lifecycle.initialize_agent")
-    @patch("run_lifecycle.broadcast_status")
+    @patch("backend.run_lifecycle.initialize_agent")
+    @patch("backend.run_lifecycle.broadcast_status")
     async def test_execute_cycle_success_with_buy(
         self,
         mock_broadcast,
@@ -414,13 +414,13 @@ class TestAgentExecutorErrorPaths:
         ``update_phase`` so the original exception is still re-raised.
     """
 
-    @patch("run_lifecycle.update_phase")
-    @patch("run_lifecycle.complete_run")
-    @patch("run_lifecycle.create_run")
+    @patch("backend.run_lifecycle.update_phase")
+    @patch("backend.run_lifecycle.complete_run")
+    @patch("backend.run_lifecycle.create_run")
     @patch("agent_executor.get_backend_client")
     @patch("agent_executor._get_account_report_raw")
-    @patch("run_lifecycle.initialize_agent")
-    @patch("run_lifecycle.broadcast_status")
+    @patch("backend.run_lifecycle.initialize_agent")
+    @patch("backend.run_lifecycle.broadcast_status")
     async def test_execute_cycle_propagates_recent_activity_backend_error(
         self,
         mock_broadcast,
@@ -439,7 +439,7 @@ class TestAgentExecutorErrorPaths:
         """If _fetch_recent_activity raises BackendAPIError, the orchestrator
         must call _handle_cycle_error (PHASE_ERROR broadcast + mark FAILED)
         and re-raise the original exception."""
-        from exceptions import BackendAPIError
+        from infra.exceptions import BackendAPIError
         from models.api_responses import AccountReport
 
         mock_initialize.return_value = None
@@ -489,16 +489,16 @@ class TestAgentExecutorErrorPaths:
         # avoids overriding a failed run back to COMPLETED.
         mock_complete_run.assert_not_called()
 
-    @patch("run_lifecycle.complete_run")
+    @patch("backend.run_lifecycle.complete_run")
     @patch("phases.decision_phase.DecisionMaker")
     @patch("phases.research_phase.MarketAnalyst")
-    @patch("guardrail_retry.Runner")
-    @patch("run_lifecycle.update_phase")
-    @patch("run_lifecycle.create_run")
+    @patch("ai_agents.guardrail_retry.Runner")
+    @patch("backend.run_lifecycle.update_phase")
+    @patch("backend.run_lifecycle.create_run")
     @patch("agent_executor.get_backend_client")
     @patch("agent_executor._get_account_report_raw")
-    @patch("run_lifecycle.initialize_agent")
-    @patch("run_lifecycle.broadcast_status")
+    @patch("backend.run_lifecycle.initialize_agent")
+    @patch("backend.run_lifecycle.broadcast_status")
     async def test_execute_cycle_propagates_max_turns_exceeded_from_research(
         self,
         mock_broadcast,
@@ -869,18 +869,18 @@ class TestAgentExecutorCycleLoggerMigration:
 class TestAgentExecutorCycleLoggerBehavior:
     """Pin behavioral evidence that cycle-start/end emit INFO log records."""
 
-    @patch("run_lifecycle.complete_run")
+    @patch("backend.run_lifecycle.complete_run")
     @patch("phases.execution_phase.buy_shares")
     @patch("phases.decision_phase.DecisionMaker")
     @patch("phases.research_phase.MarketAnalyst")
     @patch("phases.decision_phase.Runner")
-    @patch("guardrail_retry.Runner")
-    @patch("run_lifecycle.update_phase")
-    @patch("run_lifecycle.create_run")
+    @patch("ai_agents.guardrail_retry.Runner")
+    @patch("backend.run_lifecycle.update_phase")
+    @patch("backend.run_lifecycle.create_run")
     @patch("agent_executor.get_backend_client")
     @patch("agent_executor._get_account_report_raw")
-    @patch("run_lifecycle.initialize_agent")
-    @patch("run_lifecycle.broadcast_status")
+    @patch("backend.run_lifecycle.initialize_agent")
+    @patch("backend.run_lifecycle.broadcast_status")
     async def test_execute_cycle_emits_start_and_end_info_logs(
         self,
         mock_broadcast,
@@ -1025,7 +1025,7 @@ class TestExtractUsageMetricsPricing:
     @pytest.fixture(autouse=True)
     def _reset_warned_set(self):
         """Clear the module-level dedupe set between tests for isolation."""
-        import pricing
+        import infra.pricing as pricing
         pricing._UNKNOWN_MODELS_WARNED.clear()
         yield
         pricing._UNKNOWN_MODELS_WARNED.clear()
@@ -1059,7 +1059,7 @@ class TestExtractUsageMetricsPricing:
         Uses the table's published rate (0.15, 0.60) per 1M tokens to verify
         the formula and the lookup, not a single magic number.
         """
-        from telemetry import extract_usage_metrics
+        from infra.telemetry import extract_usage_metrics
 
         usage = self._make_usage_mock(
             input_tokens=1_000_000,
@@ -1084,7 +1084,7 @@ class TestExtractUsageMetricsPricing:
         Asserting on $1.25 specifically catches the regression where the
         table is added but a call site still routes through the old formula.
         """
-        from telemetry import extract_usage_metrics
+        from infra.telemetry import extract_usage_metrics
 
         usage = self._make_usage_mock(
             input_tokens=1_000_000,
@@ -1100,7 +1100,7 @@ class TestExtractUsageMetricsPricing:
     def test_unknown_model_returns_none_and_logs_warning(self, caplog):
         """Unknown model → costUsd is None AND a WARNING log is emitted."""
         import logging
-        from telemetry import extract_usage_metrics
+        from infra.telemetry import extract_usage_metrics
 
         usage = self._make_usage_mock(
             input_tokens=100_000,
@@ -1108,7 +1108,7 @@ class TestExtractUsageMetricsPricing:
             model_name="some-future-unknown-model",
         )
 
-        with caplog.at_level(logging.WARNING, logger="telemetry"):
+        with caplog.at_level(logging.WARNING, logger="infra.telemetry"):
             metrics = extract_usage_metrics(usage, model_name="ignored-fallback")
 
         assert metrics.costUsd is None
@@ -1116,7 +1116,7 @@ class TestExtractUsageMetricsPricing:
 
         warning_records = [
             r for r in caplog.records
-            if r.name == "telemetry"
+            if r.name == "infra.telemetry"
             and r.levelno == logging.WARNING
             and "No pricing entry" in r.getMessage()
             and "some-future-unknown-model" in r.getMessage()
@@ -1135,7 +1135,7 @@ class TestExtractUsageMetricsPricing:
         every trading cycle.
         """
         import logging
-        from telemetry import extract_usage_metrics
+        from infra.telemetry import extract_usage_metrics
 
         usage1 = self._make_usage_mock(
             input_tokens=100, output_tokens=50, model_name="dedupe-test-model"
@@ -1144,7 +1144,7 @@ class TestExtractUsageMetricsPricing:
             input_tokens=200, output_tokens=75, model_name="dedupe-test-model"
         )
 
-        with caplog.at_level(logging.WARNING, logger="telemetry"):
+        with caplog.at_level(logging.WARNING, logger="infra.telemetry"):
             m1 = extract_usage_metrics(usage1, model_name="ignored")
             m2 = extract_usage_metrics(usage2, model_name="ignored")
 
@@ -1153,7 +1153,7 @@ class TestExtractUsageMetricsPricing:
 
         warning_records = [
             r for r in caplog.records
-            if r.name == "telemetry"
+            if r.name == "infra.telemetry"
             and r.levelno == logging.WARNING
             and "No pricing entry" in r.getMessage()
             and "dedupe-test-model" in r.getMessage()
@@ -1187,7 +1187,7 @@ class TestLoadModelPricing:
         """Loader returns a dict containing gpt-4o-mini and gpt-5-mini with
         positive non-zero (input, output) per-1M tuples — guards against an
         empty/corrupt vendored file."""
-        from pricing import _load_model_pricing
+        from infra.pricing import _load_model_pricing
 
         pricing = _load_model_pricing()
 
@@ -1215,7 +1215,7 @@ class TestLoadModelPricing:
         and `output_cost_per_token` — covers LiteLLM's leading "sample_spec"
         placeholder plus any future malformed entries. Multiplies per-token
         values by 1_000_000 to match the per-1M convention."""
-        from pricing import _load_model_pricing
+        from infra.pricing import _load_model_pricing
 
         fake_json = {
             "sample_spec": {
@@ -1275,7 +1275,7 @@ class TestAgentExecutorPromptCaptureNarrowing:
     """
 
     @patch("phases.research_phase.MarketAnalyst")
-    @patch("guardrail_retry.Runner")
+    @patch("ai_agents.guardrail_retry.Runner")
     async def test_market_analyst_string_instructions_captured_on_ctx(
         self,
         mock_runner_class,
@@ -1330,7 +1330,7 @@ class TestAgentExecutorPromptCaptureNarrowing:
         assert ctx.market_analyst_system_prompt == "you are a market analyst"
 
     @patch("phases.research_phase.MarketAnalyst")
-    @patch("guardrail_retry.Runner")
+    @patch("ai_agents.guardrail_retry.Runner")
     async def test_market_analyst_callable_instructions_capture_is_none_with_debug_log(
         self,
         mock_runner_class,
@@ -1398,7 +1398,7 @@ class TestAgentExecutorPromptCaptureNarrowing:
             r for r in caplog.records
             if r.name == "phases.research_phase"
             and r.levelno == logging.DEBUG
-            and "market_analyst.agent.instructions is callable" in r.getMessage()
+            and "ai_agents.market_analyst.agent.instructions is callable" in r.getMessage()
         ]
         assert callable_debug_records, (
             "Expected a DEBUG log on phases.research_phase announcing the "
@@ -1407,7 +1407,7 @@ class TestAgentExecutorPromptCaptureNarrowing:
         )
 
     @patch("phases.decision_phase.DecisionMaker")
-    @patch("run_lifecycle.update_phase")
+    @patch("backend.run_lifecycle.update_phase")
     @patch("phases.decision_phase.Runner")
     async def test_decision_maker_callable_instructions_capture_is_none_with_debug_log(
         self,
@@ -1490,7 +1490,7 @@ class TestAgentExecutorPromptCaptureNarrowing:
             r for r in caplog.records
             if r.name == "phases.decision_phase"
             and r.levelno == logging.DEBUG
-            and "decision_maker.agent.instructions is callable" in r.getMessage()
+            and "ai_agents.decision_maker.agent.instructions is callable" in r.getMessage()
         ]
         assert callable_debug_records, (
             "Expected a DEBUG log on phases.decision_phase announcing the callable "
@@ -1520,7 +1520,7 @@ class TestAgentExecutorExtractRunTelemetry:
     def _reset_warned_set(self):
         """Clear the module-level dedupe set so unknown-model warnings don't
         leak across tests in this module."""
-        import pricing
+        import infra.pricing as pricing
         pricing._UNKNOWN_MODELS_WARNED.clear()
         yield
         pricing._UNKNOWN_MODELS_WARNED.clear()
@@ -1573,7 +1573,7 @@ class TestAgentExecutorExtractRunTelemetry:
         import logging
         from models.run_tracking import ToolCallDto
         from models.usage_metrics import UsageMetrics
-        from telemetry import extract_run_telemetry
+        from infra.telemetry import extract_run_telemetry
 
         # Build a result mock with 2 tool calls and a known usage shape.
         mock_result = self._make_run_result_mock(num_tool_calls=2)
@@ -1587,9 +1587,9 @@ class TestAgentExecutorExtractRunTelemetry:
 
         # Patch extract_tool_calls so we control the parsed-call list directly.
         with patch(
-            "telemetry.extract_tool_calls", return_value=parsed_calls
+            "infra.telemetry.extract_tool_calls", return_value=parsed_calls
         ) as mock_extract:
-            with caplog.at_level(logging.INFO, logger="telemetry"):
+            with caplog.at_level(logging.INFO, logger="infra.telemetry"):
                 tool_calls, usage_metrics = extract_run_telemetry(
                     mock_result,
                     model_name="gpt-4o-mini",
@@ -1626,7 +1626,7 @@ class TestAgentExecutorExtractRunTelemetry:
         # Two observability log lines must be emitted with the agent label.
         ae_info = [
             r for r in caplog.records
-            if r.name == "telemetry" and r.levelno == logging.INFO
+            if r.name == "infra.telemetry" and r.levelno == logging.INFO
         ]
         made_records = [
             r for r in ae_info
@@ -1667,18 +1667,18 @@ class TestAgentExecutorExtractRunTelemetry:
 class TestAgentExecutorCompletionMessageOnFailure:
     """Pin the FAILED-execution completion-message branch."""
 
-    @patch("run_lifecycle.complete_run")
+    @patch("backend.run_lifecycle.complete_run")
     @patch("phases.execution_phase.buy_shares")
     @patch("phases.decision_phase.DecisionMaker")
     @patch("phases.research_phase.MarketAnalyst")
     @patch("phases.decision_phase.Runner")
-    @patch("guardrail_retry.Runner")
-    @patch("run_lifecycle.update_phase")
-    @patch("run_lifecycle.create_run")
+    @patch("ai_agents.guardrail_retry.Runner")
+    @patch("backend.run_lifecycle.update_phase")
+    @patch("backend.run_lifecycle.create_run")
     @patch("agent_executor.get_backend_client")
     @patch("agent_executor._get_account_report_raw")
-    @patch("run_lifecycle.initialize_agent")
-    @patch("run_lifecycle.broadcast_status")
+    @patch("backend.run_lifecycle.initialize_agent")
+    @patch("backend.run_lifecycle.broadcast_status")
     async def test_failed_buy_emits_trade_attempted_but_failed_message(
         self,
         mock_broadcast,
@@ -1708,7 +1708,7 @@ class TestAgentExecutorCompletionMessageOnFailure:
         ``ctx.trade_id`` truthiness, so a FAILED BUY (trade_id=None) was
         mislabeled as 'Completed - No trades (HOLD decision)'.
         """
-        from status_broadcaster import PHASE_COMPLETED
+        from backend.status_broadcaster import PHASE_COMPLETED
         from models.api_responses import AccountReport
 
         # ----- Standard happy-path setup, except buy_shares raises -----
@@ -1825,7 +1825,7 @@ class TestAgentExecutorCompletionMessageOnFailure:
 
 def test_pricing_module_exports_model_pricing():
     """Pricing constants live in their own module after Task 1 extraction."""
-    from pricing import MODEL_PRICING, _UNKNOWN_MODELS_WARNED, _load_model_pricing
+    from infra.pricing import MODEL_PRICING, _UNKNOWN_MODELS_WARNED, _load_model_pricing
 
     assert isinstance(MODEL_PRICING, dict), (
         "MODEL_PRICING must be a dict mapping model name to pricing tuple"
@@ -1852,7 +1852,7 @@ def test_pricing_module_exports_model_pricing():
 
 def test_telemetry_module_exports_functions():
     """Telemetry helpers live in their own module after Task 2 extraction."""
-    from telemetry import extract_usage_metrics, extract_run_telemetry
+    from infra.telemetry import extract_usage_metrics, extract_run_telemetry
 
     assert callable(extract_usage_metrics), (
         "extract_usage_metrics must be callable (SDK Usage → UsageMetrics)"
