@@ -19,7 +19,7 @@ from models.orchestration import (
     DecisionResult,
 )
 from models.llm_output import CandidateStock, TradingDecision, ResearchResponse, WebSource
-from models.run_tracking import RunPhase, TradeDecision
+from models.run_tracking import TradeDecision
 
 
 # ============================================================================
@@ -126,52 +126,6 @@ class TestAgentExecutorInitialization:
         assert executor.name == sample_agent_name
         assert executor.agent_style == sample_agent_style
         assert executor.model_name == sample_model_name
-
-
-# ============================================================================
-# Test: Start Run
-# ============================================================================
-
-@pytest.mark.asyncio
-class TestAgentExecutorStartRun:
-    """Test _start_run method."""
-
-    @patch("run_lifecycle.initialize_agent")
-    @patch("run_lifecycle.create_run")
-    @patch("run_lifecycle.update_phase")
-    @patch("run_lifecycle.broadcast_status")
-    async def test_start_run_returns_run_id(
-        self,
-        mock_broadcast,
-        mock_update_phase,
-        mock_create_run,
-        mock_initialize,
-        sample_agent_id,
-        sample_agent_name,
-        sample_agent_style,
-    ):
-        """Test _start_run creates run and returns run_id.
-
-        After Task 4 the underlying calls happen one layer down inside
-        `RunLifecycle.start()`, so patches must target `run_lifecycle.*`
-        rather than `agent_executor.*`.
-        """
-        mock_initialize.return_value = None
-        mock_create_run.return_value = 123
-        mock_update_phase.return_value = True
-
-        executor = AgentExecutor(sample_agent_id, sample_agent_name, sample_agent_style)
-
-        result = await executor._start_run()
-
-        # Verify run_id returned
-        assert isinstance(result, int)
-        assert result == 123
-
-        # Verify API calls
-        mock_initialize.assert_called_once_with(sample_agent_name)
-        mock_create_run.assert_called_once_with(sample_agent_id)
-        mock_update_phase.assert_called_once_with(123, RunPhase.RESEARCHING)
 
 
 # ============================================================================
@@ -450,7 +404,6 @@ class TestAgentExecutorErrorPaths:
     """Error-path coverage for AgentExecutor (I11).
 
     These tests exercise branches not covered by the happy-path tests above:
-      * ``_start_run`` propagates ``BackendAPIError`` from ``create_run``.
       * ``execute_cycle`` routes phase errors through ``_handle_cycle_error``
         which broadcasts an ERROR status and re-raises.
       * ``execute_cycle`` propagates ``MaxTurnsExceeded`` from the market
@@ -460,40 +413,6 @@ class TestAgentExecutorErrorPaths:
       * ``_handle_cycle_error`` swallows secondary cleanup errors from
         ``update_phase`` so the original exception is still re-raised.
     """
-
-    @patch("run_lifecycle.initialize_agent")
-    @patch("run_lifecycle.create_run")
-    @patch("run_lifecycle.broadcast_status")
-    async def test_start_run_propagates_backend_api_error(
-        self,
-        mock_broadcast,
-        mock_create_run,
-        mock_initialize,
-        sample_agent_id,
-        sample_agent_name,
-        sample_agent_style,
-    ):
-        """_start_run must surface BackendAPIError from create_run unchanged.
-
-        After Task 4 the BackendAPIError originates inside
-        `RunLifecycle.start()`; `_start_run` is a thin wrapper that lets
-        it propagate untouched, so patches target `run_lifecycle.*`.
-        """
-        from exceptions import BackendAPIError
-
-        mock_initialize.return_value = None
-        mock_create_run.side_effect = BackendAPIError(
-            "POST /api/runs failed", status_code=500
-        )
-
-        executor = AgentExecutor(
-            sample_agent_id, sample_agent_name, sample_agent_style
-        )
-
-        with pytest.raises(BackendAPIError) as exc_info:
-            await executor._start_run()
-
-        assert exc_info.value.status_code == 500
 
     @patch("run_lifecycle.update_phase")
     @patch("run_lifecycle.complete_run")
@@ -560,7 +479,7 @@ class TestAgentExecutorErrorPaths:
         # ctx is None at this point (failure happened before RunContext was
         # built), so run_id falls back to None and update_phase must still be
         # invoked at most for the earlier RESEARCHING transition — never for
-        # FAILED because run_id was set when _start_run completed.
+        # FAILED because run_id was set when lifecycle.start() completed.
         error_broadcasts = [
             call for call in mock_broadcast.call_args_list
             if call.args[2] == "FAILED"

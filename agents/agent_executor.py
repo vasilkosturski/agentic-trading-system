@@ -1,14 +1,17 @@
 """Agent execution orchestration.
 
-Uses Trading Runs API (/api/runs) for tracking:
-- create_run() → POST /api/runs
-- update_phase() → PATCH /api/runs/{id}/phase
-- complete_run() → PUT /api/runs/{id}/complete
+`AgentExecutor.execute_cycle` is the top-level entry point for one trading
+cycle. It:
 
-Architecture:
-- Sequential operations with explicit parameters and typed results
-- Orchestrator assembles results into final state
-- Fail-fast error handling (no silent fallbacks)
+- fetches account balance, holdings, and recent activity via BackendClient
+- assembles a `RunContext` carrying all per-cycle state
+- constructs a single `RunLifecycle` and threads it through four phase
+  modules: research → decision → execution → finalization
+- routes failures through `lifecycle.fail` (best-effort error recording)
+  before re-raising the original exception
+
+Sequential operations with explicit parameters and typed results; no silent
+fallbacks.
 """
 
 import logging
@@ -211,19 +214,6 @@ class AgentExecutor:
         except Exception as e:
             await self._handle_cycle_error(e, ctx, lifecycle)
             raise
-
-    async def _start_run(self) -> int:
-        """Initialize agent and create run, transition to RESEARCHING.
-
-        Returns:
-            run_id from backend
-
-        Raises:
-            RuntimeError: If agent_id is not set
-            BackendAPIError: If create_run or update_phase fails
-        """
-        lifecycle = RunLifecycle(self.agent_id, self.name)
-        return await lifecycle.start()
 
     async def _fetch_account_data(self, agent_id: int) -> AccountData:
         """Fetch balance and holdings once for the cycle.
