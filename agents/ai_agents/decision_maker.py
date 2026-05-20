@@ -25,16 +25,16 @@ from models import AgentRunResult
 from utils.sdk_parser import extract_tool_calls, get_tool_errors
 
 # Import backend client
-from backend_client import get_backend_client
+from backend.client import get_backend_client
 
 # Import prompt loader
-from prompt_loader import load_and_format_prompt
+from infra.prompt_loader import load_and_format_prompt
 
 # Import MCP types
-from mcp_types import MCPName
+from mcp_helpers.types import MCPName
 
 if TYPE_CHECKING:
-    from mcp_types import MCPPool
+    from mcp_helpers.types import MCPPool
     from models import Holding
 
 logger = logging.getLogger(__name__)

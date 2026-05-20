@@ -182,7 +182,7 @@ def mock_mcp_pool():
 
     Returns a dict with mock servers keyed by MCPName.
     """
-    from mcp_types import MCPName
+    from mcp_helpers.types import MCPName
     return {
         MCPName.BRAVE_SEARCH: MagicMock(),
         MCPName.FETCH: MagicMock(),
@@ -288,7 +288,7 @@ def _redirect_run_lifecycle_to_agent_executor(monkeypatch):
     `patch` rebinds the module attribute and restores it on teardown).
     """
     import agent_executor
-    import run_lifecycle
+    import backend.run_lifecycle as run_lifecycle
 
     # Capture the real run_lifecycle.<symbol> values BEFORE installing
     # forwarders so the fallback can reach the actual production functions
@@ -349,7 +349,7 @@ def mock_broadcast_status(mocker):
     several broadcasts through `RunLifecycle`).
     """
     mock = mocker.patch("agent_executor.broadcast_status")
-    mocker.patch("run_lifecycle.broadcast_status", new=mock)
+    mocker.patch("backend.run_lifecycle.broadcast_status", new=mock)
     return mock
 
 
@@ -412,7 +412,7 @@ def mock_prompt_fetch(mocker):
     """
     # The in-process cache in prompt_loader survives across tests; clear it
     # so neighbouring tests can't leak state.
-    from prompt_loader import clear_prompt_cache
+    from infra.prompt_loader import clear_prompt_cache
     clear_prompt_cache()
 
     synthetic_prompt = (
@@ -429,7 +429,7 @@ def mock_prompt_fetch(mocker):
     mock_client._request = mock_request
 
     patcher = mocker.patch(
-        "prompt_loader._get_backend_client", return_value=mock_client
+        "infra.prompt_loader._get_backend_client", return_value=mock_client
     )
 
     yield patcher
@@ -452,9 +452,9 @@ def mock_run_tracking(mocker):
 
     # Wire run_lifecycle.* to the same mocks so calls inside RunLifecycle
     # are also intercepted.
-    mocker.patch("run_lifecycle.create_run", new=create_run)
-    mocker.patch("run_lifecycle.update_phase", new=update_phase)
-    mocker.patch("run_lifecycle.complete_run", new=complete_run)
+    mocker.patch("backend.run_lifecycle.create_run", new=create_run)
+    mocker.patch("backend.run_lifecycle.update_phase", new=update_phase)
+    mocker.patch("backend.run_lifecycle.complete_run", new=complete_run)
 
     # create_run returns run_id, update_phase/complete_run return bool
     create_run.return_value = 123  # Sample run ID

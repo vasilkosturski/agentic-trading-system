@@ -46,7 +46,7 @@ from config import (
 from models import TradeResult
 from models.api_responses import AccountReport, RecentActivityResponse, SymbolHistoryResponse
 from models.run_tracking import CompleteRunData
-from exceptions import BackendAPIError
+from infra.exceptions import BackendAPIError
 
 logger = logging.getLogger(__name__)
 
@@ -521,7 +521,7 @@ async def close_backend_client() -> None:
 
 
 # ========== Backward Compatibility Functions ==========
-# These wrap the BackendClient methods for existing code that imports from http_client
+# These wrap the BackendClient methods for existing code that imports from infra.http_client
 
 async def call_backend(
     method: str,

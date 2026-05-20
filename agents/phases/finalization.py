@@ -28,7 +28,7 @@ from models.run_tracking import (
     ResearchPhaseData,
     TradeDecision,
 )
-from run_lifecycle import RunLifecycle
+from backend.run_lifecycle import RunLifecycle
 
 # Constants live in agent_executor.py for now; Task 10 of the
 # decomposition plan may reconcile if a shared constants module emerges.

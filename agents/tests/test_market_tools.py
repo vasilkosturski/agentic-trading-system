@@ -9,9 +9,9 @@ Tests the graceful error handling pattern for failed symbol lookups:
 import pytest
 from unittest.mock import AsyncMock, patch
 
-import market_tools
-from market_tools import _lookup_share_price, _put_cache, _get_cached
-from exceptions import BackendAPIError
+import tools.market_tools as market_tools
+from tools.market_tools import _lookup_share_price, _put_cache, _get_cached
+from infra.exceptions import BackendAPIError
 from models import MarketData
 
 
@@ -21,7 +21,7 @@ class TestLookupSharePriceErrorHandling:
 
     async def test_404_returns_sentinel_value(self):
         """404 errors (symbol not found) should return -1.0 sentinel, not raise."""
-        with patch('market_tools._fetch_market_data', new_callable=AsyncMock) as mock_fetch:
+        with patch('tools.market_tools._fetch_market_data', new_callable=AsyncMock) as mock_fetch:
             mock_fetch.side_effect = BackendAPIError("Symbol not found", status_code=404)
             result = await _lookup_share_price("INVALID")
             assert result == -1.0
@@ -29,7 +29,7 @@ class TestLookupSharePriceErrorHandling:
 
     async def test_500_raises_exception(self):
         """5xx errors (backend issues) should raise BackendAPIError."""
-        with patch('market_tools._fetch_market_data', new_callable=AsyncMock) as mock_fetch:
+        with patch('tools.market_tools._fetch_market_data', new_callable=AsyncMock) as mock_fetch:
             mock_fetch.side_effect = BackendAPIError("Internal server error", status_code=500)
             with pytest.raises(BackendAPIError) as exc_info:
                 await _lookup_share_price("AAPL")
@@ -38,7 +38,7 @@ class TestLookupSharePriceErrorHandling:
 
     async def test_successful_lookup_returns_price(self):
         """Successful lookups should return the actual price."""
-        with patch('market_tools._fetch_market_data', new_callable=AsyncMock) as mock_fetch:
+        with patch('tools.market_tools._fetch_market_data', new_callable=AsyncMock) as mock_fetch:
             mock_data = MarketData(
                 symbol="AAPL",
                 price=195.50,

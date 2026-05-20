@@ -15,7 +15,7 @@ from cachetools import TTLCache
 from config import BACKEND_API_MARKET
 
 # Import unified HTTP client
-from http_client import call_backend, BackendAPIError
+from infra.http_client import call_backend, BackendAPIError
 
 # Import type-safe models
 from models import MarketData, PriceMetadata

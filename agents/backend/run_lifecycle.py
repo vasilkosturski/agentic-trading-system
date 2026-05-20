@@ -24,8 +24,8 @@ exception is always the one the caller re-raises.
 import logging
 
 from models.run_tracking import CompleteRunData, RunPhase
-from run_tracking import complete_run, create_run, update_phase
-from status_broadcaster import (
+from backend.run_tracking import complete_run, create_run, update_phase
+from backend.status_broadcaster import (
     PHASE_COMPLETED,
     PHASE_DECIDING,
     PHASE_ERROR,
@@ -34,7 +34,7 @@ from status_broadcaster import (
     PHASE_TRADING,
     broadcast_status,
 )
-from trading_tools import initialize_agent
+from tools.trading_tools import initialize_agent
 
 logger = logging.getLogger(__name__)
 

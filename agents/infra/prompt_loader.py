@@ -34,7 +34,7 @@ from datetime import datetime
 from typing import Dict, Literal, Tuple
 
 from agent_registry import VALID_AGENT_NAMES
-from backend_client import BackendClient, get_backend_client
+from backend.client import BackendClient, get_backend_client
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8080")
 AgentType = Literal["market_analyst", "decision_maker"]
 
 # ``VALID_AGENT_NAMES`` is re-exported from ``agent_registry`` so existing
-# imports (``from prompt_loader import VALID_AGENT_NAMES``) keep working
+# imports (``from infra.prompt_loader import VALID_AGENT_NAMES``) keep working
 # without duplicating the literal roster here.
 
 

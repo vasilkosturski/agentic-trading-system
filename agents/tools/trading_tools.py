@@ -9,7 +9,7 @@ No model-visible @function_tool exports live here; see W5 cleanup notes.
 import logging
 from typing import List
 
-from backend_client import get_backend_client
+from backend.client import get_backend_client
 from models import Holding, TradeResult
 from models.api_responses import AccountReport
 

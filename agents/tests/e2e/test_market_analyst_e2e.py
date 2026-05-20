@@ -16,9 +16,9 @@ import pytest
 from agents.mcp import MCPServerStdio
 from agents.exceptions import MaxTurnsExceeded
 
-from market_analyst import MarketAnalyst, MarketAnalystContext
-from mcp_types import MCPPool
-from mcp_params import get_mcp_server_params
+from ai_agents.market_analyst import MarketAnalyst, MarketAnalystContext
+from mcp_helpers.types import MCPPool
+from mcp_helpers.params import get_mcp_server_params
 from models.llm_output import ResearchResponse
 
 logger = logging.getLogger("e2e_tests.market_analyst")

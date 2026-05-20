@@ -17,11 +17,11 @@ from datetime import datetime
 
 from agents import Runner
 
-from decision_maker import DecisionMaker, DecisionContext
+from ai_agents.decision_maker import DecisionMaker, DecisionContext
 from models import TradingDecision
 from models.orchestration import DecisionResult, RunContext
-from run_lifecycle import RunLifecycle
-from telemetry import extract_run_telemetry
+from backend.run_lifecycle import RunLifecycle
+from infra.telemetry import extract_run_telemetry
 
 # Constants live in agent_executor.py for now; Task 10 of the
 # decomposition plan may reconcile if a shared constants module emerges.
@@ -91,7 +91,7 @@ async def run_decision_phase(
     instructions = decision_maker.agent.instructions
     if not isinstance(instructions, str) and instructions is not None:
         logger.debug(
-            "decision_maker.agent.instructions is callable, not str — "
+            "ai_agents.decision_maker.agent.instructions is callable, not str — "
             "skipping prompt capture for observability"
         )
     ctx.decision_maker_system_prompt = instructions if isinstance(instructions, str) else None

@@ -76,7 +76,7 @@ class AgentRunResult(Generic[T]):
         """
         if self.tool_errors:
             # Import here to avoid circular dependency
-            from exceptions import ToolExecutionError
+            from infra.exceptions import ToolExecutionError
             raise ToolExecutionError(
                 f"Tools failed during execution: {[e.name for e in self.tool_errors]}",
                 tool_errors=self.tool_errors

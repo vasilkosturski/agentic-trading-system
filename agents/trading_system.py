@@ -10,12 +10,12 @@ from dotenv import load_dotenv
 
 from agents.mcp import MCPServerStdio
 from agent_registry import AGENT_NAMES
-from simple_trader import SimpleTrader
+from ai_agents.simple_trader import SimpleTrader
 from models.investment_style import InvestmentStyle
-from api_server import TradingAPIServer
-from mcp_types import MCPName, MCPPool
-from mcp_params import get_mcp_server_params
-from backend_client import close_backend_client
+from api.server import TradingAPIServer
+from mcp_helpers.types import MCPName, MCPPool
+from mcp_helpers.params import get_mcp_server_params
+from backend.client import close_backend_client
 
 # Load environment variables
 load_dotenv(override=True)
@@ -68,7 +68,7 @@ class TradingSystem:
     @classmethod
     async def create(cls):
         """Factory method: ensure agents exist in backend, then create traders."""
-        from backend_client import BackendClient
+        from backend.client import BackendClient
 
         client = BackendClient()
         agents = []

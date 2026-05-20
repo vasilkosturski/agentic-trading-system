@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from prompt_loader import (
+from infra.prompt_loader import (
     _PROMPT_CACHE,
     _PartialFormatDict,
     VALID_AGENT_NAMES,
@@ -58,7 +58,7 @@ class TestLoadComposedPrompt:
     async def test_routes_through_backend_client_request(self):
         """Calls BackendClient._request with the correct URL — not httpx.get directly."""
         mock_request = AsyncMock(return_value=_make_response("You are Warren."))
-        with patch("prompt_loader._get_backend_client") as mock_get_client:
+        with patch("infra.prompt_loader._get_backend_client") as mock_get_client:
             mock_client = MagicMock()
             mock_client._request = mock_request
             mock_get_client.return_value = mock_client
@@ -93,7 +93,7 @@ class TestPromptCache:
     async def test_second_call_does_not_trigger_second_http_call(self):
         """Second call for the same (agent_type, agent_name) is served from cache."""
         mock_request = AsyncMock(return_value=_make_response("cached prompt"))
-        with patch("prompt_loader._get_backend_client") as mock_get_client:
+        with patch("infra.prompt_loader._get_backend_client") as mock_get_client:
             mock_client = MagicMock()
             mock_client._request = mock_request
             mock_get_client.return_value = mock_client
@@ -116,7 +116,7 @@ class TestPromptCache:
                 _make_response("george-analyst"),
             ]
         )
-        with patch("prompt_loader._get_backend_client") as mock_get_client:
+        with patch("infra.prompt_loader._get_backend_client") as mock_get_client:
             mock_client = MagicMock()
             mock_client._request = mock_request
             mock_get_client.return_value = mock_client
@@ -140,7 +140,7 @@ class TestPromptCache:
     async def test_cache_key_is_case_insensitive_on_agent_name(self):
         """'Warren' and 'warren' resolve to the same cache slot."""
         mock_request = AsyncMock(return_value=_make_response("p"))
-        with patch("prompt_loader._get_backend_client") as mock_get_client:
+        with patch("infra.prompt_loader._get_backend_client") as mock_get_client:
             mock_client = MagicMock()
             mock_client._request = mock_request
             mock_get_client.return_value = mock_client
@@ -178,7 +178,7 @@ class TestLoadAndFormatPrompt:
         mock_request = AsyncMock(
             return_value=_make_response("Hello Warren, time is {datetime}")
         )
-        with patch("prompt_loader._get_backend_client") as mock_get_client:
+        with patch("infra.prompt_loader._get_backend_client") as mock_get_client:
             mock_client = MagicMock()
             mock_client._request = mock_request
             mock_get_client.return_value = mock_client

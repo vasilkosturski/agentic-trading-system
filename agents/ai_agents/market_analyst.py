@@ -52,19 +52,19 @@ from models.llm_output import ResearchResponse
 from models.investment_style import InvestmentStyle
 
 # Import prompt loader
-from prompt_loader import load_and_format_prompt
+from infra.prompt_loader import load_and_format_prompt
 
-from market_tools import _lookup_share_price
+from tools.market_tools import _lookup_share_price
 from models import (
     RecentActivityResponse,
     ToolError,
     AgentRunResult,
 )
-from mcp_types import MCPName
+from mcp_helpers.types import MCPName
 from pydantic import ValidationError
 
 if TYPE_CHECKING:
-    from mcp_types import MCPPool
+    from mcp_helpers.types import MCPPool
     from models import Holding
 
 logger = logging.getLogger(__name__)

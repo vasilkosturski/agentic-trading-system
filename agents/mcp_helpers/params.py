@@ -16,7 +16,7 @@ Memory is now stored in PostgreSQL directly via trading_tools.py (no separate MC
 import os
 from typing import Dict
 from dotenv import load_dotenv
-from mcp_types import MCPName
+from mcp_helpers.types import MCPName
 
 load_dotenv(override=True)
 

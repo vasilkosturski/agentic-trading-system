@@ -10,8 +10,8 @@ import pytest
 import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend_client import BackendClient
-from exceptions import BackendAPIError
+from backend.client import BackendClient
+from infra.exceptions import BackendAPIError
 from models import TradeResult
 from models.api_responses import AccountReport
 
@@ -33,7 +33,7 @@ class TestBackendClientHttp2:
             return MagicMock(spec=real_async_client_cls, is_closed=False)
 
         client = BackendClient()
-        with patch("backend_client.httpx.AsyncClient", side_effect=fake_async_client):
+        with patch("backend.client.httpx.AsyncClient", side_effect=fake_async_client):
             client._get_client()
 
         assert captured_kwargs.get("http2") is True, (
@@ -56,7 +56,7 @@ class TestBackendClientHttp2:
             return MagicMock(spec=real_async_client_cls, is_closed=False)
 
         client = BackendClient()
-        with patch("backend_client.httpx.AsyncClient", side_effect=fake_async_client):
+        with patch("backend.client.httpx.AsyncClient", side_effect=fake_async_client):
             client._get_client()
 
         timeout = captured_kwargs.get("timeout")

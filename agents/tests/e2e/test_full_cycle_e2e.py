@@ -13,8 +13,8 @@ import requests
 from agents.mcp import MCPServerStdio
 
 from agent_executor import AgentExecutor
-from mcp_types import MCPPool
-from mcp_params import get_mcp_server_params
+from mcp_helpers.types import MCPPool
+from mcp_helpers.params import get_mcp_server_params
 from models import CycleResult, TradeAction
 
 logger = logging.getLogger("e2e_tests.full_cycle")

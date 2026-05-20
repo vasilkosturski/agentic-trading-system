@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from api_server import TradingAPIServer
+from api.server import TradingAPIServer
 
 
 @pytest.fixture

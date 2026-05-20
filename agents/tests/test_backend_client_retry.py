@@ -23,7 +23,7 @@ import httpx
 import pytest
 import tenacity
 
-from backend_client import BackendClient
+from backend.client import BackendClient
 from models.api_responses import AccountReport, RecentActivityResponse
 from models.run_tracking import (
     CompleteRunData,
