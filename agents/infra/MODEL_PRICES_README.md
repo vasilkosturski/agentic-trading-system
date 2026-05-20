@@ -29,7 +29,7 @@ schema — the loader skips any entry without both cost fields.
 
 ```bash
 curl -sL https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json \
-    -o agentic-trading-system/agents/model_prices.json
+    -o agentic-trading-system/agents/infra/model_prices.json
 ```
 
 Then update the date above, commit, and open a PR. The diff itself is the
@@ -39,7 +39,7 @@ audit trail of what changed in upstream LiteLLM since the previous refresh.
 
 A monthly bot-PR opens automatically via
 [`.github/workflows/refresh-model-prices.yml`](../.github/workflows/refresh-model-prices.yml)
-on the 1st of each month at 09:00 UTC. If `agents/model_prices.json` has
+on the 1st of each month at 09:00 UTC. If `agents/infra/model_prices.json` has
 drifted from upstream, the workflow opens a PR titled
 `chore: refresh model_prices.json from LiteLLM`.
 

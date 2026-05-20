@@ -69,7 +69,7 @@ def extract_usage_metrics(usage: Usage, model_name: str) -> UsageMetrics:
         if resolved_name not in _UNKNOWN_MODELS_WARNED:
             logger.warning(
                 f"No pricing entry for model {resolved_name!r}; costUsd will be None. "
-                f"Refresh agents/model_prices.json (see MODEL_PRICES_README.md)."
+                f"Refresh agents/infra/model_prices.json (see MODEL_PRICES_README.md)."
             )
             _UNKNOWN_MODELS_WARNED.add(resolved_name)
         cost_usd = None

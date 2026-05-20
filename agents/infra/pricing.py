@@ -23,7 +23,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_PRICING_JSON_PATH = Path(__file__).resolve().parent.parent / "model_prices.json"
+_PRICING_JSON_PATH = Path(__file__).resolve().parent / "model_prices.json"
 
 
 def _load_model_pricing(path: Path = _PRICING_JSON_PATH) -> dict[str, tuple[float, float]]:
@@ -36,7 +36,7 @@ def _load_model_pricing(path: Path = _PRICING_JSON_PATH) -> dict[str, tuple[floa
     per-1M-token convention. To refresh:
 
         curl -sL https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json \\
-            -o agentic-trading-system/agents/model_prices.json
+            -o agentic-trading-system/agents/infra/model_prices.json
     """
     with path.open() as f:
         data: dict[str, Any] = json.load(f)
