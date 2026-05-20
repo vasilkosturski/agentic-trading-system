@@ -263,10 +263,10 @@ def _redirect_run_lifecycle_to_agent_executor(monkeypatch):
 
     Many existing tests in `test_agent_executor.py` patch the run-tracking
     and broadcast functions at `agent_executor.<symbol>` (via
-    `@patch("agent_executor.create_run")` etc.). After Task 4 of the
-    AgentExecutor decomposition, `_start_run` routes through
-    `RunLifecycle.start()`, which calls `run_lifecycle.create_run` —
-    those existing patches would no longer intercept.
+    `@patch("agent_executor.create_run")` etc.). Run-tracking calls now
+    happen inside `RunLifecycle.start()` (and the other lifecycle
+    transitions), which call `run_lifecycle.create_run` directly — those
+    existing patches would no longer intercept.
 
     This autouse fixture installs lazy forwarders in `run_lifecycle` so
     that whatever value lives at `agent_executor.<symbol>` at call time
@@ -275,13 +275,12 @@ def _redirect_run_lifecycle_to_agent_executor(monkeypatch):
     `return_value` / `side_effect` settings take effect through the
     lifecycle code path too.
 
-    After Task 5 (final cleanup) deleted the unused `create_run`,
-    `update_phase`, `complete_run`, `initialize_agent`, and
-    `broadcast_status` imports from `agent_executor`, the forwarders use
-    a fallback to the real `run_lifecycle.<symbol>` value when the symbol
-    is no longer accessible via `agent_executor`. Tests that still patch
-    at `agent_executor.<symbol>` continue to work because the patcher
-    installs the attribute on the module for the test duration.
+    `agent_executor` no longer re-exports `create_run`, `update_phase`,
+    `complete_run`, `initialize_agent`, or `broadcast_status`, so the
+    forwarders fall back to the real `run_lifecycle.<symbol>` value when
+    the symbol is not accessible via `agent_executor`. Tests that still
+    patch at `agent_executor.<symbol>` continue to work because the
+    patcher installs the attribute on the module for the test duration.
 
     Skipping the forwarder for any test that *does* set its own
     `run_lifecycle.<symbol>` patch is handled implicitly: that test's
@@ -443,9 +442,9 @@ def mock_run_tracking(mocker):
 
     Patches at BOTH `agent_executor.*` AND `run_lifecycle.*` module-level
     references using the SAME Mock objects so calls intercepted from
-    either layer route through the same assertion surface (Task 4 of the
-    AgentExecutor decomposition routes `_start_run` through
-    `RunLifecycle.start()` which calls `run_lifecycle.create_run` etc.).
+    either layer route through the same assertion surface — run-tracking
+    calls now happen inside `RunLifecycle.start()` (and the other
+    lifecycle transitions), which call `run_lifecycle.create_run` etc.
     """
     create_run = mocker.patch("agent_executor.create_run")
     update_phase = mocker.patch("agent_executor.update_phase")
