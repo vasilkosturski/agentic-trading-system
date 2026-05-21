@@ -1,184 +1,41 @@
-# Agentic Trading System - Local Development Guide
+# Agentic Trading System
 
-## 🚀 Local Development Setup
+A multi-agent stock trading system, built as a realistic demo for agentic AI software development. Four AI traders — Warren, George, Ray, and Cathie — each start with $100K in virtual capital, independently research the market, and make BUY / SELL / HOLD decisions. The agents are written in Python on the [OpenAI Agents SDK](https://github.com/openai/openai-agents-python) and use Brave Search + Fetch MCP servers for web research. A Java Spring Boot backend owns accounts, trade execution, and the audit trail; a React dashboard renders performance, runs, and per-cycle audit views.
 
-This guide covers running the system locally for development purposes. For production deployment, see the main [`DEPLOYMENT.md`](../DEPLOYMENT.md).
+## Quickstart
 
-### Prerequisites
-- Java 17+ (for Spring Boot backend)
-- Node.js 18+ (for React frontend)
-- PostgreSQL 15+ (or use Docker)
-
-### 1. Database Setup
-
-The schema is generated automatically from the Java entities (`spring.jpa.hibernate.ddl-auto=update`).
-
-#### Option A: Local PostgreSQL
+Requirements: Docker (or Podman) with the Compose plugin.
 
 ```bash
-# Create database + user (run inside psql)
-CREATE USER trading_user WITH PASSWORD 'trading_password';
-CREATE DATABASE agentic_trading OWNER trading_user;
+git clone https://github.com/vasilkosturski/agentic-trading-system.git
+cd agentic-trading-system
+cp .env.example .env
+# Open .env and fill in OPENAI_API_KEY and BRAVE_API_KEY at minimum.
+docker compose up --build
 ```
 
-> Tables are created on first backend startup—no SQL scripts required.
+Once everything is healthy:
 
-#### Option B: Docker PostgreSQL
+- Dashboard — http://localhost:5173
+- Backend API — http://localhost:8080
+- PostgreSQL — `localhost:5432` (user: `trading_user`, password: `trading_password`, database: `agentic_trading`)
 
-```bash
-docker run --name postgres-dev \
-  -e POSTGRES_DB=agentic_trading \
-  -e POSTGRES_USER=trading_user \
-  -e POSTGRES_PASSWORD=trading_password \
-  -p 5432:5432 -d postgres:15
-```
+Schemas (`agents`, `trading`, `analytics`) are created automatically by the backend on first boot via JPA's `hbm2ddl.create_namespaces`. The agents container then runs trading cycles on the cadence set by `RUN_EVERY_N_MINUTES` (default 480 — lower it in `.env` if you want to see activity sooner).
 
-### 2. Start the Backend
+See [`.env.example`](.env.example) for what each variable does and where to get the API keys.
 
-```bash
-cd backend
-./gradlew bootRun
-```
+## Architecture
 
-The backend will start on `http://localhost:8080`
+The system is full-stack: Python agents on the OpenAI Agents SDK driving a two-agent pipeline (Market Analyst → Decision Maker), a Java Spring Boot backend for stateful concerns (accounts, trade execution, run/audit persistence, prompt composition, WebSocket broadcasting), a React + TypeScript dashboard, and PostgreSQL for persistence across three schemas. The Market Analyst and Decision Maker both use Brave Search and Fetch via MCP for web research; Finnhub.io feeds market quotes through the backend's price cache.
 
-### 3. Start the Frontend
+## Get Involved
 
-```bash
-cd frontend
+This project is a vehicle for learning and developing agentic systems — a space the industry is still collectively figuring out. It's a work in progress, with room for improvement across design, code quality, and ideas I haven't considered yet. If you want to comment, open an issue, send a pull request, or use the repo as a starting point to research and explore new directions for educational purposes, you're welcome to jump in.
 
-# Install dependencies (first time only)
-npm install
+## Disclaimers
 
-# Start development server
-npm run dev
-```
+While people have found the traders' market research generally helpful, **this is not investment advice**. The system trades with virtual capital — no real money is at stake. It's a demo, and some details may change as the system develops; check the repo for the current state.
 
-The frontend will start on `http://localhost:5173`
+## License
 
-### 4. Access the Application
-
-Open your browser to: **http://localhost:5173**
-
-You should see:
-- ✅ **4 Trading Agents**: Warren, George, Ray, Cathie
-- ✅ **Real-time Data**: Portfolio values, P&L, trading stats
-- ✅ **Market Status**: Live market open/closed indicator
-- ✅ **Recent Trades**: Sample trading activity
-- ✅ **Portfolio Charts**: 7-day performance visualization
-
-## 🔧 Configuration
-
-Note: Docker Compose automatically loads variables from a file named `.env` in this directory. If you use a differently named env file, run Compose with:
-
-```bash
-docker compose --env-file .env.custom up -d
-```
-
-### Backend Configuration
-The backend uses PostgreSQL profile by default. Key configuration in [`src/main/resources/application-postgresql.yml`](backend/src/main/resources/application-postgresql.yml):
-
-```yaml
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/agentic_trading
-    username: trading_user
-    password: trading_password
-```
-
-### Frontend Configuration
-Create a `.env` file in the `frontend/` directory:
-
-```env
-VITE_API_BASE_URL=http://localhost:8080/api
-VITE_APP_NAME=Agentic Trading System
-VITE_APP_VERSION=1.0.0
-```
-
-## 🐛 Troubleshooting
-
-### Backend Issues
-- **Port 8080 in use**: Change port in `application.yml`
-- **Database connection**: Ensure PostgreSQL is running and accessible
-- **Java version**: Verify Java 17+ is installed
-
-### Frontend Issues
-- **API connection**: Ensure backend is running on port 8080
-- **Dependencies**: Run `npm install` if packages are missing
-- **Port conflicts**: Vite will use next available port automatically
-
-### Database Issues
-- **Connection refused**: Check PostgreSQL service status
-- **Tables missing**: Run the initialization scripts
-- **Permission denied**: Verify database user permissions
-
-## 📊 API Endpoints
-
-### Market Data
-- `GET /api/market/status` - Current market status and hours
-
-### Trading Agents
-- `GET /api/trading/agents/status` - All agents with portfolio data
-
-### Account Management
-- `GET /api/accounts/portfolio/{agent}/history?days=7` - Portfolio history
-- `GET /api/accounts/trades/recent?limit=50` - Recent trading activity
-
-## 🔄 Development Workflow
-
-1. **Backend Changes**: Restart with `./gradlew bootRun`
-2. **Frontend Changes**: Hot reload automatically updates
-3. **Database Changes**: Restart backend—JPA migrates schema automatically
-4. **API Changes**: Update both backend endpoints and frontend services
-
-## 📁 Component Structure
-
-```
-agentic-trading-system/
-├── backend/                    # Java Spring Boot backend
-│   ├── src/main/java/com/trading/
-│   │   ├── controller/        # REST API endpoints
-│   │   ├── service/          # Business logic
-│   │   ├── entity/           # JPA entities
-│   │   └── repository/       # Data access layer
-│   └── build.gradle.kts      # Build configuration
-├── frontend/                  # React TypeScript frontend
-│   ├── src/
-│   │   ├── components/       # React components
-│   │   ├── hooks/           # Custom React hooks
-│   │   ├── services/        # API service layer
-│   │   └── App.tsx          # Main application
-│   └── package.json         # Dependencies
-├── database/                # Database documentation (JPA-managed schema)
-└── docs/                    # Technical documentation
-```
-
-## 🧪 Testing
-
-### Backend Tests
-```bash
-cd backend
-./gradlew test
-```
-
-### Frontend Tests
-```bash
-cd frontend
-npm test
-```
-
-### API Testing
-```bash
-# Test endpoints manually
-curl http://localhost:8080/api/market/status
-curl http://localhost:8080/api/trading/agents/status
-```
-
-## 🎯 Next Steps
-
-1. **View Dashboard**: Access http://localhost:5173
-2. **Monitor Agents**: Check trading agent status and activity
-3. **Explore APIs**: Test different endpoints
-4. **Customize**: Modify agent parameters or add features
-
-For production deployment, use the main deployment script: [`../deploy-to-k3s.sh`](../deploy-to-k3s.sh)test
+[MIT](LICENSE).
