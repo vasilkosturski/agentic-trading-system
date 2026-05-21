@@ -1,8 +1,16 @@
-# Full Stack Agentic Trading System - All Services in Docker
-# Usage: docker-compose up -d
+# Full-Stack Agentic Trading System — Local Development Stack
+#
+# Usage: copy .env.example to .env, fill in your API keys, then run:
+#   docker compose up --build
+#
+# Services:
+#   postgres        — PostgreSQL 15 (schemas auto-created by Spring Boot JPA)
+#   backend-service — Java 21 Spring Boot backend on http://localhost:8080
+#   agents          — Python OpenAI Agents SDK + bundled Brave Search / Fetch MCP servers
+#   frontend        — React + Vite, served via nginx on http://localhost:5173
 
 services:
-  # PostgreSQL Database
+  # PostgreSQL — holds the agents/trading/analytics schemas (JPA auto-DDL on first backend boot).
   postgres:
     image: postgres:15-alpine
     container_name: agentic-trading-postgres
@@ -24,11 +32,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # Spring Boot Backend API
-  # Service key is `backend-service` (NOT `backend`) so the compose service DNS
-  # name matches the K3s Service name. frontend/nginx.conf's static
-  # `proxy_pass http://backend-service:8080/api/` then works in BOTH environments
-  # without needing network aliases (which podman-compose ignores).
+  # Spring Boot backend. Service name `backend-service` matches the K3s Service name so
+  # frontend/nginx.conf's static `proxy_pass http://backend-service:8080/api/` works
+  # unchanged across compose and K3s.
   backend-service:
     build:
       context: ./backend
@@ -42,13 +48,13 @@ services:
       DB_NAME: agentic_trading
       DB_USERNAME: trading_user
       DB_PASSWORD: trading_password
-      # Market data API keys
+      # Optional: real-time market data. Without it, certain endpoints fall back to cached / mock data.
       FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
-      # Auth — JwtTokenProvider rejects empty/missing JWT_SECRET so .env must reach the JVM
-      JWT_SECRET: ${JWT_SECRET}
+      # Login auth. Defaults make `docker compose up` work out of the box; override in .env for anything non-local.
+      JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret-change-me-for-anything-real}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
     ports:
       - "8080:8080"
     networks:
@@ -62,7 +68,10 @@ services:
       timeout: 10s
       retries: 3
 
-  # Python Agents (includes MCP servers)
+  # Python agents container. The Brave Search and Fetch MCP servers run as stdio
+  # subprocesses inside this container — the Dockerfile installs them globally
+  # (`@modelcontextprotocol/server-brave-search` via npm, `mcp-server-fetch` via pip).
+  # No separate MCP services needed.
   agents:
     build:
       context: ./agents
@@ -70,7 +79,7 @@ services:
     container_name: agentic-trading-agents
     restart: unless-stopped
     environment:
-      # Match K3s environment variables exactly
+      # Required for the agents to do anything useful — see .env.example for where to get keys.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       BRAVE_API_KEY: ${BRAVE_API_KEY:-}
       BACKEND_URL: "http://backend-service:8080"
@@ -78,25 +87,31 @@ services:
       ENVIRONMENT: "development"
       LOG_LEVEL: "DEBUG"
       CONTINUOUS_MODE: "true"
-      RUN_EVERY_N_MINUTES: "480"
+      # Run a cycle every N minutes. 480 = 8h is a quiet default; lower it for active testing.
+      RUN_EVERY_N_MINUTES: ${RUN_EVERY_N_MINUTES:-480}
       RUN_EVEN_WHEN_MARKET_IS_CLOSED: "true"
     volumes:
-      # Mount source code for development
+      # Mount agents source so contributors can edit Python files and restart the container
+      # to pick up changes without a rebuild.
       - ./agents:/app
-      # Persistent storage for agent memory/databases
+      # Persist agent memory + logs across container restarts.
       - agent_memory:/app/memory
       - agent_logs:/app/logs
     networks:
-      - trading-network
+      trading-network:
+        # Backend's `agents.api.url` defaults to `http://agents-service:8000`; this alias
+        # makes that work without overriding the env var.
+        aliases:
+          - agents-service
     depends_on:
       backend-service:
         condition: service_healthy
     ports:
-      - "8000:8000"  # API server for manual cycle triggers
-    # Run the production autonomous trading system
+      - "8000:8000"  # API server (used by the backend to trigger manual cycles)
     command: python trading_system.py
 
-  # React Frontend (production nginx image — built from frontend/Dockerfile)
+  # React frontend. The Dockerfile runs `npm run build` and serves the bundled
+  # output via nginx, which also proxies `/api/` to backend-service:8080.
   frontend:
     build:
       context: ./frontend
@@ -104,11 +119,8 @@ services:
     container_name: agentic-trading-frontend
     restart: unless-stopped
     ports:
-      # Container nginx listens on 80; map to host 5173 to keep the dev URL stable.
+      # nginx listens on container port 80; map to host 5173 to keep the dev URL stable.
       - "5173:80"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     networks:
       - trading-network
     depends_on:
