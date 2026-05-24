@@ -4,14 +4,14 @@ A multi-agent stock trading system, built as a realistic demo for agentic AI sof
 
 ## Quickstart
 
-Requirements: Docker (or Podman) with the Compose plugin.
+Requirements: Docker with the Compose plugin, or Podman 5+ (`podman compose` delegates to `docker-compose` and works the same; `podman-compose` also works).
 
 ```bash
 git clone https://github.com/vasilkosturski/agentic-trading-system.git
 cd agentic-trading-system
 cp .env.example .env
 # Open .env and fill in OPENAI_API_KEY and BRAVE_API_KEY at minimum.
-docker compose up --build
+docker compose up --build    # or: podman compose up --build
 ```
 
 Once everything is healthy:

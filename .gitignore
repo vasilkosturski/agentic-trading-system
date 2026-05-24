@@ -137,6 +137,9 @@ bin/
 # CA certs (injected at build time, not committed)
 *.pem
 
+# Personal local compose overrides
+docker-compose.override.yml
+
 # Docker volumes
 postgres_data/
 agent_memory/
