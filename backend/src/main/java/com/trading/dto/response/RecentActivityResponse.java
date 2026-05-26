@@ -60,5 +60,15 @@ public class RecentActivityResponse {
     public void setTotalRuns(int totalRuns) { this.totalRuns = totalRuns; }
     public int getTotalTrades() { return totalTrades; }
     public void setTotalTrades(int totalTrades) { this.totalTrades = totalTrades; }
+
+    public static RecentActivityResponse empty(String agentName, int days) {
+        RecentActivityResponse response = new RecentActivityResponse();
+        response.setAgentName(agentName);
+        response.setDays(days);
+        response.setRuns(List.of());
+        response.setTotalRuns(0);
+        response.setTotalTrades(0);
+        return response;
+    }
 }
 

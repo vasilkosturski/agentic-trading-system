@@ -59,5 +59,21 @@ public interface TradingRunRepository extends JpaRepository<TradingRun, Long>, J
      * Used to filter runs by publicDisplayDelayDays at database level.
      */
     Page<TradingRun> findByStartedAtBefore(Instant cutoffDate, Pageable pageable);
+
+    /**
+     * Find runs for an agent within an exclusive startedAt date range.
+     * Boundaries are EXCLUSIVE on both ends to match Instant.isAfter(since) / isBefore(cutoffDate) semantics.
+     * Pageable lets callers push the row limit (e.g. 20) to the database.
+     */
+    @Query("SELECT tr FROM TradingRun tr " +
+           "WHERE tr.agent.id = :agentId " +
+           "AND tr.startedAt > :since " +
+           "AND tr.startedAt < :cutoffDate " +
+           "ORDER BY tr.startedAt DESC")
+    List<TradingRun> findByAgentIdAndStartedAtBetween(
+        @Param("agentId") Long agentId,
+        @Param("since") Instant since,
+        @Param("cutoffDate") Instant cutoffDate,
+        Pageable pageable);
 }
 
