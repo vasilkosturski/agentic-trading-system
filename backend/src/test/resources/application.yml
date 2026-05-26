@@ -1,0 +1,97 @@
+# Test-only application configuration. Mirrors src/main/resources/application.yml,
+# with two security-critical keys overridden to test-only values:
+#   - security.jwt.secret  (no YAML default in main; would require JWT_SECRET env var)
+#   - security.admin.password  (no YAML default in main; would require ADMIN_PASSWORD env var)
+# Existing tests @MockBean JwtTokenProvider so the test secret here is inert at runtime.
+spring:
+  application:
+    name: agentic-trading-system
+
+  profiles:
+    active: postgresql
+
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: 8080
+  error:
+    include-message: always
+
+spring.mvc:
+  problemdetails:
+    enabled: true
+
+logging:
+  level:
+    com.trading: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  model: gpt-4
+  max-tokens: 2000
+
+market:
+  finnhub:
+    api-key: ${FINNHUB_API_KEY:}
+    base-url: ${FINNHUB_BASE_URL:https://finnhub.io/api/v1}
+  cache:
+    ttl-minutes: 60
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,https://agentic-trading.vkontech.com}
+
+trading:
+  initial-balance: 10000.0
+  spread: 0.002
+  market-hours:
+    start: "09:30"
+    end: "16:00"
+    timezone: "America/New_York"
+  public-display-delay-days: 7
+
+notifications:
+    enabled: false
+
+# Spring Boot Actuator — test-only overlay.
+# Production exposes only health,info; tests expose everything so the security
+# gate (SecurityConfig's /actuator/** → hasRole("ADMIN")) can be exercised
+# against representative non-public endpoints like /actuator/env.
+# show-details: when-authorized mirrors production so the health-detail test
+# verifies the same contract end users see.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: when-authorized
+
+agents:
+  api:
+    url: ${AGENTS_API_URL:http://agents-service:8000}
+    connect-timeout: 30000
+    read-timeout: 60000
+
+# Legacy jwt block — consumed by JwtTokenProvider (which is @MockBean in all tests).
+jwt:
+  secret: test-only-jwt-secret-must-be-at-least-256-bits-long-for-hmac-sha256-algorithm
+  expiration: ${JWT_EXPIRATION:3600000}
+
+# Security cluster (bound to SecurityProperties).
+security:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,https://agentic-trading.vkontech.com}
+  public-matchers:
+    - /api/auth/**
+    - /actuator/health
+    - /actuator/info
+  jwt:
+    secret: test-only-jwt-secret-must-be-at-least-256-bits-long-for-hmac-sha256-algorithm
+    expiration: ${JWT_EXPIRATION:3600000}
+  admin:
+    username: ${ADMIN_USERNAME:admin}
+    password: test-only-admin-password-do-not-use-in-production
