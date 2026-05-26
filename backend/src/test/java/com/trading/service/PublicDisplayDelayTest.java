@@ -61,7 +61,6 @@ class PublicDisplayDelayTest {
     @InjectMocks
     private TradingRunService tradingRunService;
 
-    @InjectMocks
     private MemoryService memoryService;
 
     private TradingAgent testAgent;
@@ -79,7 +78,14 @@ class PublicDisplayDelayTest {
 
         // Set the delay configuration (7 days default)
         ReflectionTestUtils.setField(tradingRunService, "publicDisplayDelayDays", 7);
-        ReflectionTestUtils.setField(memoryService, "publicDisplayDelayDays", 7);
+        memoryService = new MemoryService(
+            7,
+            transactionRepository,
+            tradingRunRepository,
+            tradingAgentRepository,
+            accountRepository,
+            accountService
+        );
     }
 
     @Test
@@ -114,53 +120,60 @@ class PublicDisplayDelayTest {
     @Test
     @DisplayName("MemoryService.getTradingHistory() filters trades by timestamp older than 7 days")
     void getTradingHistory_shouldFilterByDelayPeriod() {
-        // Arrange: Create transactions at different times
+        // Arrange: Only "old" trades (>7 days) come back from the repository now —
+        // the date filter is applied at the DB level via findByAccountIdAndSymbolAndTimestampBetween.
         Instant now = Instant.now();
-        AccountTransaction recentTrade = createTransaction(1L, now.minus(6, ChronoUnit.DAYS)); // 6 days - FILTERED OUT
-        AccountTransaction oldTrade1 = createTransaction(2L, now.minus(8, ChronoUnit.DAYS));   // 8 days - INCLUDED
-        AccountTransaction oldTrade2 = createTransaction(3L, now.minus(15, ChronoUnit.DAYS));  // 15 days - INCLUDED
+        AccountTransaction oldTrade1 = createTransaction(2L, now.minus(8, ChronoUnit.DAYS));
+        AccountTransaction oldTrade2 = createTransaction(3L, now.minus(15, ChronoUnit.DAYS));
 
         when(accountRepository.findByAgentName("warren")).thenReturn(Optional.of(testAccount));
-        when(transactionRepository.findByAccountIdAndSymbolOrderByTimestampDesc(1L, "AAPL"))
-                .thenReturn(List.of(recentTrade, oldTrade1, oldTrade2));
+        when(transactionRepository.findByAccountIdAndSymbolAndTimestampBetween(
+                eq(1L), eq("AAPL"), any(Instant.class), any(Instant.class)))
+                .thenReturn(List.of(oldTrade1, oldTrade2));
         when(accountService.getHoldings("warren")).thenReturn(List.of());
 
-        // Act: Call service method
+        // Act
         TradingHistoryResponse result = memoryService.getTradingHistory("warren", "AAPL", 30);
 
-        // Assert: Only trades older than 7 days should be returned
+        // Assert: Service returns the rows the repo emitted; included trades match.
         assertEquals(2, result.getTrades().size(), "Should return only trades older than 7 days");
-        // Verify by comparing the parsed timestamps
         List<Instant> resultTimestamps = result.getTrades().stream()
                 .map(t -> Instant.parse(t.getDate()))
                 .toList();
-        assertFalse(resultTimestamps.contains(recentTrade.getTimestamp()),
-                "Recent trade (6 days old) should be filtered out");
         assertTrue(resultTimestamps.contains(oldTrade1.getTimestamp()),
                 "Old trade (8 days old) should be included");
         assertTrue(resultTimestamps.contains(oldTrade2.getTimestamp()),
                 "Old trade (15 days old) should be included");
+
+        // Verify the date-filtered repo method was used (no in-memory filter chain).
+        verify(transactionRepository).findByAccountIdAndSymbolAndTimestampBetween(
+                eq(1L), eq("AAPL"), any(Instant.class), any(Instant.class));
     }
 
     @Test
     @DisplayName("MemoryService.getRecentActivity() filters runs by startedAt older than 7 days")
     void getRecentActivity_shouldFilterByDelayPeriod() {
-        // Arrange: Create runs at different times
+        // Arrange: Only "old" runs (>7 days) come back from the repository now —
+        // the date filter is applied at the DB level via findByAgentIdAndStartedAtBetween.
         Instant now = Instant.now();
-        TradingRun recentRun = createRun(1L, now.minus(4, ChronoUnit.DAYS)); // 4 days old - FILTERED OUT
-        TradingRun oldRun1 = createRun(2L, now.minus(9, ChronoUnit.DAYS));   // 9 days old - INCLUDED
-        TradingRun oldRun2 = createRun(3L, now.minus(12, ChronoUnit.DAYS));  // 12 days old - INCLUDED
+        TradingRun oldRun1 = createRun(2L, now.minus(9, ChronoUnit.DAYS));
+        TradingRun oldRun2 = createRun(3L, now.minus(12, ChronoUnit.DAYS));
 
         when(tradingAgentRepository.findByName("warren")).thenReturn(Optional.of(testAgent));
-        when(tradingRunRepository.findByAgentIdOrderByStartedAtDesc(1L))
-                .thenReturn(List.of(recentRun, oldRun1, oldRun2));
+        when(tradingRunRepository.findByAgentIdAndStartedAtBetween(
+                eq(1L), any(Instant.class), any(Instant.class), any(Pageable.class)))
+                .thenReturn(List.of(oldRun1, oldRun2));
 
-        // Act: Call service method
+        // Act
         RecentActivityResponse result = memoryService.getRecentActivity("warren", 30);
 
-        // Assert: Only runs older than 7 days should be returned
+        // Assert
         assertEquals(2, result.getRuns().size(), "Should return only runs older than 7 days");
         assertEquals(2, result.getTotalRuns(), "Total runs count should match filtered results");
+
+        // Verify the date-filtered repo method was used (no in-memory filter chain).
+        verify(tradingRunRepository).findByAgentIdAndStartedAtBetween(
+                eq(1L), any(Instant.class), any(Instant.class), any(Pageable.class));
     }
 
     @Test

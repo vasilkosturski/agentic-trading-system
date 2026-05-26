@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -113,4 +114,20 @@ public interface AccountTransactionRepository extends JpaRepository<AccountTrans
         @Param("symbol") String symbol,
         @Param("excludeId") Long excludeId
     );
+
+    /**
+     * Find transactions by account ID and symbol within an exclusive date range.
+     * Boundaries are EXCLUSIVE on both ends to match Instant.isAfter(since) / isBefore(cutoffDate) semantics.
+     */
+    @Query("SELECT at FROM AccountTransaction at " +
+           "WHERE at.account.id = :accountId " +
+           "AND at.symbol = :symbol " +
+           "AND at.timestamp > :since " +
+           "AND at.timestamp < :cutoffDate " +
+           "ORDER BY at.timestamp DESC")
+    List<AccountTransaction> findByAccountIdAndSymbolAndTimestampBetween(
+        @Param("accountId") Long accountId,
+        @Param("symbol") String symbol,
+        @Param("since") Instant since,
+        @Param("cutoffDate") Instant cutoffDate);
 }

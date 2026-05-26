@@ -140,6 +140,10 @@ bin/
 # Personal local compose overrides
 docker-compose.override.yml
 
+# Personal local Dockerfile variants (committed Dockerfiles stay minimal)
+backend/Dockerfile.local
+agents/Dockerfile.local
+
 # Docker volumes
 postgres_data/
 agent_memory/

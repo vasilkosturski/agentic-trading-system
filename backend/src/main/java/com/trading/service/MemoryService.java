@@ -14,40 +14,46 @@ import com.trading.repository.AccountTransactionRepository;
 import com.trading.repository.TradingAccountRepository;
 import com.trading.repository.TradingAgentRepository;
 import com.trading.repository.TradingRunRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.trading.util.MoneyMath;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Service for providing memory/context to agents about their past decisions.
  * Returns DTOs that Jackson serializes to JSON.
  */
 @Service
+@Transactional(readOnly = true)
 public class MemoryService {
 
-    @Value("${trading.public-display-delay-days:7}")
-    private int publicDisplayDelayDays;
+    private final int publicDisplayDelayDays;
+    private final AccountTransactionRepository transactionRepository;
+    private final TradingRunRepository tradingRunRepository;
+    private final TradingAgentRepository tradingAgentRepository;
+    private final TradingAccountRepository accountRepository;
+    private final AccountService accountService;
 
-    @Autowired
-    private AccountTransactionRepository transactionRepository;
-
-    @Autowired
-    private TradingRunRepository tradingRunRepository;
-
-    @Autowired
-    private TradingAgentRepository tradingAgentRepository;
-
-    @Autowired
-    private TradingAccountRepository accountRepository;
-
-    @Autowired
-    private AccountService accountService;
+    public MemoryService(
+            @Value("${trading.public-display-delay-days:7}") int publicDisplayDelayDays,
+            AccountTransactionRepository transactionRepository,
+            TradingRunRepository tradingRunRepository,
+            TradingAgentRepository tradingAgentRepository,
+            TradingAccountRepository accountRepository,
+            AccountService accountService) {
+        this.publicDisplayDelayDays = publicDisplayDelayDays;
+        this.transactionRepository = transactionRepository;
+        this.tradingRunRepository = tradingRunRepository;
+        this.tradingAgentRepository = tradingAgentRepository;
+        this.accountRepository = accountRepository;
+        this.accountService = accountService;
+    }
 
     /**
      * Get complete trading history for a specific stock
@@ -71,29 +77,13 @@ public class MemoryService {
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
         Instant cutoffDate = Instant.now().minus(publicDisplayDelayDays, ChronoUnit.DAYS);
 
-        // Get all transactions for this symbol, filtered by delay period
+        // Get transactions for this symbol within the date window — filtered at DB level
         List<AccountTransaction> transactions = transactionRepository
-                .findByAccountIdAndSymbolOrderByTimestampDesc(account.getId(), symbol)
-                .stream()
-                .filter(t -> t.getTimestamp().isAfter(since))
-                .filter(t -> t.getTimestamp().isBefore(cutoffDate))
-                .collect(Collectors.toList());
+                .findByAccountIdAndSymbolAndTimestampBetween(account.getId(), symbol, since, cutoffDate);
 
         // Return empty response — "no history" is valid data, not an error
         if (transactions.isEmpty()) {
-            TradingHistoryResponse response = new TradingHistoryResponse();
-            response.setSymbol(symbol);
-            response.setAgentName(agentName);
-            response.setDays(days);
-            response.setCurrentPosition(new TradingHistoryResponse.Position(0, 0.0));
-            response.setTrades(List.of());
-            TradingHistoryResponse.Summary emptySummary = new TradingHistoryResponse.Summary();
-            emptySummary.setTotalTrades(0);
-            emptySummary.setBuys(0);
-            emptySummary.setSells(0);
-            emptySummary.setPattern("none");
-            response.setSummary(emptySummary);
-            return response;
+            return TradingHistoryResponse.empty(symbol, agentName, days);
         }
 
         // Build response DTO
@@ -119,36 +109,19 @@ public class MemoryService {
 
         // If agent not found in new system, return empty response
         if (agent == null) {
-            RecentActivityResponse response = new RecentActivityResponse();
-            response.setAgentName(agentName);
-            response.setDays(days);
-            response.setRuns(List.of());
-            response.setTotalRuns(0);
-            response.setTotalTrades(0);
-            return response;
+            return RecentActivityResponse.empty(agentName, days);
         }
 
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
         Instant cutoffDate = Instant.now().minus(publicDisplayDelayDays, ChronoUnit.DAYS);
 
-        // Get recent runs from the new TradingRun system, filtered by delay period
+        // Get recent runs within the date window — filtered + limited at DB level
         List<TradingRun> recentRuns = tradingRunRepository
-                .findByAgentIdOrderByStartedAtDesc(agent.getId())
-                .stream()
-                .filter(r -> r.getStartedAt().isAfter(since))
-                .filter(r -> r.getStartedAt().isBefore(cutoffDate))
-                .limit(20)  // Limit to last 20 runs
-                .collect(Collectors.toList());
+                .findByAgentIdAndStartedAtBetween(agent.getId(), since, cutoffDate, PageRequest.of(0, 20));
 
         // Return empty response — "no activity" is valid data, not an error
         if (recentRuns.isEmpty()) {
-            RecentActivityResponse response = new RecentActivityResponse();
-            response.setAgentName(agentName);
-            response.setDays(days);
-            response.setRuns(List.of());
-            response.setTotalRuns(0);
-            response.setTotalTrades(0);
-            return response;
+            return RecentActivityResponse.empty(agentName, days);
         }
 
         // Build response DTO from TradingRun data
@@ -191,7 +164,7 @@ public class MemoryService {
                 double avgCost = totalShares > 0 ? totalCost / totalShares : 0;
                 response.setCurrentPosition(new TradingHistoryResponse.Position(
                     currentShares,
-                    Math.round(avgCost * 100.0) / 100.0
+                    MoneyMath.round2(avgCost)
                 ));
             }
         } catch (Exception e) {
@@ -205,8 +178,8 @@ public class MemoryService {
             trade.setDate(t.getTimestamp().toString());
             trade.setType(t.getTransactionType().name());  // Convert enum to string
             trade.setQuantity(Math.abs(t.getQuantity()));
-            trade.setPrice(Math.round(t.getPrice() * 100.0) / 100.0);
-            trade.setTotalAmount(Math.round(Math.abs(t.getTotalAmount()) * 100.0) / 100.0);
+            trade.setPrice(MoneyMath.round2(t.getPrice()));
+            trade.setTotalAmount(MoneyMath.round2(Math.abs(t.getTotalAmount())));
             // Rationale is now stored in DecisionPhase, not AccountTransaction
             // Access it via run detail endpoint if needed
             trades.add(trade);
@@ -255,14 +228,7 @@ public class MemoryService {
 
             // Extract reasoning from DecisionPhase if available
             DecisionPhase decision = run.getDecision();
-            if (decision != null) {
-                if (decision.getReasoning() != null) {
-                    String reasoningSummary = decision.getReasoning().getResearchContext();
-                    if (reasoningSummary != null && !reasoningSummary.isEmpty()) {
-                        runDto.setSummary(reasoningSummary);
-                    }
-                }
-            }
+            ReasoningSummaryExtractor.extractSummary(decision).ifPresent(runDto::setSummary);
 
             // Extract trade info from ExecutionPhase if available
             ExecutionPhase execution = run.getExecution();
@@ -273,7 +239,7 @@ public class MemoryService {
                 tradeDto.setType(trade.getTransactionType().name());
                 tradeDto.setSymbol(trade.getSymbol());
                 tradeDto.setQuantity(Math.abs(trade.getQuantity()));
-                tradeDto.setPrice(Math.round(trade.getPrice() * 100.0) / 100.0);
+                tradeDto.setPrice(MoneyMath.round2(trade.getPrice()));
                 trades.add(tradeDto);
                 runDto.setTrades(trades);
                 totalTrades += 1;

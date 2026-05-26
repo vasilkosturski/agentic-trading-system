@@ -72,5 +72,21 @@ public class TradingHistoryResponse {
     public void setTrades(List<Trade> trades) { this.trades = trades; }
     public Summary getSummary() { return summary; }
     public void setSummary(Summary summary) { this.summary = summary; }
+
+    public static TradingHistoryResponse empty(String symbol, String agentName, int days) {
+        TradingHistoryResponse response = new TradingHistoryResponse();
+        response.setSymbol(symbol);
+        response.setAgentName(agentName);
+        response.setDays(days);
+        response.setCurrentPosition(new Position(0, 0.0));
+        response.setTrades(List.of());
+        Summary summary = new Summary();
+        summary.setTotalTrades(0);
+        summary.setBuys(0);
+        summary.setSells(0);
+        summary.setPattern("none");
+        response.setSummary(summary);
+        return response;
+    }
 }
 

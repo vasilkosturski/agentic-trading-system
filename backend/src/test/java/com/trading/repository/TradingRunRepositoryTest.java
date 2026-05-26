@@ -8,7 +8,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 
@@ -177,7 +180,7 @@ class TradingRunRepositoryTest extends BaseRepositoryTest {
         // Arrange
         TradingRun run = new TradingRun(testAgent);
         run = tradingRunRepository.save(run);
-        
+
         // Act - simulate phase progression
         run.updatePhase(RunPhase.RESEARCHING);
         tradingRunRepository.save(run);
@@ -196,6 +199,121 @@ class TradingRunRepositoryTest extends BaseRepositoryTest {
         assertThat(loaded.getPhase()).isEqualTo(RunPhase.COMPLETED);
         assertThat(loaded.getStatus()).isEqualTo(RunStatus.COMPLETED);
         assertThat(loaded.getCompletedAt()).isNotNull();
+    }
+
+    // ========== findByAgentIdAndStartedAtBetween — boundary + Pageable tests ==========
+
+    private TradingRun persistRunWithStartedAt(TradingAgent agent, Instant startedAt) {
+        TradingRun run = new TradingRun(agent);
+        run.setStartedAt(startedAt);
+        return tradingRunRepository.save(run);
+    }
+
+    @Test
+    @DisplayName("findByAgentIdAndStartedAtBetween: includes run just after 'since' (inclusive low edge)")
+    void shouldIncludeRunJustAfterSince() {
+        Instant since = Instant.now().minus(30, ChronoUnit.DAYS);
+        Instant cutoffDate = Instant.now().minus(7, ChronoUnit.DAYS);
+        TradingRun inRange = persistRunWithStartedAt(testAgent, since.plusMillis(1));
+
+        List<TradingRun> results = tradingRunRepository.findByAgentIdAndStartedAtBetween(
+                testAgent.getId(), since, cutoffDate, PageRequest.of(0, 20));
+
+        assertThat(results).extracting(TradingRun::getId).containsExactly(inRange.getId());
+    }
+
+    @Test
+    @DisplayName("findByAgentIdAndStartedAtBetween: excludes run at exactly 'since' (exclusive low edge)")
+    void shouldExcludeRunAtExactlySince() {
+        Instant since = Instant.now().minus(30, ChronoUnit.DAYS);
+        Instant cutoffDate = Instant.now().minus(7, ChronoUnit.DAYS);
+        persistRunWithStartedAt(testAgent, since);
+
+        List<TradingRun> results = tradingRunRepository.findByAgentIdAndStartedAtBetween(
+                testAgent.getId(), since, cutoffDate, PageRequest.of(0, 20));
+
+        assertThat(results).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findByAgentIdAndStartedAtBetween: includes run just before 'cutoffDate' (inclusive high edge)")
+    void shouldIncludeRunJustBeforeCutoff() {
+        Instant since = Instant.now().minus(30, ChronoUnit.DAYS);
+        Instant cutoffDate = Instant.now().minus(7, ChronoUnit.DAYS);
+        TradingRun inRange = persistRunWithStartedAt(testAgent, cutoffDate.minusMillis(1));
+
+        List<TradingRun> results = tradingRunRepository.findByAgentIdAndStartedAtBetween(
+                testAgent.getId(), since, cutoffDate, PageRequest.of(0, 20));
+
+        assertThat(results).extracting(TradingRun::getId).containsExactly(inRange.getId());
+    }
+
+    @Test
+    @DisplayName("findByAgentIdAndStartedAtBetween: excludes run at exactly 'cutoffDate' (exclusive high edge)")
+    void shouldExcludeRunAtExactlyCutoff() {
+        Instant since = Instant.now().minus(30, ChronoUnit.DAYS);
+        Instant cutoffDate = Instant.now().minus(7, ChronoUnit.DAYS);
+        persistRunWithStartedAt(testAgent, cutoffDate);
+
+        List<TradingRun> results = tradingRunRepository.findByAgentIdAndStartedAtBetween(
+                testAgent.getId(), since, cutoffDate, PageRequest.of(0, 20));
+
+        assertThat(results).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findByAgentIdAndStartedAtBetween: filters out runs of other agents")
+    void shouldFilterByAgent() {
+        Instant since = Instant.now().minus(30, ChronoUnit.DAYS);
+        Instant cutoffDate = Instant.now().minus(7, ChronoUnit.DAYS);
+        Instant inRangeTime = since.plus(10, ChronoUnit.DAYS);
+
+        TradingAgent otherAgent = new TradingAgent("OtherAgent", "Different agent");
+        otherAgent.setInitialCapital(50000.0);
+        otherAgent = tradingAgentRepository.save(otherAgent);
+
+        TradingRun matching = persistRunWithStartedAt(testAgent, inRangeTime);
+        persistRunWithStartedAt(otherAgent, inRangeTime);
+
+        List<TradingRun> results = tradingRunRepository.findByAgentIdAndStartedAtBetween(
+                testAgent.getId(), since, cutoffDate, PageRequest.of(0, 20));
+
+        assertThat(results).extracting(TradingRun::getId).containsExactly(matching.getId());
+    }
+
+    @Test
+    @DisplayName("findByAgentIdAndStartedAtBetween: Pageable limits to 20 when 25 in range")
+    void shouldRespectPageableLimit() {
+        Instant since = Instant.now().minus(30, ChronoUnit.DAYS);
+        Instant cutoffDate = Instant.now().minus(7, ChronoUnit.DAYS);
+
+        // Persist 25 runs all within range, each with distinct startedAt
+        for (int i = 0; i < 25; i++) {
+            persistRunWithStartedAt(testAgent, since.plus(i + 1, ChronoUnit.HOURS));
+        }
+
+        List<TradingRun> results = tradingRunRepository.findByAgentIdAndStartedAtBetween(
+                testAgent.getId(), since, cutoffDate, PageRequest.of(0, 20));
+
+        assertThat(results).hasSize(20);
+    }
+
+    @Test
+    @DisplayName("findByAgentIdAndStartedAtBetween: orders results by startedAt DESC")
+    void shouldOrderByStartedAtDescending() {
+        Instant since = Instant.now().minus(30, ChronoUnit.DAYS);
+        Instant cutoffDate = Instant.now().minus(7, ChronoUnit.DAYS);
+
+        TradingRun oldest = persistRunWithStartedAt(testAgent, since.plus(1, ChronoUnit.DAYS));
+        TradingRun middle = persistRunWithStartedAt(testAgent, since.plus(10, ChronoUnit.DAYS));
+        TradingRun newest = persistRunWithStartedAt(testAgent, since.plus(20, ChronoUnit.DAYS));
+
+        List<TradingRun> results = tradingRunRepository.findByAgentIdAndStartedAtBetween(
+                testAgent.getId(), since, cutoffDate, PageRequest.of(0, 20));
+
+        assertThat(results)
+                .extracting(TradingRun::getId)
+                .containsExactly(newest.getId(), middle.getId(), oldest.getId());
     }
 }
 
