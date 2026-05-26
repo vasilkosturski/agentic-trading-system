@@ -1,40 +1,42 @@
 package com.trading.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.Arrays;
-import java.util.List;
 
+/**
+ * CORS configuration.
+ *
+ * <p>Exposes a single {@link CorsConfigurationSource} bean that is wired into the
+ * security filter chain via {@code .cors(Customizer.withDefaults())} in
+ * {@link SecurityConfig#securityFilterChain}. Spring Security auto-detects the
+ * bean by its conventional name ({@code corsConfigurationSource}) and installs
+ * a {@code CorsFilter} ahead of the JWT filter, so preflight {@code OPTIONS}
+ * requests from allowed origins are short-circuited inside the security chain
+ * before the authenticated-by-default authorization rule sees them.
+ *
+ * <p>Origins are sourced from {@link SecurityProperties#getAllowedOrigins()} —
+ * the typed {@link org.springframework.boot.context.properties.ConfigurationProperties}
+ * binding — rather than a stringly-typed {@code @Value} field, so the list is
+ * parsed once at startup with validation rather than re-split on each access.
+ */
 @Configuration
-public class CorsConfig implements WebMvcConfigurer {
+public class CorsConfig {
 
-    @Value("${cors.allowed-origins}")
-    private String allowedOrigins;
+    private final SecurityProperties securityProperties;
 
-    private List<String> getAllowedOriginsList() {
-        return Arrays.asList(allowedOrigins.split(","));
-    }
-
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/**")
-                .allowedOrigins(allowedOrigins.split(","))
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("*")
-                .allowCredentials(true);
+    public CorsConfig(SecurityProperties securityProperties) {
+        this.securityProperties = securityProperties;
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(getAllowedOriginsList());
+        configuration.setAllowedOriginPatterns(securityProperties.getAllowedOrigins());
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
