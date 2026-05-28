@@ -77,6 +77,22 @@ public class AccountControllerAdvice {
     }
 
     /**
+     * Handles IllegalStateException - configuration or invariant errors.
+     * Returns 500 Internal Server Error with a generic message (no detail leak).
+     * The full exception is logged server-side for operators.
+     *
+     * <p>Placed before {@link #handleGenericException} so that IllegalStateException
+     * paths get a generic response without exposing the exception's raw message
+     * (which may include configuration internals such as YAML keys or agent identifiers).</p>
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ProblemDetail> handleIllegalState(IllegalStateException ex, HttpServletRequest request) {
+        logger.error("Configuration error", ex);
+        ProblemDetail problem = ProblemDetailFactory.internalError("Internal server error", request.getRequestURI());
+        return ResponseEntity.status(500).body(problem);
+    }
+
+    /**
      * Handles generic Exception - catch-all for unexpected errors.
      * Returns 500 Internal Server Error.
      */

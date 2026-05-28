@@ -23,7 +23,7 @@ public class ScheduledSnapshotService {
     private TradingAgentRepository agentRepository;
 
     @Autowired
-    private AccountService accountService;
+    private PortfolioSnapshotService portfolioSnapshotService;
 
     /**
      * Create daily portfolio snapshots for all agents at market close (4 PM EST)
@@ -58,7 +58,7 @@ public class ScheduledSnapshotService {
 
             for (TradingAgent agent : agents) {
                 try {
-                    accountService.createPortfolioSnapshot(agent.getName());
+                    portfolioSnapshotService.createSnapshot(agent.getName());
                     successCount++;
                     logger.debug("Created {} snapshot for agent: {}", snapshotType, agent.getName());
                 } catch (Exception e) {

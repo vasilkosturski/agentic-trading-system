@@ -27,7 +27,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
+import com.trading.testsupport.SharedPostgresContainer;
 
 import java.util.Arrays;
 
@@ -48,24 +48,9 @@ import static org.mockito.Mockito.mock;
 @DisplayName("TradingRun Integration Tests")
 class TradingRunIntegrationTest {
 
-    // Singleton container - shared across all tests for performance
-    private static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
-            .withDatabaseName("test_trading")
-            .withUsername("test")
-            .withPassword("test")
-            .withReuse(true);
-
-    static {
-        postgres.start();
-    }
-
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-        registry.add("spring.jpa.properties.hibernate.hbm2ddl.create_namespaces", () -> "true");
+        SharedPostgresContainer.register(registry);
     }
 
     @Autowired

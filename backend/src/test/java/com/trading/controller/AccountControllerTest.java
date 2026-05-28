@@ -8,6 +8,7 @@ import com.trading.dto.response.TradeResult;
 import com.trading.service.AccountService;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.MemoryService;
+import com.trading.service.TradeOrchestrator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,9 @@ class AccountControllerTest {
 
     @MockBean
     private AccountService accountService;
+
+    @MockBean
+    private TradeOrchestrator tradeOrchestrator;
 
     @MockBean
     private AgentIdentityService agentIdentityService;

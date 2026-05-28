@@ -10,6 +10,7 @@ import com.trading.entity.TradingAccount;
 import com.trading.entity.TradingAgent;
 import com.trading.entity.TradingRun;
 import com.trading.entity.TransactionType;
+import com.trading.exception.ResourceNotFoundException;
 import com.trading.repository.AccountTransactionRepository;
 import com.trading.repository.TradingAccountRepository;
 import com.trading.repository.TradingAgentRepository;
@@ -72,7 +73,7 @@ public class MemoryService {
 
         // Get account
         TradingAccount account = accountRepository.findByAgentName(agentName)
-            .orElseThrow(() -> new IllegalArgumentException("Agent not found: " + agentName));
+            .orElseThrow(() -> new ResourceNotFoundException("Agent not found: " + agentName));
 
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
         Instant cutoffDate = Instant.now().minus(publicDisplayDelayDays, ChronoUnit.DAYS);

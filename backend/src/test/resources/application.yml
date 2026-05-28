@@ -52,6 +52,18 @@ trading:
     end: "16:00"
     timezone: "America/New_York"
   public-display-delay-days: 7
+  agents:
+    profiles:
+      warren:
+        initial-capital: 100000
+      george:
+        initial-capital: 100000
+      ray:
+        initial-capital: 100000
+      cathie:
+        initial-capital: 100000
+      testagent:
+        initial-capital: 100000
 
 notifications:
     enabled: false
