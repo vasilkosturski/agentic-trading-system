@@ -1,27 +1,19 @@
 package com.trading.service;
 
+import com.trading.config.AgentProperties;
 import com.trading.dto.response.HoldingDto;
-import com.trading.dto.response.TradeResult;
-import com.trading.dto.websocket.TradeExecutedMessage;
-import com.trading.dto.websocket.TradeRejectedMessage;
 import com.trading.entity.AccountHolding;
 import com.trading.entity.TradingAccount;
 import com.trading.entity.TradingAgent;
-import com.trading.entity.TradingRun;
-import com.trading.enums.TradeRejectionType;
-import com.trading.enums.WebSocketMessageType;
-import com.trading.exception.BusinessRuleException;
 import com.trading.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import com.trading.exception.ResourceNotFoundException;
 
 import java.util.*;
@@ -47,22 +39,13 @@ class AccountServiceTest {
     private AccountTransactionRepository transactionRepository;
 
     @Mock
-    private AccountPortfolioSnapshotRepository snapshotRepository;
-
-    @Mock
-    private TradingRunRepository tradingRunRepository;
-
-    @Mock
     private MarketService marketService;
 
     @Mock
-    private BuyTradeExecutor buyTradeExecutor;
+    private AgentProperties agentProperties;
 
     @Mock
-    private SellTradeExecutor sellTradeExecutor;
-
-    @Mock
-    private SimpMessagingTemplate messagingTemplate;
+    private HoldingsValuationService holdingsValuationService;
 
     @InjectMocks
     private AccountService accountService;
@@ -79,6 +62,11 @@ class AccountServiceTest {
         // Create test account
         testAccount = new TradingAccount(testAgent, 100000.0);
         testAccount.setId(1L);
+
+        // Stub agent-properties lookup for the TestAgent profile so methods that
+        // resolve initial capital (e.g. getAccountReport) get a real value.
+        // lenient() lets tests that never call it stay clean.
+        lenient().when(agentProperties.getInitialCapital("TestAgent")).thenReturn(100000.0);
     }
 
     @Test
@@ -101,7 +89,7 @@ class AccountServiceTest {
         assertNotNull(result);
         assertEquals(testAccount.getId(), result.getId());
         assertEquals(testAccount.getBalance(), result.getBalance());
-        
+
         // Verify that save was never called (we're returning existing)
         verify(tradingAccountRepository, never()).save(any());
         verify(agentRepository, never()).save(any());
@@ -136,7 +124,7 @@ class AccountServiceTest {
         // Verify that save was called exactly once with the correct account
         ArgumentCaptor<TradingAccount> accountCaptor = ArgumentCaptor.forClass(TradingAccount.class);
         verify(tradingAccountRepository, times(1)).save(accountCaptor.capture());
-        
+
         TradingAccount capturedAccount = accountCaptor.getValue();
         assertEquals(testAgent.getId(), capturedAccount.getAgent().getId());
         assertEquals(initialBalance, capturedAccount.getBalance());
@@ -269,7 +257,7 @@ class AccountServiceTest {
         // Assert - Should return existing account with original balance
         assertNotNull(result);
         assertEquals(originalBalance, result.getBalance()); // Original balance, not new one
-        
+
         // Verify no saves occurred
         verify(tradingAccountRepository, never()).save(any());
         verify(agentRepository, never()).save(any());
@@ -317,7 +305,7 @@ class AccountServiceTest {
     void testGetHoldings_AccountHasHoldings_ReturnsList() {
         // Arrange
         String agentName = "TestAgent";
-        
+
         AccountHolding holding1 = new AccountHolding(testAccount, "AAPL", 10, 150.0);
         AccountHolding holding2 = new AccountHolding(testAccount, "GOOGL", 5, 2800.0);
         List<AccountHolding> holdings = Arrays.asList(holding1, holding2);
@@ -333,11 +321,11 @@ class AccountServiceTest {
         // Assert
         assertNotNull(result);
         assertEquals(2, result.size());
-        
+
         assertEquals("AAPL", result.get(0).getSymbol());
         assertEquals(10, result.get(0).getQuantity());
         assertEquals(150.0, result.get(0).getAveragePrice());
-        
+
         assertEquals("GOOGL", result.get(1).getSymbol());
         assertEquals(5, result.get(1).getQuantity());
         assertEquals(2800.0, result.get(1).getAveragePrice());
@@ -362,168 +350,6 @@ class AccountServiceTest {
         verify(holdingRepository, never()).findByAccount(any()); // Ensure holdingRepository is not called
     }
 
-    // ==================== WebSocket Broadcast Tests ====================
-
-    @Nested
-    @DisplayName("buyShares WebSocket Broadcasts")
-    class BuySharesBroadcastTests {
-
-        private TradingRun testRun;
-
-        @BeforeEach
-        void setUp() {
-            testRun = new TradingRun();
-            testRun.setId(100L);
-            testRun.setAgent(testAgent);
-        }
-
-        @Test
-        @DisplayName("Successful buy broadcasts trade_executed message")
-        void buyShares_Success_BroadcastsTradeExecuted() {
-            // Arrange
-            String agentName = "TestAgent";
-            String symbol = "AAPL";
-            Integer quantity = 10;
-            Long runId = 100L;
-            Double price = 150.0;
-            TradeResult tradeResult = new TradeResult(1L, symbol, quantity, price, 98500.0);
-
-            when(tradingRunRepository.findById(runId)).thenReturn(Optional.of(testRun));
-            when(marketService.getSharePrice(symbol)).thenReturn(new MarketService.PriceData(price, false, null, "test"));
-            when(buyTradeExecutor.executeBuy(agentName, symbol, quantity, price, runId)).thenReturn(tradeResult);
-            when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
-            when(holdingRepository.findByAccount(testAccount)).thenReturn(Collections.emptyList());
-
-            // Act
-            accountService.buyShares(agentName, symbol, quantity, runId);
-
-            // Assert - verify broadcast was sent
-            ArgumentCaptor<TradeExecutedMessage> messageCaptor = ArgumentCaptor.forClass(TradeExecutedMessage.class);
-            verify(messagingTemplate).convertAndSend(eq("/topic/runs/trades"), messageCaptor.capture());
-
-            TradeExecutedMessage message = messageCaptor.getValue();
-            assertEquals(WebSocketMessageType.TRADE_EXECUTED, message.getType());
-            assertEquals(testAgent.getId(), message.getAgentId());
-            assertEquals(runId, message.getRunId());
-            assertEquals("buy", message.getTrade().getSide());
-            assertEquals(symbol, message.getTrade().getSymbol());
-            assertEquals(quantity, message.getTrade().getQuantity());
-            assertEquals(150.0, message.getTrade().getPrice());
-        }
-
-        @Test
-        @DisplayName("Failed buy (insufficient funds) broadcasts trade_rejected message")
-        void buyShares_InsufficientFunds_BroadcastsTradeRejected() {
-            // Arrange
-            String agentName = "TestAgent";
-            String symbol = "AAPL";
-            Integer quantity = 1000;
-            Long runId = 100L;
-            Double price = 150.0;
-
-            when(tradingRunRepository.findById(runId)).thenReturn(Optional.of(testRun));
-            when(marketService.getSharePrice(symbol)).thenReturn(new MarketService.PriceData(price, false, null, "test"));
-            when(buyTradeExecutor.executeBuy(agentName, symbol, quantity, price, runId))
-                .thenThrow(new BusinessRuleException(TradeRejectionType.INSUFFICIENT_FUNDS, "Insufficient funds to buy 1000 shares of AAPL"));
-
-            // Act & Assert
-            assertThrows(BusinessRuleException.class, () -> {
-                accountService.buyShares(agentName, symbol, quantity, runId);
-            });
-
-            // Verify broadcast was sent
-            ArgumentCaptor<TradeRejectedMessage> messageCaptor = ArgumentCaptor.forClass(TradeRejectedMessage.class);
-            verify(messagingTemplate).convertAndSend(eq("/topic/runs/trades"), messageCaptor.capture());
-
-            TradeRejectedMessage message = messageCaptor.getValue();
-            assertEquals(WebSocketMessageType.TRADE_REJECTED, message.getType());
-            assertEquals(testAgent.getId(), message.getAgentId());
-            assertEquals(runId, message.getRunId());
-            assertEquals(TradeRejectionType.INSUFFICIENT_FUNDS, message.getRejectionType());
-            assertTrue(message.getRejectionMessage().contains("Insufficient funds"));
-        }
-    }
-
-    @Nested
-    @DisplayName("sellShares WebSocket Broadcasts")
-    class SellSharesBroadcastTests {
-
-        private TradingRun testRun;
-
-        @BeforeEach
-        void setUp() {
-            testRun = new TradingRun();
-            testRun.setId(100L);
-            testRun.setAgent(testAgent);
-        }
-
-        @Test
-        @DisplayName("Successful sell broadcasts trade_executed message")
-        void sellShares_Success_BroadcastsTradeExecuted() {
-            // Arrange
-            String agentName = "TestAgent";
-            String symbol = "AAPL";
-            Integer quantity = 5;
-            Long runId = 100L;
-            Double price = 155.0;
-            TradeResult tradeResult = new TradeResult(2L, symbol, quantity, price, 100775.0);
-
-            when(tradingRunRepository.findById(runId)).thenReturn(Optional.of(testRun));
-            when(marketService.getSharePrice(symbol)).thenReturn(new MarketService.PriceData(price, false, null, "test"));
-            when(sellTradeExecutor.executeSell(agentName, symbol, quantity, price, runId)).thenReturn(tradeResult);
-            when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
-            when(holdingRepository.findByAccount(testAccount)).thenReturn(Collections.emptyList());
-
-            // Act
-            accountService.sellShares(agentName, symbol, quantity, runId);
-
-            // Assert - verify broadcast was sent
-            ArgumentCaptor<TradeExecutedMessage> messageCaptor = ArgumentCaptor.forClass(TradeExecutedMessage.class);
-            verify(messagingTemplate).convertAndSend(eq("/topic/runs/trades"), messageCaptor.capture());
-
-            TradeExecutedMessage message = messageCaptor.getValue();
-            assertEquals(WebSocketMessageType.TRADE_EXECUTED, message.getType());
-            assertEquals(testAgent.getId(), message.getAgentId());
-            assertEquals(runId, message.getRunId());
-            assertEquals("sell", message.getTrade().getSide());
-            assertEquals(symbol, message.getTrade().getSymbol());
-            assertEquals(quantity, message.getTrade().getQuantity());
-            assertEquals(155.0, message.getTrade().getPrice());
-        }
-
-        @Test
-        @DisplayName("Failed sell (insufficient shares) broadcasts trade_rejected message")
-        void sellShares_InsufficientShares_BroadcastsTradeRejected() {
-            // Arrange
-            String agentName = "TestAgent";
-            String symbol = "AAPL";
-            Integer quantity = 100;
-            Long runId = 100L;
-            Double price = 155.0;
-
-            when(tradingRunRepository.findById(runId)).thenReturn(Optional.of(testRun));
-            when(marketService.getSharePrice(symbol)).thenReturn(new MarketService.PriceData(price, false, null, "test"));
-            when(sellTradeExecutor.executeSell(agentName, symbol, quantity, price, runId))
-                .thenThrow(new BusinessRuleException(TradeRejectionType.INSUFFICIENT_SHARES, "Insufficient shares to sell 100 of AAPL"));
-
-            // Act & Assert
-            assertThrows(BusinessRuleException.class, () -> {
-                accountService.sellShares(agentName, symbol, quantity, runId);
-            });
-
-            // Verify broadcast was sent
-            ArgumentCaptor<TradeRejectedMessage> messageCaptor = ArgumentCaptor.forClass(TradeRejectedMessage.class);
-            verify(messagingTemplate).convertAndSend(eq("/topic/runs/trades"), messageCaptor.capture());
-
-            TradeRejectedMessage message = messageCaptor.getValue();
-            assertEquals(WebSocketMessageType.TRADE_REJECTED, message.getType());
-            assertEquals(testAgent.getId(), message.getAgentId());
-            assertEquals(runId, message.getRunId());
-            assertEquals(TradeRejectionType.INSUFFICIENT_SHARES, message.getRejectionType());
-            assertTrue(message.getRejectionMessage().contains("Insufficient shares"));
-        }
-    }
-
     // ==================== Account Report with Prices and P&L Tests ====================
 
     @Test
@@ -533,11 +359,12 @@ class AccountServiceTest {
         String agentName = "TestAgent";
         AccountHolding holding = new AccountHolding(testAccount, "AAPL", 10, 150.0);
         List<AccountHolding> holdings = List.of(holding);
-        
+
         when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
         when(holdingRepository.findByAccount(testAccount)).thenReturn(holdings);
         when(marketService.getSharePrice("AAPL"))
             .thenReturn(new MarketService.PriceData(160.0, false, java.time.Instant.now(), "Real-time from Finnhub"));
+        when(holdingsValuationService.calculateHoldingsValue(holdings)).thenReturn(1600.0);
         when(transactionRepository.countByAccount(testAccount)).thenReturn(1L);
 
         // Act
@@ -548,16 +375,16 @@ class AccountServiceTest {
         assertEquals(100000.0, report.getBalance());
         assertEquals(1600.0, report.getHoldingsValue());  // 10 * 160
         assertEquals(101600.0, report.getTotalPortfolioValue());  // 100000 + 1600
-        
+
         // Assert - per-holding level
         assertNotNull(report.getHoldings());
         assertEquals(1, report.getHoldings().size());
-        
+
         HoldingDto holdingDto = report.getHoldings().get(0);
         assertEquals("AAPL", holdingDto.getSymbol());
         assertEquals(10, holdingDto.getQuantity());
         assertEquals(150.0, holdingDto.getAveragePrice());
-        
+
         // Current price and market values
         assertEquals(160.0, holdingDto.getCurrentPrice());
         assertEquals(1600.0, holdingDto.getMarketValue());      // 10 * 160
@@ -580,6 +407,7 @@ class AccountServiceTest {
         when(holdingRepository.findByAccount(testAccount)).thenReturn(holdings);
         when(marketService.getSharePrice("GOOGL"))
             .thenThrow(new RuntimeException("Finnhub API timeout"));
+        when(holdingsValuationService.calculateHoldingsValue(holdings)).thenReturn(14000.0);
         when(transactionRepository.countByAccount(testAccount)).thenReturn(1L);
 
         // Act
@@ -610,7 +438,7 @@ class AccountServiceTest {
             new AccountHolding(testAccount, "GOOGL", 5, 2800.0),
             new AccountHolding(testAccount, "MSFT", 8, 400.0)
         );
-        
+
         when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
         when(holdingRepository.findByAccount(testAccount)).thenReturn(holdings);
         when(marketService.getSharePrice("AAPL"))
@@ -619,6 +447,8 @@ class AccountServiceTest {
             .thenReturn(new MarketService.PriceData(2900.0, true, java.time.Instant.now(), "Cached"));
         when(marketService.getSharePrice("MSFT"))
             .thenReturn(new MarketService.PriceData(380.0, false, java.time.Instant.now(), "Real-time"));
+        // 160*10 + 2900*5 + 380*8 = 19140
+        when(holdingsValuationService.calculateHoldingsValue(holdings)).thenReturn(19140.0);
         when(transactionRepository.countByAccount(testAccount)).thenReturn(3L);
 
         // Act
@@ -626,24 +456,41 @@ class AccountServiceTest {
 
         // Assert
         assertEquals(3, report.getHoldings().size());
-        
+
         // AAPL: +$100 gain
         HoldingDto aapl = report.getHoldings().get(0);
         assertEquals(100.0, aapl.getUnrealizedPnl());
         assertEquals(6.67, aapl.getGainLossPercent(), 0.01);
-        
+
         // GOOGL: +$500 gain
         HoldingDto googl = report.getHoldings().get(1);
         assertEquals(500.0, googl.getUnrealizedPnl());
         assertEquals(3.57, googl.getGainLossPercent(), 0.01);
-        
+
         // MSFT: -$160 loss
         HoldingDto msft = report.getHoldings().get(2);
         assertEquals(-160.0, msft.getUnrealizedPnl());
         assertEquals(-5.0, msft.getGainLossPercent(), 0.01);
-        
+
         // Portfolio total
         double expectedHoldingsValue = 1600.0 + 14500.0 + 3040.0;  // 160*10 + 2900*5 + 380*8
         assertEquals(expectedHoldingsValue, report.getHoldingsValue(), 0.01);
+    }
+
+    @Test
+    @DisplayName("getAccountReport propagates ResourceNotFoundException for unknown agent")
+    void testGetAccountReport_UnknownAgent_PropagatesResourceNotFoundException() {
+        // Arrange — repository returns Optional.empty so getAccount() throws ResourceNotFoundException
+        String agentName = "nonexistent";
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.empty());
+
+        // Act + Assert — the typed exception must reach the caller unchanged so the
+        // RestControllerAdvice can map it to HTTP 404. Any wrapper (e.g. RuntimeException)
+        // would destroy the type and produce HTTP 500.
+        ResourceNotFoundException thrown = assertThrows(
+            ResourceNotFoundException.class,
+            () -> accountService.getAccountReport(agentName)
+        );
+        assertTrue(thrown.getMessage().contains(agentName));
     }
 }

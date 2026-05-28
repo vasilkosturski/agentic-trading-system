@@ -15,7 +15,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
-import org.testcontainers.containers.PostgreSQLContainer;
+import com.trading.testsupport.SharedPostgresContainer;
 
 import java.util.Optional;
 
@@ -49,24 +49,9 @@ class PriceCacheServiceIntegrationTest {
     private static final String FINNHUB_BASE_URL = "https://finnhub.io/api/v1";
     private static final String FINNHUB_API_KEY = "test-key";
 
-    // Singleton container - shared across all tests for performance
-    private static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
-            .withDatabaseName("test_trading")
-            .withUsername("test")
-            .withPassword("test")
-            .withReuse(true);
-
-    static {
-        postgres.start();
-    }
-
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-        registry.add("spring.jpa.properties.hibernate.hbm2ddl.create_namespaces", () -> "true");
+        SharedPostgresContainer.register(registry);
     }
 
     @Autowired
