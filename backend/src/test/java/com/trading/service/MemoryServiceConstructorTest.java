@@ -22,7 +22,7 @@ class MemoryServiceConstructorTest {
             mock(TradingRunRepository.class),
             mock(TradingAgentRepository.class),
             mock(TradingAccountRepository.class),
-            mock(AccountService.class)
+            mock(AccountQueryService.class)
         );
         assertThat(memoryService).isNotNull();
     }

@@ -6,7 +6,8 @@ import com.trading.dto.response.RunListResponseDto;
 import com.trading.repository.TradingAgentRepository;
 import com.trading.security.JwtAuthenticationFilter;
 import com.trading.security.JwtTokenProvider;
-import com.trading.service.AccountService;
+import com.trading.service.AccountProvisioner;
+import com.trading.service.AccountQueryService;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.MarketService;
 import com.trading.service.MemoryService;
@@ -182,7 +183,10 @@ class SecurityChainIntegrationTest {
     // ----- Service-layer collaborators (all DB-touching) -----
 
     @MockBean
-    private AccountService accountService;
+    private AccountQueryService accountQueryService;
+
+    @MockBean
+    private AccountProvisioner accountProvisioner;
 
     @MockBean
     private AgentIdentityService agentIdentityService;

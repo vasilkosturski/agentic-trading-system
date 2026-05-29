@@ -39,7 +39,7 @@ public class MemoryService {
     private final TradingRunRepository tradingRunRepository;
     private final TradingAgentRepository tradingAgentRepository;
     private final TradingAccountRepository accountRepository;
-    private final AccountService accountService;
+    private final AccountQueryService accountQueryService;
 
     public MemoryService(
             @Value("${trading.public-display-delay-days:7}") int publicDisplayDelayDays,
@@ -47,13 +47,13 @@ public class MemoryService {
             TradingRunRepository tradingRunRepository,
             TradingAgentRepository tradingAgentRepository,
             TradingAccountRepository accountRepository,
-            AccountService accountService) {
+            AccountQueryService accountQueryService) {
         this.publicDisplayDelayDays = publicDisplayDelayDays;
         this.transactionRepository = transactionRepository;
         this.tradingRunRepository = tradingRunRepository;
         this.tradingAgentRepository = tradingAgentRepository;
         this.accountRepository = accountRepository;
-        this.accountService = accountService;
+        this.accountQueryService = accountQueryService;
     }
 
     /**
@@ -145,31 +145,27 @@ public class MemoryService {
         response.setDays(days);
 
         // Current position
-        try {
-            List<HoldingDto> holdings = accountService.getHoldings(agentName);
-            HoldingDto holding = holdings.stream()
-                .filter(h -> symbol.equals(h.getSymbol()))
-                .findFirst()
-                .orElse(null);
-            Integer currentShares = holding != null ? holding.getQuantity() : null;
-            if (currentShares != null && currentShares > 0) {
-                // Calculate average cost
-                double totalCost = 0;
-                int totalShares = 0;
-                for (AccountTransaction t : transactions) {
-                    if (TransactionType.BUY.equals(t.getTransactionType())) {
-                        totalCost += Math.abs(t.getTotalAmount());
-                        totalShares += t.getQuantity();
-                    }
+        List<HoldingDto> holdings = accountQueryService.getHoldings(agentName);
+        HoldingDto holding = holdings.stream()
+            .filter(h -> symbol.equals(h.getSymbol()))
+            .findFirst()
+            .orElse(null);
+        Integer currentShares = holding != null ? holding.getQuantity() : null;
+        if (currentShares != null && currentShares > 0) {
+            // Calculate average cost
+            double totalCost = 0;
+            int totalShares = 0;
+            for (AccountTransaction t : transactions) {
+                if (TransactionType.BUY.equals(t.getTransactionType())) {
+                    totalCost += Math.abs(t.getTotalAmount());
+                    totalShares += t.getQuantity();
                 }
-                double avgCost = totalShares > 0 ? totalCost / totalShares : 0;
-                response.setCurrentPosition(new TradingHistoryResponse.Position(
-                    currentShares,
-                    MoneyMath.round2(avgCost)
-                ));
             }
-        } catch (Exception e) {
-            // Leave currentPosition as null
+            double avgCost = totalShares > 0 ? totalCost / totalShares : 0;
+            response.setCurrentPosition(new TradingHistoryResponse.Position(
+                currentShares,
+                MoneyMath.round2(avgCost)
+            ));
         }
 
         // Trades
