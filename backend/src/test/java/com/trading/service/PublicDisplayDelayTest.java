@@ -56,7 +56,7 @@ class PublicDisplayDelayTest {
     private TradingAccountRepository accountRepository;
 
     @Mock
-    private AccountService accountService;
+    private AccountQueryService accountQueryService;
 
     @InjectMocks
     private TradingRunService tradingRunService;
@@ -84,7 +84,7 @@ class PublicDisplayDelayTest {
             tradingRunRepository,
             tradingAgentRepository,
             accountRepository,
-            accountService
+            accountQueryService
         );
     }
 
@@ -130,7 +130,7 @@ class PublicDisplayDelayTest {
         when(transactionRepository.findByAccountIdAndSymbolAndTimestampBetween(
                 eq(1L), eq("AAPL"), any(Instant.class), any(Instant.class)))
                 .thenReturn(List.of(oldTrade1, oldTrade2));
-        when(accountService.getHoldings("warren")).thenReturn(List.of());
+        when(accountQueryService.getHoldings("warren")).thenReturn(List.of());
 
         // Act
         TradingHistoryResponse result = memoryService.getTradingHistory("warren", "AAPL", 30);

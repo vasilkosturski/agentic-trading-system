@@ -59,12 +59,16 @@ trading:
     profiles:
       warren:
         initial-capital: 100000
+        style: "Value Investor"
       george:
         initial-capital: 100000
+        style: "Contrarian Macro"
       ray:
         initial-capital: 100000
+        style: "Risk Parity"
       cathie:
         initial-capital: 100000
+        style: "Growth Innovation"
 
 # Push Notifications
 notifications:

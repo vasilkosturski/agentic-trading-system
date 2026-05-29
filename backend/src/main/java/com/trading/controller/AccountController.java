@@ -7,7 +7,8 @@ import com.trading.dto.response.RecentActivityResponse;
 import com.trading.dto.response.TradeResult;
 import com.trading.dto.response.TradingHistoryResponse;
 import jakarta.validation.Valid;
-import com.trading.service.AccountService;
+import com.trading.service.AccountProvisioner;
+import com.trading.service.AccountQueryService;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.MemoryService;
 import com.trading.service.TradeOrchestrator;
@@ -25,7 +26,10 @@ import org.springframework.web.bind.annotation.*;
 public class AccountController {
 
     @Autowired
-    private AccountService accountService;
+    private AccountQueryService accountQueryService;
+
+    @Autowired
+    private AccountProvisioner accountProvisioner;
 
     @Autowired
     private TradeOrchestrator tradeOrchestrator;
@@ -47,7 +51,7 @@ public class AccountController {
      */
     @PostMapping
     public ResponseEntity<CreateAccountResponse> createAccount(@Valid @RequestBody InitializeAgentRequest request) {
-        var account = accountService.initializeAgent(request.getName(), request.getInitialBalance());
+        var account = accountProvisioner.initializeAgent(request.getName(), request.getInitialBalance());
         var response = new CreateAccountResponse(
             account.getAgent().getId(),
             account.getId(),
@@ -85,7 +89,7 @@ public class AccountController {
     @GetMapping("/resources/accounts/{agentId}")
     public ResponseEntity<AccountReportDto> getAccountResource(@PathVariable Long agentId) {
         String name = agentIdentityService.requireAgentName(agentId);
-        AccountReportDto accountReport = accountService.getAccountReport(name);
+        AccountReportDto accountReport = accountQueryService.getAccountReport(name);
         return ResponseEntity.ok(accountReport);
     }
 

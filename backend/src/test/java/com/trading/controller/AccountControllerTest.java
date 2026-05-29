@@ -5,7 +5,8 @@ import com.trading.config.TestSecurityConfig;
 import com.trading.dto.response.AccountReportDto;
 import com.trading.dto.response.HoldingDto;
 import com.trading.dto.response.TradeResult;
-import com.trading.service.AccountService;
+import com.trading.service.AccountProvisioner;
+import com.trading.service.AccountQueryService;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.MemoryService;
 import com.trading.service.TradeOrchestrator;
@@ -37,7 +38,10 @@ class AccountControllerTest {
     private ObjectMapper objectMapper;
 
     @MockBean
-    private AccountService accountService;
+    private AccountQueryService accountQueryService;
+
+    @MockBean
+    private AccountProvisioner accountProvisioner;
 
     @MockBean
     private TradeOrchestrator tradeOrchestrator;
@@ -69,7 +73,7 @@ class AccountControllerTest {
         );
 
         when(agentIdentityService.requireAgentName(1L)).thenReturn("Warren");
-        when(accountService.getAccountReport("Warren")).thenReturn(report);
+        when(accountQueryService.getAccountReport("Warren")).thenReturn(report);
 
         mockMvc.perform(get("/api/accounts/resources/accounts/1"))
                 .andExpect(status().isOk())

@@ -3,7 +3,8 @@ package com.trading.controller.advice;
 import com.trading.config.TestSecurityConfig;
 import com.trading.controller.AccountController;
 import com.trading.exception.ResourceNotFoundException;
-import com.trading.service.AccountService;
+import com.trading.service.AccountProvisioner;
+import com.trading.service.AccountQueryService;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.MemoryService;
 import com.trading.service.TradeOrchestrator;
@@ -36,7 +37,10 @@ class AccountControllerAdviceTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private AccountService accountService;
+    private AccountQueryService accountQueryService;
+
+    @MockitoBean
+    private AccountProvisioner accountProvisioner;
 
     @MockitoBean
     private AgentIdentityService agentIdentityService;
@@ -48,17 +52,40 @@ class AccountControllerAdviceTest {
     private TradeOrchestrator tradeOrchestrator;
 
     @Test
-    @DisplayName("Unknown agent returns 404 ProblemDetail when AccountService throws ResourceNotFoundException")
+    @DisplayName("Unknown agent returns 404 ProblemDetail when AccountQueryService throws ResourceNotFoundException")
     void unknownAgent_returns404ProblemDetail() throws Exception {
         Long agentId = 999L;
         String agentName = "nonexistent";
 
         when(agentIdentityService.requireAgentName(agentId)).thenReturn(agentName);
-        when(accountService.getAccountReport(agentName))
+        when(accountQueryService.getAccountReport(agentName))
             .thenThrow(new ResourceNotFoundException(
                 "Trading account not found for agent: " + agentName));
 
         mockMvc.perform(get("/api/accounts/resources/accounts/{agentId}", agentId))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.type").value(
+                "https://trading.example.com/errors/resource-not-found"))
+            .andExpect(jsonPath("$.title").value("Resource Not Found"))
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.detail").value(
+                org.hamcrest.Matchers.containsString(agentName)));
+    }
+
+    @Test
+    @DisplayName("GET /api/accounts/{unknown}/runs/trading-history returns 404 ProblemDetail when MemoryService propagates ResourceNotFoundException")
+    void unknownAgentTradingHistory_returns404ProblemDetail() throws Exception {
+        Long agentId = 999L;
+        String agentName = "nonexistent";
+
+        when(agentIdentityService.requireAgentName(agentId)).thenReturn(agentName);
+        when(memoryService.getTradingHistory(agentName, "NVDA", 30))
+            .thenThrow(new ResourceNotFoundException(
+                "Agent not found: " + agentName));
+
+        mockMvc.perform(get("/api/accounts/{agentId}/runs/trading-history", agentId)
+                .param("symbol", "NVDA")
+                .param("days", "30"))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.type").value(
                 "https://trading.example.com/errors/resource-not-found"))
@@ -75,7 +102,7 @@ class AccountControllerAdviceTest {
         String agentName = "warren";
 
         when(agentIdentityService.requireAgentName(agentId)).thenReturn(agentName);
-        when(accountService.getAccountReport(agentName))
+        when(accountQueryService.getAccountReport(agentName))
             .thenThrow(new IllegalStateException(
                 "No initial-capital configured for agent: warren. Add trading.agents.profiles.warren.initial-capital to application.yml"));
 
