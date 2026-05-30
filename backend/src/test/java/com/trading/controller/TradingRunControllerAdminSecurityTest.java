@@ -1,6 +1,7 @@
 package com.trading.controller;
 
 import com.trading.config.SecurityConfig;
+import com.trading.config.TradingPublicProperties;
 import com.trading.dto.response.RunListResponseDto;
 import com.trading.security.JwtAuthenticationFilter;
 import com.trading.security.JwtTokenProvider;
@@ -62,6 +63,9 @@ class TradingRunControllerAdminSecurityTest {
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
 
+    @MockBean
+    private TradingPublicProperties tradingPublicProperties;
+
     /**
      * Provides a real JwtAuthenticationFilter bean wired to mocked collaborators.
      * Required because the filter must call chain.doFilter() to let requests
@@ -87,15 +91,15 @@ class TradingRunControllerAdminSecurityTest {
             0,
             20
         );
-        when(tradingRunService.listRuns(isNull(), any(), eq(true))).thenReturn(response);
+        when(tradingRunService.listRuns(isNull(), isNull(), any())).thenReturn(response);
 
         mockMvc.perform(get("/api/runs/admin"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.runs").isArray())
             .andExpect(jsonPath("$.total").value(0));
 
-        // Verify service called with showAll=true
-        verify(tradingRunService).listRuns(isNull(), any(), eq(true));
+        // Verify service called with null cutoffDate (admin bypasses display delay)
+        verify(tradingRunService).listRuns(isNull(), isNull(), any());
     }
 
     @Test
@@ -106,7 +110,7 @@ class TradingRunControllerAdminSecurityTest {
             .andExpect(status().isForbidden());
 
         // Service should never be called - authorization fails first
-        verify(tradingRunService, never()).listRuns(any(), any(), anyBoolean());
+        verify(tradingRunService, never()).listRuns(any(), any(), any());
     }
 
     @Test
@@ -125,7 +129,7 @@ class TradingRunControllerAdminSecurityTest {
             });
 
         // Service should never be called - authorization fails first
-        verify(tradingRunService, never()).listRuns(any(), any(), anyBoolean());
+        verify(tradingRunService, never()).listRuns(any(), any(), any());
     }
 
     @Test
@@ -148,27 +152,26 @@ class TradingRunControllerAdminSecurityTest {
             });
 
         // Service should never be called - authorization fails first
-        verify(tradingRunService, never()).listRuns(any(), any(), anyBoolean());
+        verify(tradingRunService, never()).listRuns(any(), any(), any());
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    @DisplayName("Admin endpoint always passes showAll=true to service (no 7-day filter)")
-    void listAllRuns_AlwaysPassesShowAllTrue() throws Exception {
+    @DisplayName("Admin endpoint always passes null cutoffDate to service (no display delay)")
+    void listAllRuns_AlwaysPassesNullCutoff() throws Exception {
         RunListResponseDto response = new RunListResponseDto(
             Collections.emptyList(),
             0L,
             0,
             20
         );
-        when(tradingRunService.listRuns(isNull(), any(), eq(true))).thenReturn(response);
+        when(tradingRunService.listRuns(isNull(), isNull(), any())).thenReturn(response);
 
         mockMvc.perform(get("/api/runs/admin"))
             .andExpect(status().isOk());
 
-        // Verify showAll=true is always passed (no 7-day filter for admin)
-        verify(tradingRunService).listRuns(isNull(), any(), eq(true));
-        verify(tradingRunService, never()).listRuns(isNull(), any(), eq(false));
+        // Verify null cutoffDate is always passed (no public display delay for admin)
+        verify(tradingRunService).listRuns(isNull(), isNull(), any());
     }
 
     /**

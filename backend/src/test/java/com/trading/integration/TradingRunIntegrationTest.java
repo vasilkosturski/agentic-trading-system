@@ -237,34 +237,34 @@ class TradingRunIntegrationTest {
 
         var pageable = PageRequest.of(0, 20);
 
-        // Filter by decision=BUY
+        // Filter by decision=BUY (null cutoffDate = admin mode, see all runs)
         var buyFilter = new RunQueryFilter(null, null, TradeDecision.BUY, null);
-        var buyResult = tradingRunService.listRuns(buyFilter, pageable);
+        var buyResult = tradingRunService.listRuns(buyFilter, null, pageable);
         assertThat(buyResult.getTotal()).isEqualTo(1);
         assertThat(buyResult.getRuns().get(0).getDecision()).isEqualTo(TradeDecision.BUY);
         assertThat(buyResult.getRuns().get(0).getSymbol()).isEqualTo("AAPL");
 
         // Filter by decision=SELL
         var sellFilter = new RunQueryFilter(null, null, TradeDecision.SELL, null);
-        var sellResult = tradingRunService.listRuns(sellFilter, pageable);
+        var sellResult = tradingRunService.listRuns(sellFilter, null, pageable);
         assertThat(sellResult.getTotal()).isEqualTo(1);
         assertThat(sellResult.getRuns().get(0).getDecision()).isEqualTo(TradeDecision.SELL);
         assertThat(sellResult.getRuns().get(0).getSymbol()).isEqualTo("GOOGL");
 
         // Filter by symbol=AAPL
         var symbolFilter = new RunQueryFilter(null, null, null, "AAPL");
-        var symbolResult = tradingRunService.listRuns(symbolFilter, pageable);
+        var symbolResult = tradingRunService.listRuns(symbolFilter, null, pageable);
         assertThat(symbolResult.getTotal()).isEqualTo(1);
         assertThat(symbolResult.getRuns().get(0).getSymbol()).isEqualTo("AAPL");
 
         // Filter by decision=HOLD
         var holdFilter = new RunQueryFilter(null, null, TradeDecision.HOLD, null);
-        var holdResult = tradingRunService.listRuns(holdFilter, pageable);
+        var holdResult = tradingRunService.listRuns(holdFilter, null, pageable);
         assertThat(holdResult.getTotal()).isEqualTo(1);
         assertThat(holdResult.getRuns().get(0).getDecision()).isEqualTo(TradeDecision.HOLD);
 
-        // Verify all runs returned without filter
-        var allResult = tradingRunService.listRuns(null, pageable);
+        // Verify all runs returned without filter (admin mode — null cutoff)
+        var allResult = tradingRunService.listRuns(null, null, pageable);
         assertThat(allResult.getTotal()).isEqualTo(3);
     }
 

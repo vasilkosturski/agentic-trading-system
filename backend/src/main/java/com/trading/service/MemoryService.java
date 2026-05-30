@@ -1,5 +1,6 @@
 package com.trading.service;
 
+import com.trading.config.TradingPublicProperties;
 import com.trading.dto.response.HoldingDto;
 import com.trading.dto.response.RecentActivityResponse;
 import com.trading.dto.response.TradingHistoryResponse;
@@ -16,7 +17,6 @@ import com.trading.repository.TradingAccountRepository;
 import com.trading.repository.TradingAgentRepository;
 import com.trading.repository.TradingRunRepository;
 import com.trading.util.MoneyMath;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +34,7 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class MemoryService {
 
-    private final int publicDisplayDelayDays;
+    private final TradingPublicProperties tradingPublicProperties;
     private final AccountTransactionRepository transactionRepository;
     private final TradingRunRepository tradingRunRepository;
     private final TradingAgentRepository tradingAgentRepository;
@@ -42,13 +42,13 @@ public class MemoryService {
     private final AccountQueryService accountQueryService;
 
     public MemoryService(
-            @Value("${trading.public-display-delay-days:7}") int publicDisplayDelayDays,
+            TradingPublicProperties tradingPublicProperties,
             AccountTransactionRepository transactionRepository,
             TradingRunRepository tradingRunRepository,
             TradingAgentRepository tradingAgentRepository,
             TradingAccountRepository accountRepository,
             AccountQueryService accountQueryService) {
-        this.publicDisplayDelayDays = publicDisplayDelayDays;
+        this.tradingPublicProperties = tradingPublicProperties;
         this.transactionRepository = transactionRepository;
         this.tradingRunRepository = tradingRunRepository;
         this.tradingAgentRepository = tradingAgentRepository;
@@ -76,7 +76,7 @@ public class MemoryService {
             .orElseThrow(() -> new ResourceNotFoundException("Agent not found: " + agentName));
 
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
-        Instant cutoffDate = Instant.now().minus(publicDisplayDelayDays, ChronoUnit.DAYS);
+        Instant cutoffDate = Instant.now().minus(tradingPublicProperties.getDisplayDelayDays(), ChronoUnit.DAYS);
 
         // Get transactions for this symbol within the date window — filtered at DB level
         List<AccountTransaction> transactions = transactionRepository
@@ -114,7 +114,7 @@ public class MemoryService {
         }
 
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
-        Instant cutoffDate = Instant.now().minus(publicDisplayDelayDays, ChronoUnit.DAYS);
+        Instant cutoffDate = Instant.now().minus(tradingPublicProperties.getDisplayDelayDays(), ChronoUnit.DAYS);
 
         // Get recent runs within the date window — filtered + limited at DB level
         List<TradingRun> recentRuns = tradingRunRepository

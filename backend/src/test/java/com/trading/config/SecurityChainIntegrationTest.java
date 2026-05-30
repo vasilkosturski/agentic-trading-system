@@ -279,7 +279,7 @@ class SecurityChainIntegrationTest {
         RunListResponseDto emptyResponse = new RunListResponseDto(
             Collections.emptyList(), 0L, 0, 20
         );
-        when(tradingRunService.listRuns(any(), any(), anyBoolean())).thenReturn(emptyResponse);
+        when(tradingRunService.listRuns(any(), any(), any())).thenReturn(emptyResponse);
 
         mockMvc.perform(get("/api/runs"))
             .andExpect(status().isOk());

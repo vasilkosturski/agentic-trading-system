@@ -2,6 +2,7 @@ package com.trading.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trading.config.TestSecurityConfig;
+import com.trading.config.TradingPublicProperties;
 import com.trading.dto.request.CompleteRunRequest;
 import com.trading.dto.request.CreateRunRequest;
 import com.trading.dto.request.RunQueryFilter;
@@ -57,6 +58,9 @@ class TradingRunControllerTest {
     @MockBean
     private TradingRunService tradingRunService;
 
+    @MockBean
+    private TradingPublicProperties tradingPublicProperties;
+
     // Test fixtures
     private TradingRunDto testRunDto;
     private TradingRunDetailDto testRunDetailDto;
@@ -66,6 +70,7 @@ class TradingRunControllerTest {
 
     @BeforeEach
     void setUp() {
+        when(tradingPublicProperties.getDisplayDelayDays()).thenReturn(7);
         // Create test DTOs using setters to avoid type issues with complex nested types
         testRunDto = new TradingRunDto();
         testRunDto.setRunId(100L);
@@ -501,7 +506,7 @@ class TradingRunControllerTest {
                 0,
                 20
             );
-            when(tradingRunService.listRuns(isNull(), any(), anyBoolean())).thenReturn(response);
+            when(tradingRunService.listRuns(isNull(), any(Instant.class), any())).thenReturn(response);
 
             mockMvc.perform(get("/api/runs"))
                 .andExpect(status().isOk())
@@ -520,7 +525,7 @@ class TradingRunControllerTest {
                 0,
                 20
             );
-            when(tradingRunService.listRuns(any(RunQueryFilter.class), any(), anyBoolean())).thenReturn(response);
+            when(tradingRunService.listRuns(any(RunQueryFilter.class), any(Instant.class), any())).thenReturn(response);
 
             mockMvc.perform(get("/api/runs")
                     .param("agentId", "1")
@@ -530,7 +535,7 @@ class TradingRunControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.runs", hasSize(1)));
 
-            verify(tradingRunService).listRuns(any(RunQueryFilter.class), any(), anyBoolean());
+            verify(tradingRunService).listRuns(any(RunQueryFilter.class), any(Instant.class), any());
         }
 
         @Test
@@ -542,7 +547,7 @@ class TradingRunControllerTest {
                 2,
                 10
             );
-            when(tradingRunService.listRuns(isNull(), any(), anyBoolean())).thenReturn(response);
+            when(tradingRunService.listRuns(isNull(), any(Instant.class), any())).thenReturn(response);
 
             mockMvc.perform(get("/api/runs")
                     .param("page", "2")
@@ -562,7 +567,7 @@ class TradingRunControllerTest {
                 0,
                 20
             );
-            when(tradingRunService.listRuns(isNull(), any(), anyBoolean())).thenReturn(response);
+            when(tradingRunService.listRuns(isNull(), any(Instant.class), any())).thenReturn(response);
 
             mockMvc.perform(get("/api/runs"))
                 .andExpect(status().isOk())
@@ -571,26 +576,27 @@ class TradingRunControllerTest {
         }
 
         @Test
-        @DisplayName("Public endpoint always enforces 7-day filter (showAll=false)")
-        void listRuns_AlwaysEnforces7DayFilter() throws Exception {
+        @DisplayName("Public endpoint always passes a non-null cutoffDate (legal display delay enforced)")
+        void listRuns_AlwaysEnforcesPublicDisplayDelay() throws Exception {
             RunListResponseDto response = new RunListResponseDto(
                 Arrays.asList(testRunDto),
                 1L,
                 0,
                 20
             );
-            // Verify service is called with showAll=false
-            when(tradingRunService.listRuns(isNull(), any(), eq(false))).thenReturn(response);
+            // Public endpoint must pass a NON-NULL cutoffDate (admin would pass null)
+            when(tradingRunService.listRuns(isNull(), any(Instant.class), any())).thenReturn(response);
 
             mockMvc.perform(get("/api/runs"))
                 .andExpect(status().isOk());
 
-            // Verify service was called with showAll=false (legal protection enabled)
-            verify(tradingRunService).listRuns(isNull(), any(), eq(false));
+            // Verify service was called with a non-null cutoff (legal protection enabled)
+            verify(tradingRunService).listRuns(isNull(), any(Instant.class), any());
+            verify(tradingRunService, never()).listRuns(isNull(), isNull(), any());
         }
 
         @Test
-        @DisplayName("Public endpoint rejects showAll parameter - always uses false for legal protection")
+        @DisplayName("Public endpoint ignores showAll query param — cutoff is always derived from properties")
         void listRuns_IgnoresShowAllParameter() throws Exception {
             RunListResponseDto response = new RunListResponseDto(
                 Arrays.asList(testRunDto),
@@ -598,18 +604,17 @@ class TradingRunControllerTest {
                 0,
                 20
             );
-            // Service should ALWAYS receive false, even if client sends showAll=true
-            when(tradingRunService.listRuns(isNull(), any(), eq(false))).thenReturn(response);
+            // Service must ALWAYS receive a non-null cutoff, regardless of client showAll= param
+            when(tradingRunService.listRuns(isNull(), any(Instant.class), any())).thenReturn(response);
 
-            // Client attempts to bypass 7-day filter with showAll=true
+            // Client attempts to bypass the public delay with showAll=true on the public endpoint
             mockMvc.perform(get("/api/runs")
                     .param("showAll", "true"))
                 .andExpect(status().isOk());
 
-            // Verify service was called with false (not the client's true value)
-            // This proves the security fix: public endpoint ignores showAll parameter
-            verify(tradingRunService).listRuns(isNull(), any(), eq(false));
-            verify(tradingRunService, never()).listRuns(isNull(), any(), eq(true));
+            // Verify the cutoff was applied (non-null) — admin bypass requires the /admin endpoint
+            verify(tradingRunService).listRuns(isNull(), any(Instant.class), any());
+            verify(tradingRunService, never()).listRuns(isNull(), isNull(), any());
         }
     }
 

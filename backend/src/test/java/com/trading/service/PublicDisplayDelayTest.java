@@ -1,5 +1,6 @@
 package com.trading.service;
 
+import com.trading.config.TradingPublicProperties;
 import com.trading.dto.response.RecentActivityResponse;
 import com.trading.dto.response.RunListResponseDto;
 import com.trading.dto.response.TradingHistoryResponse;
@@ -70,6 +71,7 @@ class PublicDisplayDelayTest {
     private TradingRunService tradingRunService;
 
     private MemoryService memoryService;
+    private TradingPublicProperties tradingPublicProperties;
 
     private TradingAgent testAgent;
     private TradingAccount testAccount;
@@ -84,10 +86,11 @@ class PublicDisplayDelayTest {
         testAccount.setId(1L);
         testAccount.setAgent(testAgent);
 
-        // Set the delay configuration (7 days default)
-        ReflectionTestUtils.setField(tradingRunService, "publicDisplayDelayDays", 7);
+        tradingPublicProperties = new TradingPublicProperties();
+        tradingPublicProperties.setDisplayDelayDays(7);
+
         memoryService = new MemoryService(
-            7,
+            tradingPublicProperties,
             transactionRepository,
             tradingRunRepository,
             tradingAgentRepository,
@@ -97,7 +100,7 @@ class PublicDisplayDelayTest {
     }
 
     @Test
-    @DisplayName("TradingRunService.listRuns() filters runs by createdAt older than 7 days")
+    @DisplayName("TradingRunService.listRuns() filters runs by cutoffDate older than 7 days")
     void listRuns_shouldFilterByDelayPeriod() {
         // Arrange: Create runs at different times
         Instant now = Instant.now();
@@ -105,6 +108,7 @@ class PublicDisplayDelayTest {
         TradingRun oldRun2 = createRun(3L, now.minus(10, ChronoUnit.DAYS));  // 10 days old - should be INCLUDED
 
         Pageable pageable = PageRequest.of(0, 10);
+        Instant cutoff = now.minus(7, ChronoUnit.DAYS);
 
         // Mock repository to return only old runs (database-level filtering via Specification)
         Page<TradingRun> oldRuns = new PageImpl<>(List.of(oldRun1, oldRun2));
@@ -112,7 +116,7 @@ class PublicDisplayDelayTest {
         when(decisionPhaseRepository.findByRunId(anyLong())).thenReturn(Optional.empty());
 
         // Act: Call service method
-        RunListResponseDto result = tradingRunService.listRuns(null, pageable);
+        RunListResponseDto result = tradingRunService.listRuns(null, cutoff, pageable);
 
         // Assert: Only runs older than 7 days should be returned
         assertEquals(2, result.getRuns().size(), "Should return only runs older than 7 days");
@@ -185,33 +189,20 @@ class PublicDisplayDelayTest {
     }
 
     @Test
-    @DisplayName("Delay configuration is injectable via @Value")
-    void delayConfiguration_shouldBeInjectable() {
-        // Arrange: Set custom delay period
-        ReflectionTestUtils.setField(tradingRunService, "publicDisplayDelayDays", 14);
-
-        // Assert: Field should be set
-        Integer delayDays = (Integer) ReflectionTestUtils.getField(tradingRunService, "publicDisplayDelayDays");
-        assertEquals(14, delayDays, "Delay days should be configurable");
-    }
-
-    @Test
     @DisplayName("Zero delay returns all data")
     void zeroDelay_shouldReturnAllData() {
-        // Arrange: Set delay to 0 (no filtering)
-        ReflectionTestUtils.setField(tradingRunService, "publicDisplayDelayDays", 0);
-
+        // Arrange: A 0-day cutoff means "now" — every run is older than the cutoff.
         Instant now = Instant.now();
-        TradingRun recentRun = createRun(1L, now.minus(1, ChronoUnit.DAYS)); // 1 day old
-        TradingRun oldRun = createRun(2L, now.minus(10, ChronoUnit.DAYS));   // 10 days old
+        TradingRun recentRun = createRun(1L, now.minus(1, ChronoUnit.DAYS));
+        TradingRun oldRun = createRun(2L, now.minus(10, ChronoUnit.DAYS));
 
         Pageable pageable = PageRequest.of(0, 10);
         Page<TradingRun> allRuns = new PageImpl<>(List.of(recentRun, oldRun));
         when(tradingRunRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(allRuns);
         when(decisionPhaseRepository.findByRunId(anyLong())).thenReturn(Optional.empty());
 
-        // Act: Call service method
-        RunListResponseDto result = tradingRunService.listRuns(null, pageable);
+        // Act: Call service method with cutoff = now (0-day delay equivalent)
+        RunListResponseDto result = tradingRunService.listRuns(null, now, pageable);
 
         // Assert: All runs should be returned (no filtering)
         assertEquals(2, result.getRuns().size(), "With 0 delay, all runs should be returned");
