@@ -4,6 +4,7 @@ import { Table, Badge, Container, Title, Text, Loader, Center } from '@mantine/c
 import { useInView } from 'react-intersection-observer'
 import type { TradingRun, Agent, PortfolioSnapshot } from './types.ts'
 import { fetchRuns, fetchAgents, fetchSnapshots } from './api.ts'
+import { fetchOrEmpty } from './fetchHelpers.ts'
 import { statusColor, decisionColor, formatTimestamp } from './utils.ts'
 import PortfolioChart from './PortfolioChart.tsx'
 import AgentComparison from './AgentComparison.tsx'
@@ -35,9 +36,12 @@ function RunsTable() {
 
     async function fetchData() {
       try {
+        // Cosmetic fetch (agents map for friendly names) must not collapse the
+        // primary runs fetch if it fails — fall back to [] so the runs table
+        // still renders with the "Agent #N" fallback in the agent column.
         const [runsData, agentsData, snapshotsData] = await Promise.all([
           fetchRuns(0, PAGE_SIZE, controller.signal, showAll),
-          fetchAgents(controller.signal),
+          fetchOrEmpty(fetchAgents(controller.signal)),
           fetchSnapshots(controller.signal),
         ])
 

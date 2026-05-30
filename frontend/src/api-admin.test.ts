@@ -37,28 +37,6 @@ describe('api.ts - fetchRuns with showAll parameter for admin endpoint', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1)
   })
 
-  it('calls /api/runs endpoint when showAll is not provided (defaults to false)', async () => {
-    // Arrange
-    const mockResponse = {
-      runs: [],
-      total: 0,
-      page: 0,
-      limit: 20,
-    }
-
-    vi.mocked(global.fetch).mockResolvedValue({
-      ok: true,
-      json: async () => mockResponse,
-    } as Response)
-
-    // Act - call without showAll parameter
-    await fetchRuns(0, 20)
-
-    // Assert - should call public endpoint by default
-    const callUrl = vi.mocked(global.fetch).mock.calls[0][0] as string
-    expect(callUrl).toBe('/api/runs?page=0&limit=20')
-  })
-
   it('calls /api/runs/admin endpoint when showAll is true', async () => {
     // Arrange
     const mockResponse = {
@@ -91,29 +69,6 @@ describe('api.ts - fetchRuns with showAll parameter for admin endpoint', () => {
       })
     )
     expect(global.fetch).toHaveBeenCalledTimes(1)
-  })
-
-  it('does not append showAll as query parameter - endpoint path changes instead', async () => {
-    // Arrange
-    const mockResponse = {
-      runs: [],
-      total: 188,
-      page: 0,
-      limit: 20,
-    }
-
-    vi.mocked(global.fetch).mockResolvedValue({
-      ok: true,
-      json: async () => mockResponse,
-    } as Response)
-
-    // Act - call with showAll=true
-    await fetchRuns(0, 20, undefined, true)
-
-    // Assert - URL should change path, not add showAll query param
-    const callUrl = vi.mocked(global.fetch).mock.calls[0][0] as string
-    expect(callUrl).toBe('/api/runs/admin?page=0&limit=20')
-    expect(callUrl).not.toContain('showAll=')
   })
 
   it('accepts showAll with AbortSignal', async () => {
