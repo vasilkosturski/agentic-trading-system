@@ -17,6 +17,7 @@ import com.trading.exception.ResourceNotFoundException;
 import com.trading.messaging.RunEventPublisher;
 import com.trading.repository.*;
 import com.trading.service.RunDtoMapper;
+import com.trading.service.RunSpecificationFactory;
 import com.trading.service.TradingRunService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -99,7 +100,8 @@ class TradingRunIntegrationTest {
             tradingAgentRepository,
             accountTransactionRepository,
             mockRunEventPublisher,
-            new RunDtoMapper()
+            new RunDtoMapper(),
+            new RunSpecificationFactory()
         );
 
         // Create test agent

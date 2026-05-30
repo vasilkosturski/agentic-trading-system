@@ -78,6 +78,7 @@ public class TradingRunSpecification {
             }
             // Join to decision_phases table
             Join<TradingRun, DecisionPhase> decisionJoin = root.join("decision", JoinType.LEFT);
+            applyDistinctIfContentQuery(query);
             return cb.equal(decisionJoin.get("decision"), decision);
         };
     }
@@ -92,8 +93,30 @@ public class TradingRunSpecification {
             }
             // Join to decision_phases table
             Join<TradingRun, DecisionPhase> decisionJoin = root.join("decision", JoinType.LEFT);
+            applyDistinctIfContentQuery(query);
             return cb.equal(cb.upper(decisionJoin.get("symbol")), symbol.toUpperCase().trim());
         };
+    }
+
+    /**
+     * Applies {@code DISTINCT} to the content query so a one-to-many LEFT JOIN
+     * cannot duplicate parent rows, while leaving the count query untouched so
+     * {@code Page.getTotalElements()} stays correct.
+     *
+     * <p>Spring Data JPA reuses the Specification for both the content query and
+     * the paging count query (via {@code findAll(Specification, Pageable)}).
+     * The count query's result type is {@code Long.class} / {@code long.class};
+     * toggling DISTINCT on the outer SELECT there trips Spring Data JPA issue
+     * #3220 (the {@code COUNT(DISTINCT x)} aggregation already deduplicates and
+     * adding an outer DISTINCT breaks the query). Guarding on
+     * {@code query.getResultType()} scopes DISTINCT to the content query only.
+     */
+    private static void applyDistinctIfContentQuery(jakarta.persistence.criteria.CriteriaQuery<?> query) {
+        if (query != null
+                && Long.class != query.getResultType()
+                && long.class != query.getResultType()) {
+            query.distinct(true);
+        }
     }
 
     /**

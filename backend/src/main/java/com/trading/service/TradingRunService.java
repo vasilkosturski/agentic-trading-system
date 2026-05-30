@@ -12,7 +12,6 @@ import com.trading.enums.TradeDecision;
 import com.trading.exception.ResourceNotFoundException;
 import com.trading.messaging.RunEventPublisher;
 import com.trading.repository.*;
-import com.trading.specification.TradingRunSpecification;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,6 +46,7 @@ public class TradingRunService {
     private final AccountTransactionRepository accountTransactionRepository;
     private final RunEventPublisher runEventPublisher;
     private final RunDtoMapper runDtoMapper;
+    private final RunSpecificationFactory runSpecificationFactory;
 
     public TradingRunService(
             TradingRunRepository tradingRunRepository,
@@ -56,7 +56,8 @@ public class TradingRunService {
             TradingAgentRepository tradingAgentRepository,
             AccountTransactionRepository accountTransactionRepository,
             RunEventPublisher runEventPublisher,
-            RunDtoMapper runDtoMapper) {
+            RunDtoMapper runDtoMapper,
+            RunSpecificationFactory runSpecificationFactory) {
         this.tradingRunRepository = tradingRunRepository;
         this.researchPhaseRepository = researchPhaseRepository;
         this.decisionPhaseRepository = decisionPhaseRepository;
@@ -65,6 +66,7 @@ public class TradingRunService {
         this.accountTransactionRepository = accountTransactionRepository;
         this.runEventPublisher = runEventPublisher;
         this.runDtoMapper = runDtoMapper;
+        this.runSpecificationFactory = runSpecificationFactory;
     }
 
     public TradingRunDto createRun(Long agentId) {
@@ -296,30 +298,13 @@ public class TradingRunService {
     public RunListResponseDto listRuns(RunQueryFilter filter, Pageable pageable, boolean showAll) {
         logger.debug("Listing runs with filter: {}, pageable: {}, showAll: {}", filter, pageable, showAll);
 
-        Page<TradingRun> page;
-        Instant cutoffDate = Instant.now().minus(publicDisplayDelayDays, ChronoUnit.DAYS);
+        Instant cutoffDate = showAll
+            ? null
+            : Instant.now().minus(publicDisplayDelayDays, ChronoUnit.DAYS);
 
-        if (showAll) {
-            // Debug mode - show all runs without delay filter
-            if (filter != null && filter.hasFilters()) {
-                page = tradingRunRepository.findAll(
-                    TradingRunSpecification.fromFilter(filter),
-                    pageable
-                );
-            } else {
-                page = tradingRunRepository.findAll(pageable);
-            }
-        } else {
-            // Production mode - apply 7-day delay filter at database level
-            if (filter != null && filter.hasFilters()) {
-                page = tradingRunRepository.findAll(
-                    TradingRunSpecification.fromFilterWithDateCutoff(filter, cutoffDate),
-                    pageable
-                );
-            } else {
-                page = tradingRunRepository.findByStartedAtBefore(cutoffDate, pageable);
-            }
-        }
+        Page<TradingRun> page = tradingRunRepository.findAll(
+            runSpecificationFactory.build(filter, cutoffDate),
+            pageable);
 
         // Map to DTOs with decision data
         List<TradingRunDto> runDtos = page.getContent().stream()

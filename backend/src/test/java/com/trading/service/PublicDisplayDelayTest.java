@@ -21,6 +21,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -62,6 +63,9 @@ class PublicDisplayDelayTest {
     @Spy
     private RunDtoMapper runDtoMapper = new RunDtoMapper();
 
+    @Spy
+    private RunSpecificationFactory runSpecificationFactory = new RunSpecificationFactory();
+
     @InjectMocks
     private TradingRunService tradingRunService;
 
@@ -102,9 +106,9 @@ class PublicDisplayDelayTest {
 
         Pageable pageable = PageRequest.of(0, 10);
 
-        // Mock repository to return only old runs (database-level filtering)
+        // Mock repository to return only old runs (database-level filtering via Specification)
         Page<TradingRun> oldRuns = new PageImpl<>(List.of(oldRun1, oldRun2));
-        when(tradingRunRepository.findByStartedAtBefore(any(Instant.class), eq(pageable))).thenReturn(oldRuns);
+        when(tradingRunRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(oldRuns);
         when(decisionPhaseRepository.findByRunId(anyLong())).thenReturn(Optional.empty());
 
         // Act: Call service method
@@ -118,7 +122,7 @@ class PublicDisplayDelayTest {
                 "Old run (10 days old) should be included");
 
         // Verify database-level filtering was used
-        verify(tradingRunRepository).findByStartedAtBefore(any(Instant.class), eq(pageable));
+        verify(tradingRunRepository).findAll(any(Specification.class), eq(pageable));
     }
 
     @Test
@@ -203,7 +207,7 @@ class PublicDisplayDelayTest {
 
         Pageable pageable = PageRequest.of(0, 10);
         Page<TradingRun> allRuns = new PageImpl<>(List.of(recentRun, oldRun));
-        when(tradingRunRepository.findByStartedAtBefore(any(Instant.class), eq(pageable))).thenReturn(allRuns);
+        when(tradingRunRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(allRuns);
         when(decisionPhaseRepository.findByRunId(anyLong())).thenReturn(Optional.empty());
 
         // Act: Call service method
@@ -213,7 +217,7 @@ class PublicDisplayDelayTest {
         assertEquals(2, result.getRuns().size(), "With 0 delay, all runs should be returned");
 
         // Verify database-level filtering was used (even with 0 delay)
-        verify(tradingRunRepository).findByStartedAtBefore(any(Instant.class), eq(pageable));
+        verify(tradingRunRepository).findAll(any(Specification.class), eq(pageable));
     }
 
     // Helper methods
