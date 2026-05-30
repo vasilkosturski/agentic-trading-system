@@ -14,7 +14,9 @@ import com.trading.enums.RunPhase;
 import com.trading.enums.RunStatus;
 import com.trading.enums.TradeDecision;
 import com.trading.exception.ResourceNotFoundException;
+import com.trading.messaging.RunEventPublisher;
 import com.trading.repository.*;
+import com.trading.service.RunDtoMapper;
 import com.trading.service.TradingRunService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,7 +26,6 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import com.trading.testsupport.SharedPostgresContainer;
@@ -41,7 +42,7 @@ import static org.mockito.Mockito.mock;
  * Tests complete end-to-end workflows through service layer with real database.
  *
  * Note: Uses @DataJpaTest to avoid web layer and controller mapping conflicts.
- * Manually configures TradingRunService with mocked SimpMessagingTemplate.
+ * Manually configures TradingRunService with mocked RunEventPublisher.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -73,7 +74,7 @@ class TradingRunIntegrationTest {
 
     // Service under test - manually instantiated with mocked WebSocket
     private TradingRunService tradingRunService;
-    private SimpMessagingTemplate mockMessagingTemplate;
+    private RunEventPublisher mockRunEventPublisher;
 
     private TradingAgent testAgent;
 
@@ -86,10 +87,10 @@ class TradingRunIntegrationTest {
         tradingRunRepository.deleteAll();
         tradingAgentRepository.deleteAll();
 
-        // Create mock messaging template (we don't test WebSocket here)
-        mockMessagingTemplate = mock(SimpMessagingTemplate.class);
+        // Create mock event publisher (we don't test WebSocket here)
+        mockRunEventPublisher = mock(RunEventPublisher.class);
 
-        // Manually create service with repositories and mock messaging
+        // Manually create service with repositories and mock event publisher
         tradingRunService = new TradingRunService(
             tradingRunRepository,
             researchPhaseRepository,
@@ -97,7 +98,8 @@ class TradingRunIntegrationTest {
             executionPhaseRepository,
             tradingAgentRepository,
             accountTransactionRepository,
-            mockMessagingTemplate
+            mockRunEventPublisher,
+            new RunDtoMapper()
         );
 
         // Create test agent

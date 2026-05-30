@@ -12,6 +12,7 @@ import com.trading.enums.RunStatus;
 import com.trading.enums.TradeDecision;
 import com.trading.enums.WebSocketMessageType;
 import com.trading.exception.ResourceNotFoundException;
+import com.trading.messaging.RunEventPublisher;
 import com.trading.repository.*;
 import com.trading.specification.TradingRunSpecification;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,13 +26,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -69,7 +70,10 @@ class TradingRunServiceTest {
     private AccountTransactionRepository accountTransactionRepository;
 
     @Mock
-    private SimpMessagingTemplate messagingTemplate;
+    private RunEventPublisher runEventPublisher;
+
+    @Spy
+    private RunDtoMapper runDtoMapper = new RunDtoMapper();
 
     @InjectMocks
     private TradingRunService tradingRunService;
@@ -194,7 +198,7 @@ class TradingRunServiceTest {
             tradingRunService.createRun(1L);
 
             // Assert - verify WebSocket message content
-            verify(messagingTemplate).convertAndSend(eq("/topic/runs/phases"), phaseUpdateCaptor.capture());
+            verify(runEventPublisher).publishPhaseUpdate(phaseUpdateCaptor.capture());
             PhaseUpdateMessage message = phaseUpdateCaptor.getValue();
             assertEquals(WebSocketMessageType.PHASE_UPDATE, message.getType(), "WebSocket message type should be phase_update");
             assertEquals(1L, message.getAgentId(), "WebSocket message should contain correct agent_id");
@@ -306,7 +310,7 @@ class TradingRunServiceTest {
             tradingRunService.updatePhase(100L, RunPhase.RESEARCHING);
 
             // Assert - verify WebSocket message content
-            verify(messagingTemplate).convertAndSend(eq("/topic/runs/phases"), phaseUpdateCaptor.capture());
+            verify(runEventPublisher).publishPhaseUpdate(phaseUpdateCaptor.capture());
             PhaseUpdateMessage message = phaseUpdateCaptor.getValue();
             assertEquals(WebSocketMessageType.PHASE_UPDATE, message.getType());
             assertEquals("RESEARCHING", message.getPhase());
@@ -568,7 +572,7 @@ class TradingRunServiceTest {
             tradingRunService.completeRun(100L, request);
 
             // Assert
-            verify(messagingTemplate).convertAndSend(eq("/topic/runs/decisions"), any(DecisionCompletedMessage.class));
+            verify(runEventPublisher).publishDecisionCompleted(any(DecisionCompletedMessage.class));
         }
 
         @Test

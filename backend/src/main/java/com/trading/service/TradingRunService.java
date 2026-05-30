@@ -10,6 +10,7 @@ import com.trading.enums.PhaseStatus;
 import com.trading.enums.RunPhase;
 import com.trading.enums.TradeDecision;
 import com.trading.exception.ResourceNotFoundException;
+import com.trading.messaging.RunEventPublisher;
 import com.trading.repository.*;
 import com.trading.specification.TradingRunSpecification;
 import org.slf4j.Logger;
@@ -17,7 +18,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,10 +36,6 @@ public class TradingRunService {
 
     private static final Logger logger = LoggerFactory.getLogger(TradingRunService.class);
 
-    // WebSocket destinations
-    private static final String TOPIC_PHASES = "/topic/runs/phases";
-    private static final String TOPIC_DECISIONS = "/topic/runs/decisions";
-
     @Value("${trading.public-display-delay-days:7}")
     private int publicDisplayDelayDays;
 
@@ -49,7 +45,8 @@ public class TradingRunService {
     private final ExecutionPhaseRepository executionPhaseRepository;
     private final TradingAgentRepository tradingAgentRepository;
     private final AccountTransactionRepository accountTransactionRepository;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final RunEventPublisher runEventPublisher;
+    private final RunDtoMapper runDtoMapper;
 
     public TradingRunService(
             TradingRunRepository tradingRunRepository,
@@ -58,14 +55,16 @@ public class TradingRunService {
             ExecutionPhaseRepository executionPhaseRepository,
             TradingAgentRepository tradingAgentRepository,
             AccountTransactionRepository accountTransactionRepository,
-            SimpMessagingTemplate messagingTemplate) {
+            RunEventPublisher runEventPublisher,
+            RunDtoMapper runDtoMapper) {
         this.tradingRunRepository = tradingRunRepository;
         this.researchPhaseRepository = researchPhaseRepository;
         this.decisionPhaseRepository = decisionPhaseRepository;
         this.executionPhaseRepository = executionPhaseRepository;
         this.tradingAgentRepository = tradingAgentRepository;
         this.accountTransactionRepository = accountTransactionRepository;
-        this.messagingTemplate = messagingTemplate;
+        this.runEventPublisher = runEventPublisher;
+        this.runDtoMapper = runDtoMapper;
     }
 
     public TradingRunDto createRun(Long agentId) {
@@ -95,7 +94,7 @@ public class TradingRunService {
         TradingRun run = getRun(runId);
         RunPhase currentPhase = run.getPhase();
 
-        validatePhaseTransition(currentPhase, newPhase);
+        RunStateMachine.requireValidTransition(currentPhase, newPhase);
 
         if (newPhase == RunPhase.FAILED) {
             run.markAsError(errorMessage);
@@ -175,27 +174,11 @@ public class TradingRunService {
 
         TradingRun run = getRun(runId);
 
-        ResearchPhaseDto researchDto = researchPhaseRepository.findByRunId(runId)
-            .map(ResearchPhaseDto::fromEntity)
-            .orElse(null);
+        Optional<ResearchPhase> research = researchPhaseRepository.findByRunId(runId);
+        Optional<DecisionPhase> decision = decisionPhaseRepository.findByRunId(runId);
+        Optional<ExecutionPhase> execution = executionPhaseRepository.findByRunId(runId);
 
-        DecisionPhaseDto decisionDto = decisionPhaseRepository.findByRunId(runId)
-            .map(DecisionPhaseDto::fromEntity)
-            .orElse(null);
-
-        ExecutionPhaseDto executionDto = executionPhaseRepository.findByRunId(runId)
-            .map(ExecutionPhaseDto::fromEntity)
-            .orElse(null);
-
-        TradingRunDto runDto;
-        if (decisionDto != null) {
-            Optional<DecisionPhase> decisionPhase = decisionPhaseRepository.findByRunId(runId);
-            runDto = TradingRunDto.fromEntityWithDecision(run, decisionPhase.orElse(null));
-        } else {
-            runDto = TradingRunDto.fromEntity(run);
-        }
-
-        return new TradingRunDetailDto(runDto, researchDto, decisionDto, executionDto);
+        return runDtoMapper.assembleDetail(run, research, decision, execution);
     }
 
     public ResearchPhaseDto getResearchPhase(Long runId) {
@@ -244,13 +227,6 @@ public class TradingRunService {
                 "Trading run not found with ID: " + runId));
     }
 
-    private void validatePhaseTransition(RunPhase currentPhase, RunPhase newPhase) {
-        if (!currentPhase.canTransitionTo(newPhase)) {
-            throw new IllegalArgumentException(
-                "Invalid phase transition: " + currentPhase + " -> " + newPhase);
-        }
-    }
-
     private ExecutionPhase createExecutionPhase(TradingRun run, DecisionPhase decisionPhase,
                                                 com.trading.dto.request.ExecutionPhaseDto executionDto) {
         ExecutionPhase executionPhase = new ExecutionPhase();
@@ -288,7 +264,7 @@ public class TradingRunService {
             run.getPhase().name()
         );
 
-        messagingTemplate.convertAndSend(TOPIC_PHASES, message);
+        runEventPublisher.publishPhaseUpdate(message);
         logger.debug("Broadcast phase_update for run {}: {}", run.getId(), run.getPhase());
     }
 
@@ -300,7 +276,7 @@ public class TradingRunService {
             tradeId
         );
 
-        messagingTemplate.convertAndSend(TOPIC_DECISIONS, message);
+        runEventPublisher.publishDecisionCompleted(message);
         logger.debug("Broadcast decision_completed for run {}: {} (trade: {})",
             run.getId(), decision, tradeId);
     }
@@ -350,7 +326,7 @@ public class TradingRunService {
             .map(run -> {
                 DecisionPhase decisionPhase = decisionPhaseRepository.findByRunId(run.getId())
                     .orElse(null);
-                return TradingRunDto.fromEntityWithDecision(run, decisionPhase);
+                return runDtoMapper.assembleListRow(run, decisionPhase);
             })
             .toList();
 
