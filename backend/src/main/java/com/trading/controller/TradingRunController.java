@@ -1,5 +1,6 @@
 package com.trading.controller;
 
+import com.trading.config.TradingPublicProperties;
 import com.trading.dto.request.CompleteRunRequest;
 import com.trading.dto.request.CreateRunRequest;
 import com.trading.dto.request.RunQueryFilter;
@@ -19,6 +20,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 /**
  * REST controller for trading run operations.
@@ -39,9 +42,12 @@ import java.net.URI;
 public class TradingRunController {
 
     private final TradingRunService tradingRunService;
+    private final TradingPublicProperties tradingPublicProperties;
 
-    public TradingRunController(TradingRunService tradingRunService) {
+    public TradingRunController(TradingRunService tradingRunService,
+                                TradingPublicProperties tradingPublicProperties) {
         this.tradingRunService = tradingRunService;
+        this.tradingPublicProperties = tradingPublicProperties;
     }
 
     /**
@@ -185,8 +191,10 @@ public class TradingRunController {
             : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
 
-        // Always enforce 7-day filter for legal data protection on public endpoint
-        RunListResponseDto result = tradingRunService.listRuns(filter, pageable, false);
+        // Always enforce display delay for legal data protection on public endpoint
+        Instant cutoffDate = Instant.now()
+            .minus(tradingPublicProperties.getDisplayDelayDays(), ChronoUnit.DAYS);
+        RunListResponseDto result = tradingRunService.listRuns(filter, cutoffDate, pageable);
         return ResponseEntity.ok(result);
     }
 
@@ -238,8 +246,8 @@ public class TradingRunController {
             : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
 
-        // Always pass showAll=true for admin endpoint - no 7-day filter
-        RunListResponseDto result = tradingRunService.listRuns(filter, pageable, true);
+        // Admin endpoint: pass null cutoff so the service skips the date predicate
+        RunListResponseDto result = tradingRunService.listRuns(filter, null, pageable);
         return ResponseEntity.ok(result);
     }
 }

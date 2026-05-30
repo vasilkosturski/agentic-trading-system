@@ -33,7 +33,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -873,11 +872,13 @@ class TradingRunServiceTest {
     @DisplayName("listRuns() Tests")
     class ListRunsTests {
 
+        private Instant cutoff;
+
         @BeforeEach
         void setUpListRunsTests() {
-            // Set publicDisplayDelayDays to 7 (default value) for tests
-            // @Value fields are not injected by @InjectMocks, so we need to set it manually
-            ReflectionTestUtils.setField(tradingRunService, "publicDisplayDelayDays", 7);
+            // Pre-compute a 7-day cutoff for use across the listRuns tests; matches
+            // the production controller's derivation from TradingPublicProperties.
+            cutoff = Instant.now().minus(7, ChronoUnit.DAYS);
         }
 
         @Test
@@ -892,7 +893,7 @@ class TradingRunServiceTest {
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
-            RunListResponseDto result = tradingRunService.listRuns(null, PageRequest.of(0, 20));
+            RunListResponseDto result = tradingRunService.listRuns(null, cutoff, PageRequest.of(0, 20));
 
             // Assert
             verify(tradingRunRepository).findAll(any(Specification.class), any(Pageable.class));
@@ -913,7 +914,7 @@ class TradingRunServiceTest {
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
-            RunListResponseDto result = tradingRunService.listRuns(filter, PageRequest.of(0, 20));
+            RunListResponseDto result = tradingRunService.listRuns(filter, cutoff, PageRequest.of(0, 20));
 
             // Assert
             assertNotNull(result);
@@ -932,7 +933,7 @@ class TradingRunServiceTest {
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
-            RunListResponseDto result = tradingRunService.listRuns(filter, PageRequest.of(0, 20));
+            RunListResponseDto result = tradingRunService.listRuns(filter, cutoff, PageRequest.of(0, 20));
 
             // Assert
             assertNotNull(result);
@@ -951,7 +952,7 @@ class TradingRunServiceTest {
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
-            RunListResponseDto result = tradingRunService.listRuns(filter, PageRequest.of(0, 20));
+            RunListResponseDto result = tradingRunService.listRuns(filter, cutoff, PageRequest.of(0, 20));
 
             // Assert
             assertNotNull(result);
@@ -969,7 +970,7 @@ class TradingRunServiceTest {
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
-            RunListResponseDto result = tradingRunService.listRuns(filter, PageRequest.of(0, 20));
+            RunListResponseDto result = tradingRunService.listRuns(filter, cutoff, PageRequest.of(0, 20));
 
             // Assert
             assertNotNull(result);
@@ -987,7 +988,7 @@ class TradingRunServiceTest {
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
-            RunListResponseDto result = tradingRunService.listRuns(filter, PageRequest.of(0, 20));
+            RunListResponseDto result = tradingRunService.listRuns(filter, cutoff, PageRequest.of(0, 20));
 
             // Assert
             assertNotNull(result);
@@ -1005,7 +1006,7 @@ class TradingRunServiceTest {
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
-            RunListResponseDto result = tradingRunService.listRuns(null, PageRequest.of(2, 10));
+            RunListResponseDto result = tradingRunService.listRuns(null, cutoff, PageRequest.of(2, 10));
 
             // Assert
             verify(tradingRunRepository).findAll(any(Specification.class), any(Pageable.class));
@@ -1027,7 +1028,7 @@ class TradingRunServiceTest {
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
-            RunListResponseDto result = tradingRunService.listRuns(null, PageRequest.of(0, 20));
+            RunListResponseDto result = tradingRunService.listRuns(null, cutoff, PageRequest.of(0, 20));
 
             // Assert
             verify(tradingRunRepository).findAll(any(Specification.class), any(Pageable.class));
@@ -1058,7 +1059,7 @@ class TradingRunServiceTest {
             when(decisionPhaseRepository.findByRunId(101L)).thenReturn(Optional.empty());
 
             // Act
-            RunListResponseDto result = tradingRunService.listRuns(null, PageRequest.of(0, 20));
+            RunListResponseDto result = tradingRunService.listRuns(null, cutoff, PageRequest.of(0, 20));
 
             // Assert - verify repository was called with Specification (database-level)
             verify(tradingRunRepository).findAll(any(Specification.class), any(Pageable.class));
@@ -1084,7 +1085,7 @@ class TradingRunServiceTest {
             when(decisionPhaseRepository.findByRunId(103L)).thenReturn(Optional.empty());
 
             // Act
-            RunListResponseDto result = tradingRunService.listRuns(null, PageRequest.of(0, 20));
+            RunListResponseDto result = tradingRunService.listRuns(null, cutoff, PageRequest.of(0, 20));
 
             // Assert - run at cutoff should be included
             verify(tradingRunRepository).findAll(any(Specification.class), any(Pageable.class));
@@ -1102,7 +1103,7 @@ class TradingRunServiceTest {
                 .thenReturn(emptyPage);
 
             // Act
-            RunListResponseDto result = tradingRunService.listRuns(null, PageRequest.of(0, 20));
+            RunListResponseDto result = tradingRunService.listRuns(null, cutoff, PageRequest.of(0, 20));
 
             // Assert - should return empty list
             verify(tradingRunRepository).findAll(any(Specification.class), any(Pageable.class));
@@ -1128,7 +1129,7 @@ class TradingRunServiceTest {
             when(decisionPhaseRepository.findByRunId(106L)).thenReturn(Optional.empty());
 
             // Act
-            RunListResponseDto result = tradingRunService.listRuns(filter, PageRequest.of(0, 20));
+            RunListResponseDto result = tradingRunService.listRuns(filter, cutoff, PageRequest.of(0, 20));
 
             // Assert - Specification should include both filter and date criteria
             verify(tradingRunRepository).findAll(any(Specification.class), any(Pageable.class));

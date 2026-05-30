@@ -1,5 +1,6 @@
 package com.trading.service;
 
+import com.trading.config.TradingPublicProperties;
 import com.trading.dto.request.CompleteRunRequest;
 import com.trading.dto.request.RunQueryFilter;
 import com.trading.dto.response.*;
@@ -14,14 +15,12 @@ import com.trading.messaging.RunEventPublisher;
 import com.trading.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,9 +33,6 @@ import java.util.Optional;
 public class TradingRunService {
 
     private static final Logger logger = LoggerFactory.getLogger(TradingRunService.class);
-
-    @Value("${trading.public-display-delay-days:7}")
-    private int publicDisplayDelayDays;
 
     private final TradingRunRepository tradingRunRepository;
     private final ResearchPhaseRepository researchPhaseRepository;
@@ -284,23 +280,21 @@ public class TradingRunService {
     }
 
     /**
-     * List trading runs with optional filtering and pagination (public endpoint).
-     * Always applies 7-day delay filter.
+     * List trading runs with optional filtering, pagination, and a cutoff date
+     * for legal display-delay enforcement.
+     *
+     * @param filter     optional filter criteria; {@code null} or
+     *                   {@code !filter.hasFilters()} skips the filter predicates.
+     * @param cutoffDate ceiling for {@code TradingRun.startedAt}; {@code null}
+     *                   means "no cutoff" (admin mode — see all runs regardless
+     *                   of age). Callers wishing to enforce the public
+     *                   display-delay should compute the cutoff from
+     *                   {@link TradingPublicProperties#getDisplayDelayDays()}
+     *                   and pass it in.
+     * @param pageable   page request.
      */
-    public RunListResponseDto listRuns(RunQueryFilter filter, Pageable pageable) {
-        return listRuns(filter, pageable, false);
-    }
-
-    /**
-     * List trading runs with optional filtering and pagination.
-     * @param showAll If true, bypass 7-day delay filter for debugging
-     */
-    public RunListResponseDto listRuns(RunQueryFilter filter, Pageable pageable, boolean showAll) {
-        logger.debug("Listing runs with filter: {}, pageable: {}, showAll: {}", filter, pageable, showAll);
-
-        Instant cutoffDate = showAll
-            ? null
-            : Instant.now().minus(publicDisplayDelayDays, ChronoUnit.DAYS);
+    public RunListResponseDto listRuns(RunQueryFilter filter, Instant cutoffDate, Pageable pageable) {
+        logger.debug("Listing runs with filter: {}, cutoffDate: {}, pageable: {}", filter, cutoffDate, pageable);
 
         Page<TradingRun> page = tradingRunRepository.findAll(
             runSpecificationFactory.build(filter, cutoffDate),
