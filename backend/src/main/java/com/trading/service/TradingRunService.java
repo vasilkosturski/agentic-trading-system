@@ -28,8 +28,12 @@ import java.util.Optional;
  * Service for managing trading runs and their phases.
  * Handles the complete trading cycle lifecycle:
  * INITIALIZING -> RESEARCHING -> DECIDING -> TRADING -> COMPLETED
+ *
+ * <p>Read-only by default; write operations override with their own
+ * {@code @Transactional} so the read-only flag does not silently drop saves.
  */
 @Service
+@Transactional(readOnly = true)
 public class TradingRunService {
 
     private static final Logger logger = LoggerFactory.getLogger(TradingRunService.class);
@@ -65,6 +69,7 @@ public class TradingRunService {
         this.runSpecificationFactory = runSpecificationFactory;
     }
 
+    @Transactional
     public TradingRunDto createRun(Long agentId) {
         logger.info("Creating trading run for agent ID: {}", agentId);
 
@@ -82,10 +87,12 @@ public class TradingRunService {
         return TradingRunDto.fromEntity(run);
     }
 
+    @Transactional
     public void updatePhase(Long runId, RunPhase newPhase) {
         updatePhase(runId, newPhase, null);
     }
 
+    @Transactional
     public void updatePhase(Long runId, RunPhase newPhase, String errorMessage) {
         logger.info("Updating phase for run ID: {} to: {}", runId, newPhase);
 
@@ -120,44 +127,31 @@ public class TradingRunService {
         TradingRun run = getRun(runId);
 
         if (researchDto != null) {
-            ResearchPhase researchPhase = new ResearchPhase(run);
-            researchPhase.setCandidates(researchDto.getCandidates());
-            researchPhase.setSources(researchDto.getSources());
-            researchPhase.setResearchNotes(researchDto.getNotes());
-            researchPhase.setToolCalls(researchDto.getToolCalls());
-            researchPhase.setLatencyMs(researchDto.getLatencyMs());
-            if (researchDto.getMetrics() != null) {
-                researchPhase.setMetrics(researchDto.getMetrics().toEntity());
-            }
-            researchPhase.setSystemPrompt(researchDto.getSystemPrompt());
-            researchPhase.setTaskPrompt(researchDto.getTaskPrompt());
-            researchPhaseRepository.save(researchPhase);
+            researchPhaseRepository.save(researchDto.toEntity(run));
         }
 
-        DecisionPhase decisionPhase = new DecisionPhase(run);
-        decisionPhase.setDecision(tradeDecision);
-        decisionPhase.setSymbol(decisionDto.getSymbol());
-        decisionPhase.setQuantity(decisionDto.getQuantity());
-        decisionPhase.setReasoning(decisionDto.getReasoning());
-        decisionPhase.setSources(decisionDto.getSources());
-        decisionPhase.setToolCalls(decisionDto.getToolCalls());
-        decisionPhase.setLatencyMs(decisionDto.getLatencyMs());
-        if (decisionDto.getMetrics() != null) {
-            decisionPhase.setMetrics(decisionDto.getMetrics().toEntity());
-        }
-        decisionPhase.setSystemPrompt(decisionDto.getSystemPrompt());
-        decisionPhase.setTaskPrompt(decisionDto.getTaskPrompt());
-        decisionPhaseRepository.save(decisionPhase);
+        DecisionPhase decisionPhase = decisionPhaseRepository.save(decisionDto.toEntity(run));
 
         Long tradeId = null;
         if (tradeDecision != TradeDecision.HOLD) {
-            ExecutionPhase executionPhase = createExecutionPhase(run, decisionPhase, executionDto);
+            AccountTransaction trade = null;
+            if (executionDto != null && executionDto.getTradeId() != null) {
+                trade = accountTransactionRepository.findById(executionDto.getTradeId()).orElse(null);
+            }
+            ExecutionPhase executionPhase = (executionDto != null)
+                ? executionDto.toEntity(run, decisionPhase, trade)
+                : failedExecution(run, decisionPhase);
             executionPhaseRepository.save(executionPhase);
             if (executionPhase.getTrade() != null) {
                 tradeId = executionPhase.getTrade().getId();
             }
         }
 
+        // Guard against silent completion from an illegitimate phase. RunPhase's
+        // transition table only permits DECIDING (HOLD path) and TRADING (BUY/SELL
+        // path) to reach COMPLETED — any other source phase is a malformed cycle
+        // and must fail loud rather than silently flipping the run to COMPLETED.
+        RunStateMachine.requireValidTransition(run.getPhase(), RunPhase.COMPLETED);
         run.markAsCompleted();
         tradingRunRepository.save(run);
 
@@ -165,6 +159,19 @@ public class TradingRunService {
             runId, tradeDecision, tradeId);
 
         broadcastDecisionCompleted(run, tradeDecision, tradeId);
+    }
+
+    /**
+     * Builds the synthetic FAILED execution phase used when {@code completeRun}
+     * receives a BUY/SELL decision without an execution DTO. Matches the
+     * fallback the previous inline binding produced.
+     */
+    private ExecutionPhase failedExecution(TradingRun run, DecisionPhase decisionPhase) {
+        ExecutionPhase phase = new ExecutionPhase();
+        phase.setRun(run);
+        phase.setDecision(decisionPhase);
+        phase.setStatus(PhaseStatus.FAILED);
+        return phase;
     }
 
     public TradingRunDetailDto getRunWithAllPhases(Long runId) {
@@ -223,36 +230,6 @@ public class TradingRunService {
         return tradingRunRepository.findById(runId)
             .orElseThrow(() -> new ResourceNotFoundException(
                 "Trading run not found with ID: " + runId));
-    }
-
-    private ExecutionPhase createExecutionPhase(TradingRun run, DecisionPhase decisionPhase,
-                                                com.trading.dto.request.ExecutionPhaseDto executionDto) {
-        ExecutionPhase executionPhase = new ExecutionPhase();
-        executionPhase.setRun(run);
-        executionPhase.setDecision(decisionPhase);
-
-        if (executionDto != null) {
-            Long tradeId = executionDto.getTradeId();
-            if (tradeId != null) {
-                AccountTransaction trade = accountTransactionRepository.findById(tradeId)
-                    .orElse(null);
-                executionPhase.setTrade(trade);
-            }
-
-            if (executionDto.getStatus() != null) {
-                executionPhase.setStatus(executionDto.getStatus());
-            } else {
-                executionPhase.setStatus(tradeId != null
-                    ? PhaseStatus.COMPLETED
-                    : PhaseStatus.FAILED);
-            }
-
-            executionPhase.setErrorDetails(executionDto.getErrorDetails());
-        } else {
-            executionPhase.setStatus(PhaseStatus.FAILED);
-        }
-
-        return executionPhase;
     }
 
     private void broadcastPhaseUpdate(TradingRun run) {

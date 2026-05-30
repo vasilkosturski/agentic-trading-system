@@ -3,6 +3,8 @@ package com.trading.dto.request;
 import com.trading.dto.UsageMetricsDto;
 import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.SourceDto;
+import com.trading.entity.ResearchPhase;
+import com.trading.entity.TradingRun;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -51,4 +53,24 @@ public class ResearchPhaseDto {
     private String systemPrompt;
 
     private String taskPrompt;
+
+    /**
+     * Convert this request DTO into a {@link ResearchPhase} entity attached to
+     * the given run. Mirrors the per-DTO mapping convention already used by
+     * {@link UsageMetricsDto#toEntity()}.
+     */
+    public ResearchPhase toEntity(TradingRun run) {
+        ResearchPhase phase = new ResearchPhase(run);
+        phase.setCandidates(candidates);
+        phase.setSources(sources);
+        phase.setResearchNotes(notes);
+        phase.setToolCalls(toolCalls);
+        phase.setLatencyMs(latencyMs);
+        if (metrics != null) {
+            phase.setMetrics(metrics.toEntity());
+        }
+        phase.setSystemPrompt(systemPrompt);
+        phase.setTaskPrompt(taskPrompt);
+        return phase;
+    }
 }

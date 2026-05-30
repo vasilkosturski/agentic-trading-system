@@ -357,6 +357,15 @@ class TradingRunServiceTest {
     @DisplayName("completeRun() Tests")
     class CompleteRunTests {
 
+        @BeforeEach
+        void putRunInCompletablePhase() {
+            // RunStateMachine guards completeRun against malformed cycles:
+            // only DECIDING (HOLD path) and TRADING (BUY/SELL path) may legally
+            // transition to COMPLETED. Tests that mock a run for completeRun
+            // must put it in one of those phases first.
+            testRun.updatePhase(RunPhase.TRADING);
+        }
+
         private CompleteRunRequest createBuyRequest() {
             // Research phase DTO (request package)
             com.trading.dto.request.ResearchPhaseDto research = new com.trading.dto.request.ResearchPhaseDto();
@@ -620,6 +629,29 @@ class TradingRunServiceTest {
                 () -> tradingRunService.completeRun(100L, request)
             );
             assertTrue(exception.getMessage().contains("requires positive quantity"));
+        }
+
+        @Test
+        @DisplayName("completeRun from non-completable phase throws IllegalArgumentException")
+        void completeRun_FromInitializingPhase_ThrowsIllegalArgumentException() {
+            // Arrange — override the @BeforeEach that puts the run in TRADING.
+            // RunPhase only permits DECIDING and TRADING to reach COMPLETED;
+            // INITIALIZING -> COMPLETED is a malformed cycle and must fail loud.
+            testRun.updatePhase(RunPhase.INITIALIZING);
+            CompleteRunRequest request = createHoldRequest();
+            when(tradingRunRepository.findById(100L)).thenReturn(Optional.of(testRun));
+
+            // Act & Assert
+            IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> tradingRunService.completeRun(100L, request)
+            );
+            assertTrue(exception.getMessage().contains("Invalid phase transition"),
+                "Should reject completion from INITIALIZING — only DECIDING/TRADING may complete");
+
+            // Run state must remain INITIALIZING (no silent completion)
+            assertEquals(RunPhase.INITIALIZING, testRun.getPhase(),
+                "Run phase should NOT flip to COMPLETED when state-machine validation fails");
         }
     }
 

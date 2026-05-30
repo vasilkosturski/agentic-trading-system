@@ -4,6 +4,8 @@ import com.trading.dto.UsageMetricsDto;
 import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.ReasoningDto;
 import com.trading.dto.jsonb.SourceDto;
+import com.trading.entity.DecisionPhase;
+import com.trading.entity.TradingRun;
 import com.trading.enums.TradeDecision;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -80,5 +82,27 @@ public class DecisionPhaseDto {
                     decision + " decision requires positive quantity");
             }
         }
+    }
+
+    /**
+     * Convert this request DTO into a {@link DecisionPhase} entity attached to
+     * the given run. Mirrors the per-DTO mapping convention already used by
+     * {@link UsageMetricsDto#toEntity()}.
+     */
+    public DecisionPhase toEntity(TradingRun run) {
+        DecisionPhase phase = new DecisionPhase(run);
+        phase.setDecision(decision);
+        phase.setSymbol(symbol);
+        phase.setQuantity(quantity);
+        phase.setReasoning(reasoning);
+        phase.setSources(sources);
+        phase.setToolCalls(toolCalls);
+        phase.setLatencyMs(latencyMs);
+        if (metrics != null) {
+            phase.setMetrics(metrics.toEntity());
+        }
+        phase.setSystemPrompt(systemPrompt);
+        phase.setTaskPrompt(taskPrompt);
+        return phase;
     }
 }
