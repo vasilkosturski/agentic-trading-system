@@ -75,6 +75,9 @@ class TradingRunServiceTest {
     @Spy
     private RunDtoMapper runDtoMapper = new RunDtoMapper();
 
+    @Spy
+    private RunSpecificationFactory runSpecificationFactory = new RunSpecificationFactory();
+
     @InjectMocks
     private TradingRunService tradingRunService;
 
@@ -884,7 +887,7 @@ class TradingRunServiceTest {
             testRun.setStartedAt(Instant.now().minus(10, ChronoUnit.DAYS)); // Make it old enough
             List<TradingRun> runs = Arrays.asList(testRun);
             Page<TradingRun> page = new PageImpl<>(runs, PageRequest.of(0, 20), 1);
-            when(tradingRunRepository.findByStartedAtBefore(any(Instant.class), any(Pageable.class)))
+            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
@@ -892,7 +895,7 @@ class TradingRunServiceTest {
             RunListResponseDto result = tradingRunService.listRuns(null, PageRequest.of(0, 20));
 
             // Assert
-            verify(tradingRunRepository).findByStartedAtBefore(any(Instant.class), any(Pageable.class));
+            verify(tradingRunRepository).findAll(any(Specification.class), any(Pageable.class));
             assertNotNull(result);
             assertEquals(1, result.getRuns().size());
             assertEquals(1L, result.getTotal());
@@ -997,7 +1000,7 @@ class TradingRunServiceTest {
             testRun.setStartedAt(Instant.now().minus(10, ChronoUnit.DAYS)); // Make it old enough
             List<TradingRun> runs = Arrays.asList(testRun);
             Page<TradingRun> page = new PageImpl<>(runs, PageRequest.of(2, 10), 30);
-            when(tradingRunRepository.findByStartedAtBefore(any(Instant.class), any(Pageable.class)))
+            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
@@ -1005,7 +1008,7 @@ class TradingRunServiceTest {
             RunListResponseDto result = tradingRunService.listRuns(null, PageRequest.of(2, 10));
 
             // Assert
-            verify(tradingRunRepository).findByStartedAtBefore(any(Instant.class), any(Pageable.class));
+            verify(tradingRunRepository).findAll(any(Specification.class), any(Pageable.class));
             assertNotNull(result);
             assertEquals(30L, result.getTotal());
             assertEquals(2, result.getPage());
@@ -1019,7 +1022,7 @@ class TradingRunServiceTest {
             testRun.setStartedAt(Instant.now().minus(10, ChronoUnit.DAYS)); // Make it old enough
             List<TradingRun> runs = Arrays.asList(testRun);
             Page<TradingRun> page = new PageImpl<>(runs, PageRequest.of(0, 20), 1);
-            when(tradingRunRepository.findByStartedAtBefore(any(Instant.class), any(Pageable.class)))
+            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
@@ -1027,7 +1030,7 @@ class TradingRunServiceTest {
             RunListResponseDto result = tradingRunService.listRuns(null, PageRequest.of(0, 20));
 
             // Assert
-            verify(tradingRunRepository).findByStartedAtBefore(any(Instant.class), any(Pageable.class));
+            verify(tradingRunRepository).findAll(any(Specification.class), any(Pageable.class));
             assertNotNull(result);
             assertEquals(1, result.getRuns().size());
             TradingRunDto runDto = result.getRuns().get(0);
@@ -1049,16 +1052,16 @@ class TradingRunServiceTest {
             List<TradingRun> runs = Arrays.asList(oldRun);
             Page<TradingRun> page = new PageImpl<>(runs, PageRequest.of(0, 20), 1);
 
-            // Verify database-level filtering: repository receives cutoff date parameter
-            when(tradingRunRepository.findByStartedAtBefore(any(Instant.class), any(Pageable.class)))
+            // Verify database-level filtering: repository receives cutoff date predicate
+            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(101L)).thenReturn(Optional.empty());
 
             // Act
             RunListResponseDto result = tradingRunService.listRuns(null, PageRequest.of(0, 20));
 
-            // Assert - verify repository was called with date filter (database-level)
-            verify(tradingRunRepository).findByStartedAtBefore(any(Instant.class), any(Pageable.class));
+            // Assert - verify repository was called with Specification (database-level)
+            verify(tradingRunRepository).findAll(any(Specification.class), any(Pageable.class));
             assertNotNull(result);
             assertEquals(1, result.getRuns().size(), "Should only return runs older than 7 days");
             assertEquals(101L, result.getRuns().get(0).getRunId(), "Should return the 10-day-old run");
@@ -1076,7 +1079,7 @@ class TradingRunServiceTest {
 
             List<TradingRun> runs = Arrays.asList(cutoffRun);
             Page<TradingRun> page = new PageImpl<>(runs, PageRequest.of(0, 20), 1);
-            when(tradingRunRepository.findByStartedAtBefore(any(Instant.class), any(Pageable.class)))
+            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(103L)).thenReturn(Optional.empty());
 
@@ -1084,7 +1087,7 @@ class TradingRunServiceTest {
             RunListResponseDto result = tradingRunService.listRuns(null, PageRequest.of(0, 20));
 
             // Assert - run at cutoff should be included
-            verify(tradingRunRepository).findByStartedAtBefore(any(Instant.class), any(Pageable.class));
+            verify(tradingRunRepository).findAll(any(Specification.class), any(Pageable.class));
             assertNotNull(result);
             assertEquals(1, result.getRuns().size(), "Should include run at exactly 7 days old");
             assertEquals(103L, result.getRuns().get(0).getRunId());
@@ -1095,14 +1098,14 @@ class TradingRunServiceTest {
         void listRuns_ReturnsEmptyWhenDatabaseReturnsNoOldRuns() {
             // Arrange - database returns empty (all runs filtered at DB level)
             Page<TradingRun> emptyPage = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
-            when(tradingRunRepository.findByStartedAtBefore(any(Instant.class), any(Pageable.class)))
+            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(emptyPage);
 
             // Act
             RunListResponseDto result = tradingRunService.listRuns(null, PageRequest.of(0, 20));
 
             // Assert - should return empty list
-            verify(tradingRunRepository).findByStartedAtBefore(any(Instant.class), any(Pageable.class));
+            verify(tradingRunRepository).findAll(any(Specification.class), any(Pageable.class));
             assertNotNull(result);
             assertEquals(0, result.getRuns().size(), "Should return empty list when database returns no old runs");
         }
