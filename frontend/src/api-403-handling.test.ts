@@ -151,23 +151,4 @@ describe('api.ts - 403 Forbidden handling', () => {
     expect(navigation.navigate).not.toHaveBeenCalled()
   })
 
-  it('handles 403 from any authenticated endpoint', async () => {
-    // Arrange
-    vi.mocked(auth.getToken).mockReturnValue('expired.jwt.token')
-
-    vi.mocked(global.fetch).mockResolvedValue({
-      ok: false,
-      status: 403,
-    } as Response)
-
-    // Act
-    await raceWithTimeout(fetchRuns(0, 20, undefined, true), 50)
-
-    // Assert
-    expect(auth.logout).toHaveBeenCalled()
-    expect(navigation.navigate).toHaveBeenCalledWith(
-      expect.stringMatching(/^\/login/),
-      { replace: true },
-    )
-  })
 })

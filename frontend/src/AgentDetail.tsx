@@ -17,6 +17,7 @@ import { formatDistanceToNow } from 'date-fns'
 import Markdown from 'react-markdown'
 import type { AgentPortfolio, Holding } from './types.ts'
 import { fetchAgentPortfolio, fetchAgents } from './api.ts'
+import { fetchOrEmpty } from './fetchHelpers.ts'
 import { AGENT_COLORS } from './constants.ts'
 import { formatCurrency, formatPercent, pnlColor } from './utils.ts'
 import classes from './AgentDetail.module.css'
@@ -41,9 +42,12 @@ function AgentDetail() {
     async function load() {
       try {
         const agentId = Number(id)
+        // Cosmetic fetch (agents map for friendly name + style + system prompt)
+        // must not collapse the primary portfolio fetch if it fails — fall back
+        // to [] so the page still renders with portfolio.agentName + no style.
         const [portfolioData, agents] = await Promise.all([
           fetchAgentPortfolio(agentId, controller.signal),
-          fetchAgents(controller.signal),
+          fetchOrEmpty(fetchAgents(controller.signal)),
         ])
         setPortfolio(portfolioData)
         const agent = agents.find(a => a.id === agentId)

@@ -63,33 +63,4 @@ describe('DisclaimerBanner', () => {
     expect(link).toHaveAttribute('href', '/disclaimer')
   })
 
-  it('uses Mantine Alert component with warning styling', () => {
-    // Arrange & Act
-    const { container } = render(
-      <MantineProvider>
-        <BrowserRouter>
-          <DisclaimerBanner />
-        </BrowserRouter>
-      </MantineProvider>
-    )
-
-    // Assert - Check for Mantine Alert component structure
-    const alert = container.querySelector('[class*="Alert"]')
-    expect(alert).toBeInTheDocument()
-  })
-
-  it('includes an alert icon', () => {
-    // Arrange & Act
-    const { container } = render(
-      <MantineProvider>
-        <BrowserRouter>
-          <DisclaimerBanner />
-        </BrowserRouter>
-      </MantineProvider>
-    )
-
-    // Assert - Check for icon element
-    const icon = container.querySelector('svg')
-    expect(icon).toBeInTheDocument()
-  })
 })

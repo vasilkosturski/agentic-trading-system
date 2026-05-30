@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Accordion,
   Container,
   Title,
   Text,
   Badge,
   Paper,
   Group,
-  Table,
   Anchor,
   Alert,
   Loader,
@@ -21,112 +19,15 @@ import type {
   ResearchPhase,
   DecisionPhase,
   ExecutionPhase,
-  ToolCall,
 } from './types.ts'
 import { fetchRunDetail, fetchAgents } from './api.ts'
+import { fetchOrEmpty } from './fetchHelpers.ts'
 import { statusColor, decisionColor, formatTimestamp } from './utils.ts'
+import { formatDuration } from './runDetailFormat.ts'
+import PhaseMetrics from './PhaseMetrics.tsx'
+import ToolCallsTable from './ToolCallsTable.tsx'
+import PromptsAccordion from './PromptsAccordion.tsx'
 import classes from './RunDetail.module.css'
-
-function formatDuration(startedAt: string, completedAt: string | null): string {
-  if (!completedAt) return 'In progress'
-  const ms = new Date(completedAt).getTime() - new Date(startedAt).getTime()
-  const seconds = (ms / 1000).toFixed(1)
-  return `${seconds}s`
-}
-
-function formatParams(params: Record<string, unknown>): string {
-  return Object.entries(params)
-    .map(([key, val]) => `${key}=${typeof val === 'string' ? val : JSON.stringify(val)}`)
-    .join(', ')
-}
-
-function PhaseMetrics({ phase }: { phase: ResearchPhase | DecisionPhase }) {
-  const m = phase.metrics
-  if (!m) return null
-
-  const hasTokens = m.inputTokens != null || m.outputTokens != null
-  if (!hasTokens && !m.modelName && !m.numTurns) return null
-
-  return (
-    <Group gap="lg" mb="sm">
-      {m.modelName && <Text size="xs" c="dimmed">Model: {m.modelName}</Text>}
-      {m.numTurns != null && <Text size="xs" c="dimmed">Turns: {m.numTurns}</Text>}
-      {hasTokens && (
-        <Text size="xs" c="dimmed">
-          Tokens: {m.inputTokens?.toLocaleString() ?? '?'} in / {m.outputTokens?.toLocaleString() ?? '?'} out / {m.tokensUsed?.toLocaleString() ?? '?'} total
-        </Text>
-      )}
-      {(m.cachedTokens ?? 0) > 0 && <Text size="xs" c="dimmed">Cached: {m.cachedTokens!.toLocaleString()}</Text>}
-      {(m.reasoningTokens ?? 0) > 0 && <Text size="xs" c="dimmed">Reasoning: {m.reasoningTokens!.toLocaleString()}</Text>}
-      {m.costUsd != null && <Text size="xs" c="dimmed">Cost: ${m.costUsd.toFixed(4)}</Text>}
-    </Group>
-  )
-}
-
-function ToolCallsTable({ toolCalls }: { toolCalls: ToolCall[] }) {
-  if (toolCalls.length === 0) return null
-  return (
-    <>
-      <Text fw={600} mt="sm" mb={4}>Tool Calls</Text>
-      <Table striped>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>Tool</Table.Th>
-            <Table.Th>Parameters</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {toolCalls.map((tc, i) => (
-            <Table.Tr key={i}>
-              <Table.Td><Text size="sm" ff="monospace">{tc.tool}</Text></Table.Td>
-              <Table.Td><Text size="sm" ff="monospace">{formatParams(tc.params)}</Text></Table.Td>
-            </Table.Tr>
-          ))}
-        </Table.Tbody>
-      </Table>
-    </>
-  )
-}
-
-function PromptsAccordion({
-  label,
-  systemPrompt,
-  taskPrompt,
-}: {
-  label: string
-  systemPrompt: string | null
-  taskPrompt: string | null
-}) {
-  if (!systemPrompt && !taskPrompt) return null
-
-  return (
-    <Accordion variant="separated" mb="sm">
-      <Accordion.Item value="prompts">
-        <Accordion.Control>
-          <Text fw={600} size="sm">{label}</Text>
-        </Accordion.Control>
-        <Accordion.Panel>
-          {systemPrompt && (
-            <>
-              <Text fw={600} size="sm" mb={4}>System Prompt</Text>
-              <div className={classes.scrollableContent}>
-                <Markdown>{systemPrompt}</Markdown>
-              </div>
-            </>
-          )}
-          {taskPrompt && (
-            <>
-              <Text fw={600} size="sm" mb={4}>Task Prompt</Text>
-              <div className={classes.scrollableContentLast}>
-                <Markdown>{taskPrompt}</Markdown>
-              </div>
-            </>
-          )}
-        </Accordion.Panel>
-      </Accordion.Item>
-    </Accordion>
-  )
-}
 
 function ResearchSection({ research }: { research: ResearchPhase | null }) {
   if (!research) {
@@ -323,9 +224,12 @@ function RunDetail() {
 
     async function fetchDetail() {
       try {
+        // Cosmetic fetch (agents map for the friendly header name) must not
+        // collapse the primary run detail fetch if it fails — fall back to []
+        // so the header shows the "Agent #N" fallback instead of an error.
         const [runData, agentsData] = await Promise.all([
           fetchRunDetail(id!, controller.signal),
-          fetchAgents(controller.signal),
+          fetchOrEmpty(fetchAgents(controller.signal)),
         ])
 
         setData(runData)

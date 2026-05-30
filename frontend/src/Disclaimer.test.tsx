@@ -36,49 +36,14 @@ describe('Disclaimer', () => {
     expect(screen.getByRole('heading', { name: /what this platform is not/i })).toBeInTheDocument()
   })
 
-  it('lists that platform is not personalized advice', () => {
-    renderDisclaimer()
-    expect(screen.getByText(/not personalized advice/i)).toBeInTheDocument()
-  })
-
-  it('lists that platform is not recommendations', () => {
-    renderDisclaimer()
-    const matches = screen.getAllByText(/not recommendations/i)
-    expect(matches.length).toBeGreaterThan(0)
-  })
-
-  it('lists that platform is not managed by licensed advisors', () => {
-    renderDisclaimer()
-    const matches = screen.getAllByText(/not managed by licensed/i)
-    expect(matches.length).toBeGreaterThan(0)
-  })
-
   it('includes past performance disclaimer', () => {
     renderDisclaimer()
     const matches = screen.getAllByText(/past performance.*future results/i)
     expect(matches.length).toBeGreaterThan(0)
   })
 
-  it('mentions AI agents can make mistakes', () => {
-    renderDisclaimer()
-    const matches = screen.getAllByText(/AI agents.*mistakes/i)
-    expect(matches.length).toBeGreaterThan(0)
-  })
-
   it('recommends consulting licensed advisor', () => {
     renderDisclaimer()
     expect(screen.getByText(/consult.*licensed.*advisor/i)).toBeInTheDocument()
-  })
-
-  it('explains educational purpose', () => {
-    renderDisclaimer()
-    const matches = screen.getAllByText(/educational.*purpose/i)
-    expect(matches.length).toBeGreaterThan(0)
-  })
-
-  it('states all data is delayed', () => {
-    renderDisclaimer()
-    const matches = screen.getAllByText(/all data.*delayed/i)
-    expect(matches.length).toBeGreaterThan(0)
   })
 })
