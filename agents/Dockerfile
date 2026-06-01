@@ -4,20 +4,25 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for MCP servers
-RUN apt-get update && apt-get install -y \
-    nodejs \
-    npm \
-    curl \
-    ca-certificates \
+# Install system dependencies for MCP servers. Versions pinned to the
+# Debian trixie (13) packages shipped by the python:3.11-slim base image
+# at build time, so rebuilds produce reproducible images. Bump these in
+# lockstep with the Python base-image tag when rolling Debian releases.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nodejs=20.19.2+dfsg-1+deb13u2 \
+    npm=9.2.0~ds1-3 \
+    curl=8.14.1-2+deb13u3 \
+    ca-certificates=20250419 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv for Python package management (used by MCP servers)
-RUN pip install uv
+# Install uv for Python package management (used by MCP servers).
+# Pinned to the current stable release at the time of writing.
+RUN pip install --no-cache-dir uv==0.5.11
 
-# Install MCP server packages globally (avoids runtime npm/uvx installs that pollute stdout)
-RUN npm install -g @modelcontextprotocol/server-brave-search
-RUN pip install mcp-server-fetch
+# Install MCP server packages globally (avoids runtime npm/uvx installs that
+# pollute stdout). Both packages pinned to their current stable releases.
+RUN npm install -g @modelcontextprotocol/server-brave-search@0.6.2
+RUN pip install --no-cache-dir mcp-server-fetch==2025.4.7
 
 # Copy project metadata and install dependencies from pyproject.toml
 # pyproject.toml is the single source of truth (W8: requirements.txt removed).
