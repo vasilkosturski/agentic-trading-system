@@ -6,10 +6,17 @@ Runs alongside the continuous trading system using proper encapsulation.
 
 import asyncio
 import logging
+import os
 import time
 from flask import Flask, jsonify
 from threading import Thread
 
+# Ensure JSON logging is installed even when this module is imported in
+# isolation (e.g. unit tests). configure_json_logging is idempotent so it's
+# a no-op when trading_system.py already ran it.
+from logging_config import configure_json_logging
+
+configure_json_logging(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
 

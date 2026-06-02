@@ -18,7 +18,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import com.trading.testsupport.SharedPostgresContainer;
@@ -27,32 +26,23 @@ import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
  * Integration tests for {@link TradeOrchestrator} — verifies that the
- * {@code @Transactional} buy flow composes with the AFTER_COMMIT event listener
- * so that committed trades produce broadcasts and rolled-back trades produce
- * zero effects.
+ * {@code @Transactional} buy flow rolls back atomically when any collaborator
+ * inside the transaction throws.
  *
- * <p>The HAPPY PATH proves the full pipeline end-to-end: a successful
- * {@code buyShares} call inserts a transaction row, reduces the account
- * balance, and (after the surrounding transaction commits) fires a broadcast
- * through the leaf {@link SimpMessagingTemplate}.</p>
+ * <p>The HAPPY PATH proves a successful {@code buyShares} call inserts a
+ * transaction row and reduces the account balance by the trade cost.</p>
  *
  * <p>The ROLLBACK PATH is the load-bearing transactional-safety proof: forcing
  * {@link PortfolioSnapshotService#createSnapshot(String)} to throw inside the
  * orchestrator's transaction must (1) roll back the trade row insert performed
- * by {@code BuyTradeExecutor.executeBuy}, (2) roll back the balance update,
- * and (3) prevent any broadcast from firing — verified via
- * {@code verifyNoInteractions(messagingTemplate)}.</p>
+ * by {@code BuyTradeExecutor.executeBuy} and (2) roll back the balance update.</p>
  */
 @SpringBootTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -72,7 +62,6 @@ class TradeOrchestratorIntegrationTest {
     @Autowired private TradingAgentRepository agentRepository;
     @Autowired private TradingRunRepository runRepository;
 
-    @MockBean private SimpMessagingTemplate messagingTemplate;
     @MockBean private PortfolioSnapshotService portfolioSnapshotService;
     @MockBean private MarketService marketService;
 
@@ -87,7 +76,7 @@ class TradeOrchestratorIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        reset(messagingTemplate, portfolioSnapshotService, marketService);
+        reset(portfolioSnapshotService, marketService);
 
         // Wipe the in-flight test database so each test starts from a known
         // empty state. The shared singleton Testcontainer survives across
@@ -120,8 +109,8 @@ class TradeOrchestratorIntegrationTest {
     }
 
     @Test
-    @DisplayName("HAPPY PATH: buyShares commits → transaction row inserted, balance reduced, broadcast fired")
-    void happyPathCommitsAndBroadcasts() {
+    @DisplayName("HAPPY PATH: buyShares commits → transaction row inserted, balance reduced")
+    void happyPathCommits() {
         long txnCountBefore = transactionRepository.count();
 
         var result = tradeOrchestrator.buyShares(AGENT_NAME, SYMBOL, 10, run.getId());
@@ -137,13 +126,10 @@ class TradeOrchestratorIntegrationTest {
         TradingAccount reloaded = accountRepository.findByAgentName(AGENT_NAME).orElseThrow();
         assertThat(reloaded.getBalance()).isLessThan(INITIAL_BALANCE);
         assertThat(reloaded.getBalance()).isEqualTo(INITIAL_BALANCE - (PRICE * 10));
-
-        // Broadcast fires (AFTER_COMMIT, asynchronous via TransactionalEventListener).
-        verify(messagingTemplate, timeout(2000)).convertAndSend(any(String.class), any(Object.class));
     }
 
     @Test
-    @DisplayName("ROLLBACK PATH: PortfolioSnapshotService throws → no txn row, no balance change, no broadcast")
+    @DisplayName("ROLLBACK PATH: PortfolioSnapshotService throws → no txn row, no balance change")
     void rollbackProducesZeroEffects() {
         long txnCountBefore = transactionRepository.count();
 
@@ -160,8 +146,5 @@ class TradeOrchestratorIntegrationTest {
 
         TradingAccount reloaded = accountRepository.findByAgentName(AGENT_NAME).orElseThrow();
         assertThat(reloaded.getBalance()).isEqualTo(INITIAL_BALANCE);
-
-        // AFTER_COMMIT listener never fires because the transaction never commits.
-        verifyNoInteractions(messagingTemplate);
     }
 }

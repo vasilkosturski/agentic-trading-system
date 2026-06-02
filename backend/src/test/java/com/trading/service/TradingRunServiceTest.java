@@ -3,16 +3,12 @@ package com.trading.service;
 import com.trading.dto.request.CompleteRunRequest;
 import com.trading.dto.request.RunQueryFilter;
 import com.trading.dto.response.*;
-import com.trading.dto.websocket.DecisionCompletedMessage;
-import com.trading.dto.websocket.PhaseUpdateMessage;
 import com.trading.entity.*;
 import com.trading.enums.PhaseStatus;
 import com.trading.enums.RunPhase;
 import com.trading.enums.RunStatus;
 import com.trading.enums.TradeDecision;
-import com.trading.enums.WebSocketMessageType;
 import com.trading.exception.ResourceNotFoundException;
-import com.trading.messaging.RunEventPublisher;
 import com.trading.repository.*;
 import com.trading.specification.TradingRunSpecification;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,9 +64,6 @@ class TradingRunServiceTest {
     @Mock
     private AccountTransactionRepository accountTransactionRepository;
 
-    @Mock
-    private RunEventPublisher runEventPublisher;
-
     @Spy
     private RunDtoMapper runDtoMapper = new RunDtoMapper();
 
@@ -92,9 +85,6 @@ class TradingRunServiceTest {
 
     @Captor
     private ArgumentCaptor<ExecutionPhase> executionPhaseCaptor;
-
-    @Captor
-    private ArgumentCaptor<PhaseUpdateMessage> phaseUpdateCaptor;
 
     // Test fixtures
     private TradingAgent testAgent;
@@ -186,29 +176,6 @@ class TradingRunServiceTest {
         }
 
         @Test
-        @DisplayName("Valid agent broadcasts phase_update via WebSocket")
-        void createRun_ValidAgent_BroadcastsPhaseUpdate() {
-            // Arrange
-            when(tradingAgentRepository.findById(1L)).thenReturn(Optional.of(testAgent));
-            when(tradingRunRepository.save(any(TradingRun.class))).thenAnswer(invocation -> {
-                TradingRun run = invocation.getArgument(0);
-                run.setId(100L);
-                return run;
-            });
-
-            // Act
-            tradingRunService.createRun(1L);
-
-            // Assert - verify WebSocket message content
-            verify(runEventPublisher).publishPhaseUpdate(phaseUpdateCaptor.capture());
-            PhaseUpdateMessage message = phaseUpdateCaptor.getValue();
-            assertEquals(WebSocketMessageType.PHASE_UPDATE, message.getType(), "WebSocket message type should be phase_update");
-            assertEquals(1L, message.getAgentId(), "WebSocket message should contain correct agent_id");
-            assertEquals(100L, message.getRunId(), "WebSocket message should contain correct run_id");
-            assertEquals("INITIALIZING", message.getPhase(), "WebSocket message should contain INITIALIZING phase");
-        }
-
-        @Test
         @DisplayName("Agent not found throws ResourceNotFoundException")
         void createRun_AgentNotFound_ThrowsResourceNotFoundException() {
             // Arrange
@@ -297,25 +264,6 @@ class TradingRunServiceTest {
                 () -> tradingRunService.updatePhase(999L, RunPhase.RESEARCHING)
             );
             assertTrue(exception.getMessage().contains("Trading run not found"));
-        }
-
-        @Test
-        @DisplayName("updatePhase broadcasts phase_update via WebSocket")
-        @SuppressWarnings("unchecked")
-        void updatePhase_BroadcastsPhaseUpdate() {
-            // Arrange
-            testRun.updatePhase(RunPhase.INITIALIZING);
-            when(tradingRunRepository.findById(100L)).thenReturn(Optional.of(testRun));
-            when(tradingRunRepository.save(any(TradingRun.class))).thenReturn(testRun);
-
-            // Act
-            tradingRunService.updatePhase(100L, RunPhase.RESEARCHING);
-
-            // Assert - verify WebSocket message content
-            verify(runEventPublisher).publishPhaseUpdate(phaseUpdateCaptor.capture());
-            PhaseUpdateMessage message = phaseUpdateCaptor.getValue();
-            assertEquals(WebSocketMessageType.PHASE_UPDATE, message.getType());
-            assertEquals("RESEARCHING", message.getPhase());
         }
 
         @Test
@@ -567,23 +515,6 @@ class TradingRunServiceTest {
             assertTrue(capturedRun.getCompletedAt().isAfter(beforeCall) ||
                        capturedRun.getCompletedAt().equals(beforeCall),
                        "completedAt should be at or after the call time");
-        }
-
-        @Test
-        @DisplayName("completeRun broadcasts decision_completed via WebSocket")
-        void completeRun_BroadcastsDecisionCompleted() {
-            // Arrange
-            CompleteRunRequest request = createHoldRequest();
-            when(tradingRunRepository.findById(100L)).thenReturn(Optional.of(testRun));
-            when(tradingRunRepository.save(any(TradingRun.class))).thenReturn(testRun);
-            when(researchPhaseRepository.save(any(ResearchPhase.class))).thenReturn(testResearchPhase);
-            when(decisionPhaseRepository.save(any(DecisionPhase.class))).thenReturn(testDecisionPhase);
-
-            // Act
-            tradingRunService.completeRun(100L, request);
-
-            // Assert
-            verify(runEventPublisher).publishDecisionCompleted(any(DecisionCompletedMessage.class));
         }
 
         @Test

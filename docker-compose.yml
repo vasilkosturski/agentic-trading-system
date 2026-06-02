@@ -17,8 +17,9 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: agentic_trading
-      POSTGRES_USER: trading_user
-      POSTGRES_PASSWORD: trading_password
+      POSTGRES_USER: ${POSTGRES_USER:-trading_user}
+      # Required at startup — copy .env.example to .env and set POSTGRES_PASSWORD before `docker compose up`.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required, set it in .env (see .env.example)}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
     ports:
       - "5432:5432"
@@ -27,7 +28,7 @@ services:
     networks:
       - trading-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U trading_user -d agentic_trading"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trading_user} -d agentic_trading"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -46,15 +47,16 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: agentic_trading
-      DB_USERNAME: trading_user
-      DB_PASSWORD: trading_password
+      DB_USERNAME: ${POSTGRES_USER:-trading_user}
+      # Required at startup — must match POSTGRES_PASSWORD above.
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required, set it in .env (see .env.example)}
       # Optional: real-time market data. Without it, certain endpoints fall back to cached / mock data.
       FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
-      # Login auth. Defaults make `docker compose up` work out of the box; override in .env for anything non-local.
-      JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret-change-me-for-anything-real}
+      # Login auth. JWT_SECRET / ADMIN_PASSWORD are required at startup so the stack never boots with a guessable default.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required (HS256 needs >=32 chars), set it in .env (see .env.example)}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required, set it in .env (see .env.example)}
     ports:
       - "8080:8080"
     networks:
@@ -80,10 +82,10 @@ services:
     restart: unless-stopped
     environment:
       # Required for the agents to do anything useful — see .env.example for where to get keys.
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      BRAVE_API_KEY: ${BRAVE_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required, set it in .env (see .env.example)}
+      BRAVE_API_KEY: ${BRAVE_API_KEY:?BRAVE_API_KEY is required, set it in .env (see .env.example)}
       BACKEND_URL: "http://backend-service:8080"
-      DATABASE_URL: "postgresql://trading_user:trading_password@postgres:5432/agentic_trading"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required, set it in .env (see .env.example)}@postgres:5432/agentic_trading"
       ENVIRONMENT: "development"
       LOG_LEVEL: "DEBUG"
       CONTINUOUS_MODE: "true"

@@ -14,13 +14,27 @@ spring:
 server:
   port: 8080
   error:
-    include-message: always  # Required for Spring Boot 2.3+ to include error messages in responses
+    # Echo framework error messages to response bodies only when the client
+    # explicitly opts in with `?message=true`. Default responses follow the
+    # ControllerAdvice ProblemDetail shape and stay terse — avoids leaking
+    # internal exception text in default 4xx/5xx envelopes.
+    include-message: on_param
 
 spring.mvc:
   problemdetails:
     enabled: true  # Enable RFC 7807 ProblemDetail support
 
 logging:
+  # Emit structured JSON to stdout using the Elastic Common Schema (ECS) format
+  # natively supported by Spring Boot 3.4+. Each line is a parseable JSON object
+  # carrying an explicit `log.level` field, so the log-shipping pipeline can read
+  # the level directly from a structured envelope instead of regex-matching the
+  # free-form message text. Field values like `log.level` remain uppercase per
+  # the ECS spec; downstream consumers lowercase as needed. The ECS `service.name`
+  # field is populated automatically from `spring.application.name` above.
+  structured:
+    format:
+      console: ecs
   level:
     com.trading: DEBUG
     org.springframework.web: DEBUG

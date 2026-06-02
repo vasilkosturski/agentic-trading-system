@@ -1,5 +1,10 @@
 """
-Status broadcasting for real-time agent updates via WebSocket.
+Status broadcasting for agent run heartbeats.
+
+Each call POSTs an agent status payload to the backend at
+``/api/agents/status``. The backend acknowledges with 204 and logs the
+update; nothing further happens server-side. The HTTP call exists so
+operators can see in the backend logs which agent is in which phase.
 
 Uses async HTTP to avoid blocking the event loop during broadcasts.
 Callers should use asyncio.create_task() for fire-and-forget behavior.

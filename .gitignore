@@ -46,7 +46,9 @@ coverage.xml
 cover/
 
 # Virtual environments
-.env
+# Covers .env plus backups (.env.bak.*), per-env variants (.env.local, .env.production), and rotation snapshots.
+.env*
+!.env.example
 .venv
 env/
 venv/

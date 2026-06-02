@@ -16,6 +16,7 @@ from api.server import TradingAPIServer
 from mcp_helpers.types import MCPName, MCPPool
 from mcp_helpers.params import get_mcp_server_params
 from backend.client import close_backend_client
+from logging_config import configure_json_logging
 
 # Load environment variables
 load_dotenv(override=True)
@@ -29,11 +30,9 @@ if not _run_interval:
     raise ValueError("RUN_EVERY_N_MINUTES environment variable must be set")
 RUN_EVERY_N_MINUTES = int(_run_interval)
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Configure JSON logging across the agents service (root + werkzeug).
+# See logging_config.py for the field-rename rationale.
+configure_json_logging(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
 # Per-agent investment style + starting balance live at module scope rather

@@ -4,14 +4,11 @@ import com.trading.config.TradingPublicProperties;
 import com.trading.dto.request.CompleteRunRequest;
 import com.trading.dto.request.RunQueryFilter;
 import com.trading.dto.response.*;
-import com.trading.dto.websocket.DecisionCompletedMessage;
-import com.trading.dto.websocket.PhaseUpdateMessage;
 import com.trading.entity.*;
 import com.trading.enums.PhaseStatus;
 import com.trading.enums.RunPhase;
 import com.trading.enums.TradeDecision;
 import com.trading.exception.ResourceNotFoundException;
-import com.trading.messaging.RunEventPublisher;
 import com.trading.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,7 +41,6 @@ public class TradingRunService {
     private final ExecutionPhaseRepository executionPhaseRepository;
     private final TradingAgentRepository tradingAgentRepository;
     private final AccountTransactionRepository accountTransactionRepository;
-    private final RunEventPublisher runEventPublisher;
     private final RunDtoMapper runDtoMapper;
     private final RunSpecificationFactory runSpecificationFactory;
 
@@ -55,7 +51,6 @@ public class TradingRunService {
             ExecutionPhaseRepository executionPhaseRepository,
             TradingAgentRepository tradingAgentRepository,
             AccountTransactionRepository accountTransactionRepository,
-            RunEventPublisher runEventPublisher,
             RunDtoMapper runDtoMapper,
             RunSpecificationFactory runSpecificationFactory) {
         this.tradingRunRepository = tradingRunRepository;
@@ -64,7 +59,6 @@ public class TradingRunService {
         this.executionPhaseRepository = executionPhaseRepository;
         this.tradingAgentRepository = tradingAgentRepository;
         this.accountTransactionRepository = accountTransactionRepository;
-        this.runEventPublisher = runEventPublisher;
         this.runDtoMapper = runDtoMapper;
         this.runSpecificationFactory = runSpecificationFactory;
     }
@@ -81,8 +75,6 @@ public class TradingRunService {
 
         logger.info("Created run ID: {} for agent: {} with phase: {}",
             run.getId(), agent.getName(), run.getPhase());
-
-        broadcastPhaseUpdate(run);
 
         return TradingRunDto.fromEntity(run);
     }
@@ -109,8 +101,6 @@ public class TradingRunService {
         run = tradingRunRepository.save(run);
 
         logger.info("Run {} phase updated: {} -> {}", runId, currentPhase, newPhase);
-
-        broadcastPhaseUpdate(run);
     }
 
     @Transactional
@@ -157,8 +147,6 @@ public class TradingRunService {
 
         logger.info("Run {} completed with decision: {}, trade ID: {}",
             runId, tradeDecision, tradeId);
-
-        broadcastDecisionCompleted(run, tradeDecision, tradeId);
     }
 
     /**
@@ -230,30 +218,6 @@ public class TradingRunService {
         return tradingRunRepository.findById(runId)
             .orElseThrow(() -> new ResourceNotFoundException(
                 "Trading run not found with ID: " + runId));
-    }
-
-    private void broadcastPhaseUpdate(TradingRun run) {
-        PhaseUpdateMessage message = new PhaseUpdateMessage(
-            run.getAgent().getId(),
-            run.getId(),
-            run.getPhase().name()
-        );
-
-        runEventPublisher.publishPhaseUpdate(message);
-        logger.debug("Broadcast phase_update for run {}: {}", run.getId(), run.getPhase());
-    }
-
-    private void broadcastDecisionCompleted(TradingRun run, TradeDecision decision, Long tradeId) {
-        DecisionCompletedMessage message = new DecisionCompletedMessage(
-            run.getAgent().getId(),
-            run.getId(),
-            decision.name(),
-            tradeId
-        );
-
-        runEventPublisher.publishDecisionCompleted(message);
-        logger.debug("Broadcast decision_completed for run {}: {} (trade: {})",
-            run.getId(), decision, tradeId);
     }
 
     /**

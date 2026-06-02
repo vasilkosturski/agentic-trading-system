@@ -17,7 +17,7 @@ spring:
 server:
   port: 8080
   error:
-    include-message: always
+    include-message: on_param
 
 spring.mvc:
   problemdetails:

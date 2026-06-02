@@ -14,7 +14,6 @@ import com.trading.enums.RunPhase;
 import com.trading.enums.RunStatus;
 import com.trading.enums.TradeDecision;
 import com.trading.exception.ResourceNotFoundException;
-import com.trading.messaging.RunEventPublisher;
 import com.trading.repository.*;
 import com.trading.service.RunDtoMapper;
 import com.trading.service.RunSpecificationFactory;
@@ -25,7 +24,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -35,7 +33,6 @@ import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
 
 /**
  * Integration tests for Trading Runs API.
@@ -43,7 +40,7 @@ import static org.mockito.Mockito.mock;
  * Tests complete end-to-end workflows through service layer with real database.
  *
  * Note: Uses @DataJpaTest to avoid web layer and controller mapping conflicts.
- * Manually configures TradingRunService with mocked RunEventPublisher.
+ * Manually configures TradingRunService against the autowired repositories.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -73,9 +70,8 @@ class TradingRunIntegrationTest {
     @Autowired
     private AccountTransactionRepository accountTransactionRepository;
 
-    // Service under test - manually instantiated with mocked WebSocket
+    // Service under test - manually instantiated against autowired repositories
     private TradingRunService tradingRunService;
-    private RunEventPublisher mockRunEventPublisher;
 
     private TradingAgent testAgent;
 
@@ -88,10 +84,7 @@ class TradingRunIntegrationTest {
         tradingRunRepository.deleteAll();
         tradingAgentRepository.deleteAll();
 
-        // Create mock event publisher (we don't test WebSocket here)
-        mockRunEventPublisher = mock(RunEventPublisher.class);
-
-        // Manually create service with repositories and mock event publisher
+        // Manually create service with repositories
         tradingRunService = new TradingRunService(
             tradingRunRepository,
             researchPhaseRepository,
@@ -99,7 +92,6 @@ class TradingRunIntegrationTest {
             executionPhaseRepository,
             tradingAgentRepository,
             accountTransactionRepository,
-            mockRunEventPublisher,
             new RunDtoMapper(),
             new RunSpecificationFactory()
         );
