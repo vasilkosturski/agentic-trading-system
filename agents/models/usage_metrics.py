@@ -13,6 +13,7 @@ class UsageMetrics(BaseModel):
 
     Fields match the backend UsageMetricsDto (camelCase field names).
     """
+
     tokensUsed: int = 0
     inputTokens: int = 0
     outputTokens: int = 0

@@ -2,24 +2,39 @@ package com.trading.entity;
 
 import com.trading.enums.RunPhase;
 import com.trading.enums.RunStatus;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import java.time.Instant;
 
 /**
  * Trading run entity - tracks each autonomous trading cycle.
  * Per design doc: Parent record with phase lifecycle (INITIALIZING → RESEARCHING → DECIDING → TRADING → COMPLETED).
- * 
+ *
  * Replaces: analytics.agent_runs
  * Schema: trading.trading_runs
  */
 @Entity
-@Table(name = "trading_runs", schema = "trading", indexes = {
-    @Index(name = "idx_trading_runs_agent_id", columnList = "agent_id"),
-    @Index(name = "idx_trading_runs_status", columnList = "status")
-})
+@Table(
+        name = "trading_runs",
+        schema = "trading",
+        indexes = {
+            @Index(name = "idx_trading_runs_agent_id", columnList = "agent_id"),
+            @Index(name = "idx_trading_runs_status", columnList = "status")
+        })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -80,6 +95,7 @@ public class TradingRun {
         }
     }
 
+    @SuppressWarnings("checkstyle:HiddenField") // parameter intentionally mirrors the field it assigns
     public void markAsError(String errorMessage) {
         this.phase = RunPhase.FAILED;
         this.status = RunStatus.FAILED;
@@ -113,4 +129,3 @@ public class TradingRun {
         return this.completedAt.toEpochMilli() - this.startedAt.toEpochMilli();
     }
 }
-

@@ -1,0 +1,99 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+        "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+        "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!--
+  Pragmatic Checkstyle ruleset for a Spring Boot codebase. Focuses on
+  structural smells and real bugs rather than purely stylistic nits that
+  Spotless (palantir-java-format) already handles. Whitespace, brace
+  placement, import ordering, and line wrapping are owned by the formatter.
+-->
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+    <property name="severity" value="error"/>
+    <property name="fileExtensions" value="java, properties, xml"/>
+
+    <module name="SuppressWarningsFilter"/>
+
+    <module name="FileTabCharacter">
+        <property name="eachLine" value="true"/>
+    </module>
+
+    <module name="LineLength">
+        <property name="fileExtensions" value="java"/>
+        <property name="max" value="180"/>
+        <property name="ignorePattern" value="^package.*|^import.*|a href|href|http://|https://|ftp://"/>
+    </module>
+
+    <module name="TreeWalker">
+        <module name="SuppressWarningsHolder"/>
+
+        <!-- Naming -->
+        <module name="PackageName">
+            <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
+        </module>
+        <module name="TypeName"/>
+        <module name="MethodName">
+            <property name="format" value="^[a-z][a-zA-Z0-9_]*$"/>
+        </module>
+        <module name="ConstantName">
+            <!-- Allow SLF4J's `logger` idiom alongside SCREAMING_SNAKE_CASE. -->
+            <property name="format" value="^(log(ger)?|[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)$"/>
+        </module>
+        <module name="LocalVariableName"/>
+        <module name="MemberName"/>
+        <module name="ParameterName"/>
+        <module name="StaticVariableName"/>
+
+        <!-- Imports -->
+        <module name="AvoidStarImport">
+            <property name="allowStaticMemberImports" value="true"/>
+        </module>
+        <module name="RedundantImport"/>
+        <module name="UnusedImports">
+            <property name="processJavadoc" value="true"/>
+        </module>
+
+        <!-- Real-bug detectors -->
+        <module name="EmptyBlock">
+            <property name="option" value="text"/>
+            <property name="tokens" value="LITERAL_TRY, LITERAL_FINALLY, LITERAL_IF, LITERAL_ELSE, LITERAL_FOR, LITERAL_WHILE, LITERAL_DO, LITERAL_SWITCH"/>
+        </module>
+        <module name="EmptyStatement"/>
+        <module name="EqualsHashCode"/>
+        <module name="MissingSwitchDefault"/>
+        <module name="FallThrough"/>
+        <module name="SimplifyBooleanExpression"/>
+        <module name="SimplifyBooleanReturn"/>
+        <module name="StringLiteralEquality"/>
+        <module name="HiddenField">
+            <property name="ignoreConstructorParameter" value="true"/>
+            <property name="ignoreSetter" value="true"/>
+            <property name="setterCanReturnItsClass" value="true"/>
+            <property name="ignoreAbstractMethods" value="true"/>
+        </module>
+        <module name="IllegalCatch"/>
+        <module name="IllegalThrows"/>
+        <module name="MissingOverride"/>
+        <module name="PackageDeclaration"/>
+        <module name="UpperEll"/>
+        <module name="ArrayTypeStyle"/>
+
+        <!-- Modifiers -->
+        <module name="ModifierOrder"/>
+        <module name="RedundantModifier"/>
+
+        <!-- Blocks -->
+        <module name="NeedBraces"/>
+        <module name="LeftCurly"/>
+        <module name="RightCurly"/>
+
+        <!-- Class design (loose: only catch the most obvious mistakes) -->
+        <module name="OneStatementPerLine"/>
+        <module name="MultipleVariableDeclarations"/>
+
+        <!-- Suppression annotation support -->
+        <module name="SuppressWarningsHolder"/>
+    </module>
+</module>

@@ -1,11 +1,10 @@
 package com.trading.model;
 
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.time.Instant;
 
 /**
  * Real-time status update for agent trading cycles
@@ -17,10 +16,9 @@ import java.time.Instant;
 public class AgentStatusUpdate {
     private Long agentId;
     private String agentName;
-    private String phase;          // INITIALIZING, FETCHING_DATA, RESEARCHING, ANALYZING, DECIDING, TRADING, COMPLETED, ERROR
-    private String message;         // Human-readable description
-    private Integer progress;       // 0-100
-    private String outcome;         // For COMPLETED phase: trade details or no-trade reason
+    private String phase; // INITIALIZING, FETCHING_DATA, RESEARCHING, ANALYZING, DECIDING, TRADING, COMPLETED, ERROR
+    private String message; // Human-readable description
+    private Integer progress; // 0-100
+    private String outcome; // For COMPLETED phase: trade details or no-trade reason
     private Instant timestamp;
 }
-

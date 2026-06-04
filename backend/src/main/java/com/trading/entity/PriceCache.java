@@ -1,6 +1,10 @@
 package com.trading.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
 import java.time.Instant;
 
 /**
@@ -9,13 +13,12 @@ import java.time.Instant;
  */
 @Entity
 @Table(
-    name = "price_cache",
-    schema = "analytics",
-    indexes = {
-        @Index(name = "idx_price_cache_symbol", columnList = "symbol"),
-        @Index(name = "idx_price_cache_timestamp", columnList = "cached_at")
-    }
-)
+        name = "price_cache",
+        schema = "analytics",
+        indexes = {
+            @Index(name = "idx_price_cache_symbol", columnList = "symbol"),
+            @Index(name = "idx_price_cache_timestamp", columnList = "cached_at")
+        })
 public class PriceCache {
 
     @Id
@@ -32,8 +35,7 @@ public class PriceCache {
     private String source;
 
     // Constructors
-    public PriceCache() {
-    }
+    public PriceCache() {}
 
     public PriceCache(String symbol, double price, Instant cachedAt, String source) {
         this.symbol = symbol;

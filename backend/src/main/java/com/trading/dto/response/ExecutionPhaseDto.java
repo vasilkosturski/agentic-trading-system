@@ -3,11 +3,10 @@ package com.trading.dto.response;
 import com.trading.entity.AccountTransaction;
 import com.trading.entity.ExecutionPhase;
 import com.trading.enums.PhaseStatus;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.time.Instant;
 
 /**
  * DTO for execution phase data.
@@ -20,10 +19,10 @@ import java.time.Instant;
 public class ExecutionPhaseDto {
     private Long executionId;
     private Long runId;
-    private Long tradeId;  // may be null
+    private Long tradeId; // may be null
     private PhaseStatus status;
-    private String errorDetails;  // may be null
-    private TradeDetailDto trade;  // nested trade details, may be null
+    private String errorDetails; // may be null
+    private TradeDetailDto trade; // nested trade details, may be null
     private Instant createdAt;
 
     /**

@@ -1,27 +1,38 @@
 package com.trading.entity;
 
-import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.SourceDto;
+import com.trading.dto.jsonb.ToolCallDto;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
+import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Type;
-import java.time.Instant;
-import java.util.List;
 
 /**
  * Research phase entity - stores Market Analyst research outputs.
  * Per design doc Lines 131-135: candidates, sources, research_notes, tool_calls, metrics.
- * 
+ *
  * Schema: trading.research_phases
  * Relationship: One per trading run (1:1)
  */
 @Entity
-@Table(name = "research_phases", schema = "trading", uniqueConstraints = {
-    @UniqueConstraint(columnNames = "run_id")
-})
+@Table(
+        name = "research_phases",
+        schema = "trading",
+        uniqueConstraints = {@UniqueConstraint(columnNames = "run_id")})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -86,4 +97,3 @@ public class ResearchPhase {
         this.run = run;
     }
 }
-

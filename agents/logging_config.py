@@ -22,7 +22,6 @@ import sys
 
 from pythonjsonlogger.json import JsonFormatter
 
-
 _CONFIGURED = False
 
 

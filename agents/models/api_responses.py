@@ -4,19 +4,20 @@ These use Pydantic BaseModel because they validate data from external APIs
 (Java backend), which is an external boundary that needs validation.
 """
 
-from datetime import datetime
 from datetime import date as DateType
+from datetime import datetime
 from enum import Enum
-from typing import List
-from pydantic import BaseModel, Field
 
+from pydantic import BaseModel, Field
 
 # =============================================================================
 # Enums for Type Safety
 # =============================================================================
 
+
 class DataTier(str, Enum):
     """Data quality tier from backend."""
+
     REAL = "REAL"
     MOCK = "MOCK"
     CACHED = "CACHED"
@@ -24,12 +25,14 @@ class DataTier(str, Enum):
 
 class TradeType(str, Enum):
     """Trade direction."""
+
     BUY = "BUY"
     SELL = "SELL"
 
 
 class RunOutcome(str, Enum):
     """Outcome of a trading run."""
+
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     IN_PROGRESS = "IN_PROGRESS"
@@ -38,6 +41,7 @@ class RunOutcome(str, Enum):
 # =============================================================================
 # Market Data Models
 # =============================================================================
+
 
 class PriceMetadata(BaseModel):
     """Stock price with metadata (from backend API)."""
@@ -100,12 +104,13 @@ class AccountReport(BaseModel):
     lastUpdated: str | None = Field(default=None, description="Last activity timestamp")
     holdingsCount: int = Field(ge=0, description="Number of stock positions")
     transactionCount: int = Field(ge=0, description="Total number of trades")
-    holdings: List[Holding] = Field(default_factory=list, description="Detailed holdings list")
+    holdings: list[Holding] = Field(default_factory=list, description="Detailed holdings list")
 
 
 # =============================================================================
 # Run History API Response Models (for /api/accounts/{agentId}/runs/* endpoints)
 # =============================================================================
+
 
 class AccountResponse(BaseModel):
     """Response from /api/accounts/{id} endpoint.
@@ -135,7 +140,9 @@ class ActivityRun(BaseModel):
     summary: str | None = Field(default=None, description="Brief summary of the run")
     fullReasoning: str | None = Field(default=None, description="Complete reasoning")
     researchSources: str | None = Field(default=None, description="JSON string of web sources")
-    historicalContext: str | None = Field(default=None, description="JSON string of historical insights")
+    historicalContext: str | None = Field(
+        default=None, description="JSON string of historical insights"
+    )
     trades: list[ActivityTrade] | None = Field(default=None, description="Trades made in this run")
 
 
@@ -198,7 +205,9 @@ class SymbolHistoryResponse(BaseModel):
     symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
     agentName: str = Field(description="Name of the trading agent")
     days: int = Field(gt=0, description="Number of days of history")
-    currentPosition: SymbolPosition | None = Field(default=None, description="Current position if any")
+    currentPosition: SymbolPosition | None = Field(
+        default=None, description="Current position if any"
+    )
     trades: list[SymbolTrade] = Field(default_factory=list, description="List of trades")
     summary: TradingSummary | None = Field(default=None, description="Trading summary")
 
@@ -214,6 +223,7 @@ class PriceLookupResponse(BaseModel):
 # =============================================================================
 # Trade Execution Models
 # =============================================================================
+
 
 class TradeResult(BaseModel):
     """Result of a trade execution (buy/sell) from backend API.
@@ -233,6 +243,7 @@ class TradeResult(BaseModel):
 # Tool Error Model (for standardized error responses from LLM tools)
 # =============================================================================
 
+
 class ToolError(BaseModel):
     """Standardized error response for LLM tools.
 
@@ -241,5 +252,9 @@ class ToolError(BaseModel):
     """
 
     error: str = Field(min_length=1, description="Human-readable error message")
-    error_type: str = Field(default="unknown", description="Error category: not_found, validation, api_error")
-    context: dict = Field(default_factory=dict, description="Additional context (symbol, agent_name, etc.)")
+    error_type: str = Field(
+        default="unknown", description="Error category: not_found, validation, api_error"
+    )
+    context: dict = Field(
+        default_factory=dict, description="Additional context (symbol, agent_name, etc.)"
+    )

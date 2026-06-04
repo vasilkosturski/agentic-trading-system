@@ -9,8 +9,7 @@ The Decision Maker is the second agent in the two-agent flow:
 
 import pytest
 
-from ai_agents.decision_maker import create_decision_maker_agent, build_decision_prompt
-from models import Holding
+from ai_agents.decision_maker import build_decision_prompt, create_decision_maker_agent
 from models.llm_output import TradingDecision
 
 
@@ -18,7 +17,7 @@ from models.llm_output import TradingDecision
 class TestDecisionMakerAgent:
     """Test Decision Maker agent creation and configuration."""
 
-    @pytest.mark.usefixtures('mock_prompt_fetch')
+    @pytest.mark.usefixtures("mock_prompt_fetch")
     async def test_create_agent_with_trading_tools(
         self,
         sample_agent_id,
@@ -42,9 +41,7 @@ class TestDecisionMakerAgent:
 class TestBuildDecisionPrompt:
     """Test decision prompt generation."""
 
-    def test_prompt_includes_position_limit_warning(
-        self, sample_research_response
-    ):
+    def test_prompt_includes_position_limit_warning(self, sample_research_response):
         """Test prompt warns when at 10 position limit."""
         prompt_at_limit = build_decision_prompt(
             research_response=sample_research_response,
@@ -68,4 +65,8 @@ class TestBuildDecisionPrompt:
 
         assert prompt_at_limit != prompt_not_at_limit
         assert "10" in prompt_at_limit
-        assert "limit" in prompt_at_limit.lower() or "maximum" in prompt_at_limit.lower() or "cannot buy" in prompt_at_limit.lower()
+        assert (
+            "limit" in prompt_at_limit.lower()
+            or "maximum" in prompt_at_limit.lower()
+            or "cannot buy" in prompt_at_limit.lower()
+        )

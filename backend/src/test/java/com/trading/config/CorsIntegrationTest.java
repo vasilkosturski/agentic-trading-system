@@ -1,5 +1,9 @@
 package com.trading.config;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.trading.repository.TradingAgentRepository;
 import com.trading.security.JwtAuthenticationFilter;
 import com.trading.security.JwtTokenProvider;
@@ -25,10 +29,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.test.web.servlet.MockMvc;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * CORS preflight integration test for the consolidated {@link CorsConfig}.
@@ -65,22 +65,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * SQLite {@code DataSource} is harmless when no test touches a repository).
  */
 @SpringBootTest(
-    webEnvironment = WebEnvironment.MOCK,
-    classes = CorsIntegrationTest.DbFreeContext.class,
-    properties = {
-        // Match SecurityChainIntegrationTest — in-memory SQLite stands in for
-        // PostgreSQL so JPA can wire its repositories at refresh without needing
-        // Testcontainers or a real DB. No CORS preflight touches the DB layer.
-        "spring.datasource.url=jdbc:sqlite::memory:",
-        "spring.datasource.driver-class-name=org.sqlite.JDBC",
-        "spring.datasource.username=",
-        "spring.datasource.password=",
-        "spring.jpa.database-platform=org.hibernate.community.dialect.SQLiteDialect",
-        "spring.jpa.hibernate.ddl-auto=none",
-        "spring.jpa.properties.hibernate.hbm2ddl.create_namespaces=false",
-        "spring.jpa.properties.hibernate.boot.allow_jdbc_metadata_access=false"
-    }
-)
+        webEnvironment = WebEnvironment.MOCK,
+        classes = CorsIntegrationTest.DbFreeContext.class,
+        properties = {
+            // Match SecurityChainIntegrationTest — in-memory SQLite stands in for
+            // PostgreSQL so JPA can wire its repositories at refresh without needing
+            // Testcontainers or a real DB. No CORS preflight touches the DB layer.
+            "spring.datasource.url=jdbc:sqlite::memory:",
+            "spring.datasource.driver-class-name=org.sqlite.JDBC",
+            "spring.datasource.username=",
+            "spring.datasource.password=",
+            "spring.jpa.database-platform=org.hibernate.community.dialect.SQLiteDialect",
+            "spring.jpa.hibernate.ddl-auto=none",
+            "spring.jpa.properties.hibernate.hbm2ddl.create_namespaces=false",
+            "spring.jpa.properties.hibernate.boot.allow_jdbc_metadata_access=false"
+        })
 @AutoConfigureMockMvc
 @DisplayName("CORS Integration Tests")
 class CorsIntegrationTest {
@@ -93,20 +92,17 @@ class CorsIntegrationTest {
      */
     @Configuration
     @ComponentScan(
-        basePackages = "com.trading",
-        excludeFilters = {
-            @ComponentScan.Filter(
-                type = FilterType.REGEX,
-                pattern = {
-                    "com\\.trading\\.service\\.ScheduledSnapshotService",
-                    "com\\.trading\\.config\\.TestSecurityConfig"
-                }
-            )
-        }
-    )
+            basePackages = "com.trading",
+            excludeFilters = {
+                @ComponentScan.Filter(
+                        type = FilterType.REGEX,
+                        pattern = {
+                            "com\\.trading\\.service\\.ScheduledSnapshotService",
+                            "com\\.trading\\.config\\.TestSecurityConfig"
+                        })
+            })
     @org.springframework.boot.autoconfigure.EnableAutoConfiguration
-    static class DbFreeContext {
-    }
+    static class DbFreeContext {}
 
     @Autowired
     private MockMvc mockMvc;
@@ -155,42 +151,42 @@ class CorsIntegrationTest {
     @DisplayName("Preflight from allowed origin returns 200 and echoes Access-Control-Allow-Origin")
     void preflightFromAllowedOrigin_Returns200() throws Exception {
         mockMvc.perform(options("/api/accounts/1/trades")
-                .header("Origin", "http://localhost:3000")
-                .header("Access-Control-Request-Method", "POST")
-                .header("Access-Control-Request-Headers", "content-type"))
-            .andExpect(status().isOk())
-            .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"))
-            .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+                        .header("Origin", "http://localhost:3000")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"))
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
     }
 
     @Test
     @DisplayName("Preflight from disallowed origin returns 403 with no Access-Control-Allow-Origin header")
     void preflightFromDisallowedOrigin_Returns403() throws Exception {
         mockMvc.perform(options("/api/accounts/1/trades")
-                .header("Origin", "http://evil.example.com")
-                .header("Access-Control-Request-Method", "POST"))
-            .andExpect(status().isForbidden())
-            .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+                        .header("Origin", "http://evil.example.com")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
     }
 
     @Test
     @DisplayName("Preflight to /api/agents/status from allowed origin returns 200 + echoes Access-Control-Allow-Origin")
     void preflightAgentsStatus_FromAllowedOrigin_Returns200() throws Exception {
         mockMvc.perform(options("/api/agents/status")
-                .header("Origin", "http://localhost:3000")
-                .header("Access-Control-Request-Method", "POST")
-                .header("Access-Control-Request-Headers", "content-type"))
-            .andExpect(status().isOk())
-            .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
+                        .header("Origin", "http://localhost:3000")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
     }
 
     @Test
     @DisplayName("Preflight to /api/agents/status from disallowed origin returns 403 with no allow-origin header")
     void preflightAgentsStatus_FromDisallowedOrigin_Returns403() throws Exception {
         mockMvc.perform(options("/api/agents/status")
-                .header("Origin", "http://evil.example.com")
-                .header("Access-Control-Request-Method", "POST"))
-            .andExpect(status().isForbidden())
-            .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+                        .header("Origin", "http://evil.example.com")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
     }
 }

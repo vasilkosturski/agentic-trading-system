@@ -1,15 +1,27 @@
 package com.trading.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.trading.config.TradingPublicProperties;
 import com.trading.dto.response.RecentActivityResponse;
 import com.trading.dto.response.RunListResponseDto;
 import com.trading.dto.response.TradingHistoryResponse;
-import com.trading.entity.TradingAgent;
-import com.trading.entity.TradingRun;
 import com.trading.entity.AccountTransaction;
 import com.trading.entity.TradingAccount;
+import com.trading.entity.TradingAgent;
+import com.trading.entity.TradingRun;
 import com.trading.entity.TransactionType;
-import com.trading.repository.*;
+import com.trading.repository.AccountTransactionRepository;
+import com.trading.repository.DecisionPhaseRepository;
+import com.trading.repository.TradingAccountRepository;
+import com.trading.repository.TradingAgentRepository;
+import com.trading.repository.TradingRunRepository;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,15 +37,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 /**
  * Tests for 7-day public display delay feature.
  * Verifies that TradingRunService and MemoryService filter data
@@ -41,6 +44,7 @@ import static org.mockito.Mockito.*;
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Public Display Delay Tests")
+@SuppressWarnings("unchecked") // Mockito argument-matcher idiom uses raw Specification.class for stubbing
 class PublicDisplayDelayTest {
 
     @Mock
@@ -90,13 +94,12 @@ class PublicDisplayDelayTest {
         tradingPublicProperties.setDisplayDelayDays(7);
 
         memoryService = new MemoryService(
-            tradingPublicProperties,
-            transactionRepository,
-            tradingRunRepository,
-            tradingAgentRepository,
-            accountRepository,
-            accountQueryService
-        );
+                tradingPublicProperties,
+                transactionRepository,
+                tradingRunRepository,
+                tradingAgentRepository,
+                accountRepository,
+                accountQueryService);
     }
 
     @Test
@@ -104,15 +107,16 @@ class PublicDisplayDelayTest {
     void listRuns_shouldFilterByDelayPeriod() {
         // Arrange: Create runs at different times
         Instant now = Instant.now();
-        TradingRun oldRun1 = createRun(2L, now.minus(8, ChronoUnit.DAYS));   // 8 days old - should be INCLUDED
-        TradingRun oldRun2 = createRun(3L, now.minus(10, ChronoUnit.DAYS));  // 10 days old - should be INCLUDED
+        TradingRun oldRun1 = createRun(2L, now.minus(8, ChronoUnit.DAYS)); // 8 days old - should be INCLUDED
+        TradingRun oldRun2 = createRun(3L, now.minus(10, ChronoUnit.DAYS)); // 10 days old - should be INCLUDED
 
         Pageable pageable = PageRequest.of(0, 10);
         Instant cutoff = now.minus(7, ChronoUnit.DAYS);
 
         // Mock repository to return only old runs (database-level filtering via Specification)
         Page<TradingRun> oldRuns = new PageImpl<>(List.of(oldRun1, oldRun2));
-        when(tradingRunRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(oldRuns);
+        when(tradingRunRepository.findAll(any(Specification.class), eq(pageable)))
+                .thenReturn(oldRuns);
         when(decisionPhaseRepository.findByRunId(anyLong())).thenReturn(Optional.empty());
 
         // Act: Call service method
@@ -120,9 +124,11 @@ class PublicDisplayDelayTest {
 
         // Assert: Only runs older than 7 days should be returned
         assertEquals(2, result.getRuns().size(), "Should return only runs older than 7 days");
-        assertTrue(result.getRuns().stream().anyMatch(r -> r.getRunId().equals(2L)),
+        assertTrue(
+                result.getRuns().stream().anyMatch(r -> r.getRunId().equals(2L)),
                 "Old run (8 days old) should be included");
-        assertTrue(result.getRuns().stream().anyMatch(r -> r.getRunId().equals(3L)),
+        assertTrue(
+                result.getRuns().stream().anyMatch(r -> r.getRunId().equals(3L)),
                 "Old run (10 days old) should be included");
 
         // Verify database-level filtering was used
@@ -140,7 +146,7 @@ class PublicDisplayDelayTest {
 
         when(accountRepository.findByAgentName("warren")).thenReturn(Optional.of(testAccount));
         when(transactionRepository.findByAccountIdAndSymbolAndTimestampBetween(
-                eq(1L), eq("AAPL"), any(Instant.class), any(Instant.class)))
+                        eq(1L), eq("AAPL"), any(Instant.class), any(Instant.class)))
                 .thenReturn(List.of(oldTrade1, oldTrade2));
         when(accountQueryService.getHoldings("warren")).thenReturn(List.of());
 
@@ -149,17 +155,15 @@ class PublicDisplayDelayTest {
 
         // Assert: Service returns the rows the repo emitted; included trades match.
         assertEquals(2, result.getTrades().size(), "Should return only trades older than 7 days");
-        List<Instant> resultTimestamps = result.getTrades().stream()
-                .map(t -> Instant.parse(t.getDate()))
-                .toList();
-        assertTrue(resultTimestamps.contains(oldTrade1.getTimestamp()),
-                "Old trade (8 days old) should be included");
-        assertTrue(resultTimestamps.contains(oldTrade2.getTimestamp()),
-                "Old trade (15 days old) should be included");
+        List<Instant> resultTimestamps =
+                result.getTrades().stream().map(t -> Instant.parse(t.getDate())).toList();
+        assertTrue(resultTimestamps.contains(oldTrade1.getTimestamp()), "Old trade (8 days old) should be included");
+        assertTrue(resultTimestamps.contains(oldTrade2.getTimestamp()), "Old trade (15 days old) should be included");
 
         // Verify the date-filtered repo method was used (no in-memory filter chain).
-        verify(transactionRepository).findByAccountIdAndSymbolAndTimestampBetween(
-                eq(1L), eq("AAPL"), any(Instant.class), any(Instant.class));
+        verify(transactionRepository)
+                .findByAccountIdAndSymbolAndTimestampBetween(
+                        eq(1L), eq("AAPL"), any(Instant.class), any(Instant.class));
     }
 
     @Test
@@ -173,7 +177,7 @@ class PublicDisplayDelayTest {
 
         when(tradingAgentRepository.findByName("warren")).thenReturn(Optional.of(testAgent));
         when(tradingRunRepository.findByAgentIdAndStartedAtBetween(
-                eq(1L), any(Instant.class), any(Instant.class), any(Pageable.class)))
+                        eq(1L), any(Instant.class), any(Instant.class), any(Pageable.class)))
                 .thenReturn(List.of(oldRun1, oldRun2));
 
         // Act
@@ -184,8 +188,8 @@ class PublicDisplayDelayTest {
         assertEquals(2, result.getTotalRuns(), "Total runs count should match filtered results");
 
         // Verify the date-filtered repo method was used (no in-memory filter chain).
-        verify(tradingRunRepository).findByAgentIdAndStartedAtBetween(
-                eq(1L), any(Instant.class), any(Instant.class), any(Pageable.class));
+        verify(tradingRunRepository)
+                .findByAgentIdAndStartedAtBetween(eq(1L), any(Instant.class), any(Instant.class), any(Pageable.class));
     }
 
     @Test
@@ -198,7 +202,8 @@ class PublicDisplayDelayTest {
 
         Pageable pageable = PageRequest.of(0, 10);
         Page<TradingRun> allRuns = new PageImpl<>(List.of(recentRun, oldRun));
-        when(tradingRunRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(allRuns);
+        when(tradingRunRepository.findAll(any(Specification.class), eq(pageable)))
+                .thenReturn(allRuns);
         when(decisionPhaseRepository.findByRunId(anyLong())).thenReturn(Optional.empty());
 
         // Act: Call service method with cutoff = now (0-day delay equivalent)

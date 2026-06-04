@@ -1,15 +1,14 @@
 package com.trading.dto.response;
 
 import com.trading.dto.UsageMetricsDto;
-import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.SourceDto;
+import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.entity.ResearchPhase;
+import java.time.Instant;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.time.Instant;
-import java.util.List;
 
 /**
  * DTO for research phase data.

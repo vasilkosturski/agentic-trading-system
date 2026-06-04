@@ -5,6 +5,8 @@ import com.trading.exception.BusinessRuleException;
 import com.trading.exception.ProblemDetailFactory;
 import com.trading.exception.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ProblemDetail;
@@ -12,9 +14,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Global exception handler for AccountController.
@@ -30,7 +29,8 @@ public class AccountControllerAdvice {
      * Maps to HTTP 404 Not Found.
      */
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ProblemDetail> handleResourceNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
+    public ResponseEntity<ProblemDetail> handleResourceNotFound(
+            ResourceNotFoundException ex, HttpServletRequest request) {
         logger.warn("Resource not found: {}", ex.getMessage());
         ProblemDetail problem = ProblemDetailFactory.resourceNotFound(ex.getMessage(), request.getRequestURI());
         return ResponseEntity.status(404).body(problem);
@@ -54,14 +54,16 @@ public class AccountControllerAdvice {
      * Returns 400 Bad Request.
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ProblemDetail> handleValidationException(MethodArgumentNotValidException ex, HttpServletRequest request) {
+    public ResponseEntity<ProblemDetail> handleValidationException(
+            MethodArgumentNotValidException ex, HttpServletRequest request) {
         Map<String, String> validationErrors = new HashMap<>();
-        ex.getBindingResult().getFieldErrors().forEach(error ->
-            validationErrors.put(error.getField(), error.getDefaultMessage())
-        );
+        ex.getBindingResult()
+                .getFieldErrors()
+                .forEach(error -> validationErrors.put(error.getField(), error.getDefaultMessage()));
         String errorMessage = "Validation failed for " + validationErrors.size() + " field(s)";
         logger.warn("Validation error: {}", validationErrors);
-        ProblemDetail problem = ProblemDetailFactory.validationError(errorMessage, request.getRequestURI(), validationErrors);
+        ProblemDetail problem =
+                ProblemDetailFactory.validationError(errorMessage, request.getRequestURI(), validationErrors);
         return ResponseEntity.badRequest().body(problem);
     }
 
@@ -70,7 +72,8 @@ public class AccountControllerAdvice {
      * Returns 400 Bad Request.
      */
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ProblemDetail> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
+    public ResponseEntity<ProblemDetail> handleIllegalArgument(
+            IllegalArgumentException ex, HttpServletRequest request) {
         logger.warn("Bad request: {}", ex.getMessage());
         ProblemDetail problem = ProblemDetailFactory.invalidRequest(ex.getMessage(), request.getRequestURI());
         return ResponseEntity.badRequest().body(problem);
@@ -99,7 +102,8 @@ public class AccountControllerAdvice {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleGenericException(Exception ex, HttpServletRequest request) {
         logger.error("Unexpected error", ex);
-        ProblemDetail problem = ProblemDetailFactory.internalError("Internal server error: " + ex.getMessage(), request.getRequestURI());
+        ProblemDetail problem = ProblemDetailFactory.internalError(
+                "Internal server error: " + ex.getMessage(), request.getRequestURI());
         return ResponseEntity.status(500).body(problem);
     }
 }

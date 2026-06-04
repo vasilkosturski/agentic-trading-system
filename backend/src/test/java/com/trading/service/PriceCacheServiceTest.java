@@ -1,7 +1,14 @@
 package com.trading.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import com.trading.entity.PriceCache;
 import com.trading.repository.PriceCacheRepository;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,14 +21,6 @@ import org.springframework.retry.support.RetryTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PriceCacheService Tests")
@@ -123,8 +122,9 @@ class PriceCacheServiceTest {
         assertEquals(150.0, result.getPrice());
         assertTrue(result.isCached());
         assertEquals(freshCachedAt, result.getTimestamp());
-        assertTrue(result.getSource().startsWith("DB Cache"),
-            "expected source to start with 'DB Cache' but was: " + result.getSource());
+        assertTrue(
+                result.getSource().startsWith("DB Cache"),
+                "expected source to start with 'DB Cache' but was: " + result.getSource());
         verify(priceCacheRepository, never()).upsert(any(), anyDouble(), any(Instant.class), any());
     }
 
@@ -143,8 +143,7 @@ class PriceCacheServiceTest {
         assertEquals(123.45, result.getPrice());
         assertFalse(result.isCached());
         assertEquals("Real-time quote from Finnhub", result.getSource());
-        verify(priceCacheRepository, times(1))
-            .upsert(eq("AAPL"), eq(123.45), any(Instant.class), eq("Finnhub"));
+        verify(priceCacheRepository, times(1)).upsert(eq("AAPL"), eq(123.45), any(Instant.class), eq("Finnhub"));
     }
 
     @Test
@@ -152,8 +151,7 @@ class PriceCacheServiceTest {
     @SuppressWarnings("unchecked")
     void getPrice_returnsNullWhenFinnhubFails() {
         when(priceCacheRepository.findBySymbol("AAPL")).thenReturn(Optional.empty());
-        doThrow(new RestClientException("boom"))
-            .when(restTemplate).getForObject(anyString(), any(Class.class));
+        doThrow(new RestClientException("boom")).when(restTemplate).getForObject(anyString(), any(Class.class));
 
         MarketService.PriceData result = priceCacheService.getPrice("AAPL");
 
@@ -173,7 +171,8 @@ class PriceCacheServiceTest {
         // CannotAcquireLockException extends ConcurrencyFailureException - exactly the kind
         // of concurrent-upsert race we still want to tolerate silently.
         doThrow(new org.springframework.dao.CannotAcquireLockException("lost the race"))
-            .when(priceCacheRepository).upsert(anyString(), anyDouble(), any(Instant.class), anyString());
+                .when(priceCacheRepository)
+                .upsert(anyString(), anyDouble(), any(Instant.class), anyString());
 
         MarketService.PriceData result = priceCacheService.getPrice("AAPL");
 
@@ -195,7 +194,8 @@ class PriceCacheServiceTest {
         // After narrowing the catch, an arbitrary RuntimeException (e.g. TransactionRequiredException
         // wrapped as InvalidDataAccessApiUsageException) must propagate so regressions stay visible.
         doThrow(new RuntimeException("DB hiccup"))
-            .when(priceCacheRepository).upsert(anyString(), anyDouble(), any(Instant.class), anyString());
+                .when(priceCacheRepository)
+                .upsert(anyString(), anyDouble(), any(Instant.class), anyString());
 
         assertThrows(RuntimeException.class, () -> priceCacheService.getPrice("AAPL"));
     }

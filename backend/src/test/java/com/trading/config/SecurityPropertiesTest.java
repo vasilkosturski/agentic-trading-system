@@ -1,11 +1,11 @@
 package com.trading.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Context-load tests for {@link SecurityProperties}.
@@ -22,19 +22,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SecurityPropertiesTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-        .withConfiguration(org.springframework.boot.autoconfigure.AutoConfigurations.of(
-            ConfigurationPropertiesAutoConfiguration.class))
-        .withUserConfiguration(SecurityPropertiesTestConfig.class)
-        .withPropertyValues(
-            "security.allowed-origins=http://localhost:3000,http://localhost:5173,https://agentic-trading.vkontech.com",
-            "security.public-matchers[0]=/api/auth/**",
-            "security.public-matchers[1]=/actuator/health",
-            "security.public-matchers[2]=/actuator/info",
-            "security.jwt.secret=testSecretKeyThatIsLongEnoughForHS256AlgorithmToWorkProperly",
-            "security.jwt.expiration=3600000",
-            "security.admin.username=admin",
-            "security.admin.password=changeme-for-test"
-        );
+            .withConfiguration(org.springframework.boot.autoconfigure.AutoConfigurations.of(
+                    ConfigurationPropertiesAutoConfiguration.class))
+            .withUserConfiguration(SecurityPropertiesTestConfig.class)
+            .withPropertyValues(
+                    "security.allowed-origins=http://localhost:3000,http://localhost:5173,https://agentic-trading.vkontech.com",
+                    "security.public-matchers[0]=/api/auth/**",
+                    "security.public-matchers[1]=/actuator/health",
+                    "security.public-matchers[2]=/actuator/info",
+                    "security.jwt.secret=testSecretKeyThatIsLongEnoughForHS256AlgorithmToWorkProperly",
+                    "security.jwt.expiration=3600000",
+                    "security.admin.username=admin",
+                    "security.admin.password=changeme-for-test");
 
     @Test
     @DisplayName("allowedOrigins binds three entries from application defaults")
@@ -69,6 +68,5 @@ class SecurityPropertiesTest {
      */
     @org.springframework.context.annotation.Configuration
     @org.springframework.boot.context.properties.EnableConfigurationProperties(SecurityProperties.class)
-    static class SecurityPropertiesTestConfig {
-    }
+    static class SecurityPropertiesTestConfig {}
 }

@@ -7,19 +7,19 @@ Each operation has explicit input parameters and returns a typed result.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Generic, TypeVar, TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from pydantic import BaseModel
 
-from models.investment_style import InvestmentStyle
-from models.llm_output import TradingDecision, ResearchResponse
-from models.run_tracking import SourceDto, PhaseStatus
-from models.usage_metrics import UsageMetrics
 from models.api_responses import RecentActivityResponse
+from models.investment_style import InvestmentStyle
+from models.llm_output import ResearchResponse, TradingDecision
+from models.run_tracking import PhaseStatus, SourceDto
+from models.usage_metrics import UsageMetrics
 
 if TYPE_CHECKING:
-    from models.run_tracking import ToolCallDto
     from models import Holding
+    from models.run_tracking import ToolCallDto
     from utils.sdk_parser import ParsedToolCall
 
 
@@ -49,9 +49,10 @@ class AgentRunResult(Generic[T]):
             # Continue with partial data or retry
         print(result.output.candidates)
     """
+
     output: T
-    tool_calls: List["ParsedToolCall"] = field(default_factory=list)
-    tool_errors: List["ParsedToolCall"] = field(default_factory=list)
+    tool_calls: list["ParsedToolCall"] = field(default_factory=list)
+    tool_errors: list["ParsedToolCall"] = field(default_factory=list)
 
     @property
     def has_errors(self) -> bool:
@@ -77,20 +78,23 @@ class AgentRunResult(Generic[T]):
         if self.tool_errors:
             # Import here to avoid circular dependency
             from infra.exceptions import ToolExecutionError
+
             raise ToolExecutionError(
                 f"Tools failed during execution: {[e.name for e in self.tool_errors]}",
-                tool_errors=self.tool_errors
+                tool_errors=self.tool_errors,
             )
 
 
 class SourceType(str, Enum):
     """Type of research source."""
+
     WEB = "web"
     SYSTEM_CONTEXT = "system_context"
 
 
 class CycleResult(BaseModel):
     """Result of a complete trading cycle."""
+
     decision: TradingDecision | None = None
     trade_count: int
     run_id: int
@@ -100,6 +104,7 @@ class CycleResult(BaseModel):
 # Operation Result Types - Each operation returns a typed result
 # ============================================================================
 
+
 @dataclass
 class ResearchResult:
     """Result of market analyst research.
@@ -107,11 +112,12 @@ class ResearchResult:
     candidates is list[str] (symbol strings) for DB storage.
     Prices live inside research_response.candidates (CandidateStock objects).
     """
+
     research_response: ResearchResponse  # Required - throw on failure
-    candidates: List[str] = field(default_factory=list)
-    sources: List[SourceDto] = field(default_factory=list)
+    candidates: list[str] = field(default_factory=list)
+    sources: list[SourceDto] = field(default_factory=list)
     notes: str = ""
-    tool_calls: List["ToolCallDto"] = field(default_factory=list)
+    tool_calls: list["ToolCallDto"] = field(default_factory=list)
     usage_metrics: UsageMetrics | None = None
     # Wall-clock latency of the market analyst phase in milliseconds.
     # Set by _run_market_analyst so _finalize_run has a single source of
@@ -124,15 +130,17 @@ class ResearchResult:
 @dataclass
 class DecisionResult:
     """Result of decision maker."""
+
     decision: TradingDecision  # Required - throw on failure
     decision_start_time: datetime  # Required - always set before returning
-    tool_calls: List["ToolCallDto"] = field(default_factory=list)
+    tool_calls: list["ToolCallDto"] = field(default_factory=list)
     usage_metrics: UsageMetrics | None = None
 
 
 @dataclass
 class ExecutionResult:
     """Result of trade execution."""
+
     execution_status: PhaseStatus  # Required - always set
     trade_id: int | None = None  # None for HOLD actions
     execution_error: str | None = None
@@ -144,8 +152,9 @@ class AccountData:
 
     Replaces tuple[float, List[Holding]] return for named access.
     """
+
     balance: float
-    holdings: List["Holding"]
+    holdings: list["Holding"]
 
 
 @dataclass
@@ -179,7 +188,7 @@ class RunContext:
     # --- Input ---
     research_start_time: datetime
     balance: float = 0.0
-    holdings: List["Holding"] = field(default_factory=list)
+    holdings: list["Holding"] = field(default_factory=list)
     recent_activity: RecentActivityResponse | None = None
 
     # --- Output (typed result, populated by _run_market_analyst) ---
@@ -194,7 +203,7 @@ class RunContext:
     # decision_sources is assembled in execute_cycle from cross-phase data
     # (research webSources + portfolio/activity system context), so it lives
     # here rather than inside DecisionResult.
-    decision_sources: List[SourceDto] = field(default_factory=list)
+    decision_sources: list[SourceDto] = field(default_factory=list)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # PROMPT CAPTURE (for observability — populated during research/decision)
@@ -214,7 +223,8 @@ class RunContext:
 
 class HoldingsSummary(BaseModel):
     """Holdings data with built-in serialization for prompts."""
-    symbols: List[str]
+
+    symbols: list[str]
     total_count: int
 
     def to_prompt_text(self) -> str:

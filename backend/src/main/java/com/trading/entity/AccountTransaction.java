@@ -1,10 +1,20 @@
 package com.trading.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import java.time.Instant;
 
 @Entity
 @Table(name = "account_transactions", schema = "trading")
@@ -12,24 +22,24 @@ import java.time.Instant;
 @Setter
 @NoArgsConstructor
 public class AccountTransaction {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
     private TradingAccount account;
-    
+
     @Column(nullable = false)
     private String symbol;
-    
+
     @Column(nullable = false)
     private Integer quantity;
-    
+
     @Column(nullable = false)
     private Double price;
-    
+
     @Column(nullable = false)
     private Instant timestamp;
 
@@ -42,11 +52,11 @@ public class AccountTransaction {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
-    
+
     // Constructor with parameters
     // NOTE: This constructor does NOT set transactionType - it must be set explicitly
-    public AccountTransaction(TradingAccount account, String symbol, Integer quantity,
-                            Double price, Instant timestamp) {
+    public AccountTransaction(
+            TradingAccount account, String symbol, Integer quantity, Double price, Instant timestamp) {
         this.account = account;
         this.symbol = symbol;
         this.quantity = quantity;
@@ -55,33 +65,33 @@ public class AccountTransaction {
         // transactionType must be set explicitly after construction
         this.totalAmount = Math.abs(quantity) * price;
     }
-    
+
     // Business methods
     public Double calculateTotal() {
         return Math.abs(quantity) * price;
     }
-    
+
     public boolean isBuy() {
         return transactionType == TransactionType.BUY;
     }
-    
+
     public boolean isSell() {
         return transactionType == TransactionType.SELL;
     }
-    
+
     // Custom setters that need business logic
-    public void setQuantity(Integer quantity) { 
+    public void setQuantity(Integer quantity) {
         this.quantity = quantity;
         // IMPORTANT: Do NOT auto-set transactionType here!
         // Transaction type must be set explicitly by the service layer.
-        // Setting it based on quantity sign caused critical bug where SELL 
+        // Setting it based on quantity sign caused critical bug where SELL
         // transactions were recorded as BUY because quantity was positive.
         if (this.price != null) {
             this.totalAmount = Math.abs(quantity) * this.price;
         }
     }
-    
-    public void setPrice(Double price) { 
+
+    public void setPrice(Double price) {
         this.price = price;
         if (this.quantity != null) {
             this.totalAmount = Math.abs(this.quantity) * price;

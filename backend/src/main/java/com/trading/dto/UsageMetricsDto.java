@@ -1,11 +1,10 @@
 package com.trading.dto;
 
 import com.trading.entity.UsageMetrics;
+import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.math.BigDecimal;
 
 /**
  * Shared DTO for LLM usage metrics.

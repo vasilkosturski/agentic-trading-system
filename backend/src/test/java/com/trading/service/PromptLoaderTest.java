@@ -1,11 +1,10 @@
 package com.trading.service;
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 @DisplayName("PromptLoader Tests")
 class PromptLoaderTest {
@@ -38,7 +37,8 @@ class PromptLoaderTest {
     @DisplayName("parses personality file into key-value map")
     void parsesPersonalityFileIntoMap() {
         PromptLoader loader = new PromptLoader();
-        String content = """
+        String content =
+                """
             identity_line: You are Warren, a Value Investor making trading decisions.
 
             identity: You are Warren, named in homage to Warren Buffett.
@@ -154,7 +154,8 @@ class PromptLoaderTest {
         assertNotNull(composedPrompt, "Composed market analyst prompt should not be null");
         assertTrue(composedPrompt.contains("Market Analyst"), "Should contain Market Analyst from personality");
         assertTrue(composedPrompt.contains("Warren"), "Should contain Warren reference");
-        assertFalse(composedPrompt.contains("{identity_line}"), "Should not contain unreplaced identity_line placeholder");
+        assertFalse(
+                composedPrompt.contains("{identity_line}"), "Should not contain unreplaced identity_line placeholder");
         assertFalse(composedPrompt.contains("{identity}"), "Should not contain unreplaced identity placeholder");
     }
 }

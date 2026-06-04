@@ -1,10 +1,15 @@
 package com.trading.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import java.time.Instant;
 
 @Entity
 @Table(name = "agent_logs", schema = "agents")
@@ -12,11 +17,11 @@ import java.time.Instant;
 @Setter
 @NoArgsConstructor
 public class LogEntry {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @Column(name = "agent_name", nullable = false)
     private String name;
 
@@ -37,34 +42,34 @@ public class LogEntry {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
-    
+
     // Constructor with parameters
     public LogEntry(String name, String type, String message) {
         this.name = name;
         this.type = type;
         this.message = message;
     }
-    
+
     public LogEntry(String name, String type, String message, String logLevel) {
         this.name = name;
         this.type = type;
         this.message = message;
         this.logLevel = logLevel;
     }
-    
+
     // Business methods
     public boolean isError() {
         return "ERROR".equalsIgnoreCase(logLevel);
     }
-    
+
     public boolean isWarning() {
         return "WARN".equalsIgnoreCase(logLevel);
     }
-    
+
     public boolean isInfo() {
         return "INFO".equalsIgnoreCase(logLevel);
     }
-    
+
     public boolean isDebug() {
         return "DEBUG".equalsIgnoreCase(logLevel);
     }

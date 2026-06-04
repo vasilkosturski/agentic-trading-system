@@ -8,14 +8,14 @@ avoids redundant HTTP calls when the LLM calls multiple tools for the same symbo
 """
 
 import logging
+
 from agents import function_tool
 from cachetools import TTLCache
 
 # Import centralized configuration
 from config import BACKEND_API_MARKET
 
-# Import unified HTTP client
-from infra.http_client import call_backend, BackendAPIError
+from backend.client import BackendAPIError, get_backend_client
 
 # Import type-safe models
 from models import MarketData, PriceMetadata
@@ -64,7 +64,8 @@ async def _fetch_market_data(symbol: str, days: int = 30) -> MarketData:
     url = f"{BACKEND_URL}/{symbol}?days={days}"
     # W4: BackendAPIError (with status code) propagates so callers like
     # _lookup_share_price can branch on status_code (e.g. 404 -> sentinel).
-    response = await call_backend("GET", url)
+    client = get_backend_client()
+    response = await client.request("GET", url)
     data = MarketData(**response.json())
     _put_cache(symbol, data)
     return data
@@ -97,6 +98,7 @@ async def _lookup_share_price(symbol: str) -> float:
         # Unexpected errors (network, parsing) - also fatal
         logger.error("Unexpected error fetching %s: %s", symbol, e)
         raise
+
 
 @function_tool
 async def lookup_share_price(symbol: str) -> float:

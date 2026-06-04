@@ -7,7 +7,7 @@ describe('navigation - module-level navigator bridge', () => {
 
   beforeEach(() => {
     resetNavigator()
-    delete (window as any).location
+    delete (window as Partial<Window>).location
     window.location = {
       ...originalLocation,
       href: 'http://localhost:3000/',

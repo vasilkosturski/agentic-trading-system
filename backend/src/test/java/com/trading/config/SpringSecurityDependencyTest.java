@@ -1,10 +1,10 @@
 package com.trading.config;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Verifies that Spring Security dependency is correctly added to build.gradle.kts.
@@ -38,8 +38,10 @@ class SpringSecurityDependencyTest {
     void shouldHaveSpringSecurityConfigAnnotationsAvailable() {
         // Verify that Spring Security configuration annotations are available
         try {
-            Class<?> enableWebSecurityClass = Class.forName("org.springframework.security.config.annotation.web.configuration.EnableWebSecurity");
-            Class<?> enableMethodSecurityClass = Class.forName("org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity");
+            Class<?> enableWebSecurityClass =
+                    Class.forName("org.springframework.security.config.annotation.web.configuration.EnableWebSecurity");
+            Class<?> enableMethodSecurityClass = Class.forName(
+                    "org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity");
 
             assertNotNull(enableWebSecurityClass, "@EnableWebSecurity annotation should be available");
             assertNotNull(enableMethodSecurityClass, "@EnableMethodSecurity annotation should be available");
@@ -52,8 +54,10 @@ class SpringSecurityDependencyTest {
     void shouldHaveUserDetailsServiceAvailable() {
         // Verify that UserDetailsService interface is available (needed for in-memory auth)
         try {
-            Class<?> userDetailsServiceClass = Class.forName("org.springframework.security.core.userdetails.UserDetailsService");
-            Class<?> inMemoryManagerClass = Class.forName("org.springframework.security.provisioning.InMemoryUserDetailsManager");
+            Class<?> userDetailsServiceClass =
+                    Class.forName("org.springframework.security.core.userdetails.UserDetailsService");
+            Class<?> inMemoryManagerClass =
+                    Class.forName("org.springframework.security.provisioning.InMemoryUserDetailsManager");
 
             assertNotNull(userDetailsServiceClass, "UserDetailsService interface should be available");
             assertNotNull(inMemoryManagerClass, "InMemoryUserDetailsManager class should be available");

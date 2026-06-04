@@ -1,11 +1,10 @@
 package com.trading.dto.response;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * Account report DTO returned by MCP resource endpoint.

@@ -11,14 +11,17 @@ Docker services (postgres + backend) are managed by pytest-docker.
 They start automatically on first test and stop after the session.
 """
 
-import os
 import logging
-import subprocess
+import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 import requests
 from dotenv import find_dotenv, load_dotenv
+
+if TYPE_CHECKING:
+    from models.investment_style import InvestmentStyle
 
 # Ensure common tool directories are on PATH.
 # IDE-spawned processes (VSCode, etc.) inherit a minimal PATH that excludes
@@ -49,8 +52,7 @@ else:
 
 # Configure logging for E2E tests (verbose)
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger("e2e_tests")
 
@@ -58,6 +60,7 @@ logger = logging.getLogger("e2e_tests")
 # =============================================================================
 # Environment Validation
 # =============================================================================
+
 
 def _require_env(var_name: str):
     """Skip test if environment variable is missing or a test stub."""
@@ -81,6 +84,7 @@ def require_brave_api_key():
 # =============================================================================
 # Docker-based Backend (pytest-docker)
 # =============================================================================
+
 
 @pytest.fixture(scope="session")
 def docker_compose_command():
@@ -138,10 +142,10 @@ def require_backend(docker_ip, docker_services) -> str:
     # Patch module-level URL variables that were captured at import time.
     # Without this, agent tools try to connect to localhost:8080 instead
     # of the Docker backend's random port.
-    import config as config_module
-    import tools.market_tools as market_tools_module
     import backend.client as backend_client_module
+    import config as config_module
     import infra.prompt_loader as prompt_loader_module
+    import tools.market_tools as market_tools_module
 
     config_module.BACKEND_BASE_URL = url
     config_module.BACKEND_API_MARKET = f"{url}/api/market"
@@ -166,6 +170,7 @@ def require_backend(docker_ip, docker_services) -> str:
 # =============================================================================
 # Database Seeding
 # =============================================================================
+
 
 @pytest.fixture(scope="session")
 def seed_test_data(docker_ip, docker_services, require_backend):
@@ -203,9 +208,15 @@ def seed_test_data(docker_ip, docker_services, require_backend):
             VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
             RETURNING id
             """,
-            (agent.name, agent.description, agent.is_active,
-             agent.trading_frequency, agent.initial_capital,
-             agent.total_trades, agent.total_pnl),
+            (
+                agent.name,
+                agent.description,
+                agent.is_active,
+                agent.trading_frequency,
+                agent.initial_capital,
+                agent.total_trades,
+                agent.total_pnl,
+            ),
         )
         agent_id = cur.fetchone()[0]
 
@@ -244,8 +255,14 @@ def seed_test_data(docker_ip, docker_services, require_backend):
                     (%s, %s, %s, %s, NOW() - INTERVAL '10 days',
                      %s, %s, NOW() - INTERVAL '10 days')
                 """,
-                (account_id, tx.symbol, tx.quantity, tx.price,
-                 tx.transaction_type, tx.quantity * tx.price),
+                (
+                    account_id,
+                    tx.symbol,
+                    tx.quantity,
+                    tx.price,
+                    tx.transaction_type,
+                    tx.quantity * tx.price,
+                ),
             )
 
         logger.info(
@@ -264,6 +281,7 @@ def seed_test_data(docker_ip, docker_services, require_backend):
 # Test Agent Configuration (derived from seed_data — single source of truth)
 # =============================================================================
 
+
 @pytest.fixture
 def test_agent_id(seed_test_data) -> int:
     """Actual DB-assigned agent ID from seed_test_data.
@@ -279,6 +297,7 @@ def test_agent_id(seed_test_data) -> int:
 def test_agent_name() -> str:
     """Agent name for E2E testing — derived from seed_data."""
     from seed_data import TEST_AGENT
+
     return TEST_AGENT.name
 
 
@@ -286,6 +305,7 @@ def test_agent_name() -> str:
 def test_agent_style() -> "InvestmentStyle":
     """Agent style for E2E testing — derived from seed_data."""
     from seed_data import TEST_AGENT
+
     return TEST_AGENT.style
 
 
@@ -297,12 +317,14 @@ def test_model_name() -> str:
     Note: gpt-4o-mini struggles with complex multi-step agent workflows.
     """
     from seed_data import TEST_AGENT
+
     return TEST_AGENT.model_name
 
 
 # =============================================================================
 # Real Backend API Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 async def real_backend_client(require_backend):
@@ -312,6 +334,7 @@ async def real_backend_client(require_backend):
     Backend URL comes from require_backend (Docker-managed).
     """
     import aiohttp
+
     async with aiohttp.ClientSession(base_url=require_backend) as session:
         yield session
 
@@ -323,6 +346,7 @@ async def real_agent_holdings(real_backend_client, test_agent_id):
         if resp.status == 200:
             data = await resp.json()
             from models import Holding
+
             return [Holding(**h) for h in data.get("holdings", [])]
         else:
             body = await resp.text()
@@ -345,10 +369,13 @@ async def real_agent_balance(real_backend_client, test_agent_id):
 async def real_recent_activity(real_backend_client, test_agent_id):
     """Fetch real recent activity from backend."""
     params = {"days": "30"}
-    async with real_backend_client.get(f"/api/accounts/{test_agent_id}/runs/recent-activity", params=params) as resp:
+    async with real_backend_client.get(
+        f"/api/accounts/{test_agent_id}/runs/recent-activity", params=params
+    ) as resp:
         if resp.status == 200:
             data = await resp.json()
             from models.api_responses import RecentActivityResponse
+
             return RecentActivityResponse(**data)
         else:
             body = await resp.text()
@@ -375,14 +402,9 @@ async def real_recent_activity(real_backend_client, test_agent_id):
 # Test Markers
 # =============================================================================
 
+
 def pytest_configure(config):
     """Register custom markers."""
-    config.addinivalue_line(
-        "markers", "e2e: mark test as end-to-end (requires real integrations)"
-    )
-    config.addinivalue_line(
-        "markers", "slow: mark test as slow (LLM calls)"
-    )
-    config.addinivalue_line(
-        "markers", "costly: mark test as costly (real API calls with billing)"
-    )
+    config.addinivalue_line("markers", "e2e: mark test as end-to-end (requires real integrations)")
+    config.addinivalue_line("markers", "slow: mark test as slow (LLM calls)")
+    config.addinivalue_line("markers", "costly: mark test as costly (real API calls with billing)")

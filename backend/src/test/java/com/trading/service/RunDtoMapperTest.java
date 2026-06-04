@@ -1,5 +1,9 @@
 package com.trading.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 import com.trading.dto.response.DecisionPhaseDto;
 import com.trading.dto.response.ExecutionPhaseDto;
 import com.trading.dto.response.ResearchPhaseDto;
@@ -16,18 +20,13 @@ import com.trading.enums.PhaseStatus;
 import com.trading.enums.RunPhase;
 import com.trading.enums.RunStatus;
 import com.trading.enums.TradeDecision;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import java.time.Instant;
-import java.util.Arrays;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Unit tests for RunDtoMapper.
@@ -107,11 +106,7 @@ class RunDtoMapperTest {
         @DisplayName("All three phases present produces fully populated DTO matching fromEntity factories")
         void assembleDetail_AllPhasesPresent_FullyPopulated() {
             TradingRunDetailDto result = mapper.assembleDetail(
-                run,
-                Optional.of(researchPhase),
-                Optional.of(decisionPhase),
-                Optional.of(executionPhase)
-            );
+                    run, Optional.of(researchPhase), Optional.of(decisionPhase), Optional.of(executionPhase));
 
             assertNotNull(result);
 
@@ -170,12 +165,8 @@ class RunDtoMapperTest {
         @Test
         @DisplayName("All phases empty — run-only DTO with null nested phases and no decision-derived fields")
         void assembleDetail_AllPhasesEmpty_NullSubDtos() {
-            TradingRunDetailDto result = mapper.assembleDetail(
-                run,
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty()
-            );
+            TradingRunDetailDto result =
+                    mapper.assembleDetail(run, Optional.empty(), Optional.empty(), Optional.empty());
 
             assertNotNull(result);
 
@@ -196,18 +187,15 @@ class RunDtoMapperTest {
         }
 
         @Test
-        @DisplayName("HOLD decision present — research + decision populated, execution null, run carries decision/symbol")
+        @DisplayName(
+                "HOLD decision present — research + decision populated, execution null, run carries decision/symbol")
         void assembleDetail_HoldDecisionNoExecution_PopulatesResearchAndDecisionOnly() {
             decisionPhase.setDecision(TradeDecision.HOLD);
             decisionPhase.setSymbol(null);
             decisionPhase.setQuantity(null);
 
             TradingRunDetailDto result = mapper.assembleDetail(
-                run,
-                Optional.of(researchPhase),
-                Optional.of(decisionPhase),
-                Optional.empty()
-            );
+                    run, Optional.of(researchPhase), Optional.of(decisionPhase), Optional.empty());
 
             assertNotNull(result);
             assertNotNull(result.getRun());

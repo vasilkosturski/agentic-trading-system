@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from unittest.mock import patch
+
 from dotenv import load_dotenv
 
 # CRITICAL: Load parent .env FIRST (has real API keys for integration tests)
@@ -17,14 +17,13 @@ os.environ.setdefault("BACKEND_API_ACCOUNTS", "http://localhost:8080")
 os.environ.setdefault("BRAVE_API_KEY", "test-brave-key-for-unit-tests")
 
 import json
-from typing import Dict, List
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aioresponses import aioresponses
 
 # Import models for fixtures
-from models import TradingDecision, Holding
+from models import Holding, TradingDecision
 from models.investment_style import InvestmentStyle
 
 
@@ -76,7 +75,7 @@ def sample_balance() -> float:
 
 
 @pytest.fixture
-def sample_holdings() -> List[Holding]:
+def sample_holdings() -> list[Holding]:
     """Sample holdings for testing (as Holding objects)."""
     return [
         Holding(symbol="AAPL", quantity=100, averagePrice=150.0),
@@ -91,10 +90,9 @@ def sample_account_report(sample_balance, sample_holdings) -> str:
     Financial story: Agent started with $130K, bought $30K of stock (AAPL + MSFT),
     leaving $100K cash. Total portfolio = cash + stock value = $130K.
     """
-    holdings_text = "\n".join([
-        f"- {h.symbol}: {h.quantity} shares @ ${h.averagePrice:.2f} avg"
-        for h in sample_holdings
-    ])
+    holdings_text = "\n".join(
+        [f"- {h.symbol}: {h.quantity} shares @ ${h.averagePrice:.2f} avg" for h in sample_holdings]
+    )
     stock_value = sum(h.quantity * h.averagePrice for h in sample_holdings)
     return f"""Account: Warren
 Balance: ${sample_balance:,.2f}
@@ -110,7 +108,8 @@ def sample_recent_activity():
     IMPORTANT: This fixture is synced with sample_holdings.
     The BUY trades here created the positions in sample_holdings.
     """
-    from models.api_responses import RecentActivityResponse, ActivityRun, ActivityTrade
+    from models.api_responses import ActivityRun, ActivityTrade, RecentActivityResponse
+
     return RecentActivityResponse(
         agentName="Warren",
         days=30,
@@ -122,9 +121,7 @@ def sample_recent_activity():
                 fullReasoning="Apple shows strong fundamentals with consistent revenue growth.",
                 researchSources=None,
                 historicalContext=None,
-                trades=[
-                    ActivityTrade(type="BUY", symbol="AAPL", quantity=100, price=150.0)
-                ]
+                trades=[ActivityTrade(type="BUY", symbol="AAPL", quantity=100, price=150.0)],
             ),
             ActivityRun(
                 date="2025-12-15T14:30:00Z",
@@ -133,13 +130,11 @@ def sample_recent_activity():
                 fullReasoning="Microsoft Azure growth continues to drive revenue.",
                 researchSources=None,
                 historicalContext=None,
-                trades=[
-                    ActivityTrade(type="BUY", symbol="MSFT", quantity=50, price=300.0)
-                ]
-            )
+                trades=[ActivityTrade(type="BUY", symbol="MSFT", quantity=50, price=300.0)],
+            ),
         ],
         totalRuns=2,
-        totalTrades=2
+        totalTrades=2,
     )
 
 
@@ -160,7 +155,8 @@ def sample_decision() -> TradingDecision:
 @pytest.fixture
 def sample_research_response():
     """Sample research response from Market Analyst for testing (two-agent architecture)."""
-    from models.llm_output import ResearchResponse, WebSource, CandidateStock
+    from models.llm_output import CandidateStock, ResearchResponse, WebSource
+
     return ResearchResponse(
         summary="Found 3 value stocks: JPM, BAC, WFC. All show strong fundamentals with P/E ratios under 15 and solid dividend yields.",
         candidates=[
@@ -169,10 +165,13 @@ def sample_research_response():
             CandidateStock(symbol="WFC", price=58.75),
         ],
         webSources=[
-            WebSource(title="JPMorgan Q4 Earnings Beat Expectations", url="https://example.com/jpm-earnings"),
+            WebSource(
+                title="JPMorgan Q4 Earnings Beat Expectations",
+                url="https://example.com/jpm-earnings",
+            ),
             WebSource(title="Bank Sector Analysis 2025", url="https://example.com/bank-analysis"),
             WebSource(title="Wells Fargo Recovery Story", url="https://example.com/wfc-recovery"),
-        ]
+        ],
     )
 
 
@@ -183,6 +182,7 @@ def mock_mcp_pool():
     Returns a dict with mock servers keyed by MCPName.
     """
     from mcp_helpers.types import MCPName
+
     return {
         MCPName.BRAVE_SEARCH: MagicMock(),
         MCPName.FETCH: MagicMock(),
@@ -190,7 +190,9 @@ def mock_mcp_pool():
 
 
 @pytest.fixture
-def mock_backend_api(mock_aiohttp, sample_balance, sample_holdings, sample_account_report, sample_agent_id):
+def mock_backend_api(
+    mock_aiohttp, sample_balance, sample_holdings, sample_account_report, sample_agent_id
+):
     """Mock backend API responses using REST endpoints.
 
     Uses the unified account report endpoint (AccountReportDto) for balance
@@ -208,28 +210,29 @@ def mock_backend_api(mock_aiohttp, sample_balance, sample_holdings, sample_accou
             "balance": sample_balance,
             "holdings": [h.model_dump() for h in sample_holdings],
             "holdingsValue": sum(h.quantity * h.averagePrice for h in sample_holdings),
-            "totalPortfolioValue": sample_balance + sum(h.quantity * h.averagePrice for h in sample_holdings),
+            "totalPortfolioValue": sample_balance
+            + sum(h.quantity * h.averagePrice for h in sample_holdings),
             "initialBalance": 130000.0,
             "totalProfitLoss": 0.0,
             "profitLossPercent": 0.0,
             "holdingsCount": len(sample_holdings),
             "transactionCount": 2,
         },
-        repeat=True
+        repeat=True,
     )
 
     # Initialize agent endpoint - POST /
     mock_aiohttp.post(
         f"{backend_url}/",
         payload={"id": sample_agent_id, "name": "Warren", "balance": sample_balance},
-        repeat=True
+        repeat=True,
     )
 
     # Buy/sell trades endpoint - POST /{agentId}/trades
     mock_aiohttp.post(
         f"{backend_url}/{sample_agent_id}/trades",
         payload="Trade executed successfully",
-        repeat=True
+        repeat=True,
     )
 
     return mock_aiohttp
@@ -413,6 +416,7 @@ def mock_prompt_fetch(mocker):
     # The in-process cache in prompt_loader survives across tests; clear it
     # so neighbouring tests can't leak state.
     from infra.prompt_loader import clear_prompt_cache
+
     clear_prompt_cache()
 
     synthetic_prompt = (
@@ -426,11 +430,9 @@ def mock_prompt_fetch(mocker):
 
     mock_request = AsyncMock(return_value=mock_response)
     mock_client = MagicMock()
-    mock_client._request = mock_request
+    mock_client.request = mock_request
 
-    patcher = mocker.patch(
-        "infra.prompt_loader._get_backend_client", return_value=mock_client
-    )
+    patcher = mocker.patch("infra.prompt_loader._get_backend_client", return_value=mock_client)
 
     yield patcher
     clear_prompt_cache()
@@ -476,52 +478,38 @@ def mock_run_tracking(mocker):
 @pytest.fixture
 def mock_backend_response():
     """Factory fixture for creating mock backend HTTP responses.
-    
+
     Usage:
         response = mock_backend_response({"key": "value"})
         # response.text is the JSON-encoded data
     """
+
     def _create(data: dict) -> MagicMock:
         mock = MagicMock()
         mock.text = json.dumps(data)
         return mock
+
     return _create
 
 
 @pytest.fixture
 def valid_holdings_data():
     """Valid holdings response data for researcher tests."""
-    return {
-        "agentName": "Warren",
-        "balance": 10000.0,
-        "holdings": [],
-        "positionCount": 0
-    }
+    return {"agentName": "Warren", "balance": 10000.0, "holdings": [], "positionCount": 0}
 
 
 @pytest.fixture
 def valid_recent_activity_data():
     """Valid recent activity response data for researcher tests."""
-    return {
-        "agentName": "Warren",
-        "days": 30,
-        "runs": [],
-        "totalRuns": 0,
-        "totalTrades": 0
-    }
+    return {"agentName": "Warren", "days": 30, "runs": [], "totalRuns": 0, "totalTrades": 0}
 
 
 @pytest.fixture
 def empty_recent_activity():
     """Empty recent activity for testing (typed Pydantic model)."""
     from models.api_responses import RecentActivityResponse
-    return RecentActivityResponse(
-        agentName="Warren",
-        days=30,
-        runs=[],
-        totalRuns=0,
-        totalTrades=0
-    )
+
+    return RecentActivityResponse(agentName="Warren", days=30, runs=[], totalRuns=0, totalTrades=0)
 
 
 @pytest.fixture
@@ -533,5 +521,5 @@ def valid_symbol_history_data():
         "days": 30,
         "currentPosition": None,
         "trades": [],
-        "summary": None
+        "summary": None,
     }

@@ -1,19 +1,18 @@
 package com.trading.repository;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.trading.entity.AccountTransaction;
 import com.trading.entity.TradingAccount;
 import com.trading.entity.TradingAgent;
 import com.trading.entity.TransactionType;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Repository tests for AccountTransaction date-range filtering.
@@ -77,8 +76,8 @@ class AccountTransactionRepositoryTest extends BaseRepositoryTest {
     void shouldIncludeTxnJustAfterSince() {
         AccountTransaction inRange = persistTxn(accountA, SYMBOL, since.plusMillis(1));
 
-        List<AccountTransaction> results = accountTransactionRepository
-                .findByAccountIdAndSymbolAndTimestampBetween(accountA.getId(), SYMBOL, since, cutoffDate);
+        List<AccountTransaction> results = accountTransactionRepository.findByAccountIdAndSymbolAndTimestampBetween(
+                accountA.getId(), SYMBOL, since, cutoffDate);
 
         assertThat(results).extracting(AccountTransaction::getId).containsExactly(inRange.getId());
     }
@@ -88,8 +87,8 @@ class AccountTransactionRepositoryTest extends BaseRepositoryTest {
     void shouldExcludeTxnAtExactlySince() {
         persistTxn(accountA, SYMBOL, since);
 
-        List<AccountTransaction> results = accountTransactionRepository
-                .findByAccountIdAndSymbolAndTimestampBetween(accountA.getId(), SYMBOL, since, cutoffDate);
+        List<AccountTransaction> results = accountTransactionRepository.findByAccountIdAndSymbolAndTimestampBetween(
+                accountA.getId(), SYMBOL, since, cutoffDate);
 
         assertThat(results).isEmpty();
     }
@@ -99,8 +98,8 @@ class AccountTransactionRepositoryTest extends BaseRepositoryTest {
     void shouldIncludeTxnJustBeforeCutoff() {
         AccountTransaction inRange = persistTxn(accountA, SYMBOL, cutoffDate.minusMillis(1));
 
-        List<AccountTransaction> results = accountTransactionRepository
-                .findByAccountIdAndSymbolAndTimestampBetween(accountA.getId(), SYMBOL, since, cutoffDate);
+        List<AccountTransaction> results = accountTransactionRepository.findByAccountIdAndSymbolAndTimestampBetween(
+                accountA.getId(), SYMBOL, since, cutoffDate);
 
         assertThat(results).extracting(AccountTransaction::getId).containsExactly(inRange.getId());
     }
@@ -110,8 +109,8 @@ class AccountTransactionRepositoryTest extends BaseRepositoryTest {
     void shouldExcludeTxnAtExactlyCutoff() {
         persistTxn(accountA, SYMBOL, cutoffDate);
 
-        List<AccountTransaction> results = accountTransactionRepository
-                .findByAccountIdAndSymbolAndTimestampBetween(accountA.getId(), SYMBOL, since, cutoffDate);
+        List<AccountTransaction> results = accountTransactionRepository.findByAccountIdAndSymbolAndTimestampBetween(
+                accountA.getId(), SYMBOL, since, cutoffDate);
 
         assertThat(results).isEmpty();
     }
@@ -123,8 +122,8 @@ class AccountTransactionRepositoryTest extends BaseRepositoryTest {
         AccountTransaction matching = persistTxn(accountA, SYMBOL, inRangeTime);
         persistTxn(accountA, OTHER_SYMBOL, inRangeTime);
 
-        List<AccountTransaction> results = accountTransactionRepository
-                .findByAccountIdAndSymbolAndTimestampBetween(accountA.getId(), SYMBOL, since, cutoffDate);
+        List<AccountTransaction> results = accountTransactionRepository.findByAccountIdAndSymbolAndTimestampBetween(
+                accountA.getId(), SYMBOL, since, cutoffDate);
 
         assertThat(results).extracting(AccountTransaction::getId).containsExactly(matching.getId());
     }
@@ -136,8 +135,8 @@ class AccountTransactionRepositoryTest extends BaseRepositoryTest {
         AccountTransaction matching = persistTxn(accountA, SYMBOL, inRangeTime);
         persistTxn(accountB, SYMBOL, inRangeTime);
 
-        List<AccountTransaction> results = accountTransactionRepository
-                .findByAccountIdAndSymbolAndTimestampBetween(accountA.getId(), SYMBOL, since, cutoffDate);
+        List<AccountTransaction> results = accountTransactionRepository.findByAccountIdAndSymbolAndTimestampBetween(
+                accountA.getId(), SYMBOL, since, cutoffDate);
 
         assertThat(results).extracting(AccountTransaction::getId).containsExactly(matching.getId());
     }
@@ -153,11 +152,9 @@ class AccountTransactionRepositoryTest extends BaseRepositoryTest {
         AccountTransaction t2 = persistTxn(accountA, SYMBOL, middle);
         AccountTransaction t3 = persistTxn(accountA, SYMBOL, newest);
 
-        List<AccountTransaction> results = accountTransactionRepository
-                .findByAccountIdAndSymbolAndTimestampBetween(accountA.getId(), SYMBOL, since, cutoffDate);
+        List<AccountTransaction> results = accountTransactionRepository.findByAccountIdAndSymbolAndTimestampBetween(
+                accountA.getId(), SYMBOL, since, cutoffDate);
 
-        assertThat(results)
-                .extracting(AccountTransaction::getId)
-                .containsExactly(t3.getId(), t2.getId(), t1.getId());
+        assertThat(results).extracting(AccountTransaction::getId).containsExactly(t3.getId(), t2.getId(), t1.getId());
     }
 }

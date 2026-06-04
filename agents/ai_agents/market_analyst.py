@@ -40,28 +40,37 @@ Per design document: system-design/workflows/trade-execution/trade_exec_workflow
 
 import logging
 from dataclasses import dataclass
-from agents import Agent, Runner, Tool, function_tool, output_guardrail, GuardrailFunctionOutput, RunContextWrapper
-from agents.mcp import MCPServer
-from config import config
-from utils.sdk_parser import extract_tool_calls, get_tool_errors
 from datetime import datetime
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
-# Import model for structured output
-from models.llm_output import ResearchResponse
-from models.investment_style import InvestmentStyle
+from agents import (
+    Agent,
+    GuardrailFunctionOutput,
+    RunContextWrapper,
+    Runner,
+    Tool,
+    function_tool,
+    output_guardrail,
+)
+from agents.mcp import MCPServer
+from pydantic import ValidationError
+
+from config import config
 
 # Import prompt loader
 from infra.prompt_loader import load_and_format_prompt
-
-from tools.market_tools import _lookup_share_price
+from mcp_helpers.types import MCPName
 from models import (
+    AgentRunResult,
     RecentActivityResponse,
     ToolError,
-    AgentRunResult,
 )
-from mcp_helpers.types import MCPName
-from pydantic import ValidationError
+from models.investment_style import InvestmentStyle
+
+# Import model for structured output
+from models.llm_output import ResearchResponse
+from tools.market_tools import _lookup_share_price
+from utils.sdk_parser import extract_tool_calls, get_tool_errors
 
 if TYPE_CHECKING:
     from mcp_helpers.types import MCPPool
@@ -79,7 +88,7 @@ _PLACEHOLDER_DOMAINS = {"example.com", "example.org", "example.net", "placeholde
 
 @output_guardrail
 async def validate_research_output(
-    _ctx: RunContextWrapper, _agent: Agent, output: ResearchResponse
+    ctx: RunContextWrapper, agent: Agent, output: ResearchResponse
 ) -> GuardrailFunctionOutput:
     """Validate that Market Analyst produced actionable research.
 
@@ -103,8 +112,7 @@ async def validate_research_output(
     else:
         # Detect hallucinated URLs — model sometimes fabricates sources
         # instead of using brave_web_search
-        fake = [s.url for s in output.webSources
-                if any(d in s.url for d in _PLACEHOLDER_DOMAINS)]
+        fake = [s.url for s in output.webSources if any(d in s.url for d in _PLACEHOLDER_DOMAINS)]
         if fake:
             issues.append(
                 f"webSources contain placeholder URLs (use brave_web_search "
@@ -120,16 +128,18 @@ async def validate_research_output(
 # Typed Input Models for MarketAnalyst
 # ============================================================================
 
+
 @dataclass
 class MarketAnalystContext:
     """Typed input context for Market Analyst research.
 
     Receives typed models, converts to strings internally for prompts.
     """
+
     agent_name: str
     agent_style: InvestmentStyle
     balance: float
-    holdings: List["Holding"]
+    holdings: list["Holding"]
     recent_activity: RecentActivityResponse | None = None
     max_positions: int = 10
 
@@ -169,13 +179,12 @@ class MarketAnalyst:
     Converts typed models to strings internally for LLM consumption.
 
     Usage (async factory pattern):
-        analyst = await MarketAnalyst.create(agent_name="Warren", agent_id=1, mcp_pool=pool)
+        analyst = await MarketAnalyst.create(agent_name="Warren", mcp_pool=pool)
         response = await analyst.run(context)  # Returns ResearchResponse directly
     """
 
     # Class-level type annotations (PEP 526) for type checker support
     agent_name: str
-    agent_id: int
     mcp_pool: "MCPPool"
     model_name: str
     agent: Agent[ResearchResponse]
@@ -188,7 +197,6 @@ class MarketAnalyst:
     async def create(
         cls,
         agent_name: str,
-        agent_id: int,
         mcp_pool: "MCPPool",
         model_name: str | None = None,
     ) -> "MarketAnalyst":
@@ -196,7 +204,6 @@ class MarketAnalyst:
 
         Args:
             agent_name: Agent name (e.g., "Warren")
-            agent_id: Agent ID for backend API calls
             mcp_pool: MCP pool with Brave Search + Fetch servers
             model_name: OpenAI model name to use. Defaults to config.OPENAI_MODEL.
 
@@ -207,12 +214,10 @@ class MarketAnalyst:
             model_name = config.OPENAI_MODEL
         instance = cls.__new__(cls)
         instance.agent_name = agent_name
-        instance.agent_id = agent_id
         instance.mcp_pool = mcp_pool
         instance.model_name = model_name
         instance.agent = await create_market_analyst_agent(
             agent_name=agent_name,
-            agent_id=agent_id,
             mcp_pool=mcp_pool,
             model_name=model_name,
         )
@@ -237,7 +242,9 @@ class MarketAnalyst:
             historical_context=context.historical_context,
         )
 
-    async def run(self, context: MarketAnalystContext, max_turns: int = 15) -> AgentRunResult[ResearchResponse]:
+    async def run(
+        self, context: MarketAnalystContext, max_turns: int = 15
+    ) -> AgentRunResult[ResearchResponse]:
         """Run market analyst agent and return result with full visibility.
 
         Encapsulates prompt building, agent execution, and response extraction.
@@ -283,7 +290,6 @@ class MarketAnalyst:
 
 async def create_market_analyst_agent(
     agent_name: str,
-    agent_id: int,
     mcp_pool: "MCPPool",
     model_name: str | None = None,
 ) -> Agent[ResearchResponse]:
@@ -291,7 +297,6 @@ async def create_market_analyst_agent(
 
     Args:
         agent_name: Agent name (e.g., "Warren")
-        agent_id: Agent ID for backend API calls (memory endpoints)
         mcp_pool: MCP pool with Brave Search + Fetch servers
         model_name: OpenAI model name to use. Defaults to config.OPENAI_MODEL.
 
@@ -332,14 +337,10 @@ async def create_market_analyst_agent(
             return ToolError(
                 error=f"Invalid price data: {e}",
                 error_type="validation",
-                context={"symbol": symbol}
+                context={"symbol": symbol},
             )
         except Exception as e:
-            return ToolError(
-                error=str(e),
-                error_type="api_error",
-                context={"symbol": symbol}
-            )
+            return ToolError(error=str(e), error_type="api_error", context={"symbol": symbol})
 
     # Collect tools (price lookup only — holdings/activity passed inline)
     db_tools: list[Tool] = [

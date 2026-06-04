@@ -23,8 +23,7 @@ public final class RunStateMachine {
      */
     public static void requireValidTransition(RunPhase from, RunPhase to) {
         if (!from.canTransitionTo(to)) {
-            throw new IllegalArgumentException(
-                "Invalid phase transition: " + from + " -> " + to);
+            throw new IllegalArgumentException("Invalid phase transition: " + from + " -> " + to);
         }
     }
 }

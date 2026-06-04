@@ -3,23 +3,37 @@ package com.trading.service;
 import com.trading.config.TradingPublicProperties;
 import com.trading.dto.request.CompleteRunRequest;
 import com.trading.dto.request.RunQueryFilter;
-import com.trading.dto.response.*;
-import com.trading.entity.*;
+import com.trading.dto.response.DecisionPhaseDto;
+import com.trading.dto.response.ExecutionPhaseDto;
+import com.trading.dto.response.ResearchPhaseDto;
+import com.trading.dto.response.RunListResponseDto;
+import com.trading.dto.response.TradingRunDetailDto;
+import com.trading.dto.response.TradingRunDto;
+import com.trading.entity.AccountTransaction;
+import com.trading.entity.DecisionPhase;
+import com.trading.entity.ExecutionPhase;
+import com.trading.entity.ResearchPhase;
+import com.trading.entity.TradingAgent;
+import com.trading.entity.TradingRun;
 import com.trading.enums.PhaseStatus;
 import com.trading.enums.RunPhase;
 import com.trading.enums.TradeDecision;
 import com.trading.exception.ResourceNotFoundException;
-import com.trading.repository.*;
+import com.trading.repository.AccountTransactionRepository;
+import com.trading.repository.DecisionPhaseRepository;
+import com.trading.repository.ExecutionPhaseRepository;
+import com.trading.repository.ResearchPhaseRepository;
+import com.trading.repository.TradingAgentRepository;
+import com.trading.repository.TradingRunRepository;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
 
 /**
  * Service for managing trading runs and their phases.
@@ -67,14 +81,14 @@ public class TradingRunService {
     public TradingRunDto createRun(Long agentId) {
         logger.info("Creating trading run for agent ID: {}", agentId);
 
-        TradingAgent agent = tradingAgentRepository.findById(agentId)
-            .orElseThrow(() -> new ResourceNotFoundException("Agent not found with ID: " + agentId));
+        TradingAgent agent = tradingAgentRepository
+                .findById(agentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent not found with ID: " + agentId));
 
         TradingRun run = new TradingRun(agent);
         run = tradingRunRepository.save(run);
 
-        logger.info("Created run ID: {} for agent: {} with phase: {}",
-            run.getId(), agent.getName(), run.getPhase());
+        logger.info("Created run ID: {} for agent: {} with phase: {}", run.getId(), agent.getName(), run.getPhase());
 
         return TradingRunDto.fromEntity(run);
     }
@@ -126,11 +140,13 @@ public class TradingRunService {
         if (tradeDecision != TradeDecision.HOLD) {
             AccountTransaction trade = null;
             if (executionDto != null && executionDto.getTradeId() != null) {
-                trade = accountTransactionRepository.findById(executionDto.getTradeId()).orElse(null);
+                trade = accountTransactionRepository
+                        .findById(executionDto.getTradeId())
+                        .orElse(null);
             }
             ExecutionPhase executionPhase = (executionDto != null)
-                ? executionDto.toEntity(run, decisionPhase, trade)
-                : failedExecution(run, decisionPhase);
+                    ? executionDto.toEntity(run, decisionPhase, trade)
+                    : failedExecution(run, decisionPhase);
             executionPhaseRepository.save(executionPhase);
             if (executionPhase.getTrade() != null) {
                 tradeId = executionPhase.getTrade().getId();
@@ -145,8 +161,7 @@ public class TradingRunService {
         run.markAsCompleted();
         tradingRunRepository.save(run);
 
-        logger.info("Run {} completed with decision: {}, trade ID: {}",
-            runId, tradeDecision, tradeId);
+        logger.info("Run {} completed with decision: {}, trade ID: {}", runId, tradeDecision, tradeId);
     }
 
     /**
@@ -181,10 +196,10 @@ public class TradingRunService {
             throw new ResourceNotFoundException("Trading run not found with ID: " + runId);
         }
 
-        return researchPhaseRepository.findByRunId(runId)
-            .map(ResearchPhaseDto::fromEntity)
-            .orElseThrow(() -> new ResourceNotFoundException(
-                "Research phase not found for run ID: " + runId));
+        return researchPhaseRepository
+                .findByRunId(runId)
+                .map(ResearchPhaseDto::fromEntity)
+                .orElseThrow(() -> new ResourceNotFoundException("Research phase not found for run ID: " + runId));
     }
 
     public DecisionPhaseDto getDecisionPhase(Long runId) {
@@ -194,10 +209,10 @@ public class TradingRunService {
             throw new ResourceNotFoundException("Trading run not found with ID: " + runId);
         }
 
-        return decisionPhaseRepository.findByRunId(runId)
-            .map(DecisionPhaseDto::fromEntity)
-            .orElseThrow(() -> new ResourceNotFoundException(
-                "Decision phase not found for run ID: " + runId));
+        return decisionPhaseRepository
+                .findByRunId(runId)
+                .map(DecisionPhaseDto::fromEntity)
+                .orElseThrow(() -> new ResourceNotFoundException("Decision phase not found for run ID: " + runId));
     }
 
     public ExecutionPhaseDto getExecutionPhase(Long runId) {
@@ -207,17 +222,17 @@ public class TradingRunService {
             throw new ResourceNotFoundException("Trading run not found with ID: " + runId);
         }
 
-        return executionPhaseRepository.findByRunId(runId)
-            .map(ExecutionPhaseDto::fromEntity)
-            .orElseThrow(() -> new ResourceNotFoundException(
-                "Execution phase not found for run ID: " + runId +
-                ""));
+        return executionPhaseRepository
+                .findByRunId(runId)
+                .map(ExecutionPhaseDto::fromEntity)
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Execution phase not found for run ID: " + runId + ""));
     }
 
     private TradingRun getRun(Long runId) {
-        return tradingRunRepository.findById(runId)
-            .orElseThrow(() -> new ResourceNotFoundException(
-                "Trading run not found with ID: " + runId));
+        return tradingRunRepository
+                .findById(runId)
+                .orElseThrow(() -> new ResourceNotFoundException("Trading run not found with ID: " + runId));
     }
 
     /**
@@ -237,24 +252,18 @@ public class TradingRunService {
     public RunListResponseDto listRuns(RunQueryFilter filter, Instant cutoffDate, Pageable pageable) {
         logger.debug("Listing runs with filter: {}, cutoffDate: {}, pageable: {}", filter, cutoffDate, pageable);
 
-        Page<TradingRun> page = tradingRunRepository.findAll(
-            runSpecificationFactory.build(filter, cutoffDate),
-            pageable);
+        Page<TradingRun> page =
+                tradingRunRepository.findAll(runSpecificationFactory.build(filter, cutoffDate), pageable);
 
         // Map to DTOs with decision data
         List<TradingRunDto> runDtos = page.getContent().stream()
-            .map(run -> {
-                DecisionPhase decisionPhase = decisionPhaseRepository.findByRunId(run.getId())
-                    .orElse(null);
-                return runDtoMapper.assembleListRow(run, decisionPhase);
-            })
-            .toList();
+                .map(run -> {
+                    DecisionPhase decisionPhase =
+                            decisionPhaseRepository.findByRunId(run.getId()).orElse(null);
+                    return runDtoMapper.assembleListRow(run, decisionPhase);
+                })
+                .toList();
 
-        return new RunListResponseDto(
-            runDtos,
-            page.getTotalElements(),
-            page.getNumber(),
-            page.getSize()
-        );
+        return new RunListResponseDto(runDtos, page.getTotalElements(), page.getNumber(), page.getSize());
     }
 }

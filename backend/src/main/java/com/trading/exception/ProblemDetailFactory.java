@@ -1,10 +1,9 @@
 package com.trading.exception;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
-
 import java.net.URI;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 
 /**
  * Factory for creating RFC 7807 ProblemDetail responses.

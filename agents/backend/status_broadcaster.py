@@ -9,12 +9,15 @@ operators can see in the backend logs which agent is in which phase.
 Uses async HTTP to avoid blocking the event loop during broadcasts.
 Callers should use asyncio.create_task() for fire-and-forget behavior.
 """
+
 import asyncio
+import logging
+from datetime import UTC, datetime
+
 import httpx
-from datetime import datetime, timezone
+
 from config import BACKEND_BASE_URL
 from models.run_tracking import RunPhase
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +36,7 @@ async def broadcast_status_async(
     phase: str,
     message: str,
     progress: int,
-    outcome: str | None = None
+    outcome: str | None = None,
 ) -> None:
     """
     Broadcast agent status update to backend (async, non-blocking).
@@ -58,7 +61,7 @@ async def broadcast_status_async(
             "message": message,
             "progress": progress,
             "outcome": outcome,
-            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         }
 
         async with httpx.AsyncClient(timeout=2.0) as client:
@@ -82,7 +85,7 @@ def broadcast_status(
     phase: str,
     message: str,
     progress: int,
-    outcome: str | None = None
+    outcome: str | None = None,
 ) -> None:
     """
     Fire-and-forget status broadcast (convenience wrapper).
@@ -101,11 +104,8 @@ def broadcast_status(
     try:
         loop = asyncio.get_running_loop()
         loop.create_task(
-            broadcast_status_async(
-                agent_id, agent_name, phase, message, progress, outcome
-            )
+            broadcast_status_async(agent_id, agent_name, phase, message, progress, outcome)
         )
     except RuntimeError:
         # No running event loop - log and skip (shouldn't happen in normal operation)
         logger.debug(f"No event loop for status broadcast: {agent_name} {phase}")
-

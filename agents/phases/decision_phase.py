@@ -17,18 +17,17 @@ from datetime import datetime
 
 from agents import Runner
 
-from ai_agents.decision_maker import DecisionMaker, DecisionContext
-from models import TradingDecision
-from models.orchestration import DecisionResult, RunContext
-from backend.run_lifecycle import RunLifecycle
-from infra.telemetry import extract_run_telemetry
-
 # Constants live in agent_executor.py for now; Task 10 of the
 # decomposition plan may reconcile if a shared constants module emerges.
 # Importing here is safe because agent_executor imports run_decision_phase
 # AFTER its module-level constants are declared, so by the time this
 # module is initialized those names are already bound on agent_executor.
 from agent_executor import AGENT_MAX_TURNS, MAX_POSITIONS
+from ai_agents.decision_maker import DecisionContext, DecisionMaker
+from backend.run_lifecycle import RunLifecycle
+from infra.telemetry import extract_run_telemetry
+from models import TradingDecision
+from models.orchestration import DecisionResult, RunContext
 
 logger = logging.getLogger(__name__)
 
@@ -118,9 +117,7 @@ async def run_decision_phase(
     )
 
     # Calculate decision latency
-    decision_latency_ms = int(
-        (datetime.now() - decision_start_time).total_seconds() * 1000
-    )
+    decision_latency_ms = int((datetime.now() - decision_start_time).total_seconds() * 1000)
     logger.info(f"📊 Decision Maker completed in {decision_latency_ms}ms")
 
     return DecisionResult(

@@ -9,29 +9,30 @@ Per design document: system-design/workflows/trade-execution/trade_exec_workflow
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime
+from typing import TYPE_CHECKING
+
 from agents import Agent, Runner, Tool, function_tool
 from agents.mcp import MCPServer
-from config import config
-from datetime import datetime
-from typing import List, TYPE_CHECKING
-
-# Import models
-from models.llm_output import TradingDecision, ResearchResponse
-from models.investment_style import InvestmentStyle
-from models.api_responses import RecentActivityResponse
-from models import AgentRunResult
-
-# Import SDK parsing utilities
-from utils.sdk_parser import extract_tool_calls, get_tool_errors
 
 # Import backend client
 from backend.client import get_backend_client
+from config import config
 
 # Import prompt loader
 from infra.prompt_loader import load_and_format_prompt
 
 # Import MCP types
 from mcp_helpers.types import MCPName
+from models import AgentRunResult
+from models.api_responses import RecentActivityResponse
+from models.investment_style import InvestmentStyle
+
+# Import models
+from models.llm_output import ResearchResponse, TradingDecision
+
+# Import SDK parsing utilities
+from utils.sdk_parser import extract_tool_calls, get_tool_errors
 
 if TYPE_CHECKING:
     from mcp_helpers.types import MCPPool
@@ -71,6 +72,7 @@ def get_position_sizing_pct(style: InvestmentStyle) -> int:
 # Typed Input Models for DecisionMaker
 # ============================================================================
 
+
 @dataclass
 class DecisionContext:
     """Typed input context for Decision Maker.
@@ -78,11 +80,12 @@ class DecisionContext:
     Receives typed models, converts to strings internally for prompts.
     Prices are carried inside research_response.candidates (CandidateStock objects).
     """
+
     agent_name: str
     agent_style: InvestmentStyle
     research_response: ResearchResponse
     balance: float
-    holdings: List["Holding"]
+    holdings: list["Holding"]
     recent_activity: RecentActivityResponse | None = None
     force_trade: bool = False
     max_positions: int = 10
@@ -192,7 +195,9 @@ class DecisionMaker:
             agent_style=context.agent_style,
         )
 
-    async def run(self, context: DecisionContext, max_turns: int = 10) -> AgentRunResult[TradingDecision]:
+    async def run(
+        self, context: DecisionContext, max_turns: int = 10
+    ) -> AgentRunResult[TradingDecision]:
         """Run decision maker agent and return result with full visibility.
 
         Encapsulates prompt building, agent execution, and response extraction.
@@ -354,9 +359,7 @@ def build_decision_prompt(
     # Format research candidates with prices from CandidateStock objects
     candidate_lines = []
     for candidate in research_response.candidates:
-        candidate_lines.append(
-            f"- {candidate.symbol} (current price: ${candidate.price:,.2f})"
-        )
+        candidate_lines.append(f"- {candidate.symbol} (current price: ${candidate.price:,.2f})")
     candidates_text = "\n".join(candidate_lines)
 
     # Format research sources
@@ -388,19 +391,19 @@ def build_decision_prompt(
 
     # Add price-based budget constraint (prices always available via CandidateStock)
     if research_response.candidates:
-        prompt += """**BUDGET CONSTRAINT (MANDATORY):**
+        prompt += f"""**BUDGET CONSTRAINT (MANDATORY):**
 - total_cost = quantity x price_per_share
 - total_cost MUST be <= available cash balance (${balance:,.2f})
 - If you cannot afford at least 1 share, do NOT pick that candidate
-""".format(balance=balance)
+"""
 
     # Add position sizing constraint (always, reinforces the system prompt rule)
-    prompt += """**POSITION SIZING CONSTRAINT (MANDATORY):**
-- Max {pct}% of portfolio per position
-- max_position_value = ${max_val:,.2f}
-- total_cost for any single trade MUST be <= ${max_val:,.2f}
+    prompt += f"""**POSITION SIZING CONSTRAINT (MANDATORY):**
+- Max {position_sizing_pct}% of portfolio per position
+- max_position_value = ${max_position_value:,.2f}
+- total_cost for any single trade MUST be <= ${max_position_value:,.2f}
 - This prevents over-concentration in any single holding
-""".format(pct=position_sizing_pct, max_val=max_position_value)
+"""
 
     if force_trade:
         prompt += """

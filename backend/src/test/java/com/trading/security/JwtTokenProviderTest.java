@@ -1,15 +1,14 @@
 package com.trading.security;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.util.Collections;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
-
-import java.util.Collections;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for JwtTokenProvider - token generation and validation.
@@ -32,10 +31,10 @@ class JwtTokenProviderTest {
     void generateToken_WithUsernameAndRole_ReturnsValidToken() {
         // Arrange
         UserDetails userDetails = User.builder()
-            .username("admin")
-            .password("password")
-            .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
-            .build();
+                .username("admin")
+                .password("password")
+                .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .build();
 
         // Act
         String token = jwtTokenProvider.generateToken(userDetails);
@@ -51,10 +50,10 @@ class JwtTokenProviderTest {
     void getUsernameFromToken_WithValidToken_ReturnsUsername() {
         // Arrange
         UserDetails userDetails = User.builder()
-            .username("admin")
-            .password("password")
-            .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
-            .build();
+                .username("admin")
+                .password("password")
+                .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .build();
         String token = jwtTokenProvider.generateToken(userDetails);
 
         // Act
@@ -69,10 +68,10 @@ class JwtTokenProviderTest {
     void validateToken_WithValidToken_ReturnsTrue() {
         // Arrange
         UserDetails userDetails = User.builder()
-            .username("admin")
-            .password("password")
-            .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
-            .build();
+                .username("admin")
+                .password("password")
+                .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .build();
         String token = jwtTokenProvider.generateToken(userDetails);
 
         // Act
@@ -87,16 +86,16 @@ class JwtTokenProviderTest {
     void validateToken_WithDifferentUsername_ReturnsFalse() {
         // Arrange
         UserDetails userDetails1 = User.builder()
-            .username("admin")
-            .password("password")
-            .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
-            .build();
+                .username("admin")
+                .password("password")
+                .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .build();
 
         UserDetails userDetails2 = User.builder()
-            .username("other")
-            .password("password")
-            .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
-            .build();
+                .username("other")
+                .password("password")
+                .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .build();
 
         String token = jwtTokenProvider.generateToken(userDetails1);
 
@@ -112,10 +111,10 @@ class JwtTokenProviderTest {
     void validateToken_WithInvalidToken_ReturnsFalse() {
         // Arrange
         UserDetails userDetails = User.builder()
-            .username("admin")
-            .password("password")
-            .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
-            .build();
+                .username("admin")
+                .password("password")
+                .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .build();
         String invalidToken = "invalid.jwt.token";
 
         // Act
@@ -186,10 +185,10 @@ class JwtTokenProviderTest {
         // (negative expiration => exp claim is in the past at issue time).
         JwtTokenProvider expiredProvider = new JwtTokenProvider(TEST_SECRET, -1000L);
         UserDetails userDetails = User.builder()
-            .username("admin")
-            .password("password")
-            .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
-            .build();
+                .username("admin")
+                .password("password")
+                .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .build();
         String expiredToken = expiredProvider.generateToken(userDetails);
 
         // Act: validate via the standard provider (same secret, normal expiration)
@@ -205,15 +204,15 @@ class JwtTokenProviderTest {
         // Arrange: an immediately-expired token signed with the same secret.
         JwtTokenProvider expiredProvider = new JwtTokenProvider(TEST_SECRET, -1000L);
         UserDetails userDetails = User.builder()
-            .username("admin")
-            .password("password")
-            .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
-            .build();
+                .username("admin")
+                .password("password")
+                .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .build();
         String expiredToken = expiredProvider.generateToken(userDetails);
 
         // Act & Assert: getUsernameFromToken must surface the typed JJWT exception so
         // JwtAuthenticationFilter can apply its targeted catch (ExpiredJwtException).
-        assertThrows(io.jsonwebtoken.ExpiredJwtException.class,
-            () -> jwtTokenProvider.getUsernameFromToken(expiredToken));
+        assertThrows(
+                io.jsonwebtoken.ExpiredJwtException.class, () -> jwtTokenProvider.getUsernameFromToken(expiredToken));
     }
 }

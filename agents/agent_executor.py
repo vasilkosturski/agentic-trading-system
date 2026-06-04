@@ -17,25 +17,24 @@ fallbacks.
 import logging
 from datetime import datetime
 
-from config import config
-from infra.pricing import MODEL_PRICING, _UNKNOWN_MODELS_WARNED  # noqa: F401
-from infra.telemetry import extract_usage_metrics, extract_run_telemetry  # noqa: F401
+from backend.client import get_backend_client
 from backend.run_lifecycle import RunLifecycle
-
+from config import config
+from infra.pricing import _UNKNOWN_MODELS_WARNED, MODEL_PRICING  # noqa: F401
+from infra.telemetry import extract_run_telemetry, extract_usage_metrics  # noqa: F401
 from models import CycleResult, InvestmentStyle
+from models.api_responses import RecentActivityResponse
 from models.orchestration import (
     AccountData,
-    RunContext,
     ExecutionResult,
+    RunContext,
 )
-from models.api_responses import RecentActivityResponse
 from models.run_tracking import (
     PhaseStatus,
     SourceDto,
     TradeDecision,
 )
 from tools.trading_tools import _get_account_report_raw
-from backend.client import get_backend_client
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +49,10 @@ MAX_ERROR_MESSAGE_LEN = 500
 
 # Imported after the module-level constants so phases.* can
 # `from agent_executor import MAX_POSITIONS, ...` without circular import.
-from phases.research_phase import run_research_phase  # noqa: E402
 from phases.decision_phase import run_decision_phase  # noqa: E402
 from phases.execution_phase import run_execution_phase  # noqa: E402
 from phases.finalization import run_finalization_phase  # noqa: E402
+from phases.research_phase import run_research_phase  # noqa: E402
 
 
 class AgentExecutor:
@@ -66,7 +65,7 @@ class AgentExecutor:
     - TRADING: Trade execution (BUY/SELL only)
     - COMPLETED: Run finished successfully
     - ERROR: Run failed
-    
+
     Data Flow:
     - RunContext created at start with guaranteed non-None values
     - Context passed through all operations explicitly
@@ -134,7 +133,7 @@ class AgentExecutor:
             research_start_time = datetime.now()
 
             run_id = await lifecycle.start()
-            
+
             # Fetch account data once (reused by both agents)
             account_data = await self._fetch_account_data(self.agent_id)
 
@@ -173,10 +172,17 @@ class AgentExecutor:
             # Build decision sources - track what data informed the decision
             ctx.decision_sources = [
                 # Research sources passed to decision maker
-                *[SourceDto.web(title=s.title, url=s.url) for s in ctx.research.research_response.webSources],
+                *[
+                    SourceDto.web(title=s.title, url=s.url)
+                    for s in ctx.research.research_response.webSources
+                ],
                 # Internal data accessed
-                SourceDto.system_context(f"Portfolio: ${ctx.balance:,.2f}, {len(ctx.holdings)} positions"),
-                SourceDto.system_context(f"Recent activity: {len(ctx.recent_activity.runs) if ctx.recent_activity else 0} runs"),
+                SourceDto.system_context(
+                    f"Portfolio: ${ctx.balance:,.2f}, {len(ctx.holdings)} positions"
+                ),
+                SourceDto.system_context(
+                    f"Recent activity: {len(ctx.recent_activity.runs) if ctx.recent_activity else 0} runs"
+                ),
             ]
 
             # === EXECUTION PHASE ===
@@ -250,7 +256,9 @@ class AgentExecutor:
         client = get_backend_client()
         result = await client.get_recent_activity(agent_id, days=RECENT_ACTIVITY_LOOKBACK_DAYS)
 
-        logger.info(f"📊 Context prepared: {result.computed_total_runs} runs, {result.computed_total_trades} trades (30 days)")
+        logger.info(
+            f"📊 Context prepared: {result.computed_total_runs} runs, {result.computed_total_trades} trades (30 days)"
+        )
         return result
 
     async def _handle_cycle_error(
@@ -270,4 +278,3 @@ class AgentExecutor:
         """
         run_id = ctx.run_id if ctx else None
         await lifecycle.fail(run_id, error)
-

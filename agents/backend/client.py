@@ -28,7 +28,7 @@ Lifecycle strategy — "loop-local singleton with optional DI":
 
 import asyncio
 import logging
-from typing import Any, Dict
+from typing import Any
 
 import httpx
 from tenacity import (
@@ -39,14 +39,14 @@ from tenacity import (
 )
 
 from config import (
-    BACKEND_BASE_URL,
     BACKEND_API_ACCOUNTS,
     BACKEND_API_TRADING_RUNS,
+    BACKEND_BASE_URL,
 )
+from infra.exceptions import BackendAPIError
 from models import TradeResult
 from models.api_responses import AccountReport, RecentActivityResponse, SymbolHistoryResponse
 from models.run_tracking import CompleteRunData
-from infra.exceptions import BackendAPIError
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +159,11 @@ class BackendClient:
         except RuntimeError:
             current_loop_id = None
 
-        if self._owned_client is None or self._owned_client.is_closed or self._loop_id != current_loop_id:
+        if (
+            self._owned_client is None
+            or self._owned_client.is_closed
+            or self._loop_id != current_loop_id
+        ):
             # HTTP/2 enabled: backend runs on Traefik 2.x which negotiates h2 over
             # ALPN. Multiplexing concurrent agent requests over a single TCP
             # connection reduces head-of-line blocking and connection overhead.
@@ -177,7 +181,7 @@ class BackendClient:
             )
             self._loop_id = current_loop_id
         return self._owned_client
-    
+
     async def close(self) -> None:
         """Close the internally-owned client.  Call during application shutdown.
 
@@ -188,45 +192,45 @@ class BackendClient:
             await self._owned_client.aclose()
             logger.debug("Closed httpx AsyncClient")
         self._owned_client = None
-    
+
     async def _request(
         self,
         method: str,
         url: str,
         *,
-        params: Dict[str, Any] | None = None,
-        json_data: Dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+        json_data: dict[str, Any] | None = None,
     ) -> httpx.Response:
         """Make HTTP request to backend API.
-        
+
         Args:
             method: HTTP method (GET, POST, PUT, PATCH, etc.)
             url: Full URL
             params: URL query parameters
             json_data: JSON request body
-            
+
         Returns:
             httpx.Response object
-            
+
         Raises:
             BackendAPIError: On any HTTP error, network error, or timeout
         """
         client = self._get_client()
-        
+
         try:
             logger.debug(f"{method} {url} params={params} json={json_data}")
-            
+
             response = await client.request(
                 method=method,
                 url=url,
                 params=params,
                 json=json_data,
             )
-            
+
             logger.debug(f"{method} {url} -> HTTP {response.status_code}")
             response.raise_for_status()
             return response
-            
+
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
             try:
@@ -234,20 +238,40 @@ class BackendClient:
                 error_msg = error_body.get("error", str(error_body))
             except Exception:
                 error_msg = e.response.text
-            
+
             logger.error(f"HTTP {status} {method} {url}: {error_msg}")
             raise BackendAPIError(f"HTTP {status}: {error_msg}", status_code=status) from e
-            
+
         except httpx.TimeoutException as e:
             logger.error(f"Timeout: {method} {url}")
-            raise BackendAPIError(f"Request timeout") from e
-            
+            raise BackendAPIError("Request timeout") from e
+
         except httpx.RequestError as e:
             logger.error(f"Network error {method} {url}: {type(e).__name__}: {e}")
             raise BackendAPIError(f"Network error: {str(e)}") from e
-    
+
+    async def request(
+        self,
+        method: str,
+        url: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json_data: dict[str, Any] | None = None,
+    ) -> httpx.Response:
+        """Make an ad-hoc HTTP request through the shared client.
+
+        Escape hatch for endpoints that don't yet have a typed wrapper — e.g.
+        market data fetches and backend-served prompt templates. Most callers
+        should use the specialised methods below (``buy_shares``,
+        ``get_account_report``, etc.) which add validation and retry policy.
+
+        Args, returns, and raises mirror the underlying request primitive:
+        a ``BackendAPIError`` is raised on any HTTP, timeout, or network error.
+        """
+        return await self._request(method, url, params=params, json_data=json_data)
+
     # ========== Trading Operations ==========
-    
+
     async def initialize_agent(self, name: str, initial_balance: float = 100000.0) -> int:
         """Initialize agent account if it doesn't exist.
 
@@ -266,10 +290,9 @@ class BackendClient:
         """
         url = BACKEND_API_ACCOUNTS
         try:
-            response = await self._request("POST", url, json_data={
-                "name": name,
-                "initialBalance": initial_balance
-            })
+            response = await self._request(
+                "POST", url, json_data={"name": name, "initialBalance": initial_balance}
+            )
             data = response.json()
             agent_id = data.get("id") if isinstance(data, dict) else None
             if agent_id is None:
@@ -299,7 +322,7 @@ class BackendClient:
                 logger.info(f"Found existing agent {name} (id={agent_id})")
                 return agent_id
         raise BackendAPIError(f"Agent {name} not found in registry after 400 response")
-    
+
     @_retry_on_transient
     async def get_account_report(self, agent_id: int) -> AccountReport:
         """Get full account report with balance, holdings, and portfolio metrics.
@@ -325,25 +348,24 @@ class BackendClient:
         run_id: int | None = None,
     ) -> TradeResult:
         """Buy shares of a stock.
-        
+
         Args:
             agent_id: Backend identifier for the agent
             symbol: Stock symbol (e.g., 'AAPL')
             quantity: Number of shares to buy
             run_id: Optional run ID to link this trade
-            
+
         Returns:
             TradeResult with tradeId, symbol, quantity, price, newBalance
         """
         url = f"{BACKEND_API_ACCOUNTS}/{agent_id}/trades"
-        response = await self._request("POST", url, json_data={
-            "type": "BUY",
-            "symbol": symbol,
-            "quantity": quantity,
-            "runId": run_id
-        })
+        response = await self._request(
+            "POST",
+            url,
+            json_data={"type": "BUY", "symbol": symbol, "quantity": quantity, "runId": run_id},
+        )
         return TradeResult.model_validate_json(response.text)
-    
+
     async def sell_shares(
         self,
         agent_id: int,
@@ -352,25 +374,24 @@ class BackendClient:
         run_id: int | None = None,
     ) -> TradeResult:
         """Sell shares of a stock.
-        
+
         Args:
             agent_id: Backend identifier for the agent
             symbol: Stock symbol (e.g., 'AAPL')
             quantity: Number of shares to sell
             run_id: Optional run ID to link this trade
-            
+
         Returns:
             TradeResult with tradeId, symbol, quantity, price, newBalance
         """
         url = f"{BACKEND_API_ACCOUNTS}/{agent_id}/trades"
-        response = await self._request("POST", url, json_data={
-            "type": "SELL",
-            "symbol": symbol,
-            "quantity": quantity,
-            "runId": run_id
-        })
+        response = await self._request(
+            "POST",
+            url,
+            json_data={"type": "SELL", "symbol": symbol, "quantity": quantity, "runId": run_id},
+        )
         return TradeResult.model_validate_json(response.text)
-    
+
     # ========== Memory / History Operations ==========
 
     async def get_trading_history(
@@ -395,9 +416,7 @@ class BackendClient:
         return SymbolHistoryResponse.model_validate_json(response.text)
 
     @_retry_on_transient
-    async def get_recent_activity(
-        self, agent_id: int, days: int = 7
-    ) -> RecentActivityResponse:
+    async def get_recent_activity(self, agent_id: int, days: int = 7) -> RecentActivityResponse:
         """Get recent trading activity across all stocks.
 
         Args:
@@ -416,31 +435,31 @@ class BackendClient:
         return RecentActivityResponse.model_validate_json(response.text)
 
     # ========== Run Tracking Operations ==========
-    
+
     @_retry_on_transient
     async def create_run(self, agent_id: int) -> int:
         """Create a new trading run.
-        
+
         Args:
             agent_id: Backend identifier for the agent
-            
+
         Returns:
             Run ID for tracking this cycle
-            
+
         Raises:
             BackendAPIError: If run creation fails
         """
         url = BACKEND_API_TRADING_RUNS
         response = await self._request("POST", url, json_data={"agentId": agent_id})
-        
+
         result = response.json()
         run_id = result.get("runId")
         if run_id is None:
             raise BackendAPIError(f"create_run response missing runId: {result}")
-        
+
         logger.info(f"Created trading run #{run_id} for agent {agent_id}")
         return run_id
-    
+
     @_retry_on_transient
     async def update_phase(self, run_id: int, phase: str, error_message: str | None = None) -> None:
         """Update the phase of a trading run.
@@ -456,11 +475,11 @@ class BackendClient:
             payload["errorMessage"] = error_message
         await self._request("PATCH", url, json_data=payload)
         logger.info(f"Updated run #{run_id} to phase {phase}")
-    
+
     @_retry_on_transient
     async def complete_run(self, run_id: int, data: CompleteRunData) -> None:
         """Complete a trading run with all phase data.
-        
+
         Args:
             run_id: The run ID to complete
             data: CompleteRunData containing all phase information
@@ -470,42 +489,25 @@ class BackendClient:
         logger.info(f"Completed run #{run_id} with decision={data.decision.decision}")
 
 
-# Module-level singleton for backward compatibility.
-#
-# Concurrency invariant — "mutations only from asyncio task context":
-#   The mutating accessors below (``get_backend_client`` / ``close_backend_client``)
-#   are intentionally synchronous functions that perform plain attribute reads and
-#   writes on this module-level slot.  They are safe ONLY because they are always
-#   invoked from within an asyncio task — i.e. from coroutine call sites that run
-#   on a single event-loop thread under cooperative scheduling.  Between two
-#   consecutive Python bytecodes within these functions there is no ``await``,
-#   so no other coroutine can interleave and observe a half-initialized state;
-#   the check-then-assign in ``get_backend_client`` is therefore race-free in
-#   practice without any explicit lock.
-#
-#   This invariant must hold at every call site:
-#     - DO call ``get_backend_client()`` from coroutines / async request
-#       handlers / asyncio.run() entry points.  These run on the loop thread.
-#     - DO NOT call it from raw OS threads (e.g. ``threading.Thread``,
-#       ``concurrent.futures.ThreadPoolExecutor`` workers, or signal handlers).
-#       Two preemptive threads racing on ``_default_client is None`` could both
-#       construct a ``BackendClient`` and one would leak, and worse, each thread
-#       might bind sockets to a different event loop — reintroducing exactly the
-#       cross-loop bug the loop-aware singleton in ``BackendClient._get_client``
-#       is designed to prevent (see httpx#2959 reference above).
-#
-#   If a sync/threaded caller ever needs access, wrap it with
-#   ``asyncio.run_coroutine_threadsafe(...)`` against the main loop, or guard
-#   this slot with an ``asyncio.Lock`` / ``threading.Lock``.  Do not silently
-#   relax the invariant.
+# Process-wide BackendClient slot. A single instance is shared across coroutine
+# callsites so the underlying httpx connection pool is reused. Mutating
+# accessors must run on the asyncio event loop — the running-loop check in
+# ``get_backend_client`` makes the check-then-assign race-free under
+# cooperative scheduling and crashes loudly if a sync thread (e.g. a Flask
+# handler) ever reaches it. Sync/threaded callers must marshal via
+# ``asyncio.run_coroutine_threadsafe`` instead.
 _default_client: BackendClient | None = None
 
 
 def get_backend_client() -> BackendClient:
-    """Get the default BackendClient singleton.
-    
-    For most use cases, use this function to get a shared client instance.
+    """Return the process-wide :class:`BackendClient`.
+
+    Must be called from inside an asyncio task. The running-loop check
+    guarantees the check-then-assign below executes on the loop thread, where
+    cooperative scheduling makes it atomic without an explicit lock. Calling
+    from a sync thread raises :class:`RuntimeError`.
     """
+    asyncio.get_running_loop()
     global _default_client
     if _default_client is None:
         _default_client = BackendClient()
@@ -518,21 +520,3 @@ async def close_backend_client() -> None:
     if _default_client is not None:
         await _default_client.close()
         _default_client = None
-
-
-# ========== Backward Compatibility Functions ==========
-# These wrap the BackendClient methods for existing code that imports from infra.http_client
-
-async def call_backend(
-    method: str,
-    url: str,
-    *,
-    params: Dict[str, Any] | None = None,
-    json_data: Dict[str, Any] | None = None,
-) -> httpx.Response:
-    """Legacy function for backward compatibility.
-
-    New code should use BackendClient directly.
-    """
-    client = get_backend_client()
-    return await client._request(method, url, params=params, json_data=json_data)

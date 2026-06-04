@@ -9,17 +9,23 @@ import json
 import logging
 from contextlib import AsyncExitStack
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from agents import Runner
 from agents.mcp import MCPServerStdio
 
-from ai_agents.decision_maker import DecisionMaker, DecisionContext
-from models.llm_output import TradeAction, TradingDecision, ResearchResponse, WebSource, CandidateStock
-from mcp_helpers.types import MCPPool
+from ai_agents.decision_maker import DecisionContext, DecisionMaker
 from mcp_helpers.params import get_mcp_server_params
+from mcp_helpers.types import MCPPool
+from models.llm_output import (
+    CandidateStock,
+    ResearchResponse,
+    TradeAction,
+    TradingDecision,
+    WebSource,
+)
 from utils.sdk_parser import extract_tool_calls
 
 logger = logging.getLogger("e2e_tests.decision_maker")
@@ -42,7 +48,7 @@ def _dump_result_to_json(
     try:
         _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         filename = f"{test_name}_{ts}.json"
 
         data = {
@@ -81,7 +87,9 @@ async def real_mcp_pool():
 @pytest.mark.e2e
 @pytest.mark.slow
 @pytest.mark.costly
-@pytest.mark.usefixtures("require_openai_api_key", "require_brave_api_key", "require_backend", "seed_test_data")
+@pytest.mark.usefixtures(
+    "require_openai_api_key", "require_brave_api_key", "require_backend", "seed_test_data"
+)
 class TestDecisionMakerE2E:
     """E2E smoke test for Decision Maker."""
 
@@ -138,8 +146,14 @@ class TestDecisionMakerE2E:
                 CandidateStock(symbol="WSBC", price=36.01),
             ],
             webSources=[
-                WebSource(title="Top 10 Most Undervalued Stocks in the S&P 500", url="https://www.nerdwallet.com/investing/learn/undervalued-stocks"),
-                WebSource(title="February 2026's Value Picks: Stocks Priced Below Estimated Worth", url="https://finance.yahoo.com/news/february-2026s-value-picks-stocks-113805029.html"),
+                WebSource(
+                    title="Top 10 Most Undervalued Stocks in the S&P 500",
+                    url="https://www.nerdwallet.com/investing/learn/undervalued-stocks",
+                ),
+                WebSource(
+                    title="February 2026's Value Picks: Stocks Priced Below Estimated Worth",
+                    url="https://finance.yahoo.com/news/february-2026s-value-picks-stocks-113805029.html",
+                ),
             ],
             portfolio_context="Current portfolio holds AAPL and MSFT. AAPL already held — could add to position. Other candidates diversify into financials to reduce tech concentration.",
         )
@@ -194,14 +208,18 @@ class TestDecisionMakerE2E:
 
             # Agent should have called get_symbol_trade_history at least once
             tool_names = [tc.name for tc in tool_calls]
-            assert "get_symbol_trade_history" in tool_names, "DecisionMaker should check trade history for candidates"
+            assert "get_symbol_trade_history" in tool_names, (
+                "DecisionMaker should check trade history for candidates"
+            )
 
             # Assertions -- structure only (LLM output is non-deterministic)
             assert decision is not None
             assert isinstance(decision, TradingDecision)
 
             # Decision should be BUY (given good candidates + available balance + position slots)
-            assert decision.action == TradeAction.BUY, f"Expected BUY given strong candidates and available capital, got {decision.action}"
+            assert decision.action == TradeAction.BUY, (
+                f"Expected BUY given strong candidates and available capital, got {decision.action}"
+            )
 
             assert decision.symbol is not None
             assert decision.quantity is not None
@@ -213,8 +231,12 @@ class TestDecisionMakerE2E:
             assert 1 <= len(decision.symbol) <= 5, f"Symbol length should be 1-5: {decision.symbol}"
 
             # Structured reasoning fields must be populated
-            assert len(decision.portfolioContext) > 20, "portfolioContext should explain portfolio state"
-            assert len(decision.historicalContext) > 10, "historicalContext should reference trading history"
+            assert len(decision.portfolioContext) > 20, (
+                "portfolioContext should explain portfolio state"
+            )
+            assert len(decision.historicalContext) > 10, (
+                "historicalContext should reference trading history"
+            )
             assert len(decision.researchContext) > 20, "researchContext should reference research"
 
             # Rationale quality -- must be meaningful, not a stub

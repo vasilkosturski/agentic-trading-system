@@ -1,15 +1,19 @@
 package com.trading.controller;
 
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trading.config.TestSecurityConfig;
 import com.trading.dto.response.AccountReportDto;
 import com.trading.dto.response.HoldingDto;
-import com.trading.dto.response.TradeResult;
 import com.trading.service.AccountProvisioner;
 import com.trading.service.AccountQueryService;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.MemoryService;
 import com.trading.service.TradeOrchestrator;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,12 +22,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.List;
-
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AccountController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -59,18 +57,18 @@ class AccountControllerTest {
     void testGetAccountResource_Success() throws Exception {
         List<HoldingDto> holdings = List.of(new HoldingDto("AAPL", 10, 150.0));
         AccountReportDto report = new AccountReportDto(
-            "Warren",           // agentName
-            95000.0,           // balance
-            5000.0,            // holdingsValue
-            100000.0,          // totalPortfolioValue
-            100000.0,          // initialBalance
-            0.0,               // totalProfitLoss
-            0.0,               // profitLossPercent
-            java.time.LocalDateTime.now(),  // lastUpdated
-            1,                 // holdingsCount
-            5L,                // transactionCount
-            holdings           // holdings
-        );
+                "Warren", // agentName
+                95000.0, // balance
+                5000.0, // holdingsValue
+                100000.0, // totalPortfolioValue
+                100000.0, // initialBalance
+                0.0, // totalProfitLoss
+                0.0, // profitLossPercent
+                java.time.LocalDateTime.now(), // lastUpdated
+                1, // holdingsCount
+                5L, // transactionCount
+                holdings // holdings
+                );
 
         when(agentIdentityService.requireAgentName(1L)).thenReturn("Warren");
         when(accountQueryService.getAccountReport("Warren")).thenReturn(report);

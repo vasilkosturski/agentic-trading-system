@@ -3,10 +3,10 @@ package com.trading.specification;
 import com.trading.dto.request.RunQueryFilter;
 import com.trading.entity.DecisionPhase;
 import com.trading.entity.TradingRun;
-import jakarta.persistence.criteria.*;
-import org.springframework.data.jpa.domain.Specification;
-
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
 import java.time.Instant;
+import org.springframework.data.jpa.domain.Specification;
 
 /**
  * JPA Specification for dynamic TradingRun filtering.
@@ -24,11 +24,10 @@ public class TradingRunSpecification {
      * Combines all non-null filters with AND logic.
      */
     public static Specification<TradingRun> fromFilter(RunQueryFilter filter) {
-        return Specification
-            .where(hasAgentId(filter.getAgentId()))
-            .and(hasStatus(filter.getStatus()))
-            .and(hasDecision(filter.getDecision()))
-            .and(hasSymbol(filter.getSymbol()));
+        return Specification.where(hasAgentId(filter.getAgentId()))
+                .and(hasStatus(filter.getStatus()))
+                .and(hasDecision(filter.getDecision()))
+                .and(hasSymbol(filter.getSymbol()));
     }
 
     /**
@@ -36,12 +35,11 @@ public class TradingRunSpecification {
      * Combines filter criteria with startedAt before cutoff date.
      */
     public static Specification<TradingRun> fromFilterWithDateCutoff(RunQueryFilter filter, Instant cutoffDate) {
-        return Specification
-            .where(hasAgentId(filter.getAgentId()))
-            .and(hasStatus(filter.getStatus()))
-            .and(hasDecision(filter.getDecision()))
-            .and(hasSymbol(filter.getSymbol()))
-            .and(startedAtBefore(cutoffDate));
+        return Specification.where(hasAgentId(filter.getAgentId()))
+                .and(hasStatus(filter.getStatus()))
+                .and(hasDecision(filter.getDecision()))
+                .and(hasSymbol(filter.getSymbol()))
+                .and(startedAtBefore(cutoffDate));
     }
 
     /**
@@ -50,7 +48,7 @@ public class TradingRunSpecification {
     public static Specification<TradingRun> hasAgentId(Long agentId) {
         return (root, query, cb) -> {
             if (agentId == null) {
-                return null;  // No filter applied
+                return null; // No filter applied
             }
             return cb.equal(root.get("agent").get("id"), agentId);
         };
@@ -94,7 +92,8 @@ public class TradingRunSpecification {
             // Join to decision_phases table
             Join<TradingRun, DecisionPhase> decisionJoin = root.join("decision", JoinType.LEFT);
             applyDistinctIfContentQuery(query);
-            return cb.equal(cb.upper(decisionJoin.get("symbol")), symbol.toUpperCase().trim());
+            return cb.equal(
+                    cb.upper(decisionJoin.get("symbol")), symbol.toUpperCase().trim());
         };
     }
 
@@ -112,9 +111,7 @@ public class TradingRunSpecification {
      * {@code query.getResultType()} scopes DISTINCT to the content query only.
      */
     private static void applyDistinctIfContentQuery(jakarta.persistence.criteria.CriteriaQuery<?> query) {
-        if (query != null
-                && Long.class != query.getResultType()
-                && long.class != query.getResultType()) {
+        if (query != null && Long.class != query.getResultType() && long.class != query.getResultType()) {
             query.distinct(true);
         }
     }

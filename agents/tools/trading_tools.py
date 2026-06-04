@@ -7,7 +7,6 @@ No model-visible @function_tool exports live here; see W5 cleanup notes.
 """
 
 import logging
-from typing import List
 
 from backend.client import get_backend_client
 from models import Holding, TradeResult
@@ -21,7 +20,7 @@ async def buy_shares(
     symbol: str,
     quantity: int,
     runId: int | None = None,
-    agent_name: str | None = None
+    agent_name: str | None = None,
 ) -> TradeResult:
     """Buy shares of a stock.
 
@@ -55,7 +54,7 @@ async def sell_shares(
     symbol: str,
     quantity: int,
     runId: int | None = None,
-    agent_name: str | None = None
+    agent_name: str | None = None,
 ) -> TradeResult:
     """Sell shares of a stock.
 
@@ -101,6 +100,7 @@ async def initialize_agent(name: str, initial_balance: float = 100000.0) -> int:
 
 # Helper functions for system use (not agent tools)
 
+
 async def _get_account_report_raw(agent_id: int) -> AccountReport:
     """Get full account report from backend.
 
@@ -117,7 +117,7 @@ async def _get_balance_raw(agent_id: int) -> float:
     return report.balance
 
 
-async def _get_holdings_raw(agent_id: int) -> List[Holding]:
+async def _get_holdings_raw(agent_id: int) -> list[Holding]:
     """Get agent holdings from account report - for system use, not exposed to agents.
 
     Returns:

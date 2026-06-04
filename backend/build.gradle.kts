@@ -1,6 +1,8 @@
 plugins {
     id("org.springframework.boot") version "3.5.14"
     id("io.spring.dependency-management") version "1.1.7"
+    id("com.diffplug.spotless") version "6.25.0"
+    checkstyle
     java
 }
 
@@ -76,4 +78,32 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+spotless {
+    java {
+        target("src/**/*.java")
+        palantirJavaFormat("2.50.0")
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+checkstyle {
+    toolVersion = "10.17.0"
+    configFile = file("config/checkstyle/checkstyle.xml")
+    isIgnoreFailures = false
+    maxWarnings = 0
+}
+
+tasks.withType<Checkstyle>().configureEach {
+    reports {
+        xml.required.set(false)
+        html.required.set(true)
+    }
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.add("-Xlint:all")
 }

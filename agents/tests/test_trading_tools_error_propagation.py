@@ -22,10 +22,9 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from agents.tool_context import ToolContext
-from infra.exceptions import BackendAPIError
 
+from infra.exceptions import BackendAPIError
 
 # ---------------------------------------------------------------------------
 # Plain async helpers — assert direct propagation
@@ -97,10 +96,11 @@ class TestFetchMarketDataPropagatesBackendAPIError:
 
         market_tools._market_data_cache.clear()
 
-        with patch("tools.market_tools.call_backend", new_callable=AsyncMock) as mock_call:
-            mock_call.side_effect = BackendAPIError(
-                "Backend timeout", status_code=504
-            )
+        mock_client = MagicMock()
+        mock_client.request = AsyncMock(
+            side_effect=BackendAPIError("Backend timeout", status_code=504)
+        )
+        with patch("tools.market_tools.get_backend_client", return_value=mock_client):
             with pytest.raises(BackendAPIError) as exc_info:
                 await market_tools._fetch_market_data("AAPL")
 
@@ -135,12 +135,11 @@ class TestFunctionToolsSurfaceBackendAPIErrorThroughSDK:
 
         market_tools._market_data_cache.clear()
 
-        with patch(
-            "tools.market_tools.call_backend", new_callable=AsyncMock
-        ) as mock_call:
-            mock_call.side_effect = BackendAPIError(
-                "Rate limited", status_code=429
-            )
+        mock_client = MagicMock()
+        mock_client.request = AsyncMock(
+            side_effect=BackendAPIError("Rate limited", status_code=429)
+        )
+        with patch("tools.market_tools.get_backend_client", return_value=mock_client):
             output = await get_price_with_metadata.on_invoke_tool(
                 _make_tool_context("get_price_with_metadata"),
                 json.dumps({"symbol": "AAPL"}),
@@ -164,6 +163,7 @@ class TestDetectToolErrorRecognisesBackendAPIErrorPath:
 
     def test_detect_tool_error_flags_backend_api_error_passthrough(self):
         from agents.tool import default_tool_error_function
+
         from utils.sdk_parser import _detect_tool_error
 
         err = BackendAPIError("Account not found", status_code=404)

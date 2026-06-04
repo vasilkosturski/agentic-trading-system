@@ -1,21 +1,20 @@
 package com.trading.repository;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.trading.entity.TradingAgent;
 import com.trading.entity.TradingRun;
 import com.trading.enums.RunPhase;
 import com.trading.enums.RunStatus;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
-
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Repository tests for TradingRun entity.
@@ -37,7 +36,7 @@ class TradingRunRepositoryTest extends BaseRepositoryTest {
         // Clean up
         tradingRunRepository.deleteAll();
         tradingAgentRepository.deleteAll();
-        
+
         // Create test agent
         testAgent = new TradingAgent("TestAgent", "Test trading agent for repository tests");
         testAgent.setInitialCapital(100000.0);
@@ -49,11 +48,11 @@ class TradingRunRepositoryTest extends BaseRepositoryTest {
     void shouldSaveAndRetrieveTradingRun() {
         // Arrange
         TradingRun run = new TradingRun(testAgent);
-        
+
         // Act
         TradingRun saved = tradingRunRepository.save(run);
         Optional<TradingRun> found = tradingRunRepository.findById(saved.getId());
-        
+
         // Assert
         assertThat(found).isPresent();
         assertThat(found.get().getAgent().getId()).isEqualTo(testAgent.getId());
@@ -68,20 +67,20 @@ class TradingRunRepositoryTest extends BaseRepositoryTest {
         // Arrange - create multiple runs with slight delay to ensure different timestamps
         TradingRun run1 = new TradingRun(testAgent);
         tradingRunRepository.save(run1);
-        
+
         Thread.sleep(10); // Small delay to ensure different timestamps
-        
+
         TradingRun run2 = new TradingRun(testAgent);
         tradingRunRepository.save(run2);
-        
+
         Thread.sleep(10);
-        
+
         TradingRun run3 = new TradingRun(testAgent);
         tradingRunRepository.save(run3);
-        
+
         // Act
         List<TradingRun> runs = tradingRunRepository.findByAgentIdOrderByStartedAtDesc(testAgent.getId());
-        
+
         // Assert
         assertThat(runs).hasSize(3);
         // Most recent first
@@ -96,20 +95,22 @@ class TradingRunRepositoryTest extends BaseRepositoryTest {
         // Arrange
         TradingRun run1 = new TradingRun(testAgent);
         run1 = tradingRunRepository.save(run1);
-        
+
         TradingRun run2 = new TradingRun(testAgent);
         run2.markAsCompleted();
         tradingRunRepository.save(run2);
-        
+
         TradingRun run3 = new TradingRun(testAgent);
         run3.markAsError("Test error");
         tradingRunRepository.save(run3);
-        
+
         // Act
-        List<TradingRun> inProgressRuns = tradingRunRepository.findByAgentIdAndStatus(testAgent.getId(), RunStatus.IN_PROGRESS);
-        List<TradingRun> completedRuns = tradingRunRepository.findByAgentIdAndStatus(testAgent.getId(), RunStatus.COMPLETED);
+        List<TradingRun> inProgressRuns =
+                tradingRunRepository.findByAgentIdAndStatus(testAgent.getId(), RunStatus.IN_PROGRESS);
+        List<TradingRun> completedRuns =
+                tradingRunRepository.findByAgentIdAndStatus(testAgent.getId(), RunStatus.COMPLETED);
         List<TradingRun> failedRuns = tradingRunRepository.findByAgentIdAndStatus(testAgent.getId(), RunStatus.FAILED);
-        
+
         // Assert
         assertThat(inProgressRuns).hasSize(1);
         assertThat(completedRuns).hasSize(1);
@@ -123,7 +124,7 @@ class TradingRunRepositoryTest extends BaseRepositoryTest {
         TradingRun completedRun = new TradingRun(testAgent);
         completedRun.markAsCompleted();
         tradingRunRepository.save(completedRun);
-        
+
         TradingRun activeRun = new TradingRun(testAgent);
         activeRun.updatePhase(RunPhase.RESEARCHING);
         tradingRunRepository.save(activeRun);
@@ -143,10 +144,10 @@ class TradingRunRepositoryTest extends BaseRepositoryTest {
         TradingRun completedRun = new TradingRun(testAgent);
         completedRun.markAsCompleted();
         tradingRunRepository.save(completedRun);
-        
+
         // Act
         Optional<TradingRun> found = tradingRunRepository.findActiveRunByAgentId(testAgent.getId());
-        
+
         // Assert
         assertThat(found).isEmpty();
     }
@@ -160,15 +161,15 @@ class TradingRunRepositoryTest extends BaseRepositoryTest {
             run.markAsCompleted();
             tradingRunRepository.save(run);
         }
-        
+
         TradingRun failedRun = new TradingRun(testAgent);
         failedRun.markAsError("Error");
         tradingRunRepository.save(failedRun);
-        
+
         // Act
         Long completedCount = tradingRunRepository.countByAgentIdAndStatus(testAgent.getId(), RunStatus.COMPLETED);
         Long failedCount = tradingRunRepository.countByAgentIdAndStatus(testAgent.getId(), RunStatus.FAILED);
-        
+
         // Assert
         assertThat(completedCount).isEqualTo(3);
         assertThat(failedCount).isEqualTo(1);
@@ -316,4 +317,3 @@ class TradingRunRepositoryTest extends BaseRepositoryTest {
                 .containsExactly(newest.getId(), middle.getId(), oldest.getId());
     }
 }
-

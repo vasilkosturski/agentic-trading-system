@@ -3,16 +3,15 @@ package com.trading.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.stereotype.Component;
-
-import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+import javax.crypto.SecretKey;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
 
 /**
  * JWT token provider for generating and validating JWT tokens.
@@ -53,15 +52,13 @@ public class JwtTokenProvider {
             @Value("${JWT_EXPIRATION:${jwt.expiration:3600000}}") long jwtExpirationMs) {
         if (secret == null || secret.trim().isEmpty()) {
             throw new IllegalArgumentException(
-                "jwt.secret must be configured in application properties or environment variables. " +
-                "It cannot be null or empty for security reasons."
-            );
+                    "jwt.secret must be configured in application properties or environment variables. "
+                            + "It cannot be null or empty for security reasons.");
         }
         if (secret.length() < 32) {
             throw new IllegalArgumentException(
-                "jwt.secret must be at least 32 characters (256 bits) for HS256 algorithm. " +
-                "Current length: " + secret.length()
-            );
+                    "jwt.secret must be at least 32 characters (256 bits) for HS256 algorithm. " + "Current length: "
+                            + secret.length());
         }
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.jwtExpirationMs = jwtExpirationMs;
@@ -77,9 +74,11 @@ public class JwtTokenProvider {
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
         // Include roles in token claims for authorization
-        claims.put("roles", userDetails.getAuthorities().stream()
-                .map(authority -> authority.getAuthority())
-                .toList());
+        claims.put(
+                "roles",
+                userDetails.getAuthorities().stream()
+                        .map(authority -> authority.getAuthority())
+                        .toList());
         return createToken(claims, userDetails.getUsername());
     }
 
@@ -167,6 +166,8 @@ public class JwtTokenProvider {
      * @param userDetails user details to validate against
      * @return true if valid
      */
+    @SuppressWarnings(
+            "checkstyle:IllegalCatch") // token validation must treat any parse/expiry/signature failure as invalid
     public Boolean validateToken(String token, UserDetails userDetails) {
         try {
             final String username = getUsernameFromToken(token);

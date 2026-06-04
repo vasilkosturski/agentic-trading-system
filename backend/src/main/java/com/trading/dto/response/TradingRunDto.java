@@ -5,11 +5,10 @@ import com.trading.entity.TradingRun;
 import com.trading.enums.RunPhase;
 import com.trading.enums.RunStatus;
 import com.trading.enums.TradeDecision;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.time.Instant;
 
 /**
  * Minimal DTO for trading run list views.
@@ -23,8 +22,8 @@ public class TradingRunDto {
     private Long agentId;
     private RunStatus status;
     private RunPhase phase;
-    private TradeDecision decision;  // from joined decision_phases
-    private String symbol;           // from joined decision_phases
+    private TradeDecision decision; // from joined decision_phases
+    private String symbol; // from joined decision_phases
     private Instant startedAt;
     private Instant completedAt;
     private String errorMessage;

@@ -17,14 +17,13 @@ import com.trading.repository.TradingAccountRepository;
 import com.trading.repository.TradingAgentRepository;
 import com.trading.repository.TradingRunRepository;
 import com.trading.util.MoneyMath;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for providing memory/context to agents about their past decisions.
@@ -72,15 +71,16 @@ public class MemoryService {
         }
 
         // Get account
-        TradingAccount account = accountRepository.findByAgentName(agentName)
-            .orElseThrow(() -> new ResourceNotFoundException("Agent not found: " + agentName));
+        TradingAccount account = accountRepository
+                .findByAgentName(agentName)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent not found: " + agentName));
 
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
         Instant cutoffDate = Instant.now().minus(tradingPublicProperties.getDisplayDelayDays(), ChronoUnit.DAYS);
 
         // Get transactions for this symbol within the date window — filtered at DB level
-        List<AccountTransaction> transactions = transactionRepository
-                .findByAccountIdAndSymbolAndTimestampBetween(account.getId(), symbol, since, cutoffDate);
+        List<AccountTransaction> transactions = transactionRepository.findByAccountIdAndSymbolAndTimestampBetween(
+                account.getId(), symbol, since, cutoffDate);
 
         // Return empty response — "no history" is valid data, not an error
         if (transactions.isEmpty()) {
@@ -105,8 +105,7 @@ public class MemoryService {
         }
 
         // Look up agent to get ID for TradingRun queries
-        TradingAgent agent = tradingAgentRepository.findByName(agentName)
-            .orElse(null);
+        TradingAgent agent = tradingAgentRepository.findByName(agentName).orElse(null);
 
         // If agent not found in new system, return empty response
         if (agent == null) {
@@ -117,8 +116,8 @@ public class MemoryService {
         Instant cutoffDate = Instant.now().minus(tradingPublicProperties.getDisplayDelayDays(), ChronoUnit.DAYS);
 
         // Get recent runs within the date window — filtered + limited at DB level
-        List<TradingRun> recentRuns = tradingRunRepository
-                .findByAgentIdAndStartedAtBetween(agent.getId(), since, cutoffDate, PageRequest.of(0, 20));
+        List<TradingRun> recentRuns = tradingRunRepository.findByAgentIdAndStartedAtBetween(
+                agent.getId(), since, cutoffDate, PageRequest.of(0, 20));
 
         // Return empty response — "no activity" is valid data, not an error
         if (recentRuns.isEmpty()) {
@@ -133,11 +132,7 @@ public class MemoryService {
      * Build trading history response DTO
      */
     private TradingHistoryResponse buildTradingHistoryResponse(
-            String agentName,
-            String symbol,
-            int days,
-            List<AccountTransaction> transactions,
-            TradingAccount account) {
+            String agentName, String symbol, int days, List<AccountTransaction> transactions, TradingAccount account) {
 
         TradingHistoryResponse response = new TradingHistoryResponse();
         response.setSymbol(symbol);
@@ -147,9 +142,9 @@ public class MemoryService {
         // Current position
         List<HoldingDto> holdings = accountQueryService.getHoldings(agentName);
         HoldingDto holding = holdings.stream()
-            .filter(h -> symbol.equals(h.getSymbol()))
-            .findFirst()
-            .orElse(null);
+                .filter(h -> symbol.equals(h.getSymbol()))
+                .findFirst()
+                .orElse(null);
         Integer currentShares = holding != null ? holding.getQuantity() : null;
         if (currentShares != null && currentShares > 0) {
             // Calculate average cost
@@ -162,10 +157,7 @@ public class MemoryService {
                 }
             }
             double avgCost = totalShares > 0 ? totalCost / totalShares : 0;
-            response.setCurrentPosition(new TradingHistoryResponse.Position(
-                currentShares,
-                MoneyMath.round2(avgCost)
-            ));
+            response.setCurrentPosition(new TradingHistoryResponse.Position(currentShares, MoneyMath.round2(avgCost)));
         }
 
         // Trades
@@ -173,7 +165,7 @@ public class MemoryService {
         for (AccountTransaction t : transactions) {
             TradingHistoryResponse.Trade trade = new TradingHistoryResponse.Trade();
             trade.setDate(t.getTimestamp().toString());
-            trade.setType(t.getTransactionType().name());  // Convert enum to string
+            trade.setType(t.getTransactionType().name()); // Convert enum to string
             trade.setQuantity(Math.abs(t.getQuantity()));
             trade.setPrice(MoneyMath.round2(t.getPrice()));
             trade.setTotalAmount(MoneyMath.round2(Math.abs(t.getTotalAmount())));
@@ -184,8 +176,12 @@ public class MemoryService {
         response.setTrades(trades);
 
         // Summary
-        long buyCount = transactions.stream().filter(t -> TransactionType.BUY.equals(t.getTransactionType())).count();
-        long sellCount = transactions.stream().filter(t -> TransactionType.SELL.equals(t.getTransactionType())).count();
+        long buyCount = transactions.stream()
+                .filter(t -> TransactionType.BUY.equals(t.getTransactionType()))
+                .count();
+        long sellCount = transactions.stream()
+                .filter(t -> TransactionType.SELL.equals(t.getTransactionType()))
+                .count();
 
         TradingHistoryResponse.Summary summary = new TradingHistoryResponse.Summary();
         summary.setTotalTrades(transactions.size());

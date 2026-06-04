@@ -9,13 +9,12 @@ import com.trading.exception.ResourceNotFoundException;
 import com.trading.repository.AccountHoldingRepository;
 import com.trading.repository.AccountTransactionRepository;
 import com.trading.repository.TradingAccountRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 
 /**
  * Read-path queries against trading accounts: balance, holdings, portfolio
@@ -83,18 +82,17 @@ public class AccountQueryService {
         double initialCapital = agentProperties.getInitialCapital(agentName);
 
         return new AccountReportDto(
-            agentName,
-            account.getBalance(),
-            holdingsValue,
-            totalValue,
-            initialCapital,
-            totalValue - initialCapital,
-            ((totalValue - initialCapital) / initialCapital) * 100,
-            account.getUpdatedAt(),
-            holdings.size(),
-            transactionRepository.countByAccount(account),
-            toHoldingDtos(holdings)
-        );
+                agentName,
+                account.getBalance(),
+                holdingsValue,
+                totalValue,
+                initialCapital,
+                totalValue - initialCapital,
+                ((totalValue - initialCapital) / initialCapital) * 100,
+                account.getUpdatedAt(),
+                holdings.size(),
+                transactionRepository.countByAccount(account),
+                toHoldingDtos(holdings));
     }
 
     /**
@@ -114,12 +112,13 @@ public class AccountQueryService {
     }
 
     private TradingAccount getAccount(String agentName) {
-        return tradingAccountRepository.findByAgentName(agentName)
-            .orElseThrow(() -> new ResourceNotFoundException(
-                "Trading account not found for agent: " + agentName +
-                ". Agent must be initialized before trading operations."));
+        return tradingAccountRepository
+                .findByAgentName(agentName)
+                .orElseThrow(() -> new ResourceNotFoundException("Trading account not found for agent: " + agentName
+                        + ". Agent must be initialized before trading operations."));
     }
 
+    @SuppressWarnings("checkstyle:IllegalCatch") // per-symbol price lookup degrades gracefully on any upstream failure
     private List<HoldingDto> toHoldingDtos(List<AccountHolding> holdings) {
         List<HoldingDto> dtos = new ArrayList<>();
         for (AccountHolding holding : holdings) {
@@ -130,32 +129,27 @@ public class AccountQueryService {
                 double costBasis = holding.getQuantity() * holding.getAveragePrice();
                 double unrealizedPnl = marketValue - costBasis;
 
-                double gainLossPercent = (costBasis != 0)
-                    ? (unrealizedPnl / costBasis) * 100
-                    : 0.0;
+                double gainLossPercent = (costBasis != 0) ? (unrealizedPnl / costBasis) * 100 : 0.0;
 
                 dtos.add(new HoldingDto(
-                    holding.getSymbol(),
-                    holding.getQuantity(),
-                    holding.getAveragePrice(),
-                    currentPrice,
-                    marketValue,
-                    costBasis,
-                    unrealizedPnl,
-                    gainLossPercent,
-                    priceData.isCached(),
-                    priceData.getTimestamp()
-                ));
+                        holding.getSymbol(),
+                        holding.getQuantity(),
+                        holding.getAveragePrice(),
+                        currentPrice,
+                        marketValue,
+                        costBasis,
+                        unrealizedPnl,
+                        gainLossPercent,
+                        priceData.isCached(),
+                        priceData.getTimestamp()));
 
             } catch (Exception e) {
-                logger.warn("Failed to get current price for {}: {}. Price fields will be null.",
-                    holding.getSymbol(), e.getMessage());
+                logger.warn(
+                        "Failed to get current price for {}: {}. Price fields will be null.",
+                        holding.getSymbol(),
+                        e.getMessage());
 
-                dtos.add(new HoldingDto(
-                    holding.getSymbol(),
-                    holding.getQuantity(),
-                    holding.getAveragePrice()
-                ));
+                dtos.add(new HoldingDto(holding.getSymbol(), holding.getQuantity(), holding.getAveragePrice()));
             }
         }
         return dtos;

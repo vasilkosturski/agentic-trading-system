@@ -14,9 +14,10 @@ public class AgentIdentityService {
     private TradingAgentRepository tradingAgentRepository;
 
     public TradingAgent requireAgent(Long agentId) {
-        return tradingAgentRepository.findById(agentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Agent not found with id: " + agentId));
+        return tradingAgentRepository
+                .findById(agentId)
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found with id: " + agentId));
     }
 
     public String requireAgentName(Long agentId) {
@@ -24,10 +25,10 @@ public class AgentIdentityService {
     }
 
     public Long requireAgentIdByName(String agentName) {
-        return tradingAgentRepository.findByName(agentName)
+        return tradingAgentRepository
+                .findByName(agentName)
                 .map(TradingAgent::getId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Agent not found with name: " + agentName));
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found with name: " + agentName));
     }
 }
-

@@ -14,7 +14,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from backend.run_lifecycle import RunLifecycle
-from models.run_tracking import CompleteRunData, RunPhase
 from backend.status_broadcaster import (
     PHASE_COMPLETED,
     PHASE_DECIDING,
@@ -23,11 +22,12 @@ from backend.status_broadcaster import (
     PHASE_RESEARCHING,
     PHASE_TRADING,
 )
-
+from models.run_tracking import CompleteRunData, RunPhase
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def lifecycle() -> RunLifecycle:
@@ -38,6 +38,7 @@ def lifecycle() -> RunLifecycle:
 # ---------------------------------------------------------------------------
 # Test 1: start() success path emits two broadcasts in order
 # ---------------------------------------------------------------------------
+
 
 @patch("backend.run_lifecycle.broadcast_status")
 @patch("backend.run_lifecycle.update_phase", new_callable=AsyncMock)
@@ -73,6 +74,7 @@ async def test_start_initializes_agent_creates_run_and_emits_two_broadcasts(
 # Test 2: start() raises RuntimeError if agent_id is falsy
 # ---------------------------------------------------------------------------
 
+
 @patch("backend.run_lifecycle.broadcast_status")
 @patch("backend.run_lifecycle.update_phase", new_callable=AsyncMock)
 @patch("backend.run_lifecycle.create_run", new_callable=AsyncMock)
@@ -99,6 +101,7 @@ async def test_start_raises_runtime_error_if_agent_id_falsy(
 # Test 3: transition_to_deciding emits phase update THEN broadcast
 # ---------------------------------------------------------------------------
 
+
 async def test_transition_to_deciding_emits_phase_update_then_broadcast(
     lifecycle: RunLifecycle,
 ) -> None:
@@ -107,8 +110,10 @@ async def test_transition_to_deciding_emits_phase_update_then_broadcast(
     parent.update_phase = AsyncMock()
     parent.broadcast_status = MagicMock()
 
-    with patch("backend.run_lifecycle.update_phase", parent.update_phase), \
-         patch("backend.run_lifecycle.broadcast_status", parent.broadcast_status):
+    with (
+        patch("backend.run_lifecycle.update_phase", parent.update_phase),
+        patch("backend.run_lifecycle.broadcast_status", parent.broadcast_status),
+    ):
         await lifecycle.transition_to_deciding(run_id=42)
 
     parent.update_phase.assert_awaited_once_with(42, RunPhase.DECIDING)
@@ -117,13 +122,16 @@ async def test_transition_to_deciding_emits_phase_update_then_broadcast(
     )
 
     # Verify ORDER: update_phase before broadcast_status.
-    call_names = [call[0] for call in parent.mock_calls if call[0] in ("update_phase", "broadcast_status")]
+    call_names = [
+        call[0] for call in parent.mock_calls if call[0] in ("update_phase", "broadcast_status")
+    ]
     assert call_names == ["update_phase", "broadcast_status"]
 
 
 # ---------------------------------------------------------------------------
 # Test 4: transition_to_trading emits phase update THEN broadcast
 # ---------------------------------------------------------------------------
+
 
 async def test_transition_to_trading_emits_phase_update_then_broadcast(
     lifecycle: RunLifecycle,
@@ -133,8 +141,10 @@ async def test_transition_to_trading_emits_phase_update_then_broadcast(
     parent.update_phase = AsyncMock()
     parent.broadcast_status = MagicMock()
 
-    with patch("backend.run_lifecycle.update_phase", parent.update_phase), \
-         patch("backend.run_lifecycle.broadcast_status", parent.broadcast_status):
+    with (
+        patch("backend.run_lifecycle.update_phase", parent.update_phase),
+        patch("backend.run_lifecycle.broadcast_status", parent.broadcast_status),
+    ):
         await lifecycle.transition_to_trading(run_id=42)
 
     parent.update_phase.assert_awaited_once_with(42, RunPhase.TRADING)
@@ -142,13 +152,16 @@ async def test_transition_to_trading_emits_phase_update_then_broadcast(
         1, "Warren", PHASE_TRADING, "Executing trade", 90
     )
 
-    call_names = [call[0] for call in parent.mock_calls if call[0] in ("update_phase", "broadcast_status")]
+    call_names = [
+        call[0] for call in parent.mock_calls if call[0] in ("update_phase", "broadcast_status")
+    ]
     assert call_names == ["update_phase", "broadcast_status"]
 
 
 # ---------------------------------------------------------------------------
 # Test 5: complete() calls complete_run then broadcasts COMPLETED
 # ---------------------------------------------------------------------------
+
 
 @patch("backend.run_lifecycle.broadcast_status")
 @patch("backend.run_lifecycle.complete_run", new_callable=AsyncMock)
@@ -174,6 +187,7 @@ async def test_complete_calls_complete_run_then_broadcasts_completed(
 # Test 6: fail() with run_id logs, broadcasts ERROR, and updates phase to FAILED
 # ---------------------------------------------------------------------------
 
+
 @patch("backend.run_lifecycle.broadcast_status")
 @patch("backend.run_lifecycle.update_phase", new_callable=AsyncMock)
 async def test_fail_with_run_id_logs_broadcasts_error_and_updates_phase_failed(
@@ -193,14 +207,11 @@ async def test_fail_with_run_id_logs_broadcasts_error_and_updates_phase_failed(
     mock_broadcast_status.assert_called_once_with(
         1, "Warren", PHASE_ERROR, "Error: boom", 0, outcome="Failed: boom"
     )
-    mock_update_phase.assert_awaited_once_with(
-        42, RunPhase.FAILED, error_message="boom"
-    )
+    mock_update_phase.assert_awaited_once_with(42, RunPhase.FAILED, error_message="boom")
 
     # At least one ERROR-level log line about the cycle error must appear.
     cycle_error_logs = [
-        rec for rec in caplog.records
-        if rec.levelno == logging.ERROR and "boom" in rec.getMessage()
+        rec for rec in caplog.records if rec.levelno == logging.ERROR and "boom" in rec.getMessage()
     ]
     assert cycle_error_logs, "expected at least one ERROR log line referencing the cycle error"
 
@@ -208,6 +219,7 @@ async def test_fail_with_run_id_logs_broadcasts_error_and_updates_phase_failed(
 # ---------------------------------------------------------------------------
 # Test 7: fail() with no run_id still broadcasts but skips update_phase
 # ---------------------------------------------------------------------------
+
 
 @patch("backend.run_lifecycle.broadcast_status")
 @patch("backend.run_lifecycle.update_phase", new_callable=AsyncMock)
@@ -227,6 +239,7 @@ async def test_fail_with_no_run_id_broadcasts_but_skips_update_phase(
 # ---------------------------------------------------------------------------
 # Test 8: fail() swallows cleanup errors and does NOT raise
 # ---------------------------------------------------------------------------
+
 
 @patch("backend.run_lifecycle.broadcast_status")
 @patch("backend.run_lifecycle.update_phase", new_callable=AsyncMock)

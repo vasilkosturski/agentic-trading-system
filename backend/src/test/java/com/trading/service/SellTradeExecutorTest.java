@@ -1,8 +1,22 @@
 package com.trading.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.trading.dto.response.TradeResult;
-import com.trading.entity.*;
-import com.trading.repository.*;
+import com.trading.entity.AccountHolding;
+import com.trading.entity.AccountTransaction;
+import com.trading.entity.TradingAccount;
+import com.trading.entity.TradingAgent;
+import com.trading.entity.TransactionType;
+import com.trading.exception.BusinessRuleException;
+import com.trading.exception.ResourceNotFoundException;
+import com.trading.repository.AccountHoldingRepository;
+import com.trading.repository.AccountTransactionRepository;
+import com.trading.repository.TradingAccountRepository;
+import java.time.Instant;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,15 +25,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.trading.exception.BusinessRuleException;
-import com.trading.exception.ResourceNotFoundException;
-
-import java.time.Instant;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("SellTradeExecutor Tests")
@@ -75,16 +80,11 @@ class SellTradeExecutorTest {
 
         AccountHolding existingHolding = new AccountHolding(testAccount, symbol, existingQuantity, averagePrice);
 
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.of(testAccount));
-        when(holdingRepository.findByAccountAndSymbol(testAccount, symbol))
-            .thenReturn(existingHolding);
-        when(tradingAccountRepository.save(any(TradingAccount.class)))
-            .thenReturn(testAccount);
-        when(transactionRepository.save(any(AccountTransaction.class)))
-            .thenReturn(new AccountTransaction());
-        when(holdingRepository.save(any(AccountHolding.class)))
-            .thenReturn(existingHolding);
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccountAndSymbol(testAccount, symbol)).thenReturn(existingHolding);
+        when(tradingAccountRepository.save(any(TradingAccount.class))).thenReturn(testAccount);
+        when(transactionRepository.save(any(AccountTransaction.class))).thenReturn(new AccountTransaction());
+        when(holdingRepository.save(any(AccountHolding.class))).thenReturn(existingHolding);
 
         // Act
         TradeResult result = sellTradeExecutor.executeSell(agentName, symbol, sellQuantity, 150.0, 1L);
@@ -105,14 +105,15 @@ class SellTradeExecutorTest {
         verify(transactionRepository).save(transactionCaptor.capture());
 
         AccountTransaction savedTransaction = transactionCaptor.getValue();
-        assertAll("Transaction should have correct business logic fields",
-            () -> assertEquals(testAccount, savedTransaction.getAccount(), "Account should match"),
-            () -> assertEquals(symbol, savedTransaction.getSymbol(), "Symbol should match"),
-            () -> assertEquals(TransactionType.SELL, savedTransaction.getTransactionType(), "Transaction type should be SELL"),
-            () -> assertEquals(sellQuantity, savedTransaction.getQuantity(), "Quantity should match"),
-            () -> assertEquals(marketPrice, savedTransaction.getPrice(), "Price should match"),
-            () -> assertNotNull(savedTransaction.getTimestamp(), "Timestamp should be set")
-        );
+        assertAll(
+                "Transaction should have correct business logic fields",
+                () -> assertEquals(testAccount, savedTransaction.getAccount(), "Account should match"),
+                () -> assertEquals(symbol, savedTransaction.getSymbol(), "Symbol should match"),
+                () -> assertEquals(
+                        TransactionType.SELL, savedTransaction.getTransactionType(), "Transaction type should be SELL"),
+                () -> assertEquals(sellQuantity, savedTransaction.getQuantity(), "Quantity should match"),
+                () -> assertEquals(marketPrice, savedTransaction.getPrice(), "Price should match"),
+                () -> assertNotNull(savedTransaction.getTimestamp(), "Timestamp should be set"));
 
         // Verify holding was updated with correct business logic
         ArgumentCaptor<AccountHolding> holdingCaptor = ArgumentCaptor.forClass(AccountHolding.class);
@@ -120,12 +121,13 @@ class SellTradeExecutorTest {
         verify(holdingRepository, never()).delete(any());
 
         AccountHolding savedHolding = holdingCaptor.getValue();
-        assertAll("Holding should have correct business logic fields",
-            () -> assertEquals(testAccount, savedHolding.getAccount(), "Account should match"),
-            () -> assertEquals(symbol, savedHolding.getSymbol(), "Symbol should match"),
-            () -> assertEquals(expectedRemainingQuantity, savedHolding.getQuantity(), "Quantity should be reduced"),
-            () -> assertEquals(averagePrice, savedHolding.getAveragePrice(), "Average price should remain unchanged")
-        );
+        assertAll(
+                "Holding should have correct business logic fields",
+                () -> assertEquals(testAccount, savedHolding.getAccount(), "Account should match"),
+                () -> assertEquals(symbol, savedHolding.getSymbol(), "Symbol should match"),
+                () -> assertEquals(expectedRemainingQuantity, savedHolding.getQuantity(), "Quantity should be reduced"),
+                () -> assertEquals(
+                        averagePrice, savedHolding.getAveragePrice(), "Average price should remain unchanged"));
     }
 
     @Test
@@ -140,14 +142,10 @@ class SellTradeExecutorTest {
 
         AccountHolding existingHolding = new AccountHolding(testAccount, symbol, quantity, averagePrice);
 
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.of(testAccount));
-        when(holdingRepository.findByAccountAndSymbol(testAccount, symbol))
-            .thenReturn(existingHolding);
-        when(tradingAccountRepository.save(any(TradingAccount.class)))
-            .thenReturn(testAccount);
-        when(transactionRepository.save(any(AccountTransaction.class)))
-            .thenReturn(new AccountTransaction());
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccountAndSymbol(testAccount, symbol)).thenReturn(existingHolding);
+        when(tradingAccountRepository.save(any(TradingAccount.class))).thenReturn(testAccount);
+        when(transactionRepository.save(any(AccountTransaction.class))).thenReturn(new AccountTransaction());
 
         // Act
         TradeResult result = sellTradeExecutor.executeSell(agentName, symbol, quantity, 150.0, 1L);
@@ -181,16 +179,11 @@ class SellTradeExecutorTest {
 
         AccountHolding existingHolding = new AccountHolding(testAccount, symbol, existingQuantity, averagePrice);
 
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.of(testAccount));
-        when(holdingRepository.findByAccountAndSymbol(testAccount, symbol))
-            .thenReturn(existingHolding);
-        when(tradingAccountRepository.save(any(TradingAccount.class)))
-            .thenReturn(testAccount);
-        when(transactionRepository.save(any(AccountTransaction.class)))
-            .thenReturn(new AccountTransaction());
-        when(holdingRepository.save(any(AccountHolding.class)))
-            .thenReturn(existingHolding);
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccountAndSymbol(testAccount, symbol)).thenReturn(existingHolding);
+        when(tradingAccountRepository.save(any(TradingAccount.class))).thenReturn(testAccount);
+        when(transactionRepository.save(any(AccountTransaction.class))).thenReturn(new AccountTransaction());
+        when(holdingRepository.save(any(AccountHolding.class))).thenReturn(existingHolding);
 
         // Act
         TradeResult result = sellTradeExecutor.executeSell(agentName, symbol, sellQuantity, 150.0, 1L);
@@ -218,10 +211,8 @@ class SellTradeExecutorTest {
         String symbol = "AAPL";
         Integer quantity = 10;
 
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.of(testAccount));
-        when(holdingRepository.findByAccountAndSymbol(testAccount, symbol))
-            .thenReturn(null); // No holding exists
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccountAndSymbol(testAccount, symbol)).thenReturn(null); // No holding exists
 
         // Act & Assert
         BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> {
@@ -250,10 +241,8 @@ class SellTradeExecutorTest {
 
         AccountHolding existingHolding = new AccountHolding(testAccount, symbol, availableQuantity, 100.0);
 
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.of(testAccount));
-        when(holdingRepository.findByAccountAndSymbol(testAccount, symbol))
-            .thenReturn(existingHolding);
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccountAndSymbol(testAccount, symbol)).thenReturn(existingHolding);
 
         // Act & Assert
         BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> {
@@ -279,16 +268,17 @@ class SellTradeExecutorTest {
         String symbol = "AAPL";
         Integer quantity = 10;
 
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.empty());
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.empty());
 
         // Act & Assert
         ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
             sellTradeExecutor.executeSell(agentName, symbol, quantity, 150.0, 1L);
         });
 
-        assertEquals("Trading account not found for agent: " + agentName +
-            ". Agent must be initialized before trading operations.", exception.getMessage());
+        assertEquals(
+                "Trading account not found for agent: " + agentName
+                        + ". Agent must be initialized before trading operations.",
+                exception.getMessage());
 
         // Verify no other operations were performed
         verify(holdingRepository, never()).findByAccountAndSymbol(any(), any());
@@ -312,8 +302,7 @@ class SellTradeExecutorTest {
             sellTradeExecutor.executeSell(agentName, symbol, quantity, 150.0, runId);
         });
 
-        assertEquals("runId is required - every transaction must be linked to an agent run",
-            exception.getMessage());
+        assertEquals("runId is required - every transaction must be linked to an agent run", exception.getMessage());
 
         // Verify no repository calls were made
         verify(tradingAccountRepository, never()).findByAgentName(any());
@@ -341,16 +330,11 @@ class SellTradeExecutorTest {
 
         AccountHolding existingHolding = new AccountHolding(testAccount, "AAPL", 20, 100.0);
 
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.of(testAccount));
-        when(holdingRepository.findByAccountAndSymbol(testAccount, "AAPL"))
-            .thenReturn(existingHolding);
-        when(tradingAccountRepository.save(any(TradingAccount.class)))
-            .thenReturn(testAccount);
-        when(transactionRepository.save(any(AccountTransaction.class)))
-            .thenReturn(new AccountTransaction());
-        when(holdingRepository.save(any(AccountHolding.class)))
-            .thenReturn(existingHolding);
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccountAndSymbol(testAccount, "AAPL")).thenReturn(existingHolding);
+        when(tradingAccountRepository.save(any(TradingAccount.class))).thenReturn(testAccount);
+        when(transactionRepository.save(any(AccountTransaction.class))).thenReturn(new AccountTransaction());
+        when(holdingRepository.save(any(AccountHolding.class))).thenReturn(existingHolding);
 
         // Act
         TradeResult result = sellTradeExecutor.executeSell(agentName, "AAPL", quantity, marketPrice, 1L);
@@ -367,25 +351,25 @@ class SellTradeExecutorTest {
         verify(transactionRepository).save(transactionCaptor.capture());
 
         AccountTransaction savedTransaction = transactionCaptor.getValue();
-        assertAll("Transaction should have correct fields for balance calculation test",
-            () -> assertEquals(testAccount, savedTransaction.getAccount()),
-            () -> assertEquals("AAPL", savedTransaction.getSymbol()),
-            () -> assertEquals(TransactionType.SELL, savedTransaction.getTransactionType()),
-            () -> assertEquals(quantity, savedTransaction.getQuantity()),
-            () -> assertEquals(marketPrice, savedTransaction.getPrice())
-        );
+        assertAll(
+                "Transaction should have correct fields for balance calculation test",
+                () -> assertEquals(testAccount, savedTransaction.getAccount()),
+                () -> assertEquals("AAPL", savedTransaction.getSymbol()),
+                () -> assertEquals(TransactionType.SELL, savedTransaction.getTransactionType()),
+                () -> assertEquals(quantity, savedTransaction.getQuantity()),
+                () -> assertEquals(marketPrice, savedTransaction.getPrice()));
 
         // Verify holding was updated with correct data
         ArgumentCaptor<AccountHolding> holdingCaptor = ArgumentCaptor.forClass(AccountHolding.class);
         verify(holdingRepository).save(holdingCaptor.capture());
 
         AccountHolding savedHolding = holdingCaptor.getValue();
-        assertAll("Holding should have correct fields for balance calculation test",
-            () -> assertEquals(testAccount, savedHolding.getAccount()),
-            () -> assertEquals("AAPL", savedHolding.getSymbol()),
-            () -> assertEquals(10, savedHolding.getQuantity()),
-            () -> assertEquals(100.0, savedHolding.getAveragePrice())
-        );
+        assertAll(
+                "Holding should have correct fields for balance calculation test",
+                () -> assertEquals(testAccount, savedHolding.getAccount()),
+                () -> assertEquals("AAPL", savedHolding.getSymbol()),
+                () -> assertEquals(10, savedHolding.getQuantity()),
+                () -> assertEquals(100.0, savedHolding.getAveragePrice()));
     }
 
     @Test
@@ -397,16 +381,11 @@ class SellTradeExecutorTest {
 
         AccountHolding existingHolding = new AccountHolding(testAccount, symbol, 20, 100.0);
 
-        when(tradingAccountRepository.findByAgentName("Warren"))
-            .thenReturn(Optional.of(testAccount));
-        when(holdingRepository.findByAccountAndSymbol(testAccount, symbol))
-            .thenReturn(existingHolding);
-        when(tradingAccountRepository.save(any(TradingAccount.class)))
-            .thenReturn(testAccount);
-        when(transactionRepository.save(any(AccountTransaction.class)))
-            .thenReturn(new AccountTransaction());
-        when(holdingRepository.save(any(AccountHolding.class)))
-            .thenReturn(existingHolding);
+        when(tradingAccountRepository.findByAgentName("Warren")).thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccountAndSymbol(testAccount, symbol)).thenReturn(existingHolding);
+        when(tradingAccountRepository.save(any(TradingAccount.class))).thenReturn(testAccount);
+        when(transactionRepository.save(any(AccountTransaction.class))).thenReturn(new AccountTransaction());
+        when(holdingRepository.save(any(AccountHolding.class))).thenReturn(existingHolding);
 
         // Act
         TradeResult result = sellTradeExecutor.executeSell("Warren", symbol, 10, providedPrice, 1L);
@@ -419,13 +398,14 @@ class SellTradeExecutorTest {
         verify(transactionRepository).save(transactionCaptor.capture());
 
         AccountTransaction savedTransaction = transactionCaptor.getValue();
-        assertAll("Transaction should use provided price parameter",
-            () -> assertEquals(testAccount, savedTransaction.getAccount()),
-            () -> assertEquals(symbol, savedTransaction.getSymbol()),
-            () -> assertEquals(TransactionType.SELL, savedTransaction.getTransactionType()),
-            () -> assertEquals(10, savedTransaction.getQuantity()),
-            () -> assertEquals(providedPrice, savedTransaction.getPrice(), "Price should match provided parameter")
-        );
+        assertAll(
+                "Transaction should use provided price parameter",
+                () -> assertEquals(testAccount, savedTransaction.getAccount()),
+                () -> assertEquals(symbol, savedTransaction.getSymbol()),
+                () -> assertEquals(TransactionType.SELL, savedTransaction.getTransactionType()),
+                () -> assertEquals(10, savedTransaction.getQuantity()),
+                () -> assertEquals(
+                        providedPrice, savedTransaction.getPrice(), "Price should match provided parameter"));
     }
 
     @Test
@@ -434,16 +414,11 @@ class SellTradeExecutorTest {
         // Arrange
         AccountHolding existingHolding = new AccountHolding(testAccount, "AAPL", 20, 100.0);
 
-        when(tradingAccountRepository.findByAgentName("Warren"))
-            .thenReturn(Optional.of(testAccount));
-        when(holdingRepository.findByAccountAndSymbol(testAccount, "AAPL"))
-            .thenReturn(existingHolding);
-        when(tradingAccountRepository.save(any(TradingAccount.class)))
-            .thenReturn(testAccount);
-        when(transactionRepository.save(any(AccountTransaction.class)))
-            .thenReturn(new AccountTransaction());
-        when(holdingRepository.save(any(AccountHolding.class)))
-            .thenReturn(existingHolding);
+        when(tradingAccountRepository.findByAgentName("Warren")).thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccountAndSymbol(testAccount, "AAPL")).thenReturn(existingHolding);
+        when(tradingAccountRepository.save(any(TradingAccount.class))).thenReturn(testAccount);
+        when(transactionRepository.save(any(AccountTransaction.class))).thenReturn(new AccountTransaction());
+        when(holdingRepository.save(any(AccountHolding.class))).thenReturn(existingHolding);
 
         // Act
         sellTradeExecutor.executeSell("Warren", "AAPL", 10, 150.0, 1L);
@@ -470,14 +445,10 @@ class SellTradeExecutorTest {
 
         AccountHolding existingHolding = new AccountHolding(testAccount, "AAPL", exactQuantity, 100.0);
 
-        when(tradingAccountRepository.findByAgentName("Warren"))
-            .thenReturn(Optional.of(testAccount));
-        when(holdingRepository.findByAccountAndSymbol(testAccount, "AAPL"))
-            .thenReturn(existingHolding);
-        when(tradingAccountRepository.save(any(TradingAccount.class)))
-            .thenReturn(testAccount);
-        when(transactionRepository.save(any(AccountTransaction.class)))
-            .thenReturn(new AccountTransaction());
+        when(tradingAccountRepository.findByAgentName("Warren")).thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccountAndSymbol(testAccount, "AAPL")).thenReturn(existingHolding);
+        when(tradingAccountRepository.save(any(TradingAccount.class))).thenReturn(testAccount);
+        when(transactionRepository.save(any(AccountTransaction.class))).thenReturn(new AccountTransaction());
 
         // Act
         TradeResult result = sellTradeExecutor.executeSell("Warren", "AAPL", exactQuantity, 150.0, 1L);
@@ -495,13 +466,13 @@ class SellTradeExecutorTest {
         verify(transactionRepository).save(transactionCaptor.capture());
 
         AccountTransaction savedTransaction = transactionCaptor.getValue();
-        assertAll("Transaction should have correct fields for exact share depletion",
-            () -> assertEquals(testAccount, savedTransaction.getAccount()),
-            () -> assertEquals("AAPL", savedTransaction.getSymbol()),
-            () -> assertEquals(TransactionType.SELL, savedTransaction.getTransactionType()),
-            () -> assertEquals(exactQuantity, savedTransaction.getQuantity()),
-            () -> assertEquals(150.0, savedTransaction.getPrice())
-        );
+        assertAll(
+                "Transaction should have correct fields for exact share depletion",
+                () -> assertEquals(testAccount, savedTransaction.getAccount()),
+                () -> assertEquals("AAPL", savedTransaction.getSymbol()),
+                () -> assertEquals(TransactionType.SELL, savedTransaction.getTransactionType()),
+                () -> assertEquals(exactQuantity, savedTransaction.getQuantity()),
+                () -> assertEquals(150.0, savedTransaction.getPrice()));
     }
 
     @Test
@@ -517,16 +488,11 @@ class SellTradeExecutorTest {
 
         AccountHolding existingHolding = new AccountHolding(testAccount, "AAPL", 20, 100.0);
 
-        when(tradingAccountRepository.findByAgentName("Warren"))
-            .thenReturn(Optional.of(testAccount));
-        when(holdingRepository.findByAccountAndSymbol(testAccount, "AAPL"))
-            .thenReturn(existingHolding);
-        when(tradingAccountRepository.save(any(TradingAccount.class)))
-            .thenReturn(testAccount);
-        when(transactionRepository.save(any(AccountTransaction.class)))
-            .thenReturn(new AccountTransaction());
-        when(holdingRepository.save(any(AccountHolding.class)))
-            .thenReturn(existingHolding);
+        when(tradingAccountRepository.findByAgentName("Warren")).thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccountAndSymbol(testAccount, "AAPL")).thenReturn(existingHolding);
+        when(tradingAccountRepository.save(any(TradingAccount.class))).thenReturn(testAccount);
+        when(transactionRepository.save(any(AccountTransaction.class))).thenReturn(new AccountTransaction());
+        when(holdingRepository.save(any(AccountHolding.class))).thenReturn(existingHolding);
 
         // Act
         TradeResult result = sellTradeExecutor.executeSell("Warren", "AAPL", quantity, price, 1L);
@@ -540,13 +506,13 @@ class SellTradeExecutorTest {
         verify(transactionRepository).save(transactionCaptor.capture());
 
         AccountTransaction savedTransaction = transactionCaptor.getValue();
-        assertAll("Transaction should have correct fields for fractional dollars",
-            () -> assertEquals(testAccount, savedTransaction.getAccount()),
-            () -> assertEquals("AAPL", savedTransaction.getSymbol()),
-            () -> assertEquals(TransactionType.SELL, savedTransaction.getTransactionType()),
-            () -> assertEquals(quantity, savedTransaction.getQuantity()),
-            () -> assertEquals(price, savedTransaction.getPrice(), 0.01, "Price should match fractional value")
-        );
+        assertAll(
+                "Transaction should have correct fields for fractional dollars",
+                () -> assertEquals(testAccount, savedTransaction.getAccount()),
+                () -> assertEquals("AAPL", savedTransaction.getSymbol()),
+                () -> assertEquals(TransactionType.SELL, savedTransaction.getTransactionType()),
+                () -> assertEquals(quantity, savedTransaction.getQuantity()),
+                () -> assertEquals(price, savedTransaction.getPrice(), 0.01, "Price should match fractional value"));
     }
 
     @Test
@@ -559,18 +525,14 @@ class SellTradeExecutorTest {
         Integer sellQuantity = 20;
         Integer expectedQuantity = 30;
 
-        AccountHolding existingHolding = new AccountHolding(testAccount, symbol, existingQuantity, originalAveragePrice);
+        AccountHolding existingHolding =
+                new AccountHolding(testAccount, symbol, existingQuantity, originalAveragePrice);
 
-        when(tradingAccountRepository.findByAgentName("Warren"))
-            .thenReturn(Optional.of(testAccount));
-        when(holdingRepository.findByAccountAndSymbol(testAccount, symbol))
-            .thenReturn(existingHolding);
-        when(tradingAccountRepository.save(any(TradingAccount.class)))
-            .thenReturn(testAccount);
-        when(transactionRepository.save(any(AccountTransaction.class)))
-            .thenReturn(new AccountTransaction());
-        when(holdingRepository.save(any(AccountHolding.class)))
-            .thenReturn(existingHolding);
+        when(tradingAccountRepository.findByAgentName("Warren")).thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccountAndSymbol(testAccount, symbol)).thenReturn(existingHolding);
+        when(tradingAccountRepository.save(any(TradingAccount.class))).thenReturn(testAccount);
+        when(transactionRepository.save(any(AccountTransaction.class))).thenReturn(new AccountTransaction());
+        when(holdingRepository.save(any(AccountHolding.class))).thenReturn(existingHolding);
 
         // Act
         sellTradeExecutor.executeSell("Warren", symbol, sellQuantity, 150.0, 1L);

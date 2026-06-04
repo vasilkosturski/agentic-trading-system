@@ -2,11 +2,10 @@ package com.trading.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
+import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.math.BigDecimal;
 
 /**
  * Embeddable usage metrics for LLM token tracking.

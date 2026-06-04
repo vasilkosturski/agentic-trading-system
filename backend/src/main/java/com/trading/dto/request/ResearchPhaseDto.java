@@ -1,15 +1,14 @@
 package com.trading.dto.request;
 
 import com.trading.dto.UsageMetricsDto;
-import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.SourceDto;
+import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.entity.ResearchPhase;
 import com.trading.entity.TradingRun;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.util.List;
 
 /**
  * Research phase data for CompleteRunRequest.

@@ -6,11 +6,9 @@ changes (e.g., tests monkeypatching config.OPENAI_MODEL) are reflected
 in new SimpleTrader instances.
 """
 
-import pytest
-
+from ai_agents.simple_trader import SimpleTrader
 from config import config
 from models.investment_style import InvestmentStyle
-from ai_agents.simple_trader import SimpleTrader
 
 
 def test_model_name_default_reads_current_config_value(monkeypatch):

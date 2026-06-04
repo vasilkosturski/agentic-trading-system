@@ -16,10 +16,10 @@ calls).
 
 import logging
 
+from backend.run_lifecycle import RunLifecycle
 from models import TradingDecision
 from models.orchestration import ExecutionResult
 from models.run_tracking import PhaseStatus, TradeDecision
-from backend.run_lifecycle import RunLifecycle
 from tools.trading_tools import buy_shares, sell_shares
 
 logger = logging.getLogger(__name__)

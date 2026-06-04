@@ -4,11 +4,10 @@ Tests focus on ensuring the HTTP client properly handles error responses
 and enforces JSON content negotiation via Accept headers.
 """
 
-import asyncio
-
-import pytest
-import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import httpx
+import pytest
 
 from backend.client import BackendClient
 from infra.exceptions import BackendAPIError
@@ -80,20 +79,18 @@ class TestBackendClientErrorHandling:
             "title": "Resource Not Found",
             "status": 404,
             "detail": "Symbol not found: INVALID",
-            "instance": "/api/market/INVALID"
+            "instance": "/api/market/INVALID",
         }
 
         mock_json_response = httpx.Response(
-            status_code=404,
-            json=json_error_body,
-            headers={"content-type": "application/json"}
+            status_code=404, json=json_error_body, headers={"content-type": "application/json"}
         )
 
         mock_async_client = AsyncMock(spec=httpx.AsyncClient)
         mock_async_client.request.side_effect = httpx.HTTPStatusError(
             "404 Not Found",
             request=httpx.Request("GET", "http://test.com/api/market/INVALID"),
-            response=mock_json_response
+            response=mock_json_response,
         )
 
         client = BackendClient(client=mock_async_client)
@@ -165,8 +162,7 @@ class TestPydanticParseUsesModelValidateJson:
     async def test_buy_shares_parses_via_response_text(self):
         """``buy_shares`` must validate from ``response.text``, not ``response.json()``."""
         payload_text = (
-            '{"tradeId":42,"symbol":"AAPL","quantity":10,'
-            '"price":150.0,"newBalance":98500.0}'
+            '{"tradeId":42,"symbol":"AAPL","quantity":10,"price":150.0,"newBalance":98500.0}'
         )
         response = self._text_only_response(payload_text)
 
@@ -187,8 +183,7 @@ class TestPydanticParseUsesModelValidateJson:
     async def test_sell_shares_parses_via_response_text(self):
         """``sell_shares`` must validate from ``response.text``, not ``response.json()``."""
         payload_text = (
-            '{"tradeId":43,"symbol":"AAPL","quantity":5,'
-            '"price":151.0,"newBalance":99255.0}'
+            '{"tradeId":43,"symbol":"AAPL","quantity":5,"price":151.0,"newBalance":99255.0}'
         )
         response = self._text_only_response(payload_text)
 

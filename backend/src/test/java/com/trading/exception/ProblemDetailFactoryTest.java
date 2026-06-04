@@ -1,13 +1,12 @@
 package com.trading.exception;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URI;
 import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 
 class ProblemDetailFactoryTest {
 
@@ -41,7 +40,8 @@ class ProblemDetailFactoryTest {
         assertThat(problem.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
         assertThat(problem.getTitle()).isEqualTo("Business Rule Violation");
         assertThat(problem.getDetail()).isEqualTo(detail);
-        assertThat(problem.getType()).isEqualTo(URI.create("https://trading.example.com/errors/business-rule-violation"));
+        assertThat(problem.getType())
+                .isEqualTo(URI.create("https://trading.example.com/errors/business-rule-violation"));
         assertThat(problem.getInstance()).isEqualTo(URI.create(instance));
     }
 
@@ -68,9 +68,8 @@ class ProblemDetailFactoryTest {
         String detail = "Validation failed for request";
         String instance = "/api/accounts";
         Map<String, String> validationErrors = Map.of(
-            "name", "must not be blank",
-            "initialBalance", "must be positive"
-        );
+                "name", "must not be blank",
+                "initialBalance", "must be positive");
 
         // When
         ProblemDetail problem = ProblemDetailFactory.validationError(detail, instance, validationErrors);

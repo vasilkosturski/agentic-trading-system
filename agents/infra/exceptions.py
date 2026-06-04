@@ -1,6 +1,6 @@
 """Custom exceptions for the trading agent system."""
 
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from utils.sdk_parser import ParsedToolCall
@@ -13,7 +13,7 @@ class ToolExecutionError(Exception):
     rather than letting the agent continue with potentially invalid data.
     """
 
-    def __init__(self, message: str, tool_errors: List["ParsedToolCall"]):
+    def __init__(self, message: str, tool_errors: list["ParsedToolCall"]):
         super().__init__(message)
         self.tool_errors = tool_errors
 

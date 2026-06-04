@@ -23,7 +23,6 @@ exception is always the one the caller re-raises.
 
 import logging
 
-from models.run_tracking import CompleteRunData, RunPhase
 from backend.run_tracking import complete_run, create_run, update_phase
 from backend.status_broadcaster import (
     PHASE_COMPLETED,
@@ -34,6 +33,7 @@ from backend.status_broadcaster import (
     PHASE_TRADING,
     broadcast_status,
 )
+from models.run_tracking import CompleteRunData, RunPhase
 from tools.trading_tools import initialize_agent
 
 logger = logging.getLogger(__name__)
@@ -89,16 +89,22 @@ class RunLifecycle:
             )
 
         broadcast_status(
-            self.agent_id, self.agent_name, PHASE_INITIALIZING,
-            "Starting trading cycle", 0,
+            self.agent_id,
+            self.agent_name,
+            PHASE_INITIALIZING,
+            "Starting trading cycle",
+            0,
         )
 
         run_id = await create_run(self.agent_id)
         await update_phase(run_id, RunPhase.RESEARCHING)
 
         broadcast_status(
-            self.agent_id, self.agent_name, PHASE_RESEARCHING,
-            "Researching market", 20,
+            self.agent_id,
+            self.agent_name,
+            PHASE_RESEARCHING,
+            "Researching market",
+            20,
         )
 
         return run_id
@@ -108,8 +114,11 @@ class RunLifecycle:
         AgentExecutor._run_decision_maker (lines ~477-484)."""
         await update_phase(run_id, RunPhase.DECIDING)
         broadcast_status(
-            self.agent_id, self.agent_name, PHASE_DECIDING,
-            "Making investment decision", 70,
+            self.agent_id,
+            self.agent_name,
+            PHASE_DECIDING,
+            "Making investment decision",
+            70,
         )
 
     async def transition_to_trading(self, run_id: int) -> None:
@@ -117,8 +126,11 @@ class RunLifecycle:
         AgentExecutor._execute_trade (lines ~581-585)."""
         await update_phase(run_id, RunPhase.TRADING)
         broadcast_status(
-            self.agent_id, self.agent_name, PHASE_TRADING,
-            "Executing trade", 90,
+            self.agent_id,
+            self.agent_name,
+            PHASE_TRADING,
+            "Executing trade",
+            90,
         )
 
     async def complete(
@@ -136,8 +148,12 @@ class RunLifecycle:
         """
         await complete_run(run_id, data)
         broadcast_status(
-            self.agent_id, self.agent_name, PHASE_COMPLETED,
-            outcome_message, 100, outcome=outcome_message,
+            self.agent_id,
+            self.agent_name,
+            PHASE_COMPLETED,
+            outcome_message,
+            100,
+            outcome=outcome_message,
         )
 
     async def fail(self, run_id: int | None, error: Exception) -> None:
@@ -154,8 +170,11 @@ class RunLifecycle:
         logger.error(f"Cycle error for {self.agent_name}: {error}")
 
         broadcast_status(
-            self.agent_id, self.agent_name, PHASE_ERROR,
-            f"Error: {str(error)}", 0,
+            self.agent_id,
+            self.agent_name,
+            PHASE_ERROR,
+            f"Error: {str(error)}",
+            0,
             outcome=f"Failed: {str(error)}",
         )
 
@@ -164,6 +183,4 @@ class RunLifecycle:
                 error_msg = str(error)[:MAX_ERROR_MESSAGE_LEN] or "Unknown error"
                 await update_phase(run_id, RunPhase.FAILED, error_message=error_msg)
             except Exception as cleanup_err:
-                logger.error(
-                    f"Failed to record error state for run {run_id}: {cleanup_err}"
-                )
+                logger.error(f"Failed to record error state for run {run_id}: {cleanup_err}")

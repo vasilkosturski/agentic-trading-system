@@ -49,7 +49,7 @@ describe('api.ts - 403 Forbidden handling', () => {
     vi.clearAllMocks()
 
     // Mock window.location
-    delete (window as any).location
+    delete (window as Partial<Window>).location
     window.location = {
       ...originalLocation,
       href: 'http://localhost:3000/',

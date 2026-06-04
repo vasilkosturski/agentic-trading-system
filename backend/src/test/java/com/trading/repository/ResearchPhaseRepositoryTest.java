@@ -1,20 +1,18 @@
 package com.trading.repository;
 
-import com.trading.dto.jsonb.ToolCallDto;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.trading.dto.jsonb.SourceDto;
+import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.entity.ResearchPhase;
 import com.trading.entity.TradingAgent;
 import com.trading.entity.TradingRun;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Repository tests for ResearchPhase entity.
@@ -40,12 +38,12 @@ class ResearchPhaseRepositoryTest extends BaseRepositoryTest {
         researchPhaseRepository.deleteAll();
         tradingRunRepository.deleteAll();
         tradingAgentRepository.deleteAll();
-        
+
         // Create test agent and run
         TradingAgent agent = new TradingAgent("TestAgent", "Test agent");
         agent.setInitialCapital(100000.0);
         agent = tradingAgentRepository.save(agent);
-        
+
         testRun = new TradingRun(agent);
         testRun = tradingRunRepository.save(testRun);
     }
@@ -61,7 +59,7 @@ class ResearchPhaseRepositoryTest extends BaseRepositoryTest {
         // Act
         ResearchPhase saved = researchPhaseRepository.save(phase);
         Optional<ResearchPhase> found = researchPhaseRepository.findById(saved.getId());
-        
+
         // Assert
         assertThat(found).isPresent();
         assertThat(found.get().getResearchNotes()).isEqualTo("Market analysis complete");
@@ -74,14 +72,14 @@ class ResearchPhaseRepositoryTest extends BaseRepositoryTest {
         // Arrange
         ResearchPhase phase = new ResearchPhase(testRun);
         phase.setCandidates(List.of("JPM", "BAC", "WFC", "GS"));
-        
+
         // Act
         researchPhaseRepository.save(phase);
-        ResearchPhase loaded = researchPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
-        
+        ResearchPhase loaded =
+                researchPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
+
         // Assert
-        assertThat(loaded.getCandidates())
-            .containsExactly("JPM", "BAC", "WFC", "GS");
+        assertThat(loaded.getCandidates()).containsExactly("JPM", "BAC", "WFC", "GS");
     }
 
     @Test
@@ -89,31 +87,32 @@ class ResearchPhaseRepositoryTest extends BaseRepositoryTest {
     void shouldRoundTripSourcesJsonb() {
         // Arrange
         ResearchPhase phase = new ResearchPhase(testRun);
-        
+
         SourceDto webSource = new SourceDto();
         webSource.setType("web");
         webSource.setTitle("Market Analysis Report");
         webSource.setUrl("https://example.com/report");
         webSource.setDescription("Comprehensive market analysis");
-        
+
         SourceDto systemSource = new SourceDto();
         systemSource.setType("system_context");
         systemSource.setDescription("Current portfolio state");
-        
+
         phase.setSources(List.of(webSource, systemSource));
-        
+
         // Act
         researchPhaseRepository.save(phase);
-        ResearchPhase loaded = researchPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
-        
+        ResearchPhase loaded =
+                researchPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
+
         // Assert
         assertThat(loaded.getSources()).hasSize(2);
-        
+
         SourceDto loadedWebSource = loaded.getSources().get(0);
         assertThat(loadedWebSource.getType()).isEqualTo("web");
         assertThat(loadedWebSource.getTitle()).isEqualTo("Market Analysis Report");
         assertThat(loadedWebSource.getUrl()).isEqualTo("https://example.com/report");
-        
+
         SourceDto loadedSystemSource = loaded.getSources().get(1);
         assertThat(loadedSystemSource.getType()).isEqualTo("system_context");
         assertThat(loadedSystemSource.getDescription()).isEqualTo("Current portfolio state");
@@ -124,22 +123,23 @@ class ResearchPhaseRepositoryTest extends BaseRepositoryTest {
     void shouldRoundTripToolCallsJsonb() {
         // Arrange
         ResearchPhase phase = new ResearchPhase(testRun);
-        
+
         ToolCallDto toolCall1 = new ToolCallDto();
         toolCall1.setTool("brave_search");
 
         ToolCallDto toolCall2 = new ToolCallDto();
         toolCall2.setTool("memory_search");
-        
+
         phase.setToolCalls(List.of(toolCall1, toolCall2));
-        
+
         // Act
         researchPhaseRepository.save(phase);
-        ResearchPhase loaded = researchPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
-        
+        ResearchPhase loaded =
+                researchPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
+
         // Assert
         assertThat(loaded.getToolCalls()).hasSize(2);
-        
+
         ToolCallDto loadedCall1 = loaded.getToolCalls().get(0);
         assertThat(loadedCall1.getTool()).isEqualTo("brave_search");
 
@@ -154,10 +154,10 @@ class ResearchPhaseRepositoryTest extends BaseRepositoryTest {
         ResearchPhase phase = new ResearchPhase(testRun);
         phase.setCandidates(List.of("AAPL", "MSFT"));
         researchPhaseRepository.save(phase);
-        
+
         // Act
         Optional<ResearchPhase> found = researchPhaseRepository.findByRunId(testRun.getId());
-        
+
         // Assert
         assertThat(found).isPresent();
         assertThat(found.get().getCandidates()).containsExactly("AAPL", "MSFT");
@@ -169,7 +169,7 @@ class ResearchPhaseRepositoryTest extends BaseRepositoryTest {
         // Arrange
         ResearchPhase phase = new ResearchPhase(testRun);
         researchPhaseRepository.save(phase);
-        
+
         // Act & Assert
         assertThat(researchPhaseRepository.existsByRunId(testRun.getId())).isTrue();
         assertThat(researchPhaseRepository.existsByRunId(99999L)).isFalse();
@@ -181,15 +181,15 @@ class ResearchPhaseRepositoryTest extends BaseRepositoryTest {
         // Arrange
         ResearchPhase phase = new ResearchPhase(testRun);
         // Don't set any JSONB fields
-        
+
         // Act
         researchPhaseRepository.save(phase);
-        ResearchPhase loaded = researchPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
-        
+        ResearchPhase loaded =
+                researchPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
+
         // Assert
         assertThat(loaded.getCandidates()).isNull();
         assertThat(loaded.getSources()).isNull();
         assertThat(loaded.getToolCalls()).isNull();
     }
 }
-

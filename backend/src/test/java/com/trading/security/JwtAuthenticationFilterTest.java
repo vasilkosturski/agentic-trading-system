@@ -1,9 +1,21 @@
 package com.trading.security;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.FilterChain;
+import java.util.Collections;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,19 +33,6 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-
-import java.util.Collections;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for {@link JwtAuthenticationFilter}.
@@ -88,10 +87,10 @@ class JwtAuthenticationFilterTest {
 
     private UserDetails adminUser() {
         return User.builder()
-            .username(ADMIN_USERNAME)
-            .password("password")
-            .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
-            .build();
+                .username(ADMIN_USERNAME)
+                .password("password")
+                .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .build();
     }
 
     @Test
@@ -100,8 +99,9 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(request, response, filterChain);
 
         verify(filterChain).doFilter(request, response);
-        assertNull(SecurityContextHolder.getContext().getAuthentication(),
-            "No Authentication should be set when no Authorization header is present");
+        assertNull(
+                SecurityContextHolder.getContext().getAuthentication(),
+                "No Authentication should be set when no Authorization header is present");
         verifyNoInteractions(jwtTokenProvider, userDetailsService);
     }
 
@@ -127,13 +127,14 @@ class JwtAuthenticationFilterTest {
     void doFilter_ExpiredToken_SwallowsExceptionAndContinuesChain() throws Exception {
         request.addHeader("Authorization", "Bearer " + EXPIRED_TOKEN);
         when(jwtTokenProvider.getUsernameFromToken(EXPIRED_TOKEN))
-            .thenThrow(new ExpiredJwtException(null, null, "JWT expired"));
+                .thenThrow(new ExpiredJwtException(null, null, "JWT expired"));
 
         filter.doFilter(request, response, filterChain);
 
         verify(filterChain).doFilter(request, response);
-        assertNull(SecurityContextHolder.getContext().getAuthentication(),
-            "Expired token must not produce an Authentication (treat as anonymous)");
+        assertNull(
+                SecurityContextHolder.getContext().getAuthentication(),
+                "Expired token must not produce an Authentication (treat as anonymous)");
         verify(userDetailsService, never()).loadUserByUsername(anyString());
     }
 
@@ -142,13 +143,14 @@ class JwtAuthenticationFilterTest {
     void doFilter_MalformedToken_SwallowsExceptionAndContinuesChain() throws Exception {
         request.addHeader("Authorization", "Bearer " + MALFORMED_TOKEN);
         when(jwtTokenProvider.getUsernameFromToken(MALFORMED_TOKEN))
-            .thenThrow(new MalformedJwtException("Malformed JWT"));
+                .thenThrow(new MalformedJwtException("Malformed JWT"));
 
         filter.doFilter(request, response, filterChain);
 
         verify(filterChain).doFilter(request, response);
-        assertNull(SecurityContextHolder.getContext().getAuthentication(),
-            "Malformed token must not produce an Authentication");
+        assertNull(
+                SecurityContextHolder.getContext().getAuthentication(),
+                "Malformed token must not produce an Authentication");
         verify(userDetailsService, never()).loadUserByUsername(anyString());
     }
 
@@ -157,29 +159,32 @@ class JwtAuthenticationFilterTest {
     void doFilter_BadSignatureToken_SwallowsExceptionAndContinuesChain() throws Exception {
         request.addHeader("Authorization", "Bearer " + BAD_SIG_TOKEN);
         when(jwtTokenProvider.getUsernameFromToken(BAD_SIG_TOKEN))
-            .thenThrow(new SignatureException("Invalid signature"));
+                .thenThrow(new SignatureException("Invalid signature"));
 
         filter.doFilter(request, response, filterChain);
 
         verify(filterChain).doFilter(request, response);
-        assertNull(SecurityContextHolder.getContext().getAuthentication(),
-            "Bad-signature token must not produce an Authentication");
+        assertNull(
+                SecurityContextHolder.getContext().getAuthentication(),
+                "Bad-signature token must not produce an Authentication");
         verify(userDetailsService, never()).loadUserByUsername(anyString());
     }
 
     @Test
-    @DisplayName("Unknown username (UserDetailsService throws UsernameNotFoundException): no authentication, chain continues")
+    @DisplayName(
+            "Unknown username (UserDetailsService throws UsernameNotFoundException): no authentication, chain continues")
     void doFilter_UsernameNotFound_SwallowsExceptionAndContinuesChain() throws Exception {
         request.addHeader("Authorization", "Bearer " + UNKNOWN_USER_TOKEN);
         when(jwtTokenProvider.getUsernameFromToken(UNKNOWN_USER_TOKEN)).thenReturn("ghost");
         when(userDetailsService.loadUserByUsername("ghost"))
-            .thenThrow(new UsernameNotFoundException("ghost not found"));
+                .thenThrow(new UsernameNotFoundException("ghost not found"));
 
         filter.doFilter(request, response, filterChain);
 
         verify(filterChain).doFilter(request, response);
-        assertNull(SecurityContextHolder.getContext().getAuthentication(),
-            "Unknown username must not produce an Authentication");
+        assertNull(
+                SecurityContextHolder.getContext().getAuthentication(),
+                "Unknown username must not produce an Authentication");
     }
 
     @Test
@@ -187,12 +192,12 @@ class JwtAuthenticationFilterTest {
     void doFilter_AuthenticationAlreadySet_DoesNotOverwrite() throws Exception {
         // Pre-populate the SecurityContext with an existing Authentication
         UserDetails preExisting = User.builder()
-            .username("preexisting")
-            .password("pw")
-            .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")))
-            .build();
+                .username("preexisting")
+                .password("pw")
+                .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")))
+                .build();
         UsernamePasswordAuthenticationToken preAuth =
-            new UsernamePasswordAuthenticationToken(preExisting, null, preExisting.getAuthorities());
+                new UsernamePasswordAuthenticationToken(preExisting, null, preExisting.getAuthorities());
         SecurityContextHolder.getContext().setAuthentication(preAuth);
 
         // The filter receives a valid token. Per the idempotency contract the filter
@@ -207,8 +212,10 @@ class JwtAuthenticationFilterTest {
         // Pre-existing Authentication must be preserved (idempotency for this filter)
         Authentication current = SecurityContextHolder.getContext().getAuthentication();
         assertNotNull(current);
-        assertEquals("preexisting", ((UserDetails) current.getPrincipal()).getUsername(),
-            "Filter must not overwrite an existing Authentication");
+        assertEquals(
+                "preexisting",
+                ((UserDetails) current.getPrincipal()).getUsername(),
+                "Filter must not overwrite an existing Authentication");
         // Filter must skip JWT processing entirely when Authentication is already set
         verifyNoInteractions(jwtTokenProvider, userDetailsService);
     }
@@ -226,8 +233,9 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(request, response, filterChain);
 
         verify(filterChain).doFilter(request, response);
-        assertNull(SecurityContextHolder.getContext().getAuthentication(),
-            "Null subject must not produce an Authentication");
+        assertNull(
+                SecurityContextHolder.getContext().getAuthentication(),
+                "Null subject must not produce an Authentication");
         verify(userDetailsService, never()).loadUserByUsername(eq(null));
     }
 
@@ -240,11 +248,12 @@ class JwtAuthenticationFilterTest {
         request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
         when(jwtTokenProvider.getUsernameFromToken(VALID_TOKEN)).thenReturn(ADMIN_USERNAME);
         when(userDetailsService.loadUserByUsername(ADMIN_USERNAME))
-            .thenThrow(new RuntimeException("Database connection lost"));
+                .thenThrow(new RuntimeException("Database connection lost"));
 
-        RuntimeException thrown = assertThrows(RuntimeException.class,
-            () -> filter.doFilter(request, response, filterChain),
-            "Unexpected RuntimeException must propagate, not be swallowed");
+        RuntimeException thrown = assertThrows(
+                RuntimeException.class,
+                () -> filter.doFilter(request, response, filterChain),
+                "Unexpected RuntimeException must propagate, not be swallowed");
         assertEquals("Database connection lost", thrown.getMessage());
 
         verify(filterChain, never()).doFilter(request, response);

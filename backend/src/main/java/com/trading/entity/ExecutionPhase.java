@@ -1,23 +1,36 @@
 package com.trading.entity;
 
 import com.trading.enums.PhaseStatus;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import java.time.Instant;
 
 /**
  * Execution phase entity - stores trade execution results.
  * Per design doc Lines 143-146: trade_id, status (executed/failed/skipped), error_details.
- * 
+ *
  * Schema: trading.execution_phases
  * Relationship: Optional - only exists for BUY/SELL decisions (0..1 per run)
  */
 @Entity
-@Table(name = "execution_phases", schema = "trading", uniqueConstraints = {
-    @UniqueConstraint(columnNames = "run_id")
-})
+@Table(
+        name = "execution_phases",
+        schema = "trading",
+        uniqueConstraints = {@UniqueConstraint(columnNames = "run_id")})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -102,4 +115,3 @@ public class ExecutionPhase {
         return status == PhaseStatus.SKIPPED;
     }
 }
-

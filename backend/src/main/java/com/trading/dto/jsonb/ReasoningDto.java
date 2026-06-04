@@ -1,10 +1,9 @@
 package com.trading.dto.jsonb;
 
+import java.io.Serializable;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.io.Serializable;
 
 /**
  * DTO for structured reasoning in decision phase.
@@ -46,4 +45,3 @@ public class ReasoningDto implements Serializable {
      */
     private String researchContext;
 }
-

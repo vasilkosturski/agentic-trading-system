@@ -3,11 +3,10 @@ package com.trading.service;
 import com.trading.dto.response.PortfolioSnapshotDto;
 import com.trading.entity.AccountPortfolioSnapshot;
 import com.trading.repository.AccountPortfolioSnapshotRepository;
-import org.springframework.stereotype.Service;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
 
 /**
  * Service for portfolio snapshot operations.
@@ -21,7 +20,8 @@ public class PortfolioService {
         this.snapshotRepository = snapshotRepository;
     }
 
-    public List<PortfolioSnapshotDto> getSnapshots(String agentName, Instant startDate, Instant endDate, Integer limit) {
+    public List<PortfolioSnapshotDto> getSnapshots(
+            String agentName, Instant startDate, Instant endDate, Integer limit) {
         List<AccountPortfolioSnapshot> snapshots;
 
         if (agentName != null && startDate != null && endDate != null) {
@@ -38,20 +38,17 @@ public class PortfolioService {
             snapshots = snapshots.subList(0, limit);
         }
 
-        return snapshots.stream()
-            .map(this::convertToDto)
-            .collect(Collectors.toList());
+        return snapshots.stream().map(this::convertToDto).collect(Collectors.toList());
     }
 
     private PortfolioSnapshotDto convertToDto(AccountPortfolioSnapshot snapshot) {
         return new PortfolioSnapshotDto(
-            snapshot.getAccount().getAgent().getName(),
-            snapshot.getTimestamp(),
-            snapshot.getTotalValue(),
-            snapshot.getCashBalance(),
-            snapshot.getHoldingsValue(),
-            snapshot.getTotalPnl(),
-            snapshot.getTotalReturnPercent()
-        );
+                snapshot.getAccount().getAgent().getName(),
+                snapshot.getTimestamp(),
+                snapshot.getTotalValue(),
+                snapshot.getCashBalance(),
+                snapshot.getHoldingsValue(),
+                snapshot.getTotalPnl(),
+                snapshot.getTotalReturnPercent());
     }
 }

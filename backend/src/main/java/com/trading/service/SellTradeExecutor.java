@@ -1,10 +1,15 @@
 package com.trading.service;
 
 import com.trading.dto.response.TradeResult;
-import com.trading.entity.*;
+import com.trading.entity.AccountHolding;
+import com.trading.entity.AccountTransaction;
+import com.trading.entity.TradingAccount;
+import com.trading.entity.TransactionType;
 import com.trading.enums.TradeRejectionType;
 import com.trading.exception.BusinessRuleException;
-import com.trading.repository.*;
+import com.trading.repository.AccountHoldingRepository;
+import com.trading.repository.AccountTransactionRepository;
+import com.trading.repository.TradingAccountRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -47,7 +52,8 @@ public class SellTradeExecutor extends TradeExecutor {
             throw new IllegalArgumentException("runId is required - every transaction must be linked to an agent run");
         }
         if (price == null || price <= 0) {
-            throw new IllegalArgumentException("price must be positive - fetch from MarketService before calling this method");
+            throw new IllegalArgumentException(
+                    "price must be positive - fetch from MarketService before calling this method");
         }
 
         TradingAccount account = getAccount(agentName);
@@ -58,7 +64,8 @@ public class SellTradeExecutor extends TradeExecutor {
         account.setBalance(account.getBalance() + totalProceeds);
         TradingAccount savedAccount = tradingAccountRepository.save(account);
 
-        AccountTransaction transaction = createTransaction(account, symbol, quantity, price, runId, TransactionType.SELL);
+        AccountTransaction transaction =
+                createTransaction(account, symbol, quantity, price, runId, TransactionType.SELL);
         updateHolding(holding, quantity, agentName, symbol);
 
         return new TradeResult(transaction.getId(), symbol, quantity, price, savedAccount.getBalance());
@@ -69,9 +76,9 @@ public class SellTradeExecutor extends TradeExecutor {
         if (holding == null || holding.getQuantity() < quantity) {
             int available = holding != null ? holding.getQuantity() : 0;
             throw new BusinessRuleException(
-                TradeRejectionType.INSUFFICIENT_SHARES,
-                "Cannot sell " + quantity + " shares of " + symbol +
-                ". Only have " + available + " shares available");
+                    TradeRejectionType.INSUFFICIENT_SHARES,
+                    "Cannot sell " + quantity + " shares of " + symbol + ". Only have " + available
+                            + " shares available");
         }
         return holding;
     }
@@ -83,8 +90,13 @@ public class SellTradeExecutor extends TradeExecutor {
             logger.info("🗑️ Removing holding for {} - {}: sold all shares", agentName, symbol);
             holdingRepository.delete(holding);
         } else {
-            logger.info("📊 Updating holding for {} - {}: current qty={}, selling qty={}, remaining={}",
-                agentName, symbol, holding.getQuantity(), quantity, newQuantity);
+            logger.info(
+                    "📊 Updating holding for {} - {}: current qty={}, selling qty={}, remaining={}",
+                    agentName,
+                    symbol,
+                    holding.getQuantity(),
+                    quantity,
+                    newQuantity);
             holding.setQuantity(newQuantity);
             holdingRepository.save(holding);
         }

@@ -1,10 +1,16 @@
 package com.trading.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
 import com.trading.dto.response.PortfolioSnapshotDto;
 import com.trading.entity.AccountPortfolioSnapshot;
 import com.trading.entity.TradingAccount;
 import com.trading.entity.TradingAgent;
 import com.trading.repository.AccountPortfolioSnapshotRepository;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,13 +18,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.Instant;
-import java.util.Arrays;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PortfolioService Tests")
@@ -51,8 +50,7 @@ class PortfolioServiceTest {
     @Test
     @DisplayName("returns snapshots filtered by agent name")
     void testGetSnapshotsByAgentName() {
-        when(snapshotRepository.findByAgentNameOrderByTimestampDesc("Warren"))
-            .thenReturn(Arrays.asList(snapshot));
+        when(snapshotRepository.findByAgentNameOrderByTimestampDesc("Warren")).thenReturn(Arrays.asList(snapshot));
 
         List<PortfolioSnapshotDto> result = portfolioService.getSnapshots("Warren", null, null, null);
 
@@ -68,8 +66,7 @@ class PortfolioServiceTest {
     void testGetSnapshotsByDateRange() {
         Instant start = Instant.parse("2026-03-01T00:00:00Z");
         Instant end = Instant.parse("2026-03-31T23:59:59Z");
-        when(snapshotRepository.findByTimestampBetween(start, end))
-            .thenReturn(Arrays.asList(snapshot));
+        when(snapshotRepository.findByTimestampBetween(start, end)).thenReturn(Arrays.asList(snapshot));
 
         List<PortfolioSnapshotDto> result = portfolioService.getSnapshots(null, start, end, null);
 
@@ -84,7 +81,7 @@ class PortfolioServiceTest {
         Instant start = Instant.parse("2026-03-01T00:00:00Z");
         Instant end = Instant.parse("2026-03-31T23:59:59Z");
         when(snapshotRepository.findByAgentNameAndDateRange("Warren", start, end))
-            .thenReturn(Arrays.asList(snapshot));
+                .thenReturn(Arrays.asList(snapshot));
 
         List<PortfolioSnapshotDto> result = portfolioService.getSnapshots("Warren", start, end, null);
 
@@ -97,8 +94,7 @@ class PortfolioServiceTest {
     @Test
     @DisplayName("returns all snapshots when no filters provided")
     void testGetAllSnapshots() {
-        when(snapshotRepository.findAllOrderByTimestampDesc())
-            .thenReturn(Arrays.asList(snapshot));
+        when(snapshotRepository.findAllOrderByTimestampDesc()).thenReturn(Arrays.asList(snapshot));
 
         List<PortfolioSnapshotDto> result = portfolioService.getSnapshots(null, null, null, null);
 
@@ -110,13 +106,15 @@ class PortfolioServiceTest {
     @Test
     @DisplayName("limits results when limit parameter provided")
     void testGetSnapshotsWithLimit() {
-        AccountPortfolioSnapshot snapshot2 = new AccountPortfolioSnapshot(account, Instant.now(), 106000.0, 51000.0, 55000.0);
+        AccountPortfolioSnapshot snapshot2 =
+                new AccountPortfolioSnapshot(account, Instant.now(), 106000.0, 51000.0, 55000.0);
         snapshot2.setId(2L);
-        AccountPortfolioSnapshot snapshot3 = new AccountPortfolioSnapshot(account, Instant.now(), 107000.0, 52000.0, 55000.0);
+        AccountPortfolioSnapshot snapshot3 =
+                new AccountPortfolioSnapshot(account, Instant.now(), 107000.0, 52000.0, 55000.0);
         snapshot3.setId(3L);
 
         when(snapshotRepository.findByAgentNameOrderByTimestampDesc("Warren"))
-            .thenReturn(Arrays.asList(snapshot, snapshot2, snapshot3));
+                .thenReturn(Arrays.asList(snapshot, snapshot2, snapshot3));
 
         List<PortfolioSnapshotDto> result = portfolioService.getSnapshots("Warren", null, null, 2);
 
@@ -127,8 +125,7 @@ class PortfolioServiceTest {
     @Test
     @DisplayName("returns all results when limit exceeds result count")
     void testGetSnapshotsWithLimitLargerThanResults() {
-        when(snapshotRepository.findByAgentNameOrderByTimestampDesc("Warren"))
-            .thenReturn(Arrays.asList(snapshot));
+        when(snapshotRepository.findByAgentNameOrderByTimestampDesc("Warren")).thenReturn(Arrays.asList(snapshot));
 
         List<PortfolioSnapshotDto> result = portfolioService.getSnapshots("Warren", null, null, 100);
 
@@ -139,8 +136,7 @@ class PortfolioServiceTest {
     @Test
     @DisplayName("snapshot DTO contains expected chart fields")
     void testSnapshotDtoContainsOnlyChartFields() {
-        when(snapshotRepository.findByAgentNameOrderByTimestampDesc("Warren"))
-            .thenReturn(Arrays.asList(snapshot));
+        when(snapshotRepository.findByAgentNameOrderByTimestampDesc("Warren")).thenReturn(Arrays.asList(snapshot));
 
         List<PortfolioSnapshotDto> result = portfolioService.getSnapshots("Warren", null, null, null);
 

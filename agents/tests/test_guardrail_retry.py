@@ -6,14 +6,22 @@ All tests mock Runner.run() -- no real LLM calls.
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
+import tenacity
 from agents.exceptions import OutputGuardrailTripwireTriggered
+
+from ai_agents import guardrail_retry
 from ai_agents.guardrail_retry import run_with_guardrail_retry
 
+
+@pytest.fixture(autouse=True)
+def _no_retry_sleep(monkeypatch):
+    """Neutralize backoff waits between retry attempts so tests stay fast."""
+    monkeypatch.setattr(guardrail_retry, "_WAIT", tenacity.wait_none())
 
 # ---------------------------------------------------------------------------
 # Helpers to build mock exceptions
 # ---------------------------------------------------------------------------
+
 
 def _make_guardrail_exception(
     output_info: str = "validation error",
@@ -52,6 +60,7 @@ def _make_run_item(item_type: str = "message_output_item"):
 # Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 class TestRunWithGuardrailRetry:
     """Tests for run_with_guardrail_retry."""
@@ -68,9 +77,7 @@ class TestRunWithGuardrailRetry:
         )
 
         assert result is mock_result
-        mock_runner_class.run.assert_awaited_once_with(
-            agent, "test prompt", max_turns=30
-        )
+        mock_runner_class.run.assert_awaited_once_with(agent, "test prompt", max_turns=30)
 
     @patch("ai_agents.guardrail_retry.Runner")
     async def test_retry_on_guardrail_trip(self, mock_runner_class):
@@ -109,9 +116,7 @@ class TestRunWithGuardrailRetry:
 
         agent = MagicMock()
         with pytest.raises(OutputGuardrailTripwireTriggered) as exc_info:
-            await run_with_guardrail_retry(
-                agent, "test", max_attempts=3, agent_name="TestAgent"
-            )
+            await run_with_guardrail_retry(agent, "test", max_attempts=3, agent_name="TestAgent")
 
         assert exc_info.value is exc3
         assert mock_runner_class.run.await_count == 3
@@ -132,9 +137,26 @@ class TestRunWithGuardrailRetry:
 
         agent = MagicMock()
         with pytest.raises(RuntimeError, match="run_data"):
+            await run_with_guardrail_retry(agent, "test", max_attempts=3, agent_name="TestAgent")
+
+    @patch("ai_agents.guardrail_retry.Runner")
+    async def test_non_guardrail_exception_propagates_unretried(self, mock_runner_class):
+        """Exceptions other than OutputGuardrailTripwireTriggered must not be retried.
+
+        Type-narrowing the retry filter to the guardrail tripwire means a
+        ``ValueError`` (or any other unrelated exception) propagates on the
+        first attempt without triggering further calls to ``Runner.run``.
+        """
+        unrelated = ValueError("unrelated failure")
+        mock_runner_class.run = AsyncMock(side_effect=unrelated)
+
+        agent = MagicMock()
+        with pytest.raises(ValueError, match="unrelated failure"):
             await run_with_guardrail_retry(
-                agent, "test", max_attempts=3, agent_name="TestAgent"
+                agent, "test prompt", max_attempts=3, agent_name="TestAgent"
             )
+
+        assert mock_runner_class.run.await_count == 1
 
     @patch("ai_agents.guardrail_retry.Runner")
     async def test_error_info_in_feedback(self, mock_runner_class):

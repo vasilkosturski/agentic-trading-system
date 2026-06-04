@@ -1,6 +1,7 @@
 package com.trading.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -10,8 +11,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.RestClientException;
-
-import java.util.NoSuchElementException;
 
 /**
  * Global exception handler for all REST controllers.
@@ -35,7 +34,8 @@ public class GlobalExceptionHandler {
      * Returns 400 Bad Request.
      */
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ProblemDetail> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
+    public ResponseEntity<ProblemDetail> handleIllegalArgument(
+            IllegalArgumentException ex, HttpServletRequest request) {
         logger.warn("Invalid argument: {}", ex.getMessage());
         ProblemDetail problem = ProblemDetailFactory.invalidRequest(ex.getMessage(), request.getRequestURI());
         return ResponseEntity.badRequest().body(problem);
@@ -57,7 +57,8 @@ public class GlobalExceptionHandler {
      * Returns 404 Not Found.
      */
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ProblemDetail> handleResourceNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
+    public ResponseEntity<ProblemDetail> handleResourceNotFound(
+            ResourceNotFoundException ex, HttpServletRequest request) {
         logger.warn("Resource not found: {}", ex.getMessage());
         ProblemDetail problem = ProblemDetailFactory.resourceNotFound(ex.getMessage(), request.getRequestURI());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem);
@@ -74,9 +75,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleRestClientException(RestClientException ex, HttpServletRequest request) {
         logger.error("External service call failed: {}", ex.getMessage());
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-            HttpStatus.SERVICE_UNAVAILABLE,
-            "External service unavailable: " + ex.getMessage()
-        );
+                HttpStatus.SERVICE_UNAVAILABLE, "External service unavailable: " + ex.getMessage());
         problem.setTitle("Service Unavailable");
         problem.setInstance(java.net.URI.create(request.getRequestURI()));
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem);
@@ -93,7 +92,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public void handleAccessDenied(AccessDeniedException ex) throws AccessDeniedException {
         logger.warn("Access denied: {}", ex.getMessage());
-        throw ex;  // Re-throw for Spring Security to handle
+        throw ex; // Re-throw for Spring Security to handle
     }
 
     /**

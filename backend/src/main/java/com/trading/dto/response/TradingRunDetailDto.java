@@ -16,5 +16,5 @@ public class TradingRunDetailDto {
     private TradingRunDto run;
     private ResearchPhaseDto research;
     private DecisionPhaseDto decision;
-    private ExecutionPhaseDto execution;  // may be null
+    private ExecutionPhaseDto execution; // may be null
 }

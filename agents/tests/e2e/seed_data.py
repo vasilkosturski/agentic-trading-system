@@ -7,8 +7,7 @@ Single source of truth for test data used by both:
 Uses dataclasses for type safety and readability instead of raw SQL strings.
 """
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 from models.investment_style import InvestmentStyle
 
@@ -16,6 +15,7 @@ from models.investment_style import InvestmentStyle
 @dataclass(frozen=True)
 class SeedAgent:
     """Agent configuration for seeding and test fixtures."""
+
     name: str
     description: str
     style: InvestmentStyle
@@ -30,6 +30,7 @@ class SeedAgent:
 @dataclass(frozen=True)
 class SeedAccount:
     """Trading account for seeding."""
+
     balance: float
     is_active: bool = True
 
@@ -37,6 +38,7 @@ class SeedAccount:
 @dataclass(frozen=True)
 class SeedHolding:
     """Portfolio holding for seeding."""
+
     symbol: str
     quantity: int
     average_price: float
@@ -45,6 +47,7 @@ class SeedHolding:
 @dataclass(frozen=True)
 class SeedTransaction:
     """Historical transaction for seeding."""
+
     symbol: str
     quantity: int
     price: float
@@ -54,6 +57,7 @@ class SeedTransaction:
 @dataclass(frozen=True)
 class SeedData:
     """Complete seed data configuration."""
+
     agent: SeedAgent
     account: SeedAccount
     holdings: list[SeedHolding]

@@ -18,6 +18,13 @@ as "Completed - No trades (HOLD decision)". Do not rewrite this block.
 import logging
 from datetime import datetime
 
+# Constants live in agent_executor.py for now; Task 10 of the
+# decomposition plan may reconcile if a shared constants module emerges.
+# Importing here is safe because agent_executor imports run_finalization_phase
+# AFTER its module-level constants are declared, so by the time this
+# module is initialized those names are already bound on agent_executor.
+from agent_executor import MAX_REASONING_FIELD_LEN
+from backend.run_lifecycle import RunLifecycle
 from models.orchestration import RunContext
 from models.run_tracking import (
     CompleteRunData,
@@ -28,14 +35,6 @@ from models.run_tracking import (
     ResearchPhaseData,
     TradeDecision,
 )
-from backend.run_lifecycle import RunLifecycle
-
-# Constants live in agent_executor.py for now; Task 10 of the
-# decomposition plan may reconcile if a shared constants module emerges.
-# Importing here is safe because agent_executor imports run_finalization_phase
-# AFTER its module-level constants are declared, so by the time this
-# module is initialized those names are already bound on agent_executor.
-from agent_executor import MAX_REASONING_FIELD_LEN
 
 logger = logging.getLogger(__name__)
 
@@ -66,18 +65,26 @@ async def run_finalization_phase(ctx: RunContext, lifecycle: RunLifecycle) -> No
     decision = ctx.decision_result.decision
     trade_decision = TradeDecision(decision.action.value)
     symbol = decision.symbol if decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
-    quantity = decision.quantity if decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
+    quantity = (
+        decision.quantity if decision.action in (TradeDecision.BUY, TradeDecision.SELL) else None
+    )
 
     # Build reasoning DTO with direct 1:1 field mapping from TradingDecision.
     reasoning = ReasoningDto(
         rationale=decision.rationale[:MAX_REASONING_FIELD_LEN] if decision.rationale else None,
-        portfolioContext=decision.portfolioContext[:MAX_REASONING_FIELD_LEN] if decision.portfolioContext else None,
-        historicalContext=decision.historicalContext[:MAX_REASONING_FIELD_LEN] if decision.historicalContext else None,
-        researchContext=decision.researchContext[:MAX_REASONING_FIELD_LEN] if decision.researchContext else None,
+        portfolioContext=decision.portfolioContext[:MAX_REASONING_FIELD_LEN]
+        if decision.portfolioContext
+        else None,
+        historicalContext=decision.historicalContext[:MAX_REASONING_FIELD_LEN]
+        if decision.historicalContext
+        else None,
+        researchContext=decision.researchContext[:MAX_REASONING_FIELD_LEN]
+        if decision.researchContext
+        else None,
     )
 
     logger.info(
-        f"📝 Reasoning: mapped 4 fields (rationale, portfolioContext, historicalContext, researchContext)"
+        "📝 Reasoning: mapped 4 fields (rationale, portfolioContext, historicalContext, researchContext)"
     )
 
     # Build nested phase DTOs

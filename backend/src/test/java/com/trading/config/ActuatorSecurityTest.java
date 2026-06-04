@@ -1,5 +1,9 @@
 package com.trading.config;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.trading.repository.TradingAgentRepository;
 import com.trading.security.JwtAuthenticationFilter;
 import com.trading.security.JwtTokenProvider;
@@ -25,10 +29,6 @@ import org.springframework.context.annotation.FilterType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Full-context security test for the Spring Boot Actuator gating contract.
@@ -58,19 +58,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * the gate, which only matters if the endpoints are reachable.
  */
 @SpringBootTest(
-    webEnvironment = WebEnvironment.MOCK,
-    classes = ActuatorSecurityTest.DbFreeContext.class,
-    properties = {
-        "spring.datasource.url=jdbc:sqlite::memory:",
-        "spring.datasource.driver-class-name=org.sqlite.JDBC",
-        "spring.datasource.username=",
-        "spring.datasource.password=",
-        "spring.jpa.database-platform=org.hibernate.community.dialect.SQLiteDialect",
-        "spring.jpa.hibernate.ddl-auto=none",
-        "spring.jpa.properties.hibernate.hbm2ddl.create_namespaces=false",
-        "spring.jpa.properties.hibernate.boot.allow_jdbc_metadata_access=false"
-    }
-)
+        webEnvironment = WebEnvironment.MOCK,
+        classes = ActuatorSecurityTest.DbFreeContext.class,
+        properties = {
+            "spring.datasource.url=jdbc:sqlite::memory:",
+            "spring.datasource.driver-class-name=org.sqlite.JDBC",
+            "spring.datasource.username=",
+            "spring.datasource.password=",
+            "spring.jpa.database-platform=org.hibernate.community.dialect.SQLiteDialect",
+            "spring.jpa.hibernate.ddl-auto=none",
+            "spring.jpa.properties.hibernate.hbm2ddl.create_namespaces=false",
+            "spring.jpa.properties.hibernate.boot.allow_jdbc_metadata_access=false"
+        })
 @AutoConfigureMockMvc
 @DisplayName("Actuator Security Tests")
 class ActuatorSecurityTest {
@@ -83,20 +82,17 @@ class ActuatorSecurityTest {
      */
     @Configuration
     @ComponentScan(
-        basePackages = "com.trading",
-        excludeFilters = {
-            @ComponentScan.Filter(
-                type = FilterType.REGEX,
-                pattern = {
-                    "com\\.trading\\.service\\.ScheduledSnapshotService",
-                    "com\\.trading\\.config\\.TestSecurityConfig"
-                }
-            )
-        }
-    )
+            basePackages = "com.trading",
+            excludeFilters = {
+                @ComponentScan.Filter(
+                        type = FilterType.REGEX,
+                        pattern = {
+                            "com\\.trading\\.service\\.ScheduledSnapshotService",
+                            "com\\.trading\\.config\\.TestSecurityConfig"
+                        })
+            })
     @org.springframework.boot.autoconfigure.EnableAutoConfiguration
-    static class DbFreeContext {
-    }
+    static class DbFreeContext {}
 
     @Autowired
     private MockMvc mockMvc;
@@ -155,9 +151,9 @@ class ActuatorSecurityTest {
     @DisplayName("Unauth GET /actuator/health returns 200 without component details")
     void unauthGetActuatorHealth_Returns200WithoutDetails() throws Exception {
         mockMvc.perform(get("/actuator/health"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.components").doesNotExist())
-            .andExpect(jsonPath("$.status").value("UP"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.components").doesNotExist())
+                .andExpect(jsonPath("$.status").value("UP"));
     }
 
     @Test
@@ -165,8 +161,8 @@ class ActuatorSecurityTest {
     @DisplayName("Admin GET /actuator/health returns 200 with component details")
     void adminGetActuatorHealth_Returns200WithDetails() throws Exception {
         mockMvc.perform(get("/actuator/health"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.components").exists());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.components").exists());
     }
 
     // =====================================================================
@@ -176,15 +172,13 @@ class ActuatorSecurityTest {
     @Test
     @DisplayName("Unauth GET /actuator/env returns 401")
     void unauthGetActuatorEnv_Returns401() throws Exception {
-        mockMvc.perform(get("/actuator/env"))
-            .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/actuator/env")).andExpect(status().isUnauthorized());
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     @DisplayName("Admin GET /actuator/env returns 200")
     void adminGetActuatorEnv_Returns200() throws Exception {
-        mockMvc.perform(get("/actuator/env"))
-            .andExpect(status().isOk());
+        mockMvc.perform(get("/actuator/env")).andExpect(status().isOk());
     }
 }

@@ -1,10 +1,9 @@
 package com.trading.repository;
 
 import com.trading.entity.ResearchPhase;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-
-import java.util.Optional;
 
 /**
  * Repository for ResearchPhase entities.
@@ -24,4 +23,3 @@ public interface ResearchPhaseRepository extends JpaRepository<ResearchPhase, Lo
      */
     boolean existsByRunId(Long runId);
 }
-

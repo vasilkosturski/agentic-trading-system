@@ -1,7 +1,17 @@
 package com.trading.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
 import com.trading.entity.PriceCache;
 import com.trading.repository.PriceCacheRepository;
+import com.trading.testsupport.SharedPostgresContainer;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,17 +25,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
-import com.trading.testsupport.SharedPostgresContainer;
-
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 
 /**
  * Integration tests for {@link PriceCacheService} that boot a real Spring context
@@ -110,8 +109,8 @@ class PriceCacheServiceIntegrationTest {
         // This is the proof the bug is fixed: before @Transactional, the upsert silently fails.
         Optional<PriceCache> persisted = priceCacheRepository.findBySymbol("AAPL");
         assertThat(persisted)
-            .as("After getPrice(), price_cache should contain a row for AAPL")
-            .isPresent();
+                .as("After getPrice(), price_cache should contain a row for AAPL")
+                .isPresent();
         assertThat(persisted.get().getPrice()).isEqualTo(123.45);
         assertThat(persisted.get().getSource()).isEqualTo("Finnhub");
 
@@ -125,8 +124,8 @@ class PriceCacheServiceIntegrationTest {
         assertThat(second).isNotNull();
         assertThat(second.getPrice()).isEqualTo(123.45);
         assertThat(second.isCached())
-            .as("Second getPrice() should return cached=true (cache was persisted by first call)")
-            .isTrue();
+                .as("Second getPrice() should return cached=true (cache was persisted by first call)")
+                .isTrue();
         assertThat(second.getSource()).startsWith("DB Cache");
 
         // Assert 2b: Finnhub was NOT called a second time.

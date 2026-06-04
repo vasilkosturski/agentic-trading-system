@@ -9,16 +9,16 @@ import json
 import logging
 from contextlib import AsyncExitStack
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from agents.mcp import MCPServerStdio
 from agents.exceptions import MaxTurnsExceeded
+from agents.mcp import MCPServerStdio
 
 from ai_agents.market_analyst import MarketAnalyst, MarketAnalystContext
-from mcp_helpers.types import MCPPool
 from mcp_helpers.params import get_mcp_server_params
+from mcp_helpers.types import MCPPool
 from models.llm_output import ResearchResponse
 
 logger = logging.getLogger("e2e_tests.market_analyst")
@@ -40,7 +40,7 @@ def _dump_result_to_json(
     try:
         _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         filename = f"{test_name}_{ts}.json"
 
         # Build serializable dict
@@ -86,7 +86,9 @@ async def real_mcp_pool():
 @pytest.mark.e2e
 @pytest.mark.slow
 @pytest.mark.costly
-@pytest.mark.usefixtures("require_openai_api_key", "require_brave_api_key", "require_backend", "seed_test_data")
+@pytest.mark.usefixtures(
+    "require_openai_api_key", "require_brave_api_key", "require_backend", "seed_test_data"
+)
 class TestMarketAnalystE2E:
     """E2E smoke test for Market Analyst."""
 
@@ -94,7 +96,6 @@ class TestMarketAnalystE2E:
     async def test_market_analyst_returns_candidates(
         self,
         real_mcp_pool: MCPPool,
-        test_agent_id,
         test_agent_name,
         test_agent_style,
         test_model_name,
@@ -123,7 +124,6 @@ class TestMarketAnalystE2E:
         # Create Market Analyst using async factory
         market_analyst = await MarketAnalyst.create(
             agent_name=test_agent_name,
-            agent_id=test_agent_id,
             mcp_pool=real_mcp_pool,
             model_name=test_model_name,
         )
@@ -196,8 +196,11 @@ class TestMarketAnalystE2E:
 
             # Agent should always find at least one candidate stock
             assert isinstance(response.candidates, list)
-            assert len(response.candidates) >= 1, "Market Analyst should find at least one candidate"
+            assert len(response.candidates) >= 1, (
+                "Market Analyst should find at least one candidate"
+            )
             from models.llm_output import CandidateStock
+
             for candidate in response.candidates:
                 assert isinstance(candidate, CandidateStock)
                 assert len(candidate.symbol) >= 1, "Candidate symbol must not be empty"
@@ -210,14 +213,18 @@ class TestMarketAnalystE2E:
                 assert source.url, "Source must have a URL"
 
             # Portfolio context should be populated (agent must explain how portfolio influenced research)
-            assert len(response.portfolio_context) > 20, "portfolio_context should explain how portfolio influenced research"
+            assert len(response.portfolio_context) > 20, (
+                "portfolio_context should explain how portfolio influenced research"
+            )
 
             # Agent should have made at least one tool call (brave_web_search at minimum)
             assert len(result.tool_calls) >= 1, "Market Analyst should make at least one tool call"
 
             # Verify brave_web_search was specifically used (core research tool)
             tool_names = [tc.name for tc in result.tool_calls]
-            assert "brave_web_search" in tool_names, "MarketAnalyst should use brave_web_search for research"
+            assert "brave_web_search" in tool_names, (
+                "MarketAnalyst should use brave_web_search for research"
+            )
 
             # Tool errors are expected (LLM may pick symbols Finnhub doesn't support)
             # What matters is the research output is valid despite any lookup failures
@@ -230,4 +237,3 @@ class TestMarketAnalystE2E:
                 system_prompt=system_prompt,
                 task_prompt=task_prompt,
             )
-

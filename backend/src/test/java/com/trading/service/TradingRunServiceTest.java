@@ -1,16 +1,39 @@
 package com.trading.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import com.trading.dto.request.CompleteRunRequest;
 import com.trading.dto.request.RunQueryFilter;
-import com.trading.dto.response.*;
-import com.trading.entity.*;
+import com.trading.dto.response.DecisionPhaseDto;
+import com.trading.dto.response.ExecutionPhaseDto;
+import com.trading.dto.response.ResearchPhaseDto;
+import com.trading.dto.response.RunListResponseDto;
+import com.trading.dto.response.TradingRunDetailDto;
+import com.trading.dto.response.TradingRunDto;
+import com.trading.entity.AccountTransaction;
+import com.trading.entity.DecisionPhase;
+import com.trading.entity.ExecutionPhase;
+import com.trading.entity.ResearchPhase;
+import com.trading.entity.TradingAgent;
+import com.trading.entity.TradingRun;
 import com.trading.enums.PhaseStatus;
 import com.trading.enums.RunPhase;
 import com.trading.enums.RunStatus;
 import com.trading.enums.TradeDecision;
 import com.trading.exception.ResourceNotFoundException;
-import com.trading.repository.*;
-import com.trading.specification.TradingRunSpecification;
+import com.trading.repository.AccountTransactionRepository;
+import com.trading.repository.DecisionPhaseRepository;
+import com.trading.repository.ExecutionPhaseRepository;
+import com.trading.repository.ResearchPhaseRepository;
+import com.trading.repository.TradingAgentRepository;
+import com.trading.repository.TradingRunRepository;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -30,20 +53,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-
 /**
  * Unit tests for TradingRunService.
  * Per tasks.md Section 3.10: ~45 test methods covering all service methods.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TradingRunService Tests")
+@SuppressWarnings("unchecked") // Mockito argument-matcher idiom uses raw Specification.class for stubbing
 class TradingRunServiceTest {
 
     @Mock
@@ -182,10 +198,8 @@ class TradingRunServiceTest {
             when(tradingAgentRepository.findById(999L)).thenReturn(Optional.empty());
 
             // Act & Assert
-            ResourceNotFoundException exception = assertThrows(
-                ResourceNotFoundException.class,
-                () -> tradingRunService.createRun(999L)
-            );
+            ResourceNotFoundException exception =
+                    assertThrows(ResourceNotFoundException.class, () -> tradingRunService.createRun(999L));
             assertTrue(exception.getMessage().contains("Agent not found"));
         }
 
@@ -246,9 +260,7 @@ class TradingRunServiceTest {
 
             // Act & Assert
             IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> tradingRunService.updatePhase(100L, RunPhase.INITIALIZING)
-            );
+                    IllegalArgumentException.class, () -> tradingRunService.updatePhase(100L, RunPhase.INITIALIZING));
             assertTrue(exception.getMessage().contains("Invalid phase transition"));
         }
 
@@ -260,9 +272,7 @@ class TradingRunServiceTest {
 
             // Act & Assert
             ResourceNotFoundException exception = assertThrows(
-                ResourceNotFoundException.class,
-                () -> tradingRunService.updatePhase(999L, RunPhase.RESEARCHING)
-            );
+                    ResourceNotFoundException.class, () -> tradingRunService.updatePhase(999L, RunPhase.RESEARCHING));
             assertTrue(exception.getMessage().contains("Trading run not found"));
         }
 
@@ -275,11 +285,10 @@ class TradingRunServiceTest {
 
             // Act & Assert
             IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> tradingRunService.updatePhase(100L, RunPhase.RESEARCHING)
-            );
-            assertTrue(exception.getMessage().contains("Invalid phase transition"),
-                       "Should reject transition from terminal COMPLETED state");
+                    IllegalArgumentException.class, () -> tradingRunService.updatePhase(100L, RunPhase.RESEARCHING));
+            assertTrue(
+                    exception.getMessage().contains("Invalid phase transition"),
+                    "Should reject transition from terminal COMPLETED state");
         }
 
         @Test
@@ -291,11 +300,10 @@ class TradingRunServiceTest {
 
             // Act & Assert
             IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> tradingRunService.updatePhase(100L, RunPhase.RESEARCHING)
-            );
-            assertTrue(exception.getMessage().contains("Invalid phase transition"),
-                       "Should reject transition from terminal ERROR state");
+                    IllegalArgumentException.class, () -> tradingRunService.updatePhase(100L, RunPhase.RESEARCHING));
+            assertTrue(
+                    exception.getMessage().contains("Invalid phase transition"),
+                    "Should reject transition from terminal ERROR state");
         }
     }
 
@@ -390,8 +398,14 @@ class TradingRunServiceTest {
             // Assert - verify research phase data captured correctly
             ResearchPhase capturedResearch = researchPhaseCaptor.getValue();
             assertEquals(testRun, capturedResearch.getRun(), "Research phase should be linked to correct run");
-            assertEquals(Arrays.asList("JPM", "BAC", "WFC"), capturedResearch.getCandidates(), "Candidates should match request");
-            assertEquals("Banking sector analysis", capturedResearch.getResearchNotes(), "Research notes should match request");
+            assertEquals(
+                    Arrays.asList("JPM", "BAC", "WFC"),
+                    capturedResearch.getCandidates(),
+                    "Candidates should match request");
+            assertEquals(
+                    "Banking sector analysis",
+                    capturedResearch.getResearchNotes(),
+                    "Research notes should match request");
             assertEquals(3400L, capturedResearch.getLatencyMs(), "Latency should match request");
         }
 
@@ -512,9 +526,10 @@ class TradingRunServiceTest {
             // Assert
             TradingRun capturedRun = tradingRunCaptor.getValue();
             assertNotNull(capturedRun.getCompletedAt(), "completedAt should be set");
-            assertTrue(capturedRun.getCompletedAt().isAfter(beforeCall) ||
-                       capturedRun.getCompletedAt().equals(beforeCall),
-                       "completedAt should be at or after the call time");
+            assertTrue(
+                    capturedRun.getCompletedAt().isAfter(beforeCall)
+                            || capturedRun.getCompletedAt().equals(beforeCall),
+                    "completedAt should be at or after the call time");
         }
 
         @Test
@@ -525,10 +540,8 @@ class TradingRunServiceTest {
             when(tradingRunRepository.findById(999L)).thenReturn(Optional.empty());
 
             // Act & Assert
-            ResourceNotFoundException exception = assertThrows(
-                ResourceNotFoundException.class,
-                () -> tradingRunService.completeRun(999L, request)
-            );
+            ResourceNotFoundException exception =
+                    assertThrows(ResourceNotFoundException.class, () -> tradingRunService.completeRun(999L, request));
             assertTrue(exception.getMessage().contains("Trading run not found"));
         }
 
@@ -540,10 +553,8 @@ class TradingRunServiceTest {
             request.getDecision().setSymbol(null);
 
             // Act & Assert
-            IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> tradingRunService.completeRun(100L, request)
-            );
+            IllegalArgumentException exception =
+                    assertThrows(IllegalArgumentException.class, () -> tradingRunService.completeRun(100L, request));
             assertTrue(exception.getMessage().contains("requires symbol"));
         }
 
@@ -555,10 +566,8 @@ class TradingRunServiceTest {
             request.getDecision().setQuantity(null);
 
             // Act & Assert
-            IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> tradingRunService.completeRun(100L, request)
-            );
+            IllegalArgumentException exception =
+                    assertThrows(IllegalArgumentException.class, () -> tradingRunService.completeRun(100L, request));
             assertTrue(exception.getMessage().contains("requires positive quantity"));
         }
 
@@ -573,16 +582,17 @@ class TradingRunServiceTest {
             when(tradingRunRepository.findById(100L)).thenReturn(Optional.of(testRun));
 
             // Act & Assert
-            IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> tradingRunService.completeRun(100L, request)
-            );
-            assertTrue(exception.getMessage().contains("Invalid phase transition"),
-                "Should reject completion from INITIALIZING — only DECIDING/TRADING may complete");
+            IllegalArgumentException exception =
+                    assertThrows(IllegalArgumentException.class, () -> tradingRunService.completeRun(100L, request));
+            assertTrue(
+                    exception.getMessage().contains("Invalid phase transition"),
+                    "Should reject completion from INITIALIZING — only DECIDING/TRADING may complete");
 
             // Run state must remain INITIALIZING (no silent completion)
-            assertEquals(RunPhase.INITIALIZING, testRun.getPhase(),
-                "Run phase should NOT flip to COMPLETED when state-machine validation fails");
+            assertEquals(
+                    RunPhase.INITIALIZING,
+                    testRun.getPhase(),
+                    "Run phase should NOT flip to COMPLETED when state-machine validation fails");
         }
     }
 
@@ -664,10 +674,7 @@ class TradingRunServiceTest {
             when(tradingRunRepository.findById(999L)).thenReturn(Optional.empty());
 
             // Act & Assert
-            assertThrows(
-                ResourceNotFoundException.class,
-                () -> tradingRunService.getRunWithAllPhases(999L)
-            );
+            assertThrows(ResourceNotFoundException.class, () -> tradingRunService.getRunWithAllPhases(999L));
         }
     }
 
@@ -701,10 +708,8 @@ class TradingRunServiceTest {
             when(researchPhaseRepository.findByRunId(100L)).thenReturn(Optional.empty());
 
             // Act & Assert
-            ResourceNotFoundException exception = assertThrows(
-                ResourceNotFoundException.class,
-                () -> tradingRunService.getResearchPhase(100L)
-            );
+            ResourceNotFoundException exception =
+                    assertThrows(ResourceNotFoundException.class, () -> tradingRunService.getResearchPhase(100L));
             assertTrue(exception.getMessage().contains("Research phase not found"));
         }
 
@@ -715,10 +720,8 @@ class TradingRunServiceTest {
             when(tradingRunRepository.existsById(999L)).thenReturn(false);
 
             // Act & Assert
-            ResourceNotFoundException exception = assertThrows(
-                ResourceNotFoundException.class,
-                () -> tradingRunService.getResearchPhase(999L)
-            );
+            ResourceNotFoundException exception =
+                    assertThrows(ResourceNotFoundException.class, () -> tradingRunService.getResearchPhase(999L));
             assertTrue(exception.getMessage().contains("Trading run not found"));
         }
     }
@@ -755,10 +758,8 @@ class TradingRunServiceTest {
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.empty());
 
             // Act & Assert
-            ResourceNotFoundException exception = assertThrows(
-                ResourceNotFoundException.class,
-                () -> tradingRunService.getDecisionPhase(100L)
-            );
+            ResourceNotFoundException exception =
+                    assertThrows(ResourceNotFoundException.class, () -> tradingRunService.getDecisionPhase(100L));
             assertTrue(exception.getMessage().contains("Decision phase not found"));
         }
 
@@ -769,10 +770,8 @@ class TradingRunServiceTest {
             when(tradingRunRepository.existsById(999L)).thenReturn(false);
 
             // Act & Assert
-            ResourceNotFoundException exception = assertThrows(
-                ResourceNotFoundException.class,
-                () -> tradingRunService.getDecisionPhase(999L)
-            );
+            ResourceNotFoundException exception =
+                    assertThrows(ResourceNotFoundException.class, () -> tradingRunService.getDecisionPhase(999L));
             assertTrue(exception.getMessage().contains("Trading run not found"));
         }
     }
@@ -807,10 +806,8 @@ class TradingRunServiceTest {
             when(executionPhaseRepository.findByRunId(100L)).thenReturn(Optional.empty());
 
             // Act & Assert
-            ResourceNotFoundException exception = assertThrows(
-                ResourceNotFoundException.class,
-                () -> tradingRunService.getExecutionPhase(100L)
-            );
+            ResourceNotFoundException exception =
+                    assertThrows(ResourceNotFoundException.class, () -> tradingRunService.getExecutionPhase(100L));
             assertTrue(exception.getMessage().contains("Execution phase not found"));
         }
 
@@ -821,10 +818,8 @@ class TradingRunServiceTest {
             when(tradingRunRepository.existsById(999L)).thenReturn(false);
 
             // Act & Assert
-            ResourceNotFoundException exception = assertThrows(
-                ResourceNotFoundException.class,
-                () -> tradingRunService.getExecutionPhase(999L)
-            );
+            ResourceNotFoundException exception =
+                    assertThrows(ResourceNotFoundException.class, () -> tradingRunService.getExecutionPhase(999L));
             assertTrue(exception.getMessage().contains("Trading run not found"));
         }
     }
@@ -852,7 +847,7 @@ class TradingRunServiceTest {
             List<TradingRun> runs = Arrays.asList(testRun);
             Page<TradingRun> page = new PageImpl<>(runs, PageRequest.of(0, 20), 1);
             when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(page);
+                    .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
@@ -873,7 +868,8 @@ class TradingRunServiceTest {
             RunQueryFilter filter = new RunQueryFilter(1L, null, null, null);
             List<TradingRun> runs = Arrays.asList(testRun);
             Page<TradingRun> page = new PageImpl<>(runs, PageRequest.of(0, 20), 1);
-            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
+                    .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
@@ -892,7 +888,8 @@ class TradingRunServiceTest {
             RunQueryFilter filter = new RunQueryFilter(null, RunStatus.IN_PROGRESS, null, null);
             List<TradingRun> runs = Arrays.asList(testRun);
             Page<TradingRun> page = new PageImpl<>(runs, PageRequest.of(0, 20), 1);
-            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
+                    .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
@@ -911,7 +908,8 @@ class TradingRunServiceTest {
             RunQueryFilter filter = new RunQueryFilter(null, null, TradeDecision.BUY, null);
             List<TradingRun> runs = Arrays.asList(testRun);
             Page<TradingRun> page = new PageImpl<>(runs, PageRequest.of(0, 20), 1);
-            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
+                    .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
@@ -929,7 +927,8 @@ class TradingRunServiceTest {
             RunQueryFilter filter = new RunQueryFilter(null, null, null, "JPM");
             List<TradingRun> runs = Arrays.asList(testRun);
             Page<TradingRun> page = new PageImpl<>(runs, PageRequest.of(0, 20), 1);
-            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
+                    .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
@@ -947,7 +946,8 @@ class TradingRunServiceTest {
             RunQueryFilter filter = new RunQueryFilter(1L, RunStatus.COMPLETED, TradeDecision.BUY, "JPM");
             List<TradingRun> runs = Arrays.asList(testRun);
             Page<TradingRun> page = new PageImpl<>(runs, PageRequest.of(0, 20), 1);
-            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+            when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
+                    .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
@@ -965,7 +965,7 @@ class TradingRunServiceTest {
             List<TradingRun> runs = Arrays.asList(testRun);
             Page<TradingRun> page = new PageImpl<>(runs, PageRequest.of(2, 10), 30);
             when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(page);
+                    .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
@@ -987,7 +987,7 @@ class TradingRunServiceTest {
             List<TradingRun> runs = Arrays.asList(testRun);
             Page<TradingRun> page = new PageImpl<>(runs, PageRequest.of(0, 20), 1);
             when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(page);
+                    .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(testDecisionPhase));
 
             // Act
@@ -1018,7 +1018,7 @@ class TradingRunServiceTest {
 
             // Verify database-level filtering: repository receives cutoff date predicate
             when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(page);
+                    .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(101L)).thenReturn(Optional.empty());
 
             // Act
@@ -1044,7 +1044,7 @@ class TradingRunServiceTest {
             List<TradingRun> runs = Arrays.asList(cutoffRun);
             Page<TradingRun> page = new PageImpl<>(runs, PageRequest.of(0, 20), 1);
             when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(page);
+                    .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(103L)).thenReturn(Optional.empty());
 
             // Act
@@ -1063,7 +1063,7 @@ class TradingRunServiceTest {
             // Arrange - database returns empty (all runs filtered at DB level)
             Page<TradingRun> emptyPage = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
             when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(emptyPage);
+                    .thenReturn(emptyPage);
 
             // Act
             RunListResponseDto result = tradingRunService.listRuns(null, cutoff, PageRequest.of(0, 20));
@@ -1088,7 +1088,7 @@ class TradingRunServiceTest {
 
             // Verify that Specification is combined with date filter
             when(tradingRunRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(page);
+                    .thenReturn(page);
             when(decisionPhaseRepository.findByRunId(106L)).thenReturn(Optional.empty());
 
             // Act

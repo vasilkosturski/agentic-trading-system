@@ -8,11 +8,10 @@ import com.trading.exception.ResourceNotFoundException;
 import com.trading.repository.AccountHoldingRepository;
 import com.trading.repository.AccountPortfolioSnapshotRepository;
 import com.trading.repository.TradingAccountRepository;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
 import java.util.List;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Owns portfolio-snapshot creation: looks up the agent's account, values the
@@ -46,10 +45,10 @@ public class PortfolioSnapshotService {
 
     @Transactional
     public void createSnapshot(String agentName) {
-        TradingAccount account = tradingAccountRepository.findByAgentName(agentName)
-            .orElseThrow(() -> new ResourceNotFoundException(
-                "Trading account not found for agent: " + agentName +
-                ". Agent must be initialized before snapshot creation."));
+        TradingAccount account = tradingAccountRepository
+                .findByAgentName(agentName)
+                .orElseThrow(() -> new ResourceNotFoundException("Trading account not found for agent: " + agentName
+                        + ". Agent must be initialized before snapshot creation."));
 
         List<AccountHolding> holdings = holdingRepository.findByAccount(account);
         double holdingsValue = holdingsValuationService.calculateHoldingsValue(holdings);
@@ -62,8 +61,7 @@ public class PortfolioSnapshotService {
         snapshot.setCashBalance(account.getBalance());
         snapshot.setHoldingsValue(holdingsValue);
 
-        AccountPortfolioSnapshot previousSnapshot = snapshotRepository
-            .findTopByAccountOrderByTimestampDesc(account);
+        AccountPortfolioSnapshot previousSnapshot = snapshotRepository.findTopByAccountOrderByTimestampDesc(account);
         if (previousSnapshot != null) {
             double initialCapital = agentProperties.getInitialCapital(agentName);
             snapshot.calculateMetrics(initialCapital, previousSnapshot.getTotalValue());

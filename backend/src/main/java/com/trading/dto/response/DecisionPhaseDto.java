@@ -1,17 +1,16 @@
 package com.trading.dto.response;
 
 import com.trading.dto.UsageMetricsDto;
-import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.ReasoningDto;
 import com.trading.dto.jsonb.SourceDto;
+import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.entity.DecisionPhase;
 import com.trading.enums.TradeDecision;
+import java.time.Instant;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.time.Instant;
-import java.util.List;
 
 /**
  * DTO for decision phase data.

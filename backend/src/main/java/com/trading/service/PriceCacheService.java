@@ -2,6 +2,10 @@ package com.trading.service;
 
 import com.trading.entity.PriceCache;
 import com.trading.repository.PriceCacheRepository;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,11 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Optional;
 
 @Service
 public class PriceCacheService {
@@ -35,9 +34,8 @@ public class PriceCacheService {
     @Value("${market.finnhub.base-url:https://finnhub.io/api/v1}")
     private String finnhubBaseUrl;
 
-    public PriceCacheService(PriceCacheRepository priceCacheRepository,
-                             RetryTemplate retryTemplate,
-                             RestTemplate restTemplate) {
+    public PriceCacheService(
+            PriceCacheRepository priceCacheRepository, RetryTemplate retryTemplate, RestTemplate restTemplate) {
         this.priceCacheRepository = priceCacheRepository;
         this.retryTemplate = retryTemplate;
         this.restTemplate = restTemplate;
@@ -54,8 +52,8 @@ public class PriceCacheService {
             CachedPrice cached = hit.get();
             long ageMinutes = Duration.between(cached.cachedAt(), now).toMinutes();
             logger.debug("Returning DB-cached price for {}: ${} (age: {} min)", symbol, cached.price(), ageMinutes);
-            return new MarketService.PriceData(cached.price(), true, cached.cachedAt(),
-                "DB Cache (age: " + ageMinutes + " min)");
+            return new MarketService.PriceData(
+                    cached.price(), true, cached.cachedAt(), "DB Cache (age: " + ageMinutes + " min)");
         }
 
         Double fresh = fetchFromFinnhub(symbol);
@@ -66,8 +64,11 @@ public class PriceCacheService {
                 PriceCache cached = staleCache.get();
                 long ageMinutes = Duration.between(cached.getCachedAt(), now).toMinutes();
                 logger.info("Finnhub unavailable for {} - using stale cache (age: {} min)", symbol, ageMinutes);
-                return new MarketService.PriceData(cached.getPrice(), true, cached.getCachedAt(),
-                    "Stale Cache (age: " + ageMinutes + " min, Finnhub unavailable)");
+                return new MarketService.PriceData(
+                        cached.getPrice(),
+                        true,
+                        cached.getCachedAt(),
+                        "Stale Cache (age: " + ageMinutes + " min, Finnhub unavailable)");
             }
             return null;
         }
@@ -80,8 +81,10 @@ public class PriceCacheService {
             // writer's value is now in the cache. Skipping is the correct behavior - price will be served
             // from cache on the next call. Logged at WARN with the exception class name so future
             // regressions (e.g. TransactionRequiredException) stay visible instead of being swallowed.
-            logger.warn("Concurrent cache upsert for {}: {} - continuing without our value",
-                    symbol, e.getClass().getSimpleName());
+            logger.warn(
+                    "Concurrent cache upsert for {}: {} - continuing without our value",
+                    symbol,
+                    e.getClass().getSimpleName());
         }
         return new MarketService.PriceData(fresh, false, now, "Real-time quote from Finnhub");
     }
@@ -123,8 +126,7 @@ public class PriceCacheService {
                 if (ctx.getRetryCount() > 0) {
                     logger.warn("Finnhub retry {}/3 for {}", ctx.getRetryCount(), symbol);
                 }
-                String url = String.format("%s/quote?symbol=%s&token=%s",
-                        finnhubBaseUrl, symbol, finnhubApiKey);
+                String url = String.format("%s/quote?symbol=%s&token=%s", finnhubBaseUrl, symbol, finnhubApiKey);
                 return restTemplate.getForObject(url, FinnhubQuoteResponse.class);
             });
 
@@ -149,10 +151,7 @@ public class PriceCacheService {
         }
     }
 
-    record FinnhubQuoteResponse(
-        double c, double d, double dp, double h,
-        double l, double o, double pc, long t
-    ) {}
+    record FinnhubQuoteResponse(double c, double d, double dp, double h, double l, double o, double pc, long t) {}
 
     public record CachedPrice(double price, Instant cachedAt) {}
 }

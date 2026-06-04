@@ -1,5 +1,7 @@
 package com.trading.specification;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.trading.entity.DecisionPhase;
 import com.trading.entity.TradingAgent;
 import com.trading.entity.TradingRun;
@@ -13,15 +15,12 @@ import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.domain.Specification;
-
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Verifies that LEFT JOIN-based specifications (hasDecision, hasSymbol) toggle
@@ -81,20 +80,19 @@ class TradingRunSpecificationDistinctTest extends BaseRepositoryTest {
         // decision rows per run become legal — this models the future schema
         // (versioned decisions, drafts, retries) where the JBR E4 bug surfaces.
         entityManager.flush();
-        entityManager.createNativeQuery(
-                "DO $$\n" +
-                "DECLARE\n" +
-                "    cname text;\n" +
-                "BEGIN\n" +
-                "    FOR cname IN\n" +
-                "        SELECT conname FROM pg_constraint\n" +
-                "        WHERE conrelid = 'trading.decision_phases'::regclass\n" +
-                "          AND contype = 'u'\n" +
-                "    LOOP\n" +
-                "        EXECUTE 'ALTER TABLE trading.decision_phases DROP CONSTRAINT ' || quote_ident(cname);\n" +
-                "    END LOOP;\n" +
-                "END$$;"
-        ).executeUpdate();
+        entityManager
+                .createNativeQuery("DO $$\n" + "DECLARE\n"
+                        + "    cname text;\n"
+                        + "BEGIN\n"
+                        + "    FOR cname IN\n"
+                        + "        SELECT conname FROM pg_constraint\n"
+                        + "        WHERE conrelid = 'trading.decision_phases'::regclass\n"
+                        + "          AND contype = 'u'\n"
+                        + "    LOOP\n"
+                        + "        EXECUTE 'ALTER TABLE trading.decision_phases DROP CONSTRAINT ' || quote_ident(cname);\n"
+                        + "    END LOOP;\n"
+                        + "END$$;")
+                .executeUpdate();
 
         agent = tradingAgentRepository.save(new TradingAgent("DistinctTestAgent", "Agent for distinct join tests"));
     }
@@ -108,8 +106,7 @@ class TradingRunSpecificationDistinctTest extends BaseRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        long distinctRunCount = runDistinctIdsViaContentQuery(
-                TradingRunSpecification.hasDecision(TradeDecision.BUY));
+        long distinctRunCount = runDistinctIdsViaContentQuery(TradingRunSpecification.hasDecision(TradeDecision.BUY));
 
         assertThat(distinctRunCount)
                 .as("Content query must collapse duplicate run rows produced by the LEFT JOIN")
@@ -125,8 +122,7 @@ class TradingRunSpecificationDistinctTest extends BaseRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        long distinctRunCount = runDistinctIdsViaContentQuery(
-                TradingRunSpecification.hasSymbol("JPM"));
+        long distinctRunCount = runDistinctIdsViaContentQuery(TradingRunSpecification.hasSymbol("JPM"));
 
         assertThat(distinctRunCount)
                 .as("Content query must collapse duplicate run rows produced by the LEFT JOIN")
@@ -134,7 +130,8 @@ class TradingRunSpecificationDistinctTest extends BaseRepositoryTest {
     }
 
     @Test
-    @DisplayName("Spec must NOT toggle DISTINCT on a count query (Long result type) — preserves COUNT(DISTINCT) correctness")
+    @DisplayName(
+            "Spec must NOT toggle DISTINCT on a count query (Long result type) — preserves COUNT(DISTINCT) correctness")
     void countQuery_distinctNotApplied() {
         // The guard exists because Spring Data JPA's count path uses COUNT(DISTINCT x)
         // and toggling DISTINCT on the outer query trips issue #3220. We verify the
@@ -143,8 +140,8 @@ class TradingRunSpecificationDistinctTest extends BaseRepositoryTest {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Long> countQuery = cb.createQuery(Long.class);
         Root<TradingRun> root = countQuery.from(TradingRun.class);
-        Predicate predicate = TradingRunSpecification.hasDecision(TradeDecision.BUY)
-                .toPredicate(root, countQuery, cb);
+        Predicate predicate =
+                TradingRunSpecification.hasDecision(TradeDecision.BUY).toPredicate(root, countQuery, cb);
         countQuery.select(cb.countDistinct(root));
         if (predicate != null) {
             countQuery.where(predicate);

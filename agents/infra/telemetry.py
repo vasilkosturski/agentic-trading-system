@@ -24,11 +24,11 @@ that never used ``self``, so the lift to a module function is mechanical.
 
 import logging
 
-from agents import Usage, RunResult
+from agents import RunResult, Usage
 
-from infra.pricing import MODEL_PRICING, _UNKNOWN_MODELS_WARNED
-from models.usage_metrics import UsageMetrics
+from infra.pricing import _UNKNOWN_MODELS_WARNED, MODEL_PRICING
 from models.run_tracking import ToolCallDto
+from models.usage_metrics import UsageMetrics
 from utils.sdk_parser import extract_tool_calls
 
 logger = logging.getLogger(__name__)
@@ -47,16 +47,16 @@ def extract_usage_metrics(usage: Usage, model_name: str) -> UsageMetrics:
     """
     cached = 0
     if usage.input_tokens_details:
-        cached = getattr(usage.input_tokens_details, 'cached_tokens', 0) or 0
+        cached = getattr(usage.input_tokens_details, "cached_tokens", 0) or 0
 
     reasoning = 0
     if usage.output_tokens_details:
-        reasoning = getattr(usage.output_tokens_details, 'reasoning_tokens', 0) or 0
+        reasoning = getattr(usage.output_tokens_details, "reasoning_tokens", 0) or 0
 
     # Try SDK first, fall back to the model name we passed to Agent()
     sdk_model = None
     if usage.request_usage_entries:
-        sdk_model = getattr(usage.request_usage_entries[0], 'model_name', None)
+        sdk_model = getattr(usage.request_usage_entries[0], "model_name", None)
 
     resolved_name: str = sdk_model if sdk_model is not None else model_name
 

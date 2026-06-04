@@ -9,6 +9,8 @@ import com.trading.enums.TradeRejectionType;
  */
 public class BusinessRuleException extends RuntimeException {
 
+    private static final long serialVersionUID = 1L;
+
     private final TradeRejectionType rejectionType;
 
     public BusinessRuleException(String message) {

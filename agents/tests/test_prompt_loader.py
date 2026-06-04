@@ -1,11 +1,11 @@
 """Tests for prompt_loader: async API-based prompt loading with in-process cache.
 
 prompt_loader.load_composed_prompt is now an async function that routes through
-BackendClient._request and caches results per (agent_type, agent_name) for the
+BackendClient.request and caches results per (agent_type, agent_name) for the
 lifetime of the process.
 
 Covers:
-1. load_composed_prompt() routes through BackendClient._request (no direct httpx.get)
+1. load_composed_prompt() routes through BackendClient.request (no direct httpx.get)
 2. Per-(agent_type, agent_name) cache prevents repeat HTTP calls
 3. format_prompt() runtime placeholder substitution
 4. Validation (invalid agent names, backend errors)
@@ -18,15 +18,11 @@ import httpx
 import pytest
 
 from infra.prompt_loader import (
-    _PROMPT_CACHE,
-    _PartialFormatDict,
     VALID_AGENT_NAMES,
     clear_prompt_cache,
     format_prompt,
-    get_available_templates,
     load_and_format_prompt,
     load_composed_prompt,
-    load_prompt_template,
 )
 
 
@@ -47,20 +43,20 @@ def _make_response(text: str, status_code: int = 200) -> MagicMock:
 
 
 # ============================================================================
-# 1. load_composed_prompt() routes through BackendClient._request (async)
+# 1. load_composed_prompt() routes through BackendClient.request (async)
 # ============================================================================
 
 
 class TestLoadComposedPrompt:
-    """Test API-based prompt loading via BackendClient._request."""
+    """Test API-based prompt loading via BackendClient.request."""
 
     @pytest.mark.asyncio
     async def test_routes_through_backend_client_request(self):
-        """Calls BackendClient._request with the correct URL — not httpx.get directly."""
+        """Calls BackendClient.request with the correct URL — not httpx.get directly."""
         mock_request = AsyncMock(return_value=_make_response("You are Warren."))
         with patch("infra.prompt_loader._get_backend_client") as mock_get_client:
             mock_client = MagicMock()
-            mock_client._request = mock_request
+            mock_client.request = mock_request
             mock_get_client.return_value = mock_client
 
             result = await load_composed_prompt("decision_maker", "Warren")
@@ -68,7 +64,7 @@ class TestLoadComposedPrompt:
             assert result == "You are Warren."
             mock_request.assert_awaited_once()
             args, kwargs = mock_request.call_args
-            # _request signature: (method, url, *, params=None, json_data=None)
+            # request signature: (method, url, *, params=None, json_data=None)
             method = args[0] if args else kwargs.get("method")
             url = args[1] if len(args) > 1 else kwargs.get("url")
             assert method == "GET"
@@ -95,7 +91,7 @@ class TestPromptCache:
         mock_request = AsyncMock(return_value=_make_response("cached prompt"))
         with patch("infra.prompt_loader._get_backend_client") as mock_get_client:
             mock_client = MagicMock()
-            mock_client._request = mock_request
+            mock_client.request = mock_request
             mock_get_client.return_value = mock_client
 
             first = await load_composed_prompt("market_analyst", "Warren")
@@ -118,7 +114,7 @@ class TestPromptCache:
         )
         with patch("infra.prompt_loader._get_backend_client") as mock_get_client:
             mock_client = MagicMock()
-            mock_client._request = mock_request
+            mock_client.request = mock_request
             mock_get_client.return_value = mock_client
 
             a = await load_composed_prompt("market_analyst", "Warren")
@@ -142,7 +138,7 @@ class TestPromptCache:
         mock_request = AsyncMock(return_value=_make_response("p"))
         with patch("infra.prompt_loader._get_backend_client") as mock_get_client:
             mock_client = MagicMock()
-            mock_client._request = mock_request
+            mock_client.request = mock_request
             mock_get_client.return_value = mock_client
 
             await load_composed_prompt("market_analyst", "Warren")
@@ -175,17 +171,13 @@ class TestFormatPrompt:
 class TestLoadAndFormatPrompt:
     @pytest.mark.asyncio
     async def test_end_to_end(self):
-        mock_request = AsyncMock(
-            return_value=_make_response("Hello Warren, time is {datetime}")
-        )
+        mock_request = AsyncMock(return_value=_make_response("Hello Warren, time is {datetime}"))
         with patch("infra.prompt_loader._get_backend_client") as mock_get_client:
             mock_client = MagicMock()
-            mock_client._request = mock_request
+            mock_client.request = mock_request
             mock_get_client.return_value = mock_client
 
-            result = await load_and_format_prompt(
-                "decision_maker", "Warren", datetime="2025-01-01"
-            )
+            result = await load_and_format_prompt("decision_maker", "Warren", datetime="2025-01-01")
 
             assert "2025-01-01" in result
             assert "{datetime}" not in result

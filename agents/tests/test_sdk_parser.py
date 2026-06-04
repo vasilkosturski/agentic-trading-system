@@ -2,17 +2,16 @@
 
 from unittest.mock import MagicMock, create_autospec
 
-import pytest
-
 from agents.items import ToolCallItem, ToolCallOutputItem
+
 from utils.sdk_parser import (
-    TOOL_RESEARCHER,
+    _SDK_ERROR_PREFIX,
     TOOL_DECIDE_ACTION,
+    TOOL_RESEARCHER,
     ParsedToolCall,
+    _detect_tool_error,
     extract_tool_calls,
     get_tool_errors,
-    _detect_tool_error,
-    _SDK_ERROR_PREFIX,
 )
 
 
@@ -112,7 +111,9 @@ class TestErrorDetection:
         """get_tool_errors returns only error tool calls."""
         calls = [
             ParsedToolCall(name="good_tool", call_id="1", output="ok", is_error=False),
-            ParsedToolCall(name="bad_tool", call_id="2", output="err", is_error=True, error_message="fail"),
+            ParsedToolCall(
+                name="bad_tool", call_id="2", output="err", is_error=True, error_message="fail"
+            ),
             ParsedToolCall(name="another_good", call_id="3", output="ok", is_error=False),
         ]
         errors = get_tool_errors(calls)

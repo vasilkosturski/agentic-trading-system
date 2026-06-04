@@ -5,9 +5,8 @@ not external input that needs validation. Dataclass is faster and simpler
 for internal-only data.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Any, Dict
-from datetime import datetime
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -25,7 +24,7 @@ class ToolCallRecord:
     """Record of a tool call for transparency tracking."""
 
     tool: str
-    inputs: Dict[str, Any]
+    inputs: dict[str, Any]
     output: str  # Truncated to 500 chars
     timestamp: str
 
@@ -36,7 +35,7 @@ class ResearchQueryRecord:
 
     query: str
     summary: str  # Truncated to 300 chars
-    sources: List[Dict[str, str]]  # List of {title, url}
+    sources: list[dict[str, str]]  # List of {title, url}
     timestamp: str
 
 

@@ -1,19 +1,18 @@
 package com.trading.dto.request;
 
 import com.trading.dto.UsageMetricsDto;
-import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.dto.jsonb.ReasoningDto;
 import com.trading.dto.jsonb.SourceDto;
+import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.entity.DecisionPhase;
 import com.trading.entity.TradingRun;
 import com.trading.enums.TradeDecision;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.util.List;
 
 /**
  * Decision phase data for CompleteRunRequest.
@@ -74,12 +73,10 @@ public class DecisionPhaseDto {
     public void validate() {
         if (decision == TradeDecision.BUY || decision == TradeDecision.SELL) {
             if (symbol == null || symbol.trim().isEmpty()) {
-                throw new IllegalArgumentException(
-                    decision + " decision requires symbol");
+                throw new IllegalArgumentException(decision + " decision requires symbol");
             }
             if (quantity == null || quantity <= 0) {
-                throw new IllegalArgumentException(
-                    decision + " decision requires positive quantity");
+                throw new IllegalArgumentException(decision + " decision requires positive quantity");
             }
         }
     }

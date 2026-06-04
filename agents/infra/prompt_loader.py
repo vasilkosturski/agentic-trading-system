@@ -31,7 +31,7 @@ import asyncio
 import logging
 import os
 from datetime import datetime
-from typing import Dict, Literal, Tuple
+from typing import Literal
 
 from agent_registry import VALID_AGENT_NAMES
 from backend.client import BackendClient, get_backend_client
@@ -56,7 +56,7 @@ AgentType = Literal["market_analyst", "decision_maker"]
 # Maps (agent_type, agent_name_lower) -> composed prompt template string.
 # Bounded only by the cardinality of (agent_type x agent_name) — currently
 # 2 x 4 = 8 entries — so an unbounded dict is safe and intentional.
-_PROMPT_CACHE: Dict[Tuple[str, str], str] = {}
+_PROMPT_CACHE: dict[tuple[str, str], str] = {}
 
 # Guards concurrent first-fetch races: two coroutines awaiting
 # load_composed_prompt(...) for the same key must share a single HTTP call.
@@ -118,14 +118,13 @@ async def load_composed_prompt(agent_type: AgentType, agent_name: str) -> str:
         ValueError: If ``agent_name`` is not in :data:`VALID_AGENT_NAMES`.
         FileNotFoundError: If backend returns 404 for this agent.
         BackendAPIError: For any other backend / network failure (propagated
-            from :meth:`BackendClient._request`).
+            from :meth:`BackendClient.request`).
     """
     agent_name_lower = agent_name.lower()
 
     if agent_name_lower not in VALID_AGENT_NAMES:
         raise ValueError(
-            f"Invalid agent name: {agent_name}. "
-            f"Valid names: {', '.join(VALID_AGENT_NAMES)}"
+            f"Invalid agent name: {agent_name}. Valid names: {', '.join(VALID_AGENT_NAMES)}"
         )
 
     cache_key = (agent_type, agent_name_lower)
@@ -146,7 +145,7 @@ async def load_composed_prompt(agent_type: AgentType, agent_name: str) -> str:
         url = f"{BACKEND_URL}/api/prompts/{agent_type}/{agent_name_lower}"
         try:
             client = _get_backend_client()
-            response = await client._request("GET", url)
+            response = await client.request("GET", url)
             prompt = response.text
         except Exception as e:
             # The backend client wraps HTTPStatusError as BackendAPIError; we
@@ -191,8 +190,7 @@ async def load_prompt_template(agent_type: AgentType, agent_name: str) -> str:
 
     if agent_name_lower not in VALID_AGENT_NAMES:
         raise ValueError(
-            f"Invalid agent name: {agent_name}. "
-            f"Valid names: {', '.join(VALID_AGENT_NAMES)}"
+            f"Invalid agent name: {agent_name}. Valid names: {', '.join(VALID_AGENT_NAMES)}"
         )
 
     return await load_composed_prompt(agent_type, agent_name)

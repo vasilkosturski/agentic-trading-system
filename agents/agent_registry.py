@@ -18,13 +18,12 @@ If you add an agent, add a single entry to :data:`AGENT_NAMES` and the rest
 of the system picks it up automatically.
 """
 
-from typing import Final, Tuple
-
+from typing import Final
 
 # Order is significant for the trading-system AGENT_CONFIGS table and the
 # UI roster summary — keep new entries appended unless the order is
 # intentionally being changed.
-AGENT_NAMES: Final[Tuple[str, ...]] = ("Warren", "George", "Ray", "Cathie")
+AGENT_NAMES: Final[tuple[str, ...]] = ("Warren", "George", "Ray", "Cathie")
 
 # Lowercased lookup set used by the prompt loader (the backend API URL
 # segments are lowercase). Built from AGENT_NAMES so there is exactly one

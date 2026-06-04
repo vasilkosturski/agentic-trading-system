@@ -24,8 +24,7 @@ public final class SharedPostgresContainer {
         POSTGRES.start();
     }
 
-    private SharedPostgresContainer() {
-    }
+    private SharedPostgresContainer() {}
 
     public static void register(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);

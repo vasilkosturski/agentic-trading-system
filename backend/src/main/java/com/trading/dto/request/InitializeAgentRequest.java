@@ -11,13 +11,13 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class InitializeAgentRequest {
-    
+
     /**
      * Agent name (required) - e.g., "Warren", "George", "Ray", "Cathie"
      */
     @NotBlank(message = "name is required")
     private String name;
-    
+
     /**
      * Initial cash balance (required)
      */
@@ -25,5 +25,3 @@ public class InitializeAgentRequest {
     @Positive(message = "initialBalance must be positive")
     private Double initialBalance;
 }
-
-

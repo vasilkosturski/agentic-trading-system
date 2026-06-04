@@ -19,10 +19,21 @@ public class TradingHistoryResponse {
             this.averageCost = averageCost;
         }
 
-        public int getShares() { return shares; }
-        public void setShares(int shares) { this.shares = shares; }
-        public double getAverageCost() { return averageCost; }
-        public void setAverageCost(double averageCost) { this.averageCost = averageCost; }
+        public int getShares() {
+            return shares;
+        }
+
+        public void setShares(int shares) {
+            this.shares = shares;
+        }
+
+        public double getAverageCost() {
+            return averageCost;
+        }
+
+        public void setAverageCost(double averageCost) {
+            this.averageCost = averageCost;
+        }
     }
 
     public static class Trade {
@@ -32,16 +43,45 @@ public class TradingHistoryResponse {
         private double price;
         private double totalAmount;
 
-        public String getDate() { return date; }
-        public void setDate(String date) { this.date = date; }
-        public String getType() { return type; }
-        public void setType(String type) { this.type = type; }
-        public int getQuantity() { return quantity; }
-        public void setQuantity(int quantity) { this.quantity = quantity; }
-        public double getPrice() { return price; }
-        public void setPrice(double price) { this.price = price; }
-        public double getTotalAmount() { return totalAmount; }
-        public void setTotalAmount(double totalAmount) { this.totalAmount = totalAmount; }
+        public String getDate() {
+            return date;
+        }
+
+        public void setDate(String date) {
+            this.date = date;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public int getQuantity() {
+            return quantity;
+        }
+
+        public void setQuantity(int quantity) {
+            this.quantity = quantity;
+        }
+
+        public double getPrice() {
+            return price;
+        }
+
+        public void setPrice(double price) {
+            this.price = price;
+        }
+
+        public double getTotalAmount() {
+            return totalAmount;
+        }
+
+        public void setTotalAmount(double totalAmount) {
+            this.totalAmount = totalAmount;
+        }
     }
 
     public static class Summary {
@@ -50,28 +90,86 @@ public class TradingHistoryResponse {
         private int sells;
         private String pattern;
 
-        public int getTotalTrades() { return totalTrades; }
-        public void setTotalTrades(int totalTrades) { this.totalTrades = totalTrades; }
-        public int getBuys() { return buys; }
-        public void setBuys(int buys) { this.buys = buys; }
-        public int getSells() { return sells; }
-        public void setSells(int sells) { this.sells = sells; }
-        public String getPattern() { return pattern; }
-        public void setPattern(String pattern) { this.pattern = pattern; }
+        public int getTotalTrades() {
+            return totalTrades;
+        }
+
+        public void setTotalTrades(int totalTrades) {
+            this.totalTrades = totalTrades;
+        }
+
+        public int getBuys() {
+            return buys;
+        }
+
+        public void setBuys(int buys) {
+            this.buys = buys;
+        }
+
+        public int getSells() {
+            return sells;
+        }
+
+        public void setSells(int sells) {
+            this.sells = sells;
+        }
+
+        public String getPattern() {
+            return pattern;
+        }
+
+        public void setPattern(String pattern) {
+            this.pattern = pattern;
+        }
     }
 
-    public String getSymbol() { return symbol; }
-    public void setSymbol(String symbol) { this.symbol = symbol; }
-    public String getAgentName() { return agentName; }
-    public void setAgentName(String agentName) { this.agentName = agentName; }
-    public int getDays() { return days; }
-    public void setDays(int days) { this.days = days; }
-    public Position getCurrentPosition() { return currentPosition; }
-    public void setCurrentPosition(Position currentPosition) { this.currentPosition = currentPosition; }
-    public List<Trade> getTrades() { return trades; }
-    public void setTrades(List<Trade> trades) { this.trades = trades; }
-    public Summary getSummary() { return summary; }
-    public void setSummary(Summary summary) { this.summary = summary; }
+    public String getSymbol() {
+        return symbol;
+    }
+
+    public void setSymbol(String symbol) {
+        this.symbol = symbol;
+    }
+
+    public String getAgentName() {
+        return agentName;
+    }
+
+    public void setAgentName(String agentName) {
+        this.agentName = agentName;
+    }
+
+    public int getDays() {
+        return days;
+    }
+
+    public void setDays(int days) {
+        this.days = days;
+    }
+
+    public Position getCurrentPosition() {
+        return currentPosition;
+    }
+
+    public void setCurrentPosition(Position currentPosition) {
+        this.currentPosition = currentPosition;
+    }
+
+    public List<Trade> getTrades() {
+        return trades;
+    }
+
+    public void setTrades(List<Trade> trades) {
+        this.trades = trades;
+    }
+
+    public Summary getSummary() {
+        return summary;
+    }
+
+    public void setSummary(Summary summary) {
+        this.summary = summary;
+    }
 
     public static TradingHistoryResponse empty(String symbol, String agentName, int days) {
         TradingHistoryResponse response = new TradingHistoryResponse();
@@ -89,4 +187,3 @@ public class TradingHistoryResponse {
         return response;
     }
 }
-

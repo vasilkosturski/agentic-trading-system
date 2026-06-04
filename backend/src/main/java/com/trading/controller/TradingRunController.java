@@ -5,23 +5,34 @@ import com.trading.dto.request.CompleteRunRequest;
 import com.trading.dto.request.CreateRunRequest;
 import com.trading.dto.request.RunQueryFilter;
 import com.trading.dto.request.UpdatePhaseRequest;
-import com.trading.dto.response.*;
-import com.trading.enums.RunPhase;
+import com.trading.dto.response.DecisionPhaseDto;
+import com.trading.dto.response.ExecutionPhaseDto;
+import com.trading.dto.response.ResearchPhaseDto;
+import com.trading.dto.response.RunListResponseDto;
+import com.trading.dto.response.TradingRunDetailDto;
+import com.trading.dto.response.TradingRunDto;
 import com.trading.enums.RunStatus;
 import com.trading.enums.TradeDecision;
 import com.trading.service.TradingRunService;
 import jakarta.validation.Valid;
+import java.net.URI;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
-
-import java.net.URI;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 
 /**
  * REST controller for trading run operations.
@@ -44,8 +55,7 @@ public class TradingRunController {
     private final TradingRunService tradingRunService;
     private final TradingPublicProperties tradingPublicProperties;
 
-    public TradingRunController(TradingRunService tradingRunService,
-                                TradingPublicProperties tradingPublicProperties) {
+    public TradingRunController(TradingRunService tradingRunService, TradingPublicProperties tradingPublicProperties) {
         this.tradingRunService = tradingRunService;
         this.tradingPublicProperties = tradingPublicProperties;
     }
@@ -60,11 +70,10 @@ public class TradingRunController {
     @PostMapping
     public ResponseEntity<TradingRunDto> createRun(@Valid @RequestBody CreateRunRequest request) {
         TradingRunDto result = tradingRunService.createRun(request.getAgentId());
-        URI location = ServletUriComponentsBuilder
-            .fromCurrentRequest()
-            .path("/{id}")
-            .buildAndExpand(result.getRunId())
-            .toUri();
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(result.getRunId())
+                .toUri();
         return ResponseEntity.created(location).body(result);
     }
 
@@ -77,9 +86,7 @@ public class TradingRunController {
      * @return 200 OK on success
      */
     @PatchMapping("/{id}/phase")
-    public ResponseEntity<Void> updatePhase(
-            @PathVariable Long id,
-            @Valid @RequestBody UpdatePhaseRequest request) {
+    public ResponseEntity<Void> updatePhase(@PathVariable Long id, @Valid @RequestBody UpdatePhaseRequest request) {
         tradingRunService.updatePhase(id, request.getPhase(), request.getErrorMessage());
         return ResponseEntity.ok().build();
     }
@@ -93,9 +100,7 @@ public class TradingRunController {
      * @return 200 OK on success
      */
     @PutMapping("/{id}/complete")
-    public ResponseEntity<Void> completeRun(
-            @PathVariable Long id,
-            @Valid @RequestBody CompleteRunRequest request) {
+    public ResponseEntity<Void> completeRun(@PathVariable Long id, @Valid @RequestBody CompleteRunRequest request) {
         tradingRunService.completeRun(id, request);
         return ResponseEntity.ok().build();
     }
@@ -186,14 +191,11 @@ public class TradingRunController {
         }
 
         // Build pageable
-        Sort.Direction sortDirection = "asc".equalsIgnoreCase(direction)
-            ? Sort.Direction.ASC
-            : Sort.Direction.DESC;
+        Sort.Direction sortDirection = "asc".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
 
         // Always enforce display delay for legal data protection on public endpoint
-        Instant cutoffDate = Instant.now()
-            .minus(tradingPublicProperties.getDisplayDelayDays(), ChronoUnit.DAYS);
+        Instant cutoffDate = Instant.now().minus(tradingPublicProperties.getDisplayDelayDays(), ChronoUnit.DAYS);
         RunListResponseDto result = tradingRunService.listRuns(filter, cutoffDate, pageable);
         return ResponseEntity.ok(result);
     }
@@ -241,9 +243,7 @@ public class TradingRunController {
         }
 
         // Build pageable
-        Sort.Direction sortDirection = "asc".equalsIgnoreCase(direction)
-            ? Sort.Direction.ASC
-            : Sort.Direction.DESC;
+        Sort.Direction sortDirection = "asc".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
 
         // Admin endpoint: pass null cutoff so the service skips the date predicate

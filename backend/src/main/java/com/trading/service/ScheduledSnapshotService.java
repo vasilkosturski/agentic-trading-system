@@ -2,13 +2,12 @@ package com.trading.service;
 
 import com.trading.entity.TradingAgent;
 import com.trading.repository.TradingAgentRepository;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 /**
  * Service responsible for creating scheduled portfolio snapshots
@@ -50,6 +49,9 @@ public class ScheduledSnapshotService {
     /**
      * Common method to create snapshots for all agents
      */
+    @SuppressWarnings(
+            "checkstyle:IllegalCatch") // scheduled task isolates per-agent and per-batch failures so the cron keeps
+    // running
     private void createSnapshotsForAllAgents(String snapshotType) {
         try {
             List<TradingAgent> agents = agentRepository.findAll();
@@ -63,13 +65,16 @@ public class ScheduledSnapshotService {
                     logger.debug("Created {} snapshot for agent: {}", snapshotType, agent.getName());
                 } catch (Exception e) {
                     failCount++;
-                    logger.error("Failed to create {} snapshot for agent {}: {}",
-                        snapshotType, agent.getName(), e.getMessage());
+                    logger.error(
+                            "Failed to create {} snapshot for agent {}: {}",
+                            snapshotType,
+                            agent.getName(),
+                            e.getMessage());
                 }
             }
 
-            logger.info("{} snapshot creation completed. Success: {}, Failed: {}",
-                snapshotType, successCount, failCount);
+            logger.info(
+                    "{} snapshot creation completed. Success: {}, Failed: {}", snapshotType, successCount, failCount);
         } catch (Exception e) {
             logger.error("Error during {} snapshot creation: {}", snapshotType, e.getMessage(), e);
         }

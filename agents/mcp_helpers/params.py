@@ -14,8 +14,9 @@ Memory is now stored in PostgreSQL directly via trading_tools.py (no separate MC
 """
 
 import os
-from typing import Dict
+
 from dotenv import load_dotenv
+
 from mcp_helpers.types import MCPName
 
 load_dotenv(override=True)
@@ -24,9 +25,10 @@ load_dotenv(override=True)
 brave_api_key = os.getenv("BRAVE_API_KEY")
 brave_env = {"BRAVE_API_KEY": brave_api_key} if brave_api_key else {}
 
+
 # MCP server parameters - External MCPs for web research
 # These are legitimate MCPs - we don't control these services
-def get_mcp_server_params() -> Dict[MCPName, dict]:
+def get_mcp_server_params() -> dict[MCPName, dict]:
     """
     Get MCP server parameters as a dict keyed by MCPName.
 
@@ -41,10 +43,7 @@ def get_mcp_server_params() -> Dict[MCPName, dict]:
         Dict[MCPName, dict] - MCP server configuration by name
     """
     return {
-        MCPName.FETCH: {
-            "command": "mcp-server-fetch",
-            "args": []
-        },
+        MCPName.FETCH: {"command": "mcp-server-fetch", "args": []},
         MCPName.BRAVE_SEARCH: {
             "command": "mcp-server-brave-search",
             "args": [],

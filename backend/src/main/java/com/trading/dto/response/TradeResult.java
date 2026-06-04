@@ -13,10 +13,4 @@ package com.trading.dto.response;
  * - timestamp: Not needed for trade decisions
  * - message: Redundant formatted string of structured data
  */
-public record TradeResult(
-    Long tradeId,
-    String symbol,
-    Integer quantity,
-    Double price,
-    Double newBalance
-) {}
+public record TradeResult(Long tradeId, String symbol, Integer quantity, Double price, Double newBalance) {}

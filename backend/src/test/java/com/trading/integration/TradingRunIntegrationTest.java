@@ -1,5 +1,8 @@
 package com.trading.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import com.trading.dto.request.CompleteRunRequest;
 import com.trading.dto.request.DecisionPhaseDto;
 import com.trading.dto.request.ExecutionPhaseDto;
@@ -14,10 +17,17 @@ import com.trading.enums.RunPhase;
 import com.trading.enums.RunStatus;
 import com.trading.enums.TradeDecision;
 import com.trading.exception.ResourceNotFoundException;
-import com.trading.repository.*;
+import com.trading.repository.AccountTransactionRepository;
+import com.trading.repository.DecisionPhaseRepository;
+import com.trading.repository.ExecutionPhaseRepository;
+import com.trading.repository.ResearchPhaseRepository;
+import com.trading.repository.TradingAgentRepository;
+import com.trading.repository.TradingRunRepository;
 import com.trading.service.RunDtoMapper;
 import com.trading.service.RunSpecificationFactory;
 import com.trading.service.TradingRunService;
+import com.trading.testsupport.SharedPostgresContainer;
+import java.util.Arrays;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,12 +37,6 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import com.trading.testsupport.SharedPostgresContainer;
-
-import java.util.Arrays;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Integration tests for Trading Runs API.
@@ -86,15 +90,14 @@ class TradingRunIntegrationTest {
 
         // Manually create service with repositories
         tradingRunService = new TradingRunService(
-            tradingRunRepository,
-            researchPhaseRepository,
-            decisionPhaseRepository,
-            executionPhaseRepository,
-            tradingAgentRepository,
-            accountTransactionRepository,
-            new RunDtoMapper(),
-            new RunSpecificationFactory()
-        );
+                tradingRunRepository,
+                researchPhaseRepository,
+                decisionPhaseRepository,
+                executionPhaseRepository,
+                tradingAgentRepository,
+                accountTransactionRepository,
+                new RunDtoMapper(),
+                new RunSpecificationFactory());
 
         // Create test agent
         testAgent = new TradingAgent("IntegrationTestAgent", "Agent for integration testing");
@@ -173,8 +176,8 @@ class TradingRunIntegrationTest {
 
         // Verify getExecutionPhase throws ResourceNotFoundException
         assertThatThrownBy(() -> tradingRunService.getExecutionPhase(runId))
-            .isInstanceOf(ResourceNotFoundException.class)
-            .hasMessageContaining("Execution phase not found");
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Execution phase not found");
 
         // Verify database: no ExecutionPhase record
         assertThat(executionPhaseRepository.findByRunId(runId)).isEmpty();
@@ -273,7 +276,9 @@ class TradingRunIntegrationTest {
             if (phase.ordinal() <= targetPhase.ordinal() && phase != RunPhase.COMPLETED) {
                 tradingRunService.updatePhase(runId, phase);
             }
-            if (phase == targetPhase) break;
+            if (phase == targetPhase) {
+                break;
+            }
         }
 
         return runId;

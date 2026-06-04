@@ -6,18 +6,18 @@ The Market Analyst is the first agent in the two-agent flow:
 - Returns ResearchResponse with candidates and sources
 """
 
-import pytest
 from unittest.mock import MagicMock
 
-from ai_agents.market_analyst import create_market_analyst_agent, build_research_prompt
-from models.llm_output import ResearchResponse
+import pytest
+
+from ai_agents.market_analyst import build_research_prompt, create_market_analyst_agent
 
 
 @pytest.mark.asyncio
 class TestMarketAnalystAgent:
     """Test Market Analyst agent creation and configuration."""
 
-    @pytest.mark.usefixtures('mock_prompt_fetch')
+    @pytest.mark.usefixtures("mock_prompt_fetch")
     async def test_create_agent_with_correct_mcp_servers(
         self,
         sample_agent_name,
@@ -37,7 +37,6 @@ class TestMarketAnalystAgent:
 
         agent = await create_market_analyst_agent(
             agent_name=sample_agent_name,
-            agent_id=1,
             mcp_pool=mcp_pool,
             model_name=sample_model_name,
         )
@@ -49,9 +48,7 @@ class TestMarketAnalystAgent:
 class TestBuildResearchPrompt:
     """Test research prompt generation."""
 
-    def test_prompt_adjusts_for_portfolio_capacity(
-        self, sample_agent_name, sample_agent_style
-    ):
+    def test_prompt_adjusts_for_portfolio_capacity(self, sample_agent_name, sample_agent_style):
         """Test prompt changes based on position count."""
         prompt_full = build_research_prompt(
             agent_name=sample_agent_name,

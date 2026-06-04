@@ -1,13 +1,12 @@
 package com.trading.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.trading.dto.jsonb.ReasoningDto;
 import com.trading.entity.DecisionPhase;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("ReasoningSummaryExtractor tests")
 class ReasoningSummaryExtractorTest {

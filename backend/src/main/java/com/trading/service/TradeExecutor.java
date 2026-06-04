@@ -1,12 +1,15 @@
 package com.trading.service;
 
-import com.trading.entity.*;
+import com.trading.entity.AccountTransaction;
+import com.trading.entity.TradingAccount;
+import com.trading.entity.TransactionType;
 import com.trading.exception.ResourceNotFoundException;
-import com.trading.repository.*;
+import com.trading.repository.AccountHoldingRepository;
+import com.trading.repository.AccountTransactionRepository;
+import com.trading.repository.TradingAccountRepository;
+import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.time.Instant;
 
 /**
  * Base class for trade executors (buy/sell).
@@ -32,23 +35,32 @@ public abstract class TradeExecutor {
     }
 
     protected TradingAccount getAccount(String agentName) {
-        return tradingAccountRepository.findByAgentName(agentName)
-            .orElseThrow(() -> new ResourceNotFoundException(
-                "Trading account not found for agent: " + agentName +
-                ". Agent must be initialized before trading operations."));
+        return tradingAccountRepository
+                .findByAgentName(agentName)
+                .orElseThrow(() -> new ResourceNotFoundException("Trading account not found for agent: " + agentName
+                        + ". Agent must be initialized before trading operations."));
     }
 
     protected Double fetchMarketPrice(String symbol) {
         logger.info("🔍 DEBUGGING: Requesting real market price for {} from MarketService", symbol);
         MarketService.PriceData priceData = marketService.getSharePrice(symbol);
         Double price = priceData.getPrice();
-        logger.info("💰 DEBUGGING: Received price for {}: ${} from {} (cached: {})",
-            symbol, price, priceData.getSource(), priceData.isCached());
+        logger.info(
+                "💰 DEBUGGING: Received price for {}: ${} from {} (cached: {})",
+                symbol,
+                price,
+                priceData.getSource(),
+                priceData.isCached());
         return price;
     }
 
-    protected AccountTransaction createTransaction(TradingAccount account, String symbol, Integer quantity,
-                                     Double price, Long runId, TransactionType transactionType) {
+    protected AccountTransaction createTransaction(
+            TradingAccount account,
+            String symbol,
+            Integer quantity,
+            Double price,
+            Long runId,
+            TransactionType transactionType) {
         AccountTransaction transaction = new AccountTransaction();
         transaction.setAccount(account);
         transaction.setSymbol(symbol);

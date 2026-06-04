@@ -74,7 +74,7 @@ function RunsTable() {
       setRuns((prev) => [...prev, ...(data.runs ?? [])])
       setTotalRuns(data.total ?? 0)
       pageRef.current = nextPage
-    } catch (err) {
+    } catch {
       // Silently fail on load-more — user can scroll again
     } finally {
       setLoadingMore(false)

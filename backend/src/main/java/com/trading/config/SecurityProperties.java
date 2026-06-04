@@ -1,12 +1,10 @@
 package com.trading.config;
 
-import java.util.List;
-
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.validation.annotation.Validated;
-
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import java.util.List;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * Type-safe configuration properties for the security cluster.

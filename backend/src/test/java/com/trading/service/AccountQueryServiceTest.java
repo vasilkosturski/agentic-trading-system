@@ -1,5 +1,8 @@
 package com.trading.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
 import com.trading.config.AgentProperties;
 import com.trading.dto.response.HoldingDto;
 import com.trading.entity.AccountHolding;
@@ -9,6 +12,9 @@ import com.trading.exception.ResourceNotFoundException;
 import com.trading.repository.AccountHoldingRepository;
 import com.trading.repository.AccountTransactionRepository;
 import com.trading.repository.TradingAccountRepository;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,13 +22,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AccountQueryService Tests")
@@ -70,8 +69,7 @@ class AccountQueryServiceTest {
     @DisplayName("Should return balance when account exists")
     void testGetBalance_AccountExists_ReturnsBalance() {
         String agentName = "TestAgent";
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.of(testAccount));
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
 
         Double result = accountQueryService.getBalance(agentName);
 
@@ -83,14 +81,15 @@ class AccountQueryServiceTest {
     @DisplayName("getBalance throws ResourceNotFoundException when account does not exist")
     void testGetBalance_AccountMissing_ThrowsException() {
         String agentName = "NonExistentAgent";
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.empty());
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.empty());
 
-        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class,
-            () -> accountQueryService.getBalance(agentName));
+        ResourceNotFoundException exception =
+                assertThrows(ResourceNotFoundException.class, () -> accountQueryService.getBalance(agentName));
 
-        assertEquals("Trading account not found for agent: " + agentName +
-            ". Agent must be initialized before trading operations.", exception.getMessage());
+        assertEquals(
+                "Trading account not found for agent: " + agentName
+                        + ". Agent must be initialized before trading operations.",
+                exception.getMessage());
     }
 
     // ==================== getHoldings ====================
@@ -103,10 +102,8 @@ class AccountQueryServiceTest {
         AccountHolding holding2 = new AccountHolding(testAccount, "GOOGL", 5, 2800.0);
         List<AccountHolding> holdings = Arrays.asList(holding1, holding2);
 
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.of(testAccount));
-        when(holdingRepository.findByAccount(testAccount))
-            .thenReturn(holdings);
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
+        when(holdingRepository.findByAccount(testAccount)).thenReturn(holdings);
 
         List<HoldingDto> result = accountQueryService.getHoldings(agentName);
 
@@ -124,14 +121,15 @@ class AccountQueryServiceTest {
     @DisplayName("getHoldings throws ResourceNotFoundException when account does not exist")
     void testGetHoldings_AccountMissing_ThrowsException() {
         String agentName = "NonExistentAgent";
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.empty());
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.empty());
 
-        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class,
-            () -> accountQueryService.getHoldings(agentName));
+        ResourceNotFoundException exception =
+                assertThrows(ResourceNotFoundException.class, () -> accountQueryService.getHoldings(agentName));
 
-        assertEquals("Trading account not found for agent: " + agentName +
-            ". Agent must be initialized before trading operations.", exception.getMessage());
+        assertEquals(
+                "Trading account not found for agent: " + agentName
+                        + ". Agent must be initialized before trading operations.",
+                exception.getMessage());
         verify(holdingRepository, never()).findByAccount(any());
     }
 
@@ -147,7 +145,8 @@ class AccountQueryServiceTest {
         when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
         when(holdingRepository.findByAccount(testAccount)).thenReturn(holdings);
         when(marketService.getSharePrice("AAPL"))
-            .thenReturn(new MarketService.PriceData(160.0, false, java.time.Instant.now(), "Real-time from Finnhub"));
+                .thenReturn(
+                        new MarketService.PriceData(160.0, false, java.time.Instant.now(), "Real-time from Finnhub"));
         when(holdingsValuationService.calculateHoldingsValue(holdings)).thenReturn(1600.0);
         when(transactionRepository.countByAccount(testAccount)).thenReturn(1L);
 
@@ -183,8 +182,7 @@ class AccountQueryServiceTest {
 
         when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
         when(holdingRepository.findByAccount(testAccount)).thenReturn(holdings);
-        when(marketService.getSharePrice("GOOGL"))
-            .thenThrow(new RuntimeException("Finnhub API timeout"));
+        when(marketService.getSharePrice("GOOGL")).thenThrow(new RuntimeException("Finnhub API timeout"));
         when(holdingsValuationService.calculateHoldingsValue(holdings)).thenReturn(14000.0);
         when(transactionRepository.countByAccount(testAccount)).thenReturn(1L);
 
@@ -207,19 +205,18 @@ class AccountQueryServiceTest {
     void testGetAccountReport_MultipleHoldings_AllCalculated() {
         String agentName = "TestAgent";
         List<AccountHolding> holdings = Arrays.asList(
-            new AccountHolding(testAccount, "AAPL", 10, 150.0),
-            new AccountHolding(testAccount, "GOOGL", 5, 2800.0),
-            new AccountHolding(testAccount, "MSFT", 8, 400.0)
-        );
+                new AccountHolding(testAccount, "AAPL", 10, 150.0),
+                new AccountHolding(testAccount, "GOOGL", 5, 2800.0),
+                new AccountHolding(testAccount, "MSFT", 8, 400.0));
 
         when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
         when(holdingRepository.findByAccount(testAccount)).thenReturn(holdings);
         when(marketService.getSharePrice("AAPL"))
-            .thenReturn(new MarketService.PriceData(160.0, false, java.time.Instant.now(), "Real-time"));
+                .thenReturn(new MarketService.PriceData(160.0, false, java.time.Instant.now(), "Real-time"));
         when(marketService.getSharePrice("GOOGL"))
-            .thenReturn(new MarketService.PriceData(2900.0, true, java.time.Instant.now(), "Cached"));
+                .thenReturn(new MarketService.PriceData(2900.0, true, java.time.Instant.now(), "Cached"));
         when(marketService.getSharePrice("MSFT"))
-            .thenReturn(new MarketService.PriceData(380.0, false, java.time.Instant.now(), "Real-time"));
+                .thenReturn(new MarketService.PriceData(380.0, false, java.time.Instant.now(), "Real-time"));
         when(holdingsValuationService.calculateHoldingsValue(holdings)).thenReturn(19140.0);
         when(transactionRepository.countByAccount(testAccount)).thenReturn(3L);
 
@@ -249,10 +246,8 @@ class AccountQueryServiceTest {
         String agentName = "nonexistent";
         when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.empty());
 
-        ResourceNotFoundException thrown = assertThrows(
-            ResourceNotFoundException.class,
-            () -> accountQueryService.getAccountReport(agentName)
-        );
+        ResourceNotFoundException thrown =
+                assertThrows(ResourceNotFoundException.class, () -> accountQueryService.getAccountReport(agentName));
         assertTrue(thrown.getMessage().contains(agentName));
     }
 
@@ -265,8 +260,7 @@ class AccountQueryServiceTest {
         AccountHolding holding = new AccountHolding(testAccount, "AAPL", 10, 150.0);
         List<AccountHolding> holdings = List.of(holding);
 
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.of(testAccount));
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
         when(holdingRepository.findByAccount(testAccount)).thenReturn(holdings);
         when(holdingsValuationService.calculateHoldingsValue(holdings)).thenReturn(1600.0);
 

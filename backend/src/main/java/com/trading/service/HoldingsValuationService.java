@@ -1,9 +1,8 @@
 package com.trading.service;
 
 import com.trading.entity.AccountHolding;
-import org.springframework.stereotype.Component;
-
 import java.util.List;
+import org.springframework.stereotype.Component;
 
 /**
  * Computes the live-market value of an agent's holdings.
@@ -23,11 +22,10 @@ public class HoldingsValuationService {
     }
 
     public double calculateHoldingsValue(List<AccountHolding> holdings) {
-        return holdings.stream()
-            .mapToDouble(this::valueOf)
-            .sum();
+        return holdings.stream().mapToDouble(this::valueOf).sum();
     }
 
+    @SuppressWarnings("checkstyle:IllegalCatch") // valuation falls back to cost basis on any upstream price failure
     private double valueOf(AccountHolding holding) {
         try {
             MarketService.PriceData priceData = marketService.getSharePrice(holding.getSymbol());

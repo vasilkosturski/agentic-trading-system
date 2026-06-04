@@ -61,7 +61,9 @@ class Config:
             raise ValueError("OPENAI_API_KEY environment variable is required")
 
         if not self.BRAVE_API_KEY:
-            raise ValueError("BRAVE_API_KEY environment variable is required for research functionality")
+            raise ValueError(
+                "BRAVE_API_KEY environment variable is required for research functionality"
+            )
 
     def __repr__(self) -> str:
         """String representation (safe - no secrets)."""

@@ -37,13 +37,12 @@ public enum RunPhase {
     FAILED;
 
     private static final Map<RunPhase, Set<RunPhase>> VALID_TRANSITIONS = Map.of(
-        INITIALIZING, Set.of(RESEARCHING, FAILED),
-        RESEARCHING,  Set.of(DECIDING, FAILED),
-        DECIDING,     Set.of(TRADING, COMPLETED, FAILED),
-        TRADING,      Set.of(COMPLETED, FAILED),
-        COMPLETED,    Set.of(),
-        FAILED,       Set.of(FAILED)
-    );
+            INITIALIZING, Set.of(RESEARCHING, FAILED),
+            RESEARCHING, Set.of(DECIDING, FAILED),
+            DECIDING, Set.of(TRADING, COMPLETED, FAILED),
+            TRADING, Set.of(COMPLETED, FAILED),
+            COMPLETED, Set.of(),
+            FAILED, Set.of(FAILED));
 
     /**
      * Check whether transitioning from this phase to the target phase is allowed.

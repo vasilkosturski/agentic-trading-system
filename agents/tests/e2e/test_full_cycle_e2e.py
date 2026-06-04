@@ -13,8 +13,8 @@ import requests
 from agents.mcp import MCPServerStdio
 
 from agent_executor import AgentExecutor
-from mcp_helpers.types import MCPPool
 from mcp_helpers.params import get_mcp_server_params
+from mcp_helpers.types import MCPPool
 from models import CycleResult, TradeAction
 
 logger = logging.getLogger("e2e_tests.full_cycle")
@@ -100,7 +100,9 @@ class TestFullCycleE2E:
         assert result.run_id is not None and result.run_id > 0
 
         # With force_trade=True, must be BUY or SELL
-        assert result.decision.action in (TradeAction.BUY, TradeAction.SELL), f"Expected BUY/SELL with force_trade, got {result.decision.action}"
+        assert result.decision.action in (TradeAction.BUY, TradeAction.SELL), (
+            f"Expected BUY/SELL with force_trade, got {result.decision.action}"
+        )
         assert result.decision.symbol is not None
         assert result.decision.quantity is not None
         assert result.decision.quantity > 0
@@ -113,13 +115,23 @@ class TestFullCycleE2E:
         # Symbol format (BUY/SELL guaranteed by force_trade)
         # Allow dots for class shares (e.g., BRK.B, BF.B)
         symbol_clean = result.decision.symbol.replace(".", "")
-        assert symbol_clean.isalpha(), f"Symbol should be alphabetic (dots allowed): {result.decision.symbol}"
-        assert result.decision.symbol.isupper(), f"Symbol should be uppercase: {result.decision.symbol}"
-        assert 1 <= len(result.decision.symbol) <= 6, f"Symbol length should be 1-6: {result.decision.symbol}"
+        assert symbol_clean.isalpha(), (
+            f"Symbol should be alphabetic (dots allowed): {result.decision.symbol}"
+        )
+        assert result.decision.symbol.isupper(), (
+            f"Symbol should be uppercase: {result.decision.symbol}"
+        )
+        assert 1 <= len(result.decision.symbol) <= 6, (
+            f"Symbol length should be 1-6: {result.decision.symbol}"
+        )
 
         # Structured reasoning fields should be populated for trade decisions
-        assert len(result.decision.portfolioContext) > 0, "portfolioContext should be populated for BUY/SELL"
-        assert len(result.decision.researchContext) > 0, "researchContext should be populated for BUY/SELL"
+        assert len(result.decision.portfolioContext) > 0, (
+            "portfolioContext should be populated for BUY/SELL"
+        )
+        assert len(result.decision.researchContext) > 0, (
+            "researchContext should be populated for BUY/SELL"
+        )
 
         # Trade should have been attempted (count is 0 or 1 depending on execution success)
         assert result.trade_count in [0, 1]
@@ -147,7 +159,9 @@ class TestFullCycleE2E:
         assert run_meta["phase"] == "COMPLETED"
         assert run_meta["decision"] == result.decision.action
         assert run_meta["symbol"] == result.decision.symbol
-        logger.info(f"  Run metadata: OK (status={run_meta['status']}, decision={run_meta['decision']})")
+        logger.info(
+            f"  Run metadata: OK (status={run_meta['status']}, decision={run_meta['decision']})"
+        )
 
         # --- Research phase ---
         research = run_detail["research"]
@@ -172,11 +186,13 @@ class TestFullCycleE2E:
         reasoning = decision.get("reasoning")
         if reasoning is not None:
             reasoning_fields = [
-                "portfolioContext", "historicalContext", "researchContext",
+                "portfolioContext",
+                "historicalContext",
+                "researchContext",
             ]
             for field in reasoning_fields:
                 assert field in reasoning, f"Reasoning missing field: {field}"
-            logger.info(f"  Decision reasoning: OK (all 3 fields present)")
+            logger.info("  Decision reasoning: OK (all 3 fields present)")
 
         logger.info(f"  Decision: OK (action={decision['decision']}, symbol={decision['symbol']})")
 

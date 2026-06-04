@@ -1,14 +1,13 @@
 package com.trading.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Context-load tests for {@link AgentProperties}.
@@ -25,21 +24,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AgentPropertiesTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-        .withConfiguration(AutoConfigurations.of(
-            ConfigurationPropertiesAutoConfiguration.class))
-        .withUserConfiguration(AgentPropertiesTestConfig.class)
-        .withPropertyValues(
-            "trading.agents.profiles.warren.initial-capital=100000",
-            "trading.agents.profiles.warren.style=Value Investor",
-            "trading.agents.profiles.george.initial-capital=100000",
-            "trading.agents.profiles.george.style=Contrarian Macro",
-            "trading.agents.profiles.ray.initial-capital=100000",
-            "trading.agents.profiles.ray.style=Risk Parity",
-            "trading.agents.profiles.cathie.initial-capital=100000",
-            "trading.agents.profiles.cathie.style=Growth Innovation",
-            "trading.agents.profiles.testagent.initial-capital=100000",
-            "trading.agents.profiles.testagent.style=Test Style"
-        );
+            .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class))
+            .withUserConfiguration(AgentPropertiesTestConfig.class)
+            .withPropertyValues(
+                    "trading.agents.profiles.warren.initial-capital=100000",
+                    "trading.agents.profiles.warren.style=Value Investor",
+                    "trading.agents.profiles.george.initial-capital=100000",
+                    "trading.agents.profiles.george.style=Contrarian Macro",
+                    "trading.agents.profiles.ray.initial-capital=100000",
+                    "trading.agents.profiles.ray.style=Risk Parity",
+                    "trading.agents.profiles.cathie.initial-capital=100000",
+                    "trading.agents.profiles.cathie.style=Growth Innovation",
+                    "trading.agents.profiles.testagent.initial-capital=100000",
+                    "trading.agents.profiles.testagent.style=Test Style");
 
     @Test
     @DisplayName("YAML binding populates style for all 4 production agents + testagent")
@@ -92,6 +89,5 @@ class AgentPropertiesTest {
      */
     @org.springframework.context.annotation.Configuration
     @org.springframework.boot.context.properties.EnableConfigurationProperties(AgentProperties.class)
-    static class AgentPropertiesTestConfig {
-    }
+    static class AgentPropertiesTestConfig {}
 }

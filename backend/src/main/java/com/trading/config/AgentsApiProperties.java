@@ -1,10 +1,9 @@
 package com.trading.config;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.validation.annotation.Validated;
-
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * Type-safe configuration properties for Agents API.

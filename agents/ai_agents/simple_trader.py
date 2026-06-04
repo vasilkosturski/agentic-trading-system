@@ -14,8 +14,8 @@ from agents import trace
 
 from agent_executor import AgentExecutor
 from config import config
-from models.investment_style import InvestmentStyle
 from mcp_helpers.types import MCPName, MCPPool
+from models.investment_style import InvestmentStyle
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ REQUIRED_MCPS = [MCPName.BRAVE_SEARCH, MCPName.FETCH]
 # ============================================================================
 
 
-async def run_trader_cycle(trader: 'SimpleTrader', mcp_pool: MCPPool, force_trade: bool = False):
+async def run_trader_cycle(trader: "SimpleTrader", mcp_pool: MCPPool, force_trade: bool = False):
     """Run a complete trading cycle with two-agent architecture.
 
     Args:
@@ -86,6 +86,7 @@ async def run_trader_cycle(trader: 'SimpleTrader', mcp_pool: MCPPool, force_trad
 # Config class (thin wrapper for TradingSystem compatibility)
 # ============================================================================
 
+
 @dataclass
 class SimpleTrader:
     """Config holder with run interface for TradingSystem compatibility.
@@ -93,6 +94,7 @@ class SimpleTrader:
     This is intentionally minimal - all logic lives in module-level functions
     to match the researcher.py pattern.
     """
+
     name: str
     agent_style: InvestmentStyle
     strategy: str

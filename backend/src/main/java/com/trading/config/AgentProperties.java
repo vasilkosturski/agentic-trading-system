@@ -1,16 +1,14 @@
 package com.trading.config;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.validation.annotation.Validated;
-
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * Type-safe per-agent configuration bound to {@code trading.agents.*}.
@@ -87,9 +85,7 @@ public class AgentProperties {
             return Optional.empty();
         }
         AgentConfig cfg = profiles.get(agentName.toLowerCase());
-        return cfg == null
-            ? Optional.empty()
-            : Optional.ofNullable(cfg.getStyle());
+        return cfg == null ? Optional.empty() : Optional.ofNullable(cfg.getStyle());
     }
 
     /**

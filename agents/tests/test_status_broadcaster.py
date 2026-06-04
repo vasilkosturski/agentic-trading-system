@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
@@ -180,9 +180,7 @@ def test_broadcast_status_sync_schedules_task_on_running_loop(mocker):
 
     # Patch the symbol the way the module accesses it: status_broadcaster
     # imports `asyncio` and calls ``asyncio.get_running_loop()``.
-    mocker.patch.object(
-        status_broadcaster.asyncio, "get_running_loop", return_value=fake_loop
-    )
+    mocker.patch.object(status_broadcaster.asyncio, "get_running_loop", return_value=fake_loop)
 
     status_broadcaster.broadcast_status(
         agent_id=42,
@@ -212,9 +210,7 @@ def test_broadcast_status_outside_event_loop_does_not_raise(caplog):
 
     def call_from_thread() -> None:
         try:
-            with caplog.at_level(
-                logging.DEBUG, logger=status_broadcaster.logger.name
-            ):
+            with caplog.at_level(logging.DEBUG, logger=status_broadcaster.logger.name):
                 status_broadcaster.broadcast_status(
                     agent_id=1,
                     agent_name="Warren",

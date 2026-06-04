@@ -1,23 +1,21 @@
 package com.trading.repository;
 
-import com.trading.dto.jsonb.ToolCallDto;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.trading.dto.jsonb.ReasoningDto;
 import com.trading.dto.jsonb.SourceDto;
+import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.entity.DecisionPhase;
-import com.trading.enums.TradeDecision;
 import com.trading.entity.TradingAgent;
 import com.trading.entity.TradingRun;
+import com.trading.enums.TradeDecision;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Repository tests for DecisionPhase entity.
@@ -43,12 +41,12 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         decisionPhaseRepository.deleteAll();
         tradingRunRepository.deleteAll();
         tradingAgentRepository.deleteAll();
-        
+
         // Create test agent and run
         TradingAgent agent = new TradingAgent("TestAgent", "Test agent");
         agent.setInitialCapital(100000.0);
         agent = tradingAgentRepository.save(agent);
-        
+
         testRun = new TradingRun(agent);
         testRun = tradingRunRepository.save(testRun);
     }
@@ -66,7 +64,7 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         // Act
         DecisionPhase saved = decisionPhaseRepository.save(phase);
         Optional<DecisionPhase> found = decisionPhaseRepository.findById(saved.getId());
-        
+
         // Assert
         assertThat(found).isPresent();
         assertThat(found.get().getDecision()).isEqualTo(TradeDecision.BUY);
@@ -84,26 +82,30 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         phase.setDecision(TradeDecision.BUY);
         phase.setSymbol("BAC");
         phase.setQuantity(15);
-        
+
         ReasoningDto reasoning = new ReasoningDto();
         reasoning.setRationale("Buying BAC because strong earnings and value metrics are compelling.");
         reasoning.setPortfolioContext("Current cash: $50,000. Holdings: 5 positions.");
         reasoning.setHistoricalContext("No previous trades in BAC. Last financials trade was GS.");
         reasoning.setResearchContext("Market Analyst identified BAC as top candidate based on earnings.");
-        
+
         phase.setReasoning(reasoning);
-        
+
         // Act
         decisionPhaseRepository.save(phase);
-        DecisionPhase loaded = decisionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
-        
+        DecisionPhase loaded =
+                decisionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
+
         // Assert
         ReasoningDto loadedReasoning = loaded.getReasoning();
         assertThat(loadedReasoning).isNotNull();
-        assertThat(loadedReasoning.getRationale()).isEqualTo("Buying BAC because strong earnings and value metrics are compelling.");
+        assertThat(loadedReasoning.getRationale())
+                .isEqualTo("Buying BAC because strong earnings and value metrics are compelling.");
         assertThat(loadedReasoning.getPortfolioContext()).isEqualTo("Current cash: $50,000. Holdings: 5 positions.");
-        assertThat(loadedReasoning.getHistoricalContext()).isEqualTo("No previous trades in BAC. Last financials trade was GS.");
-        assertThat(loadedReasoning.getResearchContext()).isEqualTo("Market Analyst identified BAC as top candidate based on earnings.");
+        assertThat(loadedReasoning.getHistoricalContext())
+                .isEqualTo("No previous trades in BAC. Last financials trade was GS.");
+        assertThat(loadedReasoning.getResearchContext())
+                .isEqualTo("Market Analyst identified BAC as top candidate based on earnings.");
     }
 
     @Test
@@ -114,7 +116,7 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         phase.setDecision(TradeDecision.SELL);
         phase.setSymbol("AAPL");
         phase.setQuantity(5);
-        
+
         ToolCallDto toolCall1 = new ToolCallDto();
         toolCall1.setTool("get_symbol_trade_history");
         toolCall1.setParams(Map.of("symbol", "AAPL", "limit", 10));
@@ -122,16 +124,17 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         ToolCallDto toolCall2 = new ToolCallDto();
         toolCall2.setTool("get_current_price");
         toolCall2.setParams(Map.of("symbol", "AAPL"));
-        
+
         phase.setToolCalls(List.of(toolCall1, toolCall2));
-        
+
         // Act
         decisionPhaseRepository.save(phase);
-        DecisionPhase loaded = decisionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
-        
+        DecisionPhase loaded =
+                decisionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
+
         // Assert
         assertThat(loaded.getToolCalls()).hasSize(2);
-        
+
         ToolCallDto loadedCall1 = loaded.getToolCalls().get(0);
         assertThat(loadedCall1.getTool()).isEqualTo("get_symbol_trade_history");
         assertThat(loadedCall1.getParams()).containsEntry("symbol", "AAPL");
@@ -146,17 +149,18 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         // Arrange
         DecisionPhase phase = new DecisionPhase(testRun);
         phase.setDecision(TradeDecision.HOLD);
-        
+
         SourceDto source = new SourceDto();
         source.setType("system_context");
         source.setDescription("Portfolio already has maximum positions");
-        
+
         phase.setSources(List.of(source));
-        
+
         // Act
         decisionPhaseRepository.save(phase);
-        DecisionPhase loaded = decisionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
-        
+        DecisionPhase loaded =
+                decisionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
+
         // Assert
         assertThat(loaded.getSources()).hasSize(1);
         assertThat(loaded.getSources().get(0).getType()).isEqualTo("system_context");
@@ -170,14 +174,15 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         DecisionPhase phase = new DecisionPhase(testRun);
         phase.setDecision(TradeDecision.HOLD);
         // symbol and quantity should be null for HOLD
-        
+
         ReasoningDto reasoning = new ReasoningDto();
         phase.setReasoning(reasoning);
-        
+
         // Act
         decisionPhaseRepository.save(phase);
-        DecisionPhase loaded = decisionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
-        
+        DecisionPhase loaded =
+                decisionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
+
         // Assert
         assertThat(loaded.getDecision()).isEqualTo(TradeDecision.HOLD);
         assertThat(loaded.isHold()).isTrue();
@@ -195,10 +200,10 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         phase.setSymbol("MSFT");
         phase.setQuantity(20);
         decisionPhaseRepository.save(phase);
-        
+
         // Act
         Optional<DecisionPhase> found = decisionPhaseRepository.findByRunId(testRun.getId());
-        
+
         // Assert
         assertThat(found).isPresent();
         assertThat(found.get().getSymbol()).isEqualTo("MSFT");
@@ -211,10 +216,9 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         DecisionPhase phase = new DecisionPhase(testRun);
         phase.setDecision(TradeDecision.HOLD);
         decisionPhaseRepository.save(phase);
-        
+
         // Act & Assert
         assertThat(decisionPhaseRepository.existsByRunId(testRun.getId())).isTrue();
         assertThat(decisionPhaseRepository.existsByRunId(99999L)).isFalse();
     }
 }
-

@@ -1,11 +1,15 @@
 package com.trading.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
 import com.trading.config.AgentProperties;
 import com.trading.entity.TradingAccount;
 import com.trading.entity.TradingAgent;
 import com.trading.exception.ResourceNotFoundException;
 import com.trading.repository.TradingAccountRepository;
 import com.trading.repository.TradingAgentRepository;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,11 +18,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AccountProvisioner Tests")
@@ -57,10 +56,8 @@ class AccountProvisionerTest {
         String agentName = "TestAgent";
         Double initialBalance = 100000.0;
 
-        when(agentRepository.findByName(agentName))
-            .thenReturn(Optional.of(testAgent));
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.of(testAccount));
+        when(agentRepository.findByName(agentName)).thenReturn(Optional.of(testAgent));
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
 
         TradingAccount result = accountProvisioner.initializeAgent(agentName, initialBalance);
 
@@ -78,15 +75,12 @@ class AccountProvisionerTest {
         String agentName = "TestAgent";
         Double initialBalance = 150000.0;
 
-        when(agentRepository.findByName(agentName))
-            .thenReturn(Optional.of(testAgent));
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.empty());
+        when(agentRepository.findByName(agentName)).thenReturn(Optional.of(testAgent));
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.empty());
 
         TradingAccount savedAccount = new TradingAccount(testAgent, initialBalance);
         savedAccount.setId(2L);
-        when(tradingAccountRepository.save(any(TradingAccount.class)))
-            .thenReturn(savedAccount);
+        when(tradingAccountRepository.save(any(TradingAccount.class))).thenReturn(savedAccount);
 
         TradingAccount result = accountProvisioner.initializeAgent(agentName, initialBalance);
 
@@ -110,19 +104,16 @@ class AccountProvisionerTest {
         String agentName = "NewAgent";
         Double initialBalance = 200000.0;
 
-        when(agentRepository.findByName(agentName))
-            .thenReturn(Optional.empty());
+        when(agentRepository.findByName(agentName)).thenReturn(Optional.empty());
 
         TradingAgent newAgent = new TradingAgent(agentName, "Autonomous trading agent");
         newAgent.setId(3L);
         newAgent.setInitialCapital(initialBalance);
-        when(agentRepository.save(any(TradingAgent.class)))
-            .thenReturn(newAgent);
+        when(agentRepository.save(any(TradingAgent.class))).thenReturn(newAgent);
 
         TradingAccount newAccount = new TradingAccount(newAgent, initialBalance);
         newAccount.setId(3L);
-        when(tradingAccountRepository.save(any(TradingAccount.class)))
-            .thenReturn(newAccount);
+        when(tradingAccountRepository.save(any(TradingAccount.class))).thenReturn(newAccount);
 
         TradingAccount result = accountProvisioner.initializeAgent(agentName, initialBalance);
 
@@ -152,21 +143,17 @@ class AccountProvisionerTest {
         String agentName = "Warren";
         Double initialBalance = 100000.0;
 
-        when(agentRepository.findByName(agentName))
-            .thenReturn(Optional.empty());
-        when(agentProperties.getStyle(agentName))
-            .thenReturn(Optional.of("Value Investor"));
+        when(agentRepository.findByName(agentName)).thenReturn(Optional.empty());
+        when(agentProperties.getStyle(agentName)).thenReturn(Optional.of("Value Investor"));
 
         TradingAgent savedAgent = new TradingAgent(agentName, "Autonomous trading agent");
         savedAgent.setId(1L);
         savedAgent.setStyle("Value Investor");
-        when(agentRepository.save(any(TradingAgent.class)))
-            .thenReturn(savedAgent);
+        when(agentRepository.save(any(TradingAgent.class))).thenReturn(savedAgent);
 
         TradingAccount newAccount = new TradingAccount(savedAgent, initialBalance);
         newAccount.setId(1L);
-        when(tradingAccountRepository.save(any(TradingAccount.class)))
-            .thenReturn(newAccount);
+        when(tradingAccountRepository.save(any(TradingAccount.class))).thenReturn(newAccount);
 
         accountProvisioner.initializeAgent(agentName, initialBalance);
 
@@ -187,12 +174,9 @@ class AccountProvisionerTest {
         existingAgent.setId(1L);
         existingAgent.setStyle(null);
 
-        when(agentRepository.findByName(agentName))
-            .thenReturn(Optional.of(existingAgent));
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.of(testAccount));
-        when(agentProperties.getStyle(agentName))
-            .thenReturn(Optional.of("Value Investor"));
+        when(agentRepository.findByName(agentName)).thenReturn(Optional.of(existingAgent));
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
+        when(agentProperties.getStyle(agentName)).thenReturn(Optional.of("Value Investor"));
 
         accountProvisioner.initializeAgent(agentName, initialBalance);
 
@@ -206,20 +190,16 @@ class AccountProvisionerTest {
         String agentName = "Mystery";
         Double initialBalance = 100000.0;
 
-        when(agentRepository.findByName(agentName))
-            .thenReturn(Optional.empty());
-        when(agentProperties.getStyle(agentName))
-            .thenReturn(Optional.empty());
+        when(agentRepository.findByName(agentName)).thenReturn(Optional.empty());
+        when(agentProperties.getStyle(agentName)).thenReturn(Optional.empty());
 
         TradingAgent savedAgent = new TradingAgent(agentName, "Autonomous trading agent");
         savedAgent.setId(5L);
-        when(agentRepository.save(any(TradingAgent.class)))
-            .thenReturn(savedAgent);
+        when(agentRepository.save(any(TradingAgent.class))).thenReturn(savedAgent);
 
         TradingAccount newAccount = new TradingAccount(savedAgent, initialBalance);
         newAccount.setId(5L);
-        when(tradingAccountRepository.save(any(TradingAccount.class)))
-            .thenReturn(newAccount);
+        when(tradingAccountRepository.save(any(TradingAccount.class))).thenReturn(newAccount);
 
         accountProvisioner.initializeAgent(agentName, initialBalance);
 
@@ -240,10 +220,8 @@ class AccountProvisionerTest {
         existingAgent.setId(1L);
         existingAgent.setStyle("Pre-existing Style");
 
-        when(agentRepository.findByName(agentName))
-            .thenReturn(Optional.of(existingAgent));
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.of(testAccount));
+        when(agentRepository.findByName(agentName)).thenReturn(Optional.of(existingAgent));
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
 
         accountProvisioner.initializeAgent(agentName, initialBalance);
 
@@ -258,10 +236,8 @@ class AccountProvisionerTest {
         Double originalBalance = 100000.0;
         Double newBalance = 500000.0;
 
-        when(agentRepository.findByName(agentName))
-            .thenReturn(Optional.of(testAgent));
-        when(tradingAccountRepository.findByAgentName(agentName))
-            .thenReturn(Optional.of(testAccount));
+        when(agentRepository.findByName(agentName)).thenReturn(Optional.of(testAgent));
+        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.of(testAccount));
 
         TradingAccount result = accountProvisioner.initializeAgent(agentName, newBalance);
 
@@ -279,8 +255,7 @@ class AccountProvisionerTest {
     void testUpdateAgentActivity_AgentExists_SavesUpdatedActivity() {
         String agentName = "TestAgent";
 
-        when(agentRepository.findByName(agentName))
-            .thenReturn(Optional.of(testAgent));
+        when(agentRepository.findByName(agentName)).thenReturn(Optional.of(testAgent));
 
         accountProvisioner.updateAgentActivity(agentName);
 
@@ -292,13 +267,10 @@ class AccountProvisionerTest {
     void testUpdateAgentActivity_AgentMissing_ThrowsResourceNotFoundException() {
         String agentName = "NonExistent";
 
-        when(agentRepository.findByName(agentName))
-            .thenReturn(Optional.empty());
+        when(agentRepository.findByName(agentName)).thenReturn(Optional.empty());
 
-        ResourceNotFoundException ex = assertThrows(
-            ResourceNotFoundException.class,
-            () -> accountProvisioner.updateAgentActivity(agentName)
-        );
+        ResourceNotFoundException ex =
+                assertThrows(ResourceNotFoundException.class, () -> accountProvisioner.updateAgentActivity(agentName));
         assertTrue(ex.getMessage().contains(agentName));
         verify(agentRepository, never()).save(any());
     }

@@ -1,10 +1,9 @@
 package com.trading.dto.jsonb;
 
+import java.io.Serializable;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.io.Serializable;
 
 /**
  * DTO for source attribution in research and decision phases.
@@ -21,25 +20,23 @@ public class SourceDto implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-
     /**
      * Source type: "web" or "system_context"
      */
     private String type;
-    
+
     /**
      * Title for web sources (e.g., "JPMorgan Q4 earnings beat expectations")
      */
     private String title;
-    
+
     /**
      * URL for web sources (clickable, verifiable)
      */
     private String url;
-    
+
     /**
      * Description for system_context sources (e.g., "Checked portfolio: 8 positions")
      */
     private String description;
 }
-

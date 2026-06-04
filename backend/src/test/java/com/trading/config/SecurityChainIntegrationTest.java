@@ -1,5 +1,11 @@
 package com.trading.config;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trading.dto.request.LoginRequest;
 import com.trading.dto.response.RunListResponseDto;
@@ -15,6 +21,7 @@ import com.trading.service.PortfolioService;
 import com.trading.service.PriceCacheService;
 import com.trading.service.PromptLoader;
 import com.trading.service.TradingRunService;
+import java.util.Collections;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,15 +41,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.Collections;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Full-context security filter chain integration test.
@@ -94,25 +92,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @see JwtAuthenticationFilter
  */
 @SpringBootTest(
-    webEnvironment = WebEnvironment.MOCK,
-    classes = SecurityChainIntegrationTest.DbFreeContext.class,
-    properties = {
-        // In-memory SQLite stands in for PostgreSQL so the JPA repositories can be
-        // proxied at context refresh without needing Testcontainers / a real DB.
-        // No test exercises a repository method, so the actual SQL never runs and
-        // the SQLDialect mismatch with the real schema is irrelevant.
-        "spring.datasource.url=jdbc:sqlite::memory:",
-        "spring.datasource.driver-class-name=org.sqlite.JDBC",
-        "spring.datasource.username=",
-        "spring.datasource.password=",
-        "spring.jpa.database-platform=org.hibernate.community.dialect.SQLiteDialect",
-        "spring.jpa.hibernate.ddl-auto=none",
-        "spring.jpa.properties.hibernate.hbm2ddl.create_namespaces=false",
-        // Disable JPA metadata processing of entities since we never query — keeps
-        // boot fast and avoids dialect quirks with our PostgreSQL-specific schema.
-        "spring.jpa.properties.hibernate.boot.allow_jdbc_metadata_access=false"
-    }
-)
+        webEnvironment = WebEnvironment.MOCK,
+        classes = SecurityChainIntegrationTest.DbFreeContext.class,
+        properties = {
+            // In-memory SQLite stands in for PostgreSQL so the JPA repositories can be
+            // proxied at context refresh without needing Testcontainers / a real DB.
+            // No test exercises a repository method, so the actual SQL never runs and
+            // the SQLDialect mismatch with the real schema is irrelevant.
+            "spring.datasource.url=jdbc:sqlite::memory:",
+            "spring.datasource.driver-class-name=org.sqlite.JDBC",
+            "spring.datasource.username=",
+            "spring.datasource.password=",
+            "spring.jpa.database-platform=org.hibernate.community.dialect.SQLiteDialect",
+            "spring.jpa.hibernate.ddl-auto=none",
+            "spring.jpa.properties.hibernate.hbm2ddl.create_namespaces=false",
+            // Disable JPA metadata processing of entities since we never query — keeps
+            // boot fast and avoids dialect quirks with our PostgreSQL-specific schema.
+            "spring.jpa.properties.hibernate.boot.allow_jdbc_metadata_access=false"
+        })
 @AutoConfigureMockMvc
 @DisplayName("SecurityChain Integration Tests")
 class SecurityChainIntegrationTest {
@@ -131,26 +128,23 @@ class SecurityChainIntegrationTest {
      */
     @Configuration
     @ComponentScan(
-        basePackages = "com.trading",
-        excludeFilters = {
-            @ComponentScan.Filter(
-                type = FilterType.REGEX,
-                pattern = {
-                    // ScheduledSnapshotService has @Scheduled methods and reaches
-                    // through services we do not exercise here. Excluding keeps
-                    // the @EnableScheduling refresh phase quiet.
-                    "com\\.trading\\.service\\.ScheduledSnapshotService",
-                    // Test-only @TestConfiguration that lives in the same package
-                    // and ALSO @MockBeans JwtTokenProvider — would clash with our
-                    // own @MockBean on the same type.
-                    "com\\.trading\\.config\\.TestSecurityConfig"
-                }
-            )
-        }
-    )
+            basePackages = "com.trading",
+            excludeFilters = {
+                @ComponentScan.Filter(
+                        type = FilterType.REGEX,
+                        pattern = {
+                            // ScheduledSnapshotService has @Scheduled methods and reaches
+                            // through services we do not exercise here. Excluding keeps
+                            // the @EnableScheduling refresh phase quiet.
+                            "com\\.trading\\.service\\.ScheduledSnapshotService",
+                            // Test-only @TestConfiguration that lives in the same package
+                            // and ALSO @MockBeans JwtTokenProvider — would clash with our
+                            // own @MockBean on the same type.
+                            "com\\.trading\\.config\\.TestSecurityConfig"
+                        })
+            })
     @org.springframework.boot.autoconfigure.EnableAutoConfiguration
-    static class DbFreeContext {
-    }
+    static class DbFreeContext {}
 
     @Autowired
     private MockMvc mockMvc;
@@ -229,23 +223,21 @@ class SecurityChainIntegrationTest {
         loginRequest.setPassword("changeme");
 
         UserDetails adminUser = User.builder()
-            .username("admin")
-            .password("password")
-            .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
-            .build();
-        Authentication authentication = new UsernamePasswordAuthenticationToken(
-            adminUser, null, adminUser.getAuthorities()
-        );
+                .username("admin")
+                .password("password")
+                .authorities(Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .build();
+        Authentication authentication =
+                new UsernamePasswordAuthenticationToken(adminUser, null, adminUser.getAuthorities());
 
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-            .thenReturn(authentication);
-        when(jwtTokenProvider.generateToken(any(UserDetails.class)))
-            .thenReturn("stub.jwt.token");
+                .thenReturn(authentication);
+        when(jwtTokenProvider.generateToken(any(UserDetails.class))).thenReturn("stub.jwt.token");
 
         mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginRequest)))
-            .andExpect(status().isOk());
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -256,12 +248,12 @@ class SecurityChainIntegrationTest {
         loginRequest.setPassword("wrongpassword");
 
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-            .thenThrow(new BadCredentialsException("Invalid credentials"));
+                .thenThrow(new BadCredentialsException("Invalid credentials"));
 
         mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginRequest)))
-            .andExpect(status().isUnauthorized());
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isUnauthorized());
     }
 
     // =====================================================================
@@ -276,13 +268,10 @@ class SecurityChainIntegrationTest {
     @Test
     @DisplayName("Unauthenticated GET /api/runs returns 200 (public-by-default contract)")
     void unauthenticatedListRuns_Returns200() throws Exception {
-        RunListResponseDto emptyResponse = new RunListResponseDto(
-            Collections.emptyList(), 0L, 0, 20
-        );
+        RunListResponseDto emptyResponse = new RunListResponseDto(Collections.emptyList(), 0L, 0, 20);
         when(tradingRunService.listRuns(any(), any(), any())).thenReturn(emptyResponse);
 
-        mockMvc.perform(get("/api/runs"))
-            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/runs")).andExpect(status().isOk());
     }
 
     // =====================================================================
@@ -296,7 +285,6 @@ class SecurityChainIntegrationTest {
     @Test
     @DisplayName("Unauthenticated GET /actuator/env returns 401")
     void unauthenticatedGetActuatorEnv_Returns401() throws Exception {
-        mockMvc.perform(get("/actuator/env"))
-            .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/actuator/env")).andExpect(status().isUnauthorized());
     }
 }

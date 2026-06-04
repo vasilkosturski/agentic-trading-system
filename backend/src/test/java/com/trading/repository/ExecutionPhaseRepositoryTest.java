@@ -1,16 +1,21 @@
 package com.trading.repository;
 
-import com.trading.entity.*;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.trading.entity.AccountTransaction;
+import com.trading.entity.DecisionPhase;
+import com.trading.entity.ExecutionPhase;
+import com.trading.entity.TradingAccount;
+import com.trading.entity.TradingAgent;
+import com.trading.entity.TradingRun;
+import com.trading.entity.TransactionType;
 import com.trading.enums.PhaseStatus;
 import com.trading.enums.TradeDecision;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Repository tests for ExecutionPhase entity.
@@ -76,9 +81,7 @@ class ExecutionPhaseRepositoryTest extends BaseRepositoryTest {
     @DisplayName("Should save executed phase with trade FK")
     void shouldSaveExecutedPhaseWithTradeFk() {
         // Arrange - create a transaction
-        AccountTransaction trade = new AccountTransaction(
-            testAccount, "JPM", 10, 150.0, java.time.Instant.now()
-        );
+        AccountTransaction trade = new AccountTransaction(testAccount, "JPM", 10, 150.0, java.time.Instant.now());
         trade.setTransactionType(TransactionType.BUY);
         trade = accountTransactionRepository.save(trade);
 
@@ -107,7 +110,8 @@ class ExecutionPhaseRepositoryTest extends BaseRepositoryTest {
 
         // Act
         executionPhaseRepository.save(phase);
-        ExecutionPhase loaded = executionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
+        ExecutionPhase loaded =
+                executionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
 
         // Assert
         assertThat(loaded.getStatus()).isEqualTo(PhaseStatus.FAILED);
@@ -125,7 +129,8 @@ class ExecutionPhaseRepositoryTest extends BaseRepositoryTest {
 
         // Act
         executionPhaseRepository.save(phase);
-        ExecutionPhase loaded = executionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
+        ExecutionPhase loaded =
+                executionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
 
         // Assert
         assertThat(loaded.getStatus()).isEqualTo(PhaseStatus.SKIPPED);
@@ -154,9 +159,7 @@ class ExecutionPhaseRepositoryTest extends BaseRepositoryTest {
     @DisplayName("Should find by decision ID")
     void shouldFindByDecisionId() {
         // Arrange - create a transaction
-        AccountTransaction trade = new AccountTransaction(
-            testAccount, "JPM", 10, 150.0, java.time.Instant.now()
-        );
+        AccountTransaction trade = new AccountTransaction(testAccount, "JPM", 10, 150.0, java.time.Instant.now());
         trade.setTransactionType(TransactionType.BUY);
         trade = accountTransactionRepository.save(trade);
 
@@ -191,7 +194,8 @@ class ExecutionPhaseRepositoryTest extends BaseRepositoryTest {
 
         // Act
         executionPhaseRepository.save(phase);
-        ExecutionPhase loaded = executionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
+        ExecutionPhase loaded =
+                executionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
 
         // Assert
         assertThat(loaded.getTrade()).isNull();

@@ -6,11 +6,10 @@ import com.trading.entity.TradingAgent;
 import com.trading.exception.ResourceNotFoundException;
 import com.trading.repository.TradingAccountRepository;
 import com.trading.repository.TradingAgentRepository;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-
-import java.util.Optional;
 
 /**
  * Lifecycle operations for trading agents: initial provisioning of an agent +

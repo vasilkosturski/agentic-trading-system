@@ -38,6 +38,93 @@ test = [
     "psycopg2-binary>=2.9.0",
     "mypy>=1.0.0",
 ]
+lint = [
+    "ruff>=0.6.0",
+    "mypy>=1.0.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+    "venv",
+    ".venv",
+    ".mypy_cache",
+    ".ruff_cache",
+    "logs",
+    "*.egg-info",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+# E/W = pycodestyle errors/warnings, F = pyflakes, I = isort,
+# B = flake8-bugbear, UP = pyupgrade, N = pep8-naming.
+select = ["E", "F", "W", "I", "B", "UP", "N"]
+ignore = [
+    # Line-too-long is noisy on log messages and long literal strings; the
+    # formatter handles obvious cases and we accept the rest.
+    "E501",
+]
+# Treat any leading-underscore name as intentionally unused so positional
+# placeholders required by external SDK signatures (e.g. guardrail
+# validators where the function shape is fixed by the framework) don't
+# trip unused-argument or unused-variable rules.
+dummy-variable-rgx = "^_.*"
+
+[tool.ruff.lint.per-file-ignores]
+# Test conftest files intentionally set env vars before importing modules
+# that read them at import time; keep the import-order pragma scoped.
+"tests/conftest.py" = ["E402"]
+"tests/**/conftest.py" = ["E402"]
+# Tests can use assert and may have long string fixtures.
+"tests/**/*.py" = ["B011"]
+# Pydantic response/request models mirror the Java backend's JSON wire
+# shape (camelCase field names + `date as DateType` alias matching the
+# backend's typed sub-fields). Renaming would break the API contract.
+"models/api_responses.py" = ["N815", "N812"]
+"models/llm_output.py" = ["N815"]
+"models/run_tracking.py" = ["N815"]
+"models/usage_metrics.py" = ["N815"]
+# Cross-language enum bridges (str + Enum) are still the safest carrier
+# for backend wire compatibility; `StrEnum` has subtle __str__ differences
+# that would need a serializer audit before flipping.
+"models/*.py" = ["UP042"]
+# Public re-export hub: imports are intentionally surfaced via the
+# package namespace even when not used inside the module itself.
+"models/__init__.py" = ["F401"]
+# camelCase argument names here mirror the backend's JSON request shape.
+"tools/trading_tools.py" = ["N803"]
+# ALLCAPS @property names model URL constants derived from a base URL.
+"config.py" = ["N802"]
+# Test imports alias module-level constants to local set names for
+# readability; the alias is not itself a constant.
+"tests/test_agent_registry.py" = ["N811"]
+
+[tool.mypy]
+python_version = "3.11"
+# Pragmatic defaults: surface real type bugs without requiring full
+# annotations on legacy code paths. New code is expected to annotate.
+disallow_untyped_defs = false
+check_untyped_defs = false
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = false
+no_implicit_optional = true
+ignore_missing_imports = true
+exclude = [
+    "venv/",
+    ".venv/",
+    ".mypy_cache/",
+    "logs/",
+    "build/",
+    "dist/",
+]
+
+[[tool.mypy.overrides]]
+# Tests can stay loose; we care about type safety in production code.
+module = "tests.*"
+disallow_untyped_defs = false
+check_untyped_defs = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

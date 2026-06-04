@@ -1,10 +1,9 @@
 package com.trading.dto.response;
 
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.time.Instant;
 
 /**
  * DTO for portfolio snapshot returned by API.

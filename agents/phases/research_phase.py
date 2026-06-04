@@ -16,19 +16,18 @@ import json
 import logging
 from datetime import datetime
 
-from ai_agents.guardrail_retry import run_with_guardrail_retry
-from ai_agents.market_analyst import MarketAnalyst, MarketAnalystContext
-from models import ResearchResponse
-from models.orchestration import ResearchResult, RunContext
-from models.run_tracking import SourceDto
-from infra.telemetry import extract_run_telemetry
-
 # Constants live in agent_executor.py for now; Task 10 of the
 # decomposition plan may reconcile if a shared constants module emerges.
 # Importing here is safe because agent_executor imports run_research_phase
 # AFTER its module-level constants are declared, so by the time this
 # module is initialized those names are already bound on agent_executor.
 from agent_executor import AGENT_MAX_TURNS, MAX_POSITIONS, RESEARCH_MAX_ATTEMPTS
+from ai_agents.guardrail_retry import run_with_guardrail_retry
+from ai_agents.market_analyst import MarketAnalyst, MarketAnalystContext
+from infra.telemetry import extract_run_telemetry
+from models import ResearchResponse
+from models.orchestration import ResearchResult, RunContext
+from models.run_tracking import SourceDto
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +57,7 @@ async def run_research_phase(
     portfolio_data = {
         "balance": round(ctx.balance, 2),
         "holdings_count": len(ctx.holdings),
-        "symbols": [h.symbol for h in ctx.holdings] if ctx.holdings else []
+        "symbols": [h.symbol for h in ctx.holdings] if ctx.holdings else [],
     }
     logger.debug(
         "Portfolio data fetched: balance=$%.2f, positions=%d, symbols=%s",
@@ -70,7 +69,6 @@ async def run_research_phase(
     # Create Market Analyst using async factory pattern
     market_analyst = await MarketAnalyst.create(
         agent_name=ctx.agent_name,
-        agent_id=ctx.agent_id,
         mcp_pool=mcp_pool,
         model_name=ctx.model_name,
     )
@@ -127,17 +125,14 @@ async def run_research_phase(
 
     # Build sources list
     sources = [
-        SourceDto.web(title=source.title, url=source.url)
-        for source in research_response.webSources
+        SourceDto.web(title=source.title, url=source.url) for source in research_response.webSources
     ]
     # Add system context source for portfolio
     sources.append(SourceDto.system_context(f"Portfolio context: {json.dumps(portfolio_data)}"))
     sources.append(SourceDto.system_context("Retrieved 30-day trading activity history"))
 
     # Calculate research latency
-    research_latency_ms = int(
-        (datetime.now() - research_start_time).total_seconds() * 1000
-    )
+    research_latency_ms = int((datetime.now() - research_start_time).total_seconds() * 1000)
     logger.info(f"📊 Market Analyst completed in {research_latency_ms}ms")
 
     # Extract tool calls + usage metrics (DRY helper — see telemetry.extract_run_telemetry)

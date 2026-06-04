@@ -9,7 +9,7 @@ Uses camelCase field names to match Java naming convention directly.
 """
 
 from enum import Enum
-from typing import Any, Dict, List, Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -18,6 +18,7 @@ from models.usage_metrics import UsageMetrics
 
 class RunPhase(str, Enum):
     """Run phase enum matching backend RunPhase.java"""
+
     INITIALIZING = "INITIALIZING"
     RESEARCHING = "RESEARCHING"
     DECIDING = "DECIDING"
@@ -28,6 +29,7 @@ class RunPhase(str, Enum):
 
 class PhaseStatus(str, Enum):
     """Execution phase status matching backend PhaseStatus.java"""
+
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     SKIPPED = "SKIPPED"
@@ -35,6 +37,7 @@ class PhaseStatus(str, Enum):
 
 class TradeDecision(str, Enum):
     """Trade decision enum matching backend TradeDecision.java"""
+
     BUY = "BUY"
     SELL = "SELL"
     HOLD = "HOLD"
@@ -48,6 +51,7 @@ class SourceDto(BaseModel):
     - web: Has title + url (verifiable)
     - system_context: Has description (internal tool usage)
     """
+
     type: Literal["web", "system_context"]
     title: str | None = None
     url: str | None = None
@@ -74,8 +78,9 @@ class ToolCallDto(BaseModel):
     - error: Whether the tool call returned an error
     - errorMessage: Truncated error output (max 500 chars)
     """
+
     tool: str
-    params: Dict[str, Any] | None = None
+    params: dict[str, Any] | None = None
     error: bool | None = None
     errorMessage: str | None = None
 
@@ -87,6 +92,7 @@ class ReasoningDto(BaseModel):
     4-field structured reasoning: rationale narrative, portfolio context,
     historical context, research summary.
     """
+
     rationale: str | None = None
     portfolioContext: str | None = None
     historicalContext: str | None = None
@@ -99,10 +105,11 @@ class ResearchPhaseData(BaseModel):
     Matches backend ResearchPhaseDto.java.
     Contains all data collected during the RESEARCHING phase.
     """
-    candidates: List[str] = Field(default_factory=list)
-    sources: List[SourceDto] = Field(default_factory=list)
+
+    candidates: list[str] = Field(default_factory=list)
+    sources: list[SourceDto] = Field(default_factory=list)
     notes: str | None = None
-    toolCalls: List[ToolCallDto] = Field(default_factory=list)
+    toolCalls: list[ToolCallDto] = Field(default_factory=list)
     latencyMs: int | None = None
     # Token usage metrics (nested object)
     metrics: UsageMetrics | None = None
@@ -117,12 +124,13 @@ class DecisionPhaseData(BaseModel):
     Matches backend DecisionPhaseDto.java.
     Contains all data collected during the DECIDING phase.
     """
+
     decision: TradeDecision
     symbol: str | None = None
     quantity: int | None = None
     reasoning: ReasoningDto | None = None
-    sources: List[SourceDto] = Field(default_factory=list)
-    toolCalls: List[ToolCallDto] = Field(default_factory=list)
+    sources: list[SourceDto] = Field(default_factory=list)
+    toolCalls: list[ToolCallDto] = Field(default_factory=list)
     latencyMs: int | None = None
     # Token usage metrics (nested object)
     metrics: UsageMetrics | None = None
@@ -137,6 +145,7 @@ class ExecutionPhaseData(BaseModel):
     Matches backend ExecutionPhaseDto.java.
     Contains all data collected during the TRADING phase.
     """
+
     tradeId: int | None = None
     status: PhaseStatus | None = None
     errorDetails: str | None = None
@@ -148,10 +157,11 @@ class CompleteRunData(BaseModel):
     Matches backend CompleteRunRequest.java.
     Nested structure with explicit phase DTOs for self-documenting API.
     """
+
     research: ResearchPhaseData | None = None
     decision: DecisionPhaseData
     execution: ExecutionPhaseData | None = None
 
-    def to_json_dict(self) -> Dict[str, Any]:
+    def to_json_dict(self) -> dict[str, Any]:
         """Serialize to dict for API."""
         return self.model_dump(exclude_none=True)

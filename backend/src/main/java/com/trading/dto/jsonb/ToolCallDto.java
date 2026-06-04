@@ -1,12 +1,11 @@
 package com.trading.dto.jsonb;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.io.Serializable;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.io.Serializable;
-import java.util.Map;
 
 /**
  * Unified DTO for tool calls in all phases (research, decision).
@@ -25,6 +24,7 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
+@SuppressWarnings("serial") // Map<String, Object> is the interface type Jackson populates from JSONB
 public class ToolCallDto implements Serializable {
 
     private static final long serialVersionUID = 1L;

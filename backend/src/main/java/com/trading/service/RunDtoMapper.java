@@ -9,9 +9,8 @@ import com.trading.entity.DecisionPhase;
 import com.trading.entity.ExecutionPhase;
 import com.trading.entity.ResearchPhase;
 import com.trading.entity.TradingRun;
-import org.springframework.stereotype.Component;
-
 import java.util.Optional;
+import org.springframework.stereotype.Component;
 
 /**
  * Assembles response DTOs for trading runs by composing the static {@code fromEntity*}
@@ -47,9 +46,12 @@ public class RunDtoMapper {
 
         TradingRunDto runDto = assembleListRow(run, decision.orElse(null));
 
-        ResearchPhaseDto researchDto = research.map(ResearchPhaseDto::fromEntity).orElse(null);
-        DecisionPhaseDto decisionDto = decision.map(DecisionPhaseDto::fromEntity).orElse(null);
-        ExecutionPhaseDto executionDto = execution.map(ExecutionPhaseDto::fromEntity).orElse(null);
+        ResearchPhaseDto researchDto =
+                research.map(ResearchPhaseDto::fromEntity).orElse(null);
+        DecisionPhaseDto decisionDto =
+                decision.map(DecisionPhaseDto::fromEntity).orElse(null);
+        ExecutionPhaseDto executionDto =
+                execution.map(ExecutionPhaseDto::fromEntity).orElse(null);
 
         return new TradingRunDetailDto(runDto, researchDto, decisionDto, executionDto);
     }

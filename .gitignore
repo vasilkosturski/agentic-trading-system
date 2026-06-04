@@ -65,7 +65,8 @@ agents/*.db
 memory-tool.db
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/settings.json
 .idea/
 *.swp
 *.swo
@@ -157,3 +158,4 @@ agents/tests/e2e/results/
 # ConPort database and vector data
 context_portal/# Test hook - Fri Dec  5 23:38:11 EET 2025
 # Test hook - Fri Dec  5 23:40:01 EET 2025
+.ruff_cache/

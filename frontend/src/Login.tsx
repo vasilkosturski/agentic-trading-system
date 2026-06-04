@@ -26,7 +26,7 @@ function Login() {
       // Redirect back to the original URL with query parameters
       const returnUrl = searchParams.get('returnUrl') || '/'
       navigate(returnUrl)
-    } catch (err) {
+    } catch {
       setError('Invalid username or password')
     } finally {
       setLoading(false)

@@ -1,15 +1,14 @@
 package com.trading.service;
 
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
-import org.springframework.util.PropertyPlaceholderHelper;
-import org.springframework.util.StreamUtils;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.stereotype.Component;
+import org.springframework.util.PropertyPlaceholderHelper;
+import org.springframework.util.StreamUtils;
 
 /**
  * Loads and composes agent system prompts from classpath resources.
@@ -18,12 +17,10 @@ import java.util.regex.Pattern;
 @Component
 public class PromptLoader {
 
-    private static final PropertyPlaceholderHelper PLACEHOLDER_HELPER =
-            new PropertyPlaceholderHelper("{", "}");
+    private static final PropertyPlaceholderHelper PLACEHOLDER_HELPER = new PropertyPlaceholderHelper("{", "}");
 
     private static final Pattern SAFE_PATH_SEGMENT = Pattern.compile("[a-zA-Z0-9_]+");
-    private static final Pattern UNRESOLVED_PLACEHOLDER =
-            Pattern.compile("(?<!\\{)\\{[a-zA-Z0-9_]+}(?!})");
+    private static final Pattern UNRESOLVED_PLACEHOLDER = Pattern.compile("(?<!\\{)\\{[a-zA-Z0-9_]+}(?!})");
 
     /**
      * Load base template for an agent type from classpath.
@@ -72,7 +69,8 @@ public class PromptLoader {
             int colonPos = line.indexOf(':');
 
             // Check if line starts a new key (word chars + colon)
-            if (colonPos > 0 && SAFE_PATH_SEGMENT.matcher(line.substring(0, colonPos)).matches()) {
+            if (colonPos > 0
+                    && SAFE_PATH_SEGMENT.matcher(line.substring(0, colonPos)).matches()) {
                 // Save previous key if exists
                 if (currentKey != null) {
                     fields.put(currentKey, currentValue.toString().trim());
@@ -127,11 +125,10 @@ public class PromptLoader {
 
         // Validate no single-brace placeholders remain (double-braces are OK for runtime substitution)
         if (UNRESOLVED_PLACEHOLDER.matcher(result).find()) {
-            throw new IllegalStateException(
-                String.format("Unresolved single-brace placeholders found in prompt for %s/%s. " +
-                             "Check that personality file defines all required fields.",
-                             agentType, agentName)
-            );
+            throw new IllegalStateException(String.format(
+                    "Unresolved single-brace placeholders found in prompt for %s/%s. "
+                            + "Check that personality file defines all required fields.",
+                    agentType, agentName));
         }
 
         return result;
@@ -165,8 +162,7 @@ public class PromptLoader {
     private void validatePathSegment(String value, String paramName) {
         if (value == null || !SAFE_PATH_SEGMENT.matcher(value).matches()) {
             throw new IllegalArgumentException(
-                String.format("Invalid %s: must contain only alphanumeric characters and underscores", paramName)
-            );
+                    String.format("Invalid %s: must contain only alphanumeric characters and underscores", paramName));
         }
     }
 }

@@ -1,5 +1,12 @@
 package com.trading.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.when;
+
 import com.trading.entity.TradingAccount;
 import com.trading.entity.TradingAgent;
 import com.trading.entity.TradingRun;
@@ -11,6 +18,8 @@ import com.trading.repository.AccountTransactionRepository;
 import com.trading.repository.TradingAccountRepository;
 import com.trading.repository.TradingAgentRepository;
 import com.trading.repository.TradingRunRepository;
+import com.trading.testsupport.SharedPostgresContainer;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,16 +29,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import com.trading.testsupport.SharedPostgresContainer;
-
-import java.time.Instant;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.when;
 
 /**
  * Integration tests for {@link TradeOrchestrator} — verifies that the
@@ -54,16 +53,32 @@ class TradeOrchestratorIntegrationTest {
         SharedPostgresContainer.register(registry);
     }
 
-    @Autowired private TradeOrchestrator tradeOrchestrator;
-    @Autowired private TradingAccountRepository accountRepository;
-    @Autowired private AccountTransactionRepository transactionRepository;
-    @Autowired private AccountHoldingRepository holdingRepository;
-    @Autowired private AccountPortfolioSnapshotRepository snapshotRepository;
-    @Autowired private TradingAgentRepository agentRepository;
-    @Autowired private TradingRunRepository runRepository;
+    @Autowired
+    private TradeOrchestrator tradeOrchestrator;
 
-    @MockBean private PortfolioSnapshotService portfolioSnapshotService;
-    @MockBean private MarketService marketService;
+    @Autowired
+    private TradingAccountRepository accountRepository;
+
+    @Autowired
+    private AccountTransactionRepository transactionRepository;
+
+    @Autowired
+    private AccountHoldingRepository holdingRepository;
+
+    @Autowired
+    private AccountPortfolioSnapshotRepository snapshotRepository;
+
+    @Autowired
+    private TradingAgentRepository agentRepository;
+
+    @Autowired
+    private TradingRunRepository runRepository;
+
+    @MockBean
+    private PortfolioSnapshotService portfolioSnapshotService;
+
+    @MockBean
+    private MarketService marketService;
 
     private static final String AGENT_NAME = "testagent";
     private static final String SYMBOL = "NVDA";
@@ -105,7 +120,7 @@ class TradeOrchestratorIntegrationTest {
         run = runRepository.save(run);
 
         when(marketService.getSharePrice(anyString()))
-            .thenReturn(new MarketService.PriceData(PRICE, false, Instant.now(), "test"));
+                .thenReturn(new MarketService.PriceData(PRICE, false, Instant.now(), "test"));
     }
 
     @Test
@@ -135,11 +150,12 @@ class TradeOrchestratorIntegrationTest {
 
         // Force a throw INSIDE the @Transactional boundary, AFTER the executor has inserted the trade row.
         doThrow(new RuntimeException("forced rollback for test"))
-            .when(portfolioSnapshotService).createSnapshot(anyString());
+                .when(portfolioSnapshotService)
+                .createSnapshot(anyString());
 
         assertThatThrownBy(() -> tradeOrchestrator.buyShares(AGENT_NAME, SYMBOL, 10, run.getId()))
-            .isInstanceOf(RuntimeException.class)
-            .hasMessageContaining("forced rollback");
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("forced rollback");
 
         // All effects rolled back:
         assertThat(transactionRepository.count()).isEqualTo(txnCountBefore);

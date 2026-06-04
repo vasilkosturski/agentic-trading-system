@@ -1,5 +1,6 @@
 package com.trading.config;
 
+import java.util.Map;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.retry.annotation.EnableRetry;
@@ -7,8 +8,6 @@ import org.springframework.retry.backoff.ExponentialBackOffPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.web.client.RestClientException;
-
-import java.util.Map;
 
 /**
  * Centralized retry configuration for all external API calls.
@@ -26,8 +25,7 @@ public class RetryConfig {
         RetryTemplate template = new RetryTemplate();
 
         // Retry up to 3 times on transient HTTP errors
-        SimpleRetryPolicy retryPolicy = new SimpleRetryPolicy(
-                3, Map.of(RestClientException.class, true), true);
+        SimpleRetryPolicy retryPolicy = new SimpleRetryPolicy(3, Map.of(RestClientException.class, true), true);
         template.setRetryPolicy(retryPolicy);
 
         // Exponential backoff: 500ms → 1s → 2s

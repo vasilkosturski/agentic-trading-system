@@ -118,24 +118,20 @@ public class SecurityConfig {
      * @throws Exception if configuration fails
      */
     @Bean
-    public SecurityFilterChain securityFilterChain(
-            HttpSecurity http,
-            JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
-        http
-            .cors(Customizer.withDefaults())
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(securityProperties.getPublicMatchers().toArray(new String[0])).permitAll()
-                .requestMatchers("/actuator/**").hasRole("ADMIN")
-                .anyRequest().permitAll()
-            )
-            .exceptionHandling(ex -> ex
-                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
-            )
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter)
+            throws Exception {
+        http.cors(Customizer.withDefaults())
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth.requestMatchers(
+                                securityProperties.getPublicMatchers().toArray(new String[0]))
+                        .permitAll()
+                        .requestMatchers("/actuator/**")
+                        .hasRole("ADMIN")
+                        .anyRequest()
+                        .permitAll())
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -158,10 +154,10 @@ public class SecurityConfig {
     @Bean
     public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder) {
         UserDetails admin = User.builder()
-            .username(adminUsername)
-            .password(passwordEncoder.encode(adminPassword))
-            .roles("ADMIN")
-            .build();
+                .username(adminUsername)
+                .password(passwordEncoder.encode(adminPassword))
+                .roles("ADMIN")
+                .build();
 
         return new InMemoryUserDetailsManager(admin);
     }
@@ -188,7 +184,8 @@ public class SecurityConfig {
      * @throws Exception if configuration fails
      */
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
+            throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
     }
 }

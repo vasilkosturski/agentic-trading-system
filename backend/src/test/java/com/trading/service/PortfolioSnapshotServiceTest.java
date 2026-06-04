@@ -1,5 +1,12 @@
 package com.trading.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
 import com.trading.config.AgentProperties;
 import com.trading.entity.AccountHolding;
 import com.trading.entity.AccountPortfolioSnapshot;
@@ -9,6 +16,9 @@ import com.trading.exception.ResourceNotFoundException;
 import com.trading.repository.AccountHoldingRepository;
 import com.trading.repository.AccountPortfolioSnapshotRepository;
 import com.trading.repository.TradingAccountRepository;
+import java.lang.reflect.Method;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,17 +27,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.lang.reflect.Method;
-import java.util.List;
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PortfolioSnapshotService Tests")
@@ -52,7 +51,8 @@ class PortfolioSnapshotServiceTest {
     private PortfolioSnapshotService portfolioSnapshotService;
 
     @Test
-    @DisplayName("createSnapshot — empty holdings + no previous snapshot → totalValue=balance, holdingsValue=0, metrics null")
+    @DisplayName(
+            "createSnapshot — empty holdings + no previous snapshot → totalValue=balance, holdingsValue=0, metrics null")
     void createSnapshot_EmptyHoldingsNoPrevious_PersistsBaseSnapshotWithoutMetrics() {
         TradingAccount account = newAccount("warren", 100_000.0);
         when(tradingAccountRepository.findByAgentName("warren")).thenReturn(Optional.of(account));
@@ -122,8 +122,8 @@ class PortfolioSnapshotServiceTest {
         when(tradingAccountRepository.findByAgentName("unknown")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> portfolioSnapshotService.createSnapshot("unknown"))
-            .isInstanceOf(ResourceNotFoundException.class)
-            .hasMessageContaining("Trading account not found for agent: unknown");
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Trading account not found for agent: unknown");
 
         verifyNoInteractions(holdingRepository, snapshotRepository, holdingsValuationService, agentProperties);
     }
@@ -133,8 +133,8 @@ class PortfolioSnapshotServiceTest {
     void createSnapshot_HasTransactionalAnnotation() throws NoSuchMethodException {
         Method method = PortfolioSnapshotService.class.getDeclaredMethod("createSnapshot", String.class);
         assertThat(method.getAnnotation(Transactional.class))
-            .as("createSnapshot must carry @Transactional")
-            .isNotNull();
+                .as("createSnapshot must carry @Transactional")
+                .isNotNull();
     }
 
     // Helpers

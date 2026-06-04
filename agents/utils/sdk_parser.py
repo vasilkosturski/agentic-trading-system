@@ -14,10 +14,9 @@ Error detection covers two patterns:
 
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any
 
 from agents.items import RunItem, ToolCallItem, ToolCallOutputItem
-
 
 TOOL_RESEARCHER = "Researcher"
 TOOL_DECIDE_ACTION = "decide_action"
@@ -30,7 +29,7 @@ class ParsedToolCall:
     name: str
     call_id: str
     output: str
-    params: Dict[str, Any] | None = None
+    params: dict[str, Any] | None = None
     is_error: bool = False
     error_message: str | None = None
 
@@ -49,9 +48,9 @@ def extract_tool_calls(items: list[RunItem]) -> list[ParsedToolCall]:
     via call_id. Output is read from raw_item which the SDK already
     serializes to a string.
     """
-    tool_calls: List[ParsedToolCall] = []
-    names: Dict[str, str] = {}
-    params: Dict[str, Dict[str, Any] | None] = {}
+    tool_calls: list[ParsedToolCall] = []
+    names: dict[str, str] = {}
+    params: dict[str, dict[str, Any] | None] = {}
 
     for item in items:
         if isinstance(item, ToolCallItem):
@@ -79,14 +78,16 @@ def extract_tool_calls(items: list[RunItem]) -> list[ParsedToolCall]:
             output = json.dumps(raw_output) if isinstance(raw_output, list) else str(raw_output)
             if call_id and call_id in names:
                 is_error, error_msg = _detect_tool_error(output)
-                tool_calls.append(ParsedToolCall(
-                    name=names[call_id],
-                    call_id=call_id,
-                    output=output,
-                    params=params.get(call_id),
-                    is_error=is_error,
-                    error_message=error_msg,
-                ))
+                tool_calls.append(
+                    ParsedToolCall(
+                        name=names[call_id],
+                        call_id=call_id,
+                        output=output,
+                        params=params.get(call_id),
+                        is_error=is_error,
+                        error_message=error_msg,
+                    )
+                )
 
     return tool_calls
 

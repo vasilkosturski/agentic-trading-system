@@ -8,6 +8,7 @@ class MCPServerName(str, Enum):
 
     Using an enum prevents typos and provides IDE autocomplete.
     """
+
     BRAVE_SEARCH = "brave-search"
     FETCH = "fetch"
     MEMORY = "memory"

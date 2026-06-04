@@ -1,11 +1,18 @@
 package com.trading.controller;
 
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.trading.config.SecurityConfig;
 import com.trading.config.TradingPublicProperties;
 import com.trading.dto.response.RunListResponseDto;
 import com.trading.security.JwtAuthenticationFilter;
 import com.trading.security.JwtTokenProvider;
 import com.trading.service.TradingRunService;
+import java.util.Collections;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,14 +26,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.Collections;
-
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Security tests for the admin endpoint in TradingRunController.
@@ -75,8 +74,7 @@ class TradingRunControllerAdminSecurityTest {
     static class JwtFilterTestConfig {
         @Bean
         JwtAuthenticationFilter jwtAuthenticationFilter(
-                JwtTokenProvider jwtTokenProvider,
-                UserDetailsService userDetailsService) {
+                JwtTokenProvider jwtTokenProvider, UserDetailsService userDetailsService) {
             return new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService);
         }
     }
@@ -85,18 +83,13 @@ class TradingRunControllerAdminSecurityTest {
     @WithMockUser(roles = "ADMIN")
     @DisplayName("Admin user can access /api/runs/admin and receives 200 OK")
     void listAllRuns_WithAdminRole_Returns200() throws Exception {
-        RunListResponseDto response = new RunListResponseDto(
-            Collections.emptyList(),
-            0L,
-            0,
-            20
-        );
+        RunListResponseDto response = new RunListResponseDto(Collections.emptyList(), 0L, 0, 20);
         when(tradingRunService.listRuns(isNull(), isNull(), any())).thenReturn(response);
 
         mockMvc.perform(get("/api/runs/admin"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.runs").isArray())
-            .andExpect(jsonPath("$.total").value(0));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runs").isArray())
+                .andExpect(jsonPath("$.total").value(0));
 
         // Verify service called with null cutoffDate (admin bypasses display delay)
         verify(tradingRunService).listRuns(isNull(), isNull(), any());
@@ -106,8 +99,7 @@ class TradingRunControllerAdminSecurityTest {
     @WithMockUser(roles = "USER")
     @DisplayName("Non-admin user gets 403 Forbidden")
     void listAllRuns_WithoutAdminRole_Returns403() throws Exception {
-        mockMvc.perform(get("/api/runs/admin"))
-            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/runs/admin")).andExpect(status().isForbidden());
 
         // Service should never be called - authorization fails first
         verify(tradingRunService, never()).listRuns(any(), any(), any());
@@ -119,14 +111,12 @@ class TradingRunControllerAdminSecurityTest {
         // Spring's default for anonymous against @PreAuthorize is 403 Forbidden
         // (AccessDeniedException -> ExceptionTranslationFilter -> 403).
         // The contract is that the request MUST be denied — accept either 401 or 403.
-        mockMvc.perform(get("/api/runs/admin"))
-            .andExpect(result -> {
-                int status = result.getResponse().getStatus();
-                if (status != 401 && status != 403) {
-                    throw new AssertionError(
-                        "Expected 401 or 403 for unauthenticated request, got " + status);
-                }
-            });
+        mockMvc.perform(get("/api/runs/admin")).andExpect(result -> {
+            int status = result.getResponse().getStatus();
+            if (status != 401 && status != 403) {
+                throw new AssertionError("Expected 401 or 403 for unauthenticated request, got " + status);
+            }
+        });
 
         // Service should never be called - authorization fails first
         verify(tradingRunService, never()).listRuns(any(), any(), any());
@@ -139,17 +129,15 @@ class TradingRunControllerAdminSecurityTest {
         // catches the exception broadly and lets the request through with no
         // authentication set, so the request reaches @PreAuthorize as anonymous.
         when(jwtTokenProvider.getUsernameFromToken(anyString()))
-            .thenThrow(new io.jsonwebtoken.ExpiredJwtException(null, null, "expired"));
+                .thenThrow(new io.jsonwebtoken.ExpiredJwtException(null, null, "expired"));
 
-        mockMvc.perform(get("/api/runs/admin")
-                .header("Authorization", "Bearer expired.jwt.token"))
-            .andExpect(result -> {
-                int status = result.getResponse().getStatus();
-                if (status != 401 && status != 403) {
-                    throw new AssertionError(
-                        "Expected 401 or 403 for expired token, got " + status);
-                }
-            });
+        mockMvc.perform(get("/api/runs/admin").header("Authorization", "Bearer expired.jwt.token"))
+                .andExpect(result -> {
+                    int status = result.getResponse().getStatus();
+                    if (status != 401 && status != 403) {
+                        throw new AssertionError("Expected 401 or 403 for expired token, got " + status);
+                    }
+                });
 
         // Service should never be called - authorization fails first
         verify(tradingRunService, never()).listRuns(any(), any(), any());
@@ -159,16 +147,10 @@ class TradingRunControllerAdminSecurityTest {
     @WithMockUser(roles = "ADMIN")
     @DisplayName("Admin endpoint always passes null cutoffDate to service (no display delay)")
     void listAllRuns_AlwaysPassesNullCutoff() throws Exception {
-        RunListResponseDto response = new RunListResponseDto(
-            Collections.emptyList(),
-            0L,
-            0,
-            20
-        );
+        RunListResponseDto response = new RunListResponseDto(Collections.emptyList(), 0L, 0, 20);
         when(tradingRunService.listRuns(isNull(), isNull(), any())).thenReturn(response);
 
-        mockMvc.perform(get("/api/runs/admin"))
-            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/runs/admin")).andExpect(status().isOk());
 
         // Verify null cutoffDate is always passed (no public display delay for admin)
         verify(tradingRunService).listRuns(isNull(), isNull(), any());

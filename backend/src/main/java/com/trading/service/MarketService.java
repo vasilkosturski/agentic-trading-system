@@ -1,9 +1,8 @@
 package com.trading.service;
 
 import com.trading.exception.ResourceNotFoundException;
-import org.springframework.stereotype.Service;
-
 import java.time.Instant;
+import org.springframework.stereotype.Service;
 
 @Service
 public class MarketService {
@@ -21,8 +20,8 @@ public class MarketService {
         String upperSymbol = symbol.toUpperCase();
         PriceData priceData = priceCacheService.getPrice(upperSymbol);
         if (priceData == null) {
-            throw new ResourceNotFoundException("Symbol not found: " + upperSymbol +
-                ". Finnhub does not have data for this symbol.");
+            throw new ResourceNotFoundException(
+                    "Symbol not found: " + upperSymbol + ". Finnhub does not have data for this symbol.");
         }
         return priceData;
     }
@@ -40,9 +39,20 @@ public class MarketService {
             this.source = source;
         }
 
-        public double getPrice() { return price; }
-        public boolean isCached() { return cached; }
-        public Instant getTimestamp() { return timestamp; }
-        public String getSource() { return source; }
+        public double getPrice() {
+            return price;
+        }
+
+        public boolean isCached() {
+            return cached;
+        }
+
+        public Instant getTimestamp() {
+            return timestamp;
+        }
+
+        public String getSource() {
+            return source;
+        }
     }
 }

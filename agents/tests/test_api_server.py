@@ -83,9 +83,7 @@ def test_trigger_cycle_does_not_touch_event_private_loop_attr(
     assert mock_loop.call_soon_threadsafe.call_count == 1
 
 
-def test_trigger_cycle_rejects_when_already_running(
-    api_server, mock_loop, cycle_running_flag
-):
+def test_trigger_cycle_rejects_when_already_running(api_server, mock_loop, cycle_running_flag):
     """When a cycle is in progress the handler must return 409 and must NOT
     schedule another set() on the loop."""
     cycle_running_flag["running"] = True
@@ -128,9 +126,7 @@ def test_health_endpoint_returns_200_with_expected_body(api_server):
     assert body == {"status": "healthy", "service": "trading-agents-api"}
 
 
-def test_trigger_cycle_success_body_shape(
-    api_server, mock_loop, cycle_running_flag
-):
+def test_trigger_cycle_success_body_shape(api_server, mock_loop, cycle_running_flag):
     """On 202 the body must include both a human message and the
     machine-readable status flag ``TRIGGERED`` so the frontend can
     differentiate this from the 409 ALREADY_RUNNING path."""
@@ -146,9 +142,7 @@ def test_trigger_cycle_success_body_shape(
     assert isinstance(body["message"], str) and body["message"]
 
 
-def test_trigger_cycle_409_body_shape(
-    api_server, mock_loop, cycle_running_flag
-):
+def test_trigger_cycle_409_body_shape(api_server, mock_loop, cycle_running_flag):
     """On 409 the body must carry status ``ALREADY_RUNNING`` so callers can
     distinguish a duplicate-trigger rejection from any other failure."""
     cycle_running_flag["running"] = True

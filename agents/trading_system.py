@@ -5,18 +5,18 @@ import logging
 import os
 import random
 from contextlib import AsyncExitStack
-from typing import List
-from dotenv import load_dotenv
 
 from agents.mcp import MCPServerStdio
+from dotenv import load_dotenv
+
 from agent_registry import AGENT_NAMES
 from ai_agents.simple_trader import SimpleTrader
-from models.investment_style import InvestmentStyle
 from api.server import TradingAPIServer
-from mcp_helpers.types import MCPName, MCPPool
-from mcp_helpers.params import get_mcp_server_params
 from backend.client import close_backend_client
 from logging_config import configure_json_logging
+from mcp_helpers.params import get_mcp_server_params
+from mcp_helpers.types import MCPPool
+from models.investment_style import InvestmentStyle
 
 # Load environment variables
 load_dotenv(override=True)
@@ -40,28 +40,28 @@ logger = logging.getLogger(__name__)
 # close over them (list comprehensions inside a class body don't see the
 # class's other class-level names).
 _AGENT_STYLES = (
-    InvestmentStyle.VALUE,            # Warren
-    InvestmentStyle.CONTRARIAN_MACRO, # George
-    InvestmentStyle.RISK_PARITY,      # Ray
-    InvestmentStyle.GROWTH,           # Cathie
+    InvestmentStyle.VALUE,  # Warren
+    InvestmentStyle.CONTRARIAN_MACRO,  # George
+    InvestmentStyle.RISK_PARITY,  # Ray
+    InvestmentStyle.GROWTH,  # Cathie
 )
 _DEFAULT_STARTING_BALANCE = 100000.0
 
 
 class TradingSystem:
     """Main trading system that orchestrates all four autonomous agents"""
-    
-    def __init__(self, agents: List[SimpleTrader]):
+
+    def __init__(self, agents: list[SimpleTrader]):
         """Initialize with pre-configured agents (use create() factory method)"""
         self.agents = agents
-    
+
     # Per-agent config table. The agent NAMES live in
     # ``agent_registry.AGENT_NAMES`` (single source of truth); this table
     # zips each name with its persona-specific style + starting balance
     # (defined at module scope above, in registry order).
     AGENT_CONFIGS = [
         {"name": name, "style": style, "balance": _DEFAULT_STARTING_BALANCE}
-        for name, style in zip(AGENT_NAMES, _AGENT_STYLES)
+        for name, style in zip(AGENT_NAMES, _AGENT_STYLES, strict=True)
     ]
 
     @classmethod
@@ -86,7 +86,7 @@ class TradingSystem:
 
         logger.info(f"✅ TradingSystem created with {len(agents)} agents")
         return cls(agents)
-    
+
     async def _run_agent_with_own_mcp(self, agent: SimpleTrader, force_trade: bool):
         """Each agent gets its own MCP pool to avoid stdio interleaving.
 
@@ -143,7 +143,7 @@ class TradingSystem:
 
         success = 0
         failure = 0
-        for agent, result in zip(self.agents, results):
+        for agent, result in zip(self.agents, results, strict=True):
             if isinstance(result, BaseException):
                 failure += 1
                 logger.error(
@@ -155,23 +155,23 @@ class TradingSystem:
                 success += 1
 
         logger.info(
-            f"✅ All agents completed their trading cycle "
-            f"(success={success}, failure={failure})"
+            f"✅ All agents completed their trading cycle (success={success}, failure={failure})"
         )
         return {"success": success, "failure": failure}
-    
+
     def print_agent_summary(self):
         """Print a summary of all agents"""
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("🏛️  AGENTIC TRADING SYSTEM - AGENT ROSTER")
-        print("="*80)
-        
+        print("=" * 80)
+
         # Use actual agent data from self.agents
         for agent in self.agents:
             print(f"👤 {agent.name} ({agent.agent_style})")
             print()
-        
-        print("="*80 + "\n")
+
+        print("=" * 80 + "\n")
+
 
 async def run_continuous_trading():
     """Run continuous trading cycles - matches source project pattern"""
@@ -181,7 +181,7 @@ async def run_continuous_trading():
     manual_cycle_event = asyncio.Event()
 
     # Create flag to track if a cycle is currently running (thread-safe dict)
-    cycle_running_flag = {'running': False}
+    cycle_running_flag = {"running": False}
 
     # Capture the running event loop so the Flask handler thread can schedule
     # callbacks back onto it via loop.call_soon_threadsafe. Passing the loop
@@ -201,7 +201,9 @@ async def run_continuous_trading():
     logger.info(f"Continuous trading loop started with {RUN_EVERY_N_MINUTES} minute intervals")
     logger.info("🎓 Demo mode: Trading enabled 24/7 (using end-of-day data)")
     logger.info("📡 Manual cycle trigger available at http://localhost:8000/api/trigger-cycle")
-    logger.info(f"⏰ First cycle will run in {RUN_EVERY_N_MINUTES} minutes or when manually triggered")
+    logger.info(
+        f"⏰ First cycle will run in {RUN_EVERY_N_MINUTES} minutes or when manually triggered"
+    )
     logger.info(f"🔧 DEBUG: Event loop: {asyncio.get_event_loop()}")
     logger.info(f"🔧 DEBUG: Manual cycle event: {manual_cycle_event}")
 
@@ -210,7 +212,9 @@ async def run_continuous_trading():
         while True:
             # Wait for either: scheduled time OR manual trigger event
             sleep_seconds = RUN_EVERY_N_MINUTES * 60
-            logger.info(f"💤 Waiting {RUN_EVERY_N_MINUTES} minutes for next cycle (or manual trigger)...")
+            logger.info(
+                f"💤 Waiting {RUN_EVERY_N_MINUTES} minutes for next cycle (or manual trigger)..."
+            )
 
             is_manual_trigger = False
             try:
@@ -220,7 +224,7 @@ async def run_continuous_trading():
                 logger.info("📣 Manual cycle triggered - starting immediately...")
                 manual_cycle_event.clear()  # Reset for next trigger
                 is_manual_trigger = True
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Normal scheduled cycle
                 logger.info("⏰ Scheduled cycle time reached")
 
@@ -228,17 +232,17 @@ async def run_continuous_trading():
             logger.info("🚀 Starting trading cycle...")
 
             # Set flag to indicate cycle is running
-            cycle_running_flag['running'] = True
+            cycle_running_flag["running"] = True
 
             try:
                 # Force one agent to trade if manually triggered
                 await system.run_all_agents(force_one_trade=is_manual_trigger)
-                logger.info(f"✅ Trading cycle completed.")
+                logger.info("✅ Trading cycle completed.")
             finally:
                 # Always clear the flag, even if there was an error
-                cycle_running_flag['running'] = False
+                cycle_running_flag["running"] = False
                 logger.info("🔓 Trading cycle lock released")
-            
+
     except KeyboardInterrupt:
         logger.info("🛑 Graceful shutdown requested (Ctrl+C)")
         print("\n🛑 Shutting down trading system gracefully...")
@@ -247,6 +251,7 @@ async def run_continuous_trading():
         raise
     finally:
         await close_backend_client()
+
 
 async def main():
     """Main function - single run for testing"""
@@ -262,10 +267,11 @@ async def main():
     finally:
         await close_backend_client()
 
+
 if __name__ == "__main__":
     # Check if we should run continuously or just once
     continuous_mode = os.getenv("CONTINUOUS_MODE", "true").lower() == "true"
-    
+
     if continuous_mode:
         print("🔄 Running in CONTINUOUS mode")
         asyncio.run(run_continuous_trading())

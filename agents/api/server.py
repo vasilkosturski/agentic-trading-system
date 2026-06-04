@@ -7,9 +7,10 @@ Runs alongside the continuous trading system using proper encapsulation.
 import asyncio
 import logging
 import os
-import time
+from threading import Event, Thread
+
 from flask import Flask, jsonify
-from threading import Thread
+from werkzeug.serving import make_server
 
 # Ensure JSON logging is installed even when this module is imported in
 # isolation (e.g. unit tests). configure_json_logging is idempotent so it's
@@ -48,27 +49,29 @@ class TradingAPIServer:
         self._loop = loop
         self.app = Flask(__name__)
         self._setup_routes()
-    
+
     def _setup_routes(self):
         """Setup Flask routes."""
-        
-        @self.app.route('/health', methods=['GET'])
+
+        @self.app.route("/health", methods=["GET"])
         def health():
             """Health check endpoint."""
             return jsonify({"status": "healthy", "service": "trading-agents-api"}), 200
-        
-        @self.app.route('/api/trigger-cycle', methods=['POST'])
+
+        @self.app.route("/api/trigger-cycle", methods=["POST"])
         def trigger_cycle():
             """Trigger a manual trading cycle (demo mode - always allowed)."""
             logger.info("📣 Manual trading cycle requested via API")
 
             # Check if a cycle is already running
-            if self.cycle_running_flag['running']:
+            if self.cycle_running_flag["running"]:
                 logger.warning("⚠️ Trading cycle already in progress - rejecting duplicate request")
-                return jsonify({
-                    "message": "A trading cycle is already in progress. Please wait for it to complete.",
-                    "status": "ALREADY_RUNNING"
-                }), 409  # 409 Conflict
+                return jsonify(
+                    {
+                        "message": "A trading cycle is already in progress. Please wait for it to complete.",
+                        "status": "ALREADY_RUNNING",
+                    }
+                ), 409  # 409 Conflict
 
             # Signal the event to trigger a cycle immediately.
             # Use the explicitly-captured loop's call_soon_threadsafe to safely
@@ -77,24 +80,29 @@ class TradingAPIServer:
             self._loop.call_soon_threadsafe(self.manual_cycle_event.set)
             logger.info("✅ Manual trading cycle triggered successfully")
 
-            return jsonify({
-                "message": "Trading cycle triggered successfully.",
-                "status": "TRIGGERED"
-            }), 202  # 202 Accepted - request accepted for processing
-    
+            return jsonify(
+                {"message": "Trading cycle triggered successfully.", "status": "TRIGGERED"}
+            ), 202  # 202 Accepted - request accepted for processing
+
     def run(self, port=8000):
-        """Run the Flask API server in a separate daemon thread."""
+        """Run the Flask API server in a daemon thread.
+
+        Blocks the caller until the HTTP listener has bound to the port (or 5s
+        elapses, in which case a warning is logged). After this returns the
+        /health and /api/trigger-cycle routes are serving.
+        """
+        ready = Event()
+
         def run_flask():
             try:
-                logger.info(f"🚀 Starting Flask server on 0.0.0.0:{port}")
-                self.app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False, threaded=True)
+                srv = make_server("0.0.0.0", port, self.app, threaded=True)
+                logger.info(f"🌐 Flask listener bound on 0.0.0.0:{port}")
+                ready.set()
+                srv.serve_forever()
             except Exception as e:
                 logger.error(f"❌ Flask server failed to start: {e}", exc_info=True)
-        
-        thread = Thread(target=run_flask, daemon=True)
-        thread.start()
-        logger.info(f"🌐 API server thread started on port {port}")
-        
-        # Give Flask a moment to start
-        time.sleep(2)
-        logger.info(f"✅ Flask server should be running on http://0.0.0.0:{port}")
+                ready.set()
+
+        Thread(target=run_flask, daemon=True).start()
+        if not ready.wait(timeout=5.0):
+            logger.warning(f"⚠️ Flask listener did not bind within 5s on port {port}")
