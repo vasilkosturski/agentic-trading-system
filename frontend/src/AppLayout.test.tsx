@@ -6,7 +6,6 @@ import AppLayout from './AppLayout'
 
 describe('AppLayout', () => {
   it('renders the disclaimer banner before all content', () => {
-    // Arrange & Act
     const { container } = render(
       <MantineProvider>
         <BrowserRouter>
@@ -17,7 +16,6 @@ describe('AppLayout', () => {
       </MantineProvider>
     )
 
-    // Assert - Banner should be in alert role
     const alert = container.querySelector('[role="alert"]')
     expect(alert).toBeInTheDocument()
     expect(alert?.textContent).toMatch(/Educational Demonstration Only/i)
@@ -25,7 +23,6 @@ describe('AppLayout', () => {
   })
 
   it('renders the footer after all content', () => {
-    // Arrange & Act
     const { container } = render(
       <MantineProvider>
         <BrowserRouter>
@@ -36,10 +33,8 @@ describe('AppLayout', () => {
       </MantineProvider>
     )
 
-    // Assert
     const footer = container.querySelector('footer')
     expect(footer).toBeInTheDocument()
-    // Check footer contains the disclaimer text
     const footerText = footer?.textContent
     expect(footerText).toMatch(/Educational demonstration only/i)
     expect(footerText).toMatch(/7\+? days?/i)

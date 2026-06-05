@@ -19,7 +19,6 @@ interface AgentSummary {
   systemPrompt?: string
 }
 
-/** Extract the latest snapshot per agent from the full snapshots array and merge with agent data. */
 function latestPerAgent(snapshots: PortfolioSnapshot[], agents: Agent[]): AgentSummary[] {
   const latest = new Map<string, PortfolioSnapshot>()
   const agentMap = new Map(agents.map(a => [a.name, a]))

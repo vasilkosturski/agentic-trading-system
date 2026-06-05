@@ -1,9 +1,7 @@
-"""Unified Backend Client for all backend API calls.
+"""Unified Backend Client.
 
-Loop-local singleton with optional DI: production path creates the client
-lazily and rebinds the underlying httpx.AsyncClient when the asyncio loop
-changes (pytest-asyncio per-function loops); test path can inject an
-externally-owned client and bypass the loop tracking.
+Loop-local: rebinds httpx.AsyncClient when the asyncio loop changes
+(pytest-asyncio per-function loops); tests may inject an externally-owned client.
 """
 
 import asyncio
@@ -19,10 +17,10 @@ from tenacity import (
 )
 
 from config import (
-    BACKEND_ADMIN_PASSWORD as ADMIN_PASSWORD,
+    BACKEND_ADMIN_PASSWORD as ADMIN_PASSWORD,  # noqa: F401
 )
 from config import (
-    BACKEND_ADMIN_USERNAME as ADMIN_USERNAME,
+    BACKEND_ADMIN_USERNAME as ADMIN_USERNAME,  # noqa: F401
 )
 from config import (
     BACKEND_API_ACCOUNTS,
@@ -102,12 +100,6 @@ class BackendClient:
         self._owned_client = None
 
     async def _login(self) -> str:
-        """POST credentials to /api/auth/login and return the JWT.
-
-        The auth endpoint is filter-chain ``permitAll``, so this call
-        intentionally bypasses the bearer-injection / retry logic in
-        ``_request``.
-        """
         client = self._get_client()
         url = f"{BACKEND_BASE_URL}/api/auth/login"
         try:

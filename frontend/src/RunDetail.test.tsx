@@ -25,7 +25,6 @@ describe('RunDetail.tsx — Promise.all partial-failure resilience (R1)', () => 
   })
 
   it('still renders run detail with fallback agent name when fetchAgents rejects', async () => {
-    // Arrange — primary detail succeeds, cosmetic agents fetch fails.
     vi.mocked(api.fetchRunDetail).mockResolvedValue({
       run: {
         runId: 42,
@@ -43,7 +42,6 @@ describe('RunDetail.tsx — Promise.all partial-failure resilience (R1)', () => 
     })
     vi.mocked(api.fetchAgents).mockRejectedValue(new Error('agents endpoint down'))
 
-    // Act
     render(
       <MantineProvider>
         <MemoryRouter initialEntries={['/runs/42']}>
@@ -52,15 +50,12 @@ describe('RunDetail.tsx — Promise.all partial-failure resilience (R1)', () => 
       </MantineProvider>
     )
 
-    // Assert — primary content (run header) renders.
     await waitFor(() => {
       expect(screen.queryByText(/Loading run details/i)).toBeNull()
     })
 
-    // Header shows fallback "Agent #7" because agents lookup failed.
     expect(screen.getByText(/Agent #7/)).toBeInTheDocument()
 
-    // No error message painted from cosmetic-fetch failure.
     expect(screen.queryByText(/agents endpoint down/i)).toBeNull()
   })
 })

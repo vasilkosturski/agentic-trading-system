@@ -16,6 +16,7 @@ import com.trading.service.TradeOrchestrator;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -58,6 +59,7 @@ public class AccountController {
      * @return success message with 201 Created
      */
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CreateAccountResponse> createAccount(@Valid @RequestBody InitializeAgentRequest request) {
         var account = accountProvisioner.initializeAgent(request.getName(), request.getInitialBalance());
         var response = new CreateAccountResponse(
@@ -74,6 +76,7 @@ public class AccountController {
      * @return TradeResult with 201 Created
      */
     @PostMapping("/{agentId}/trades")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<TradeResult> executeTrade(
             @PathVariable Long agentId, @Valid @RequestBody TradeRequest request) {
         String name = agentIdentityService.requireAgentName(agentId);

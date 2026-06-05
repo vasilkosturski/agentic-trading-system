@@ -2,12 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fetchRuns } from './api'
 import * as auth from './auth'
 
-// Mock auth module
 vi.mock('./auth')
 
 describe('api.ts - fetchRuns with showAll parameter for admin endpoint', () => {
   beforeEach(() => {
-    // Setup fetch mock
     global.fetch = vi.fn()
   })
 
@@ -16,7 +14,6 @@ describe('api.ts - fetchRuns with showAll parameter for admin endpoint', () => {
   })
 
   it('calls /api/runs endpoint when showAll is false', async () => {
-    // Arrange
     const mockResponse = {
       runs: [{ runId: '123', agentId: 1, status: 'COMPLETED' }],
       total: 104,
@@ -29,16 +26,13 @@ describe('api.ts - fetchRuns with showAll parameter for admin endpoint', () => {
       json: async () => mockResponse,
     } as Response)
 
-    // Act
     await fetchRuns(0, 20, undefined, false)
 
-    // Assert - should call public endpoint (with empty options object, no auth)
     expect(global.fetch).toHaveBeenCalledWith('/api/runs?page=0&limit=20', {})
     expect(global.fetch).toHaveBeenCalledTimes(1)
   })
 
   it('calls /api/runs/admin endpoint when showAll is true', async () => {
-    // Arrange
     const mockResponse = {
       runs: [
         { runId: '1', agentId: 1, status: 'COMPLETED' },
@@ -56,10 +50,8 @@ describe('api.ts - fetchRuns with showAll parameter for admin endpoint', () => {
       json: async () => mockResponse,
     } as Response)
 
-    // Act
     await fetchRuns(0, 20, undefined, true)
 
-    // Assert - should call admin endpoint with auth header
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/runs/admin?page=0&limit=20',
       expect.objectContaining({
@@ -72,7 +64,6 @@ describe('api.ts - fetchRuns with showAll parameter for admin endpoint', () => {
   })
 
   it('accepts showAll with AbortSignal', async () => {
-    // Arrange
     const mockResponse = {
       runs: [],
       total: 188,
@@ -89,10 +80,8 @@ describe('api.ts - fetchRuns with showAll parameter for admin endpoint', () => {
 
     const abortController = new AbortController()
 
-    // Act - pass signal and showAll
     await fetchRuns(1, 10, abortController.signal, true)
 
-    // Assert - should include both signal and auth header
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/runs/admin?page=1&limit=10',
       expect.objectContaining({
@@ -105,7 +94,6 @@ describe('api.ts - fetchRuns with showAll parameter for admin endpoint', () => {
   })
 
   it('returns paginated runs data structure from admin endpoint', async () => {
-    // Arrange
     const mockResponse = {
       runs: [
         { runId: '1', agentId: 1, status: 'COMPLETED' },
@@ -121,23 +109,19 @@ describe('api.ts - fetchRuns with showAll parameter for admin endpoint', () => {
       json: async () => mockResponse,
     } as Response)
 
-    // Act
     const result = await fetchRuns(0, 20, undefined, true)
 
-    // Assert
     expect(result).toEqual(mockResponse)
     expect(result.runs).toHaveLength(2)
     expect(result.total).toBe(188)
   })
 
   it('throws error when admin endpoint fetch fails', async () => {
-    // Arrange
     vi.mocked(global.fetch).mockResolvedValue({
       ok: false,
-      status: 401, // Unauthorized
+      status: 401,
     } as Response)
 
-    // Act & Assert
     await expect(fetchRuns(0, 20, undefined, true)).rejects.toThrow(
       'Failed to fetch /api/runs/admin?page=0&limit=20: 401'
     )

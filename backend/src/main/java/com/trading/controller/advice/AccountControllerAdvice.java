@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -93,6 +94,17 @@ public class AccountControllerAdvice {
         logger.error("Configuration error", ex);
         ProblemDetail problem = ProblemDetailFactory.internalError("Internal server error", request.getRequestURI());
         return ResponseEntity.status(500).body(problem);
+    }
+
+    /**
+     * Re-throws {@link AccessDeniedException} so Spring Security's
+     * {@code ExceptionTranslationFilter} maps it to 403 Forbidden. Without this,
+     * the catch-all {@link #handleGenericException} below would swallow it and
+     * return 500.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public void handleAccessDenied(AccessDeniedException ex) throws AccessDeniedException {
+        throw ex;
     }
 
     /**

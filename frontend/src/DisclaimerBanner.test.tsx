@@ -6,7 +6,6 @@ import DisclaimerBanner from './DisclaimerBanner'
 
 describe('DisclaimerBanner', () => {
   it('displays educational demonstration warning', () => {
-    // Arrange & Act
     render(
       <MantineProvider>
         <BrowserRouter>
@@ -15,12 +14,10 @@ describe('DisclaimerBanner', () => {
       </MantineProvider>
     )
 
-    // Assert
     expect(screen.getByText(/Educational Demonstration Only/i)).toBeInTheDocument()
   })
 
   it('mentions the 7-day delay explicitly', () => {
-    // Arrange & Act
     render(
       <MantineProvider>
         <BrowserRouter>
@@ -29,12 +26,10 @@ describe('DisclaimerBanner', () => {
       </MantineProvider>
     )
 
-    // Assert
     expect(screen.getByText(/7\+? days?/i)).toBeInTheDocument()
   })
 
   it('states this is not financial advice', () => {
-    // Arrange & Act
     render(
       <MantineProvider>
         <BrowserRouter>
@@ -43,12 +38,10 @@ describe('DisclaimerBanner', () => {
       </MantineProvider>
     )
 
-    // Assert
     expect(screen.getByText(/not financial advice/i)).toBeInTheDocument()
   })
 
   it('includes a link to the disclaimer page', () => {
-    // Arrange & Act
     render(
       <MantineProvider>
         <BrowserRouter>
@@ -57,7 +50,6 @@ describe('DisclaimerBanner', () => {
       </MantineProvider>
     )
 
-    // Assert
     const link = screen.getByRole('link', { name: /disclaimer|learn more/i })
     expect(link).toBeInTheDocument()
     expect(link).toHaveAttribute('href', '/disclaimer')

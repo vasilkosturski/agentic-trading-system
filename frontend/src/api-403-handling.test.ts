@@ -3,7 +3,6 @@ import { fetchRuns } from './api'
 import * as auth from './auth'
 import * as navigation from './navigation'
 
-// Mock auth module
 vi.mock('./auth', () => ({
   getToken: vi.fn(),
   logout: vi.fn(),
@@ -48,7 +47,6 @@ describe('api.ts - 403 Forbidden handling', () => {
     localStorage.clear()
     vi.clearAllMocks()
 
-    // Mock window.location
     delete (window as Partial<Window>).location
     window.location = {
       ...originalLocation,
@@ -64,7 +62,6 @@ describe('api.ts - 403 Forbidden handling', () => {
   })
 
   it('clears token and triggers SPA navigate to /login on 403', async () => {
-    // Arrange
     vi.mocked(auth.getToken).mockReturnValue('expired.jwt.token')
 
     vi.mocked(global.fetch).mockResolvedValue({
@@ -73,11 +70,10 @@ describe('api.ts - 403 Forbidden handling', () => {
       statusText: 'Forbidden',
     } as Response)
 
-    // Act — the promise must hang (never resolve, never reject) so callers'
+    // The promise must hang (never resolve, never reject) so callers'
     // catch blocks don't fire and paint the error before navigation completes.
     const result = await raceWithTimeout(fetchRuns(0, 20, undefined, true), 50)
 
-    // Assert
     expect(result).toBe(HANG_SENTINEL)
     expect(auth.logout).toHaveBeenCalled()
     expect(navigation.navigate).toHaveBeenCalledWith(
@@ -87,7 +83,6 @@ describe('api.ts - 403 Forbidden handling', () => {
   })
 
   it('encodes current URL as returnUrl when redirecting on 403', async () => {
-    // Arrange
     window.location = {
       ...originalLocation,
       href: 'http://localhost:3000/?showAll=true',
@@ -102,10 +97,8 @@ describe('api.ts - 403 Forbidden handling', () => {
       status: 403,
     } as Response)
 
-    // Act
     await raceWithTimeout(fetchRuns(0, 20, undefined, true), 50)
 
-    // Assert — returnUrl includes the encoded current path + query string
     expect(navigation.navigate).toHaveBeenCalledWith(
       '/login?returnUrl=%2F%3FshowAll%3Dtrue',
       { replace: true },
@@ -113,7 +106,6 @@ describe('api.ts - 403 Forbidden handling', () => {
   })
 
   it('does not throw a Failed-to-fetch error visible to the caller on 403', async () => {
-    // Arrange
     vi.mocked(auth.getToken).mockReturnValue('expired.jwt.token')
 
     vi.mocked(global.fetch).mockResolvedValue({
@@ -126,15 +118,12 @@ describe('api.ts - 403 Forbidden handling', () => {
       caughtError = err
     })
 
-    // Wait long enough that the rejection — if any — has propagated.
     await raceWithTimeout(wrapped, 50)
 
-    // Assert — no rejection ever surfaced to the caller's catch block.
     expect(caughtError).toBeNull()
   })
 
   it('does not clear token or call navigate on non-403 errors', async () => {
-    // Arrange
     vi.mocked(auth.getToken).mockReturnValue('valid.jwt.token')
 
     vi.mocked(global.fetch).mockResolvedValue({
@@ -142,7 +131,6 @@ describe('api.ts - 403 Forbidden handling', () => {
       status: 500,
     } as Response)
 
-    // Act & Assert — non-403 errors still throw normally.
     await expect(fetchRuns(0, 20, undefined, true)).rejects.toThrow(
       'Failed to fetch /api/runs/admin?page=0&limit=20: 500',
     )

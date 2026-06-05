@@ -1,260 +1,156 @@
-"""Models for API response validation.
-
-These use Pydantic BaseModel because they validate data from external APIs
-(Java backend), which is an external boundary that needs validation.
-"""
-
 from datetime import date as DateType
 from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
 
-# =============================================================================
-# Enums for Type Safety
-# =============================================================================
-
 
 class DataTier(str, Enum):
-    """Data quality tier from backend."""
-
     REAL = "REAL"
     MOCK = "MOCK"
     CACHED = "CACHED"
 
 
 class TradeType(str, Enum):
-    """Trade direction."""
-
     BUY = "BUY"
     SELL = "SELL"
 
 
 class RunOutcome(str, Enum):
-    """Outcome of a trading run."""
-
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     IN_PROGRESS = "IN_PROGRESS"
 
 
-# =============================================================================
-# Market Data Models
-# =============================================================================
-
-
 class PriceMetadata(BaseModel):
-    """Stock price with metadata (from backend API)."""
-
-    price: float = Field(gt=0, description="Current stock price in USD")
-    cached: bool = Field(default=False, description="Whether from cache")
-    timestamp: datetime = Field(description="Timestamp of price data")
-    source: str = Field(description="Data source description")
+    price: float = Field(gt=0)
+    cached: bool = Field(default=False)
+    timestamp: datetime
+    source: str
 
 
 class HistoricalPrice(BaseModel):
-    """Single historical price point."""
-
-    date: DateType = Field(description="Date of the price point")
-    price: float = Field(gt=0, description="Closing price in USD")
+    date: DateType
+    price: float = Field(gt=0)
 
 
 class MarketIndicators(BaseModel):
-    """Technical indicators for a stock."""
-
-    sma5: float = Field(description="5-day simple moving average")
-    sma20: float = Field(description="20-day simple moving average")
-    volatility: float = Field(ge=0, description="Price volatility measure")
+    sma5: float
+    sma20: float
+    volatility: float = Field(ge=0)
 
 
 class MarketData(BaseModel):
-    """Price data from GET /api/market/{symbol} endpoint."""
-
-    price: float = Field(gt=0, description="Current stock price in USD")
-    cached: bool = Field(default=False, description="Whether price came from cache")
-    timestamp: datetime = Field(description="Timestamp of price data")
-    source: str = Field(description="Data source description")
+    price: float = Field(gt=0)
+    cached: bool = Field(default=False)
+    timestamp: datetime
+    source: str
 
 
 class Holding(BaseModel):
-    """Stock holding from backend API.
-
-    Validated at API boundary for type safety.
-    """
-
-    symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
-    quantity: int = Field(gt=0, description="Number of shares held")
-    averagePrice: float = Field(gt=0, description="Average purchase price per share")
+    symbol: str = Field(min_length=1, max_length=5)
+    quantity: int = Field(gt=0)
+    averagePrice: float = Field(gt=0)
 
 
 class AccountReport(BaseModel):
-    """Full account report from /api/accounts/resources/accounts/{agentId}.
-
-    Single endpoint returning balance, holdings, and portfolio metrics.
-    Matches Java AccountReportDto.
-    """
-
-    agentName: str = Field(description="Agent name")
-    balance: float = Field(ge=0, description="Cash balance in USD")
-    holdingsValue: float = Field(ge=0, description="Total value of stock holdings")
-    totalPortfolioValue: float = Field(ge=0, description="Cash + holdings value")
-    initialBalance: float = Field(gt=0, description="Starting balance")
-    totalProfitLoss: float = Field(description="Total P&L in USD")
-    profitLossPercent: float = Field(description="P&L as percentage")
-    lastUpdated: str | None = Field(default=None, description="Last activity timestamp")
-    holdingsCount: int = Field(ge=0, description="Number of stock positions")
-    transactionCount: int = Field(ge=0, description="Total number of trades")
-    holdings: list[Holding] = Field(default_factory=list, description="Detailed holdings list")
-
-
-# =============================================================================
-# Run History API Response Models (for /api/accounts/{agentId}/runs/* endpoints)
-# =============================================================================
+    agentName: str
+    balance: float = Field(ge=0)
+    holdingsValue: float = Field(ge=0)
+    totalPortfolioValue: float = Field(ge=0)
+    initialBalance: float = Field(gt=0)
+    totalProfitLoss: float
+    profitLossPercent: float
+    lastUpdated: str | None = None
+    holdingsCount: int = Field(ge=0)
+    transactionCount: int = Field(ge=0)
+    holdings: list[Holding] = Field(default_factory=list)
 
 
 class AccountResponse(BaseModel):
-    """Response from /api/accounts/{id} endpoint.
-
-    Basic account information from backend.
-    """
-
-    id: int = Field(description="Account ID")
-    name: str = Field(description="Account/agent name")
-    balance: float = Field(ge=0, description="Cash balance in USD")
+    id: int
+    name: str
+    balance: float = Field(ge=0)
 
 
 class ActivityTrade(BaseModel):
-    """A trade within an activity run."""
-
-    type: TradeType = Field(description="Trade type: BUY or SELL")
-    symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
-    quantity: int = Field(gt=0, description="Number of shares")
-    price: float = Field(gt=0, description="Price per share")
+    type: TradeType
+    symbol: str = Field(min_length=1, max_length=5)
+    quantity: int = Field(gt=0)
+    price: float = Field(gt=0)
 
 
 class ActivityRun(BaseModel):
-    """A single trading run in recent activity."""
-
-    date: datetime = Field(description="Date/time of the run")
-    outcome: RunOutcome = Field(description="Run outcome: COMPLETED, ERROR, or IN_PROGRESS")
-    summary: str | None = Field(default=None, description="Brief summary of the run")
-    fullReasoning: str | None = Field(default=None, description="Complete reasoning")
-    researchSources: str | None = Field(default=None, description="JSON string of web sources")
-    historicalContext: str | None = Field(
-        default=None, description="JSON string of historical insights"
-    )
-    trades: list[ActivityTrade] | None = Field(default=None, description="Trades made in this run")
+    date: datetime
+    outcome: RunOutcome
+    summary: str | None = None
+    fullReasoning: str | None = None
+    researchSources: str | None = None
+    historicalContext: str | None = None
+    trades: list[ActivityTrade] | None = None
 
 
 class RecentActivityResponse(BaseModel):
-    """Response from /api/accounts/{agentId}/runs/recent-activity endpoint.
+    agentName: str
+    days: int = Field(gt=0)
+    runs: list[ActivityRun] = Field(default_factory=list)
 
-    Note: totalRuns and totalTrades are computed from runs list.
-    Backend may still send these fields for backwards compatibility,
-    but they are ignored in favor of computed values.
-    """
-
-    agentName: str = Field(description="Name of the trading agent")
-    days: int = Field(gt=0, description="Number of days of activity")
-    runs: list[ActivityRun] = Field(default_factory=list, description="List of trading runs")
-
-    # Keep fields for API compatibility but compute actual values
-    totalRuns: int = Field(default=0, ge=0, description="Deprecated - use len(runs)")
-    totalTrades: int = Field(default=0, ge=0, description="Deprecated - use computed_total_trades")
+    totalRuns: int = Field(default=0, ge=0)
+    totalTrades: int = Field(default=0, ge=0)
 
     @property
     def computed_total_runs(self) -> int:
-        """Compute total runs from runs list (single source of truth)."""
         return len(self.runs)
 
     @property
     def computed_total_trades(self) -> int:
-        """Compute total trades from runs list (single source of truth)."""
         return sum(len(run.trades or []) for run in self.runs)
 
 
 class SymbolPosition(BaseModel):
-    """Current position for a specific symbol."""
-
-    shares: int = Field(ge=0, description="Number of shares held")
-    averageCost: float = Field(ge=0, description="Average cost per share")
+    shares: int = Field(ge=0)
+    averageCost: float = Field(ge=0)
 
 
 class SymbolTrade(BaseModel):
-    """A trade for a specific symbol."""
-
-    date: str = Field(description="Date/time of the trade")
-    type: TradeType = Field(description="Trade type: BUY or SELL")
-    quantity: int = Field(gt=0, description="Number of shares")
-    price: float = Field(gt=0, description="Price per share")
-    totalAmount: float = Field(description="Total trade amount")
+    date: str
+    type: TradeType
+    quantity: int = Field(gt=0)
+    price: float = Field(gt=0)
+    totalAmount: float
 
 
 class TradingSummary(BaseModel):
-    """Summary of trading activity for a symbol."""
-
-    totalTrades: int = Field(ge=0, description="Total number of trades")
-    buys: int = Field(ge=0, description="Number of buy trades")
-    sells: int = Field(ge=0, description="Number of sell trades")
-    pattern: str = Field(default="", description="Detected trading pattern")
+    totalTrades: int = Field(ge=0)
+    buys: int = Field(ge=0)
+    sells: int = Field(ge=0)
+    pattern: str = ""
 
 
 class SymbolHistoryResponse(BaseModel):
-    """Response from /api/accounts/{agentId}/runs/trading-history endpoint."""
-
-    symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
-    agentName: str = Field(description="Name of the trading agent")
-    days: int = Field(gt=0, description="Number of days of history")
-    currentPosition: SymbolPosition | None = Field(
-        default=None, description="Current position if any"
-    )
-    trades: list[SymbolTrade] = Field(default_factory=list, description="List of trades")
-    summary: TradingSummary | None = Field(default=None, description="Trading summary")
+    symbol: str = Field(min_length=1, max_length=5)
+    agentName: str
+    days: int = Field(gt=0)
+    currentPosition: SymbolPosition | None = None
+    trades: list[SymbolTrade] = Field(default_factory=list)
+    summary: TradingSummary | None = None
 
 
 class PriceLookupResponse(BaseModel):
-    """Response from price lookup (internal, not backend API)."""
-
-    symbol: str = Field(min_length=1, max_length=5, description="Stock symbol")
-    price: float = Field(gt=0, description="Current price in USD")
-    timestamp: datetime = Field(description="Timestamp of lookup")
-
-
-# =============================================================================
-# Trade Execution Models
-# =============================================================================
+    symbol: str = Field(min_length=1, max_length=5)
+    price: float = Field(gt=0)
+    timestamp: datetime
 
 
 class TradeResult(BaseModel):
-    """Result of a trade execution (buy/sell) from backend API.
-
-    Matches Java TradeResult.java record.
-    Contains essential data for trade confirmation and audit trail.
-    """
-
-    tradeId: int = Field(gt=0, description="Transaction ID for audit trail")
-    symbol: str = Field(min_length=1, max_length=5, description="Stock symbol traded")
-    quantity: int = Field(gt=0, description="Number of shares traded")
-    price: float = Field(gt=0, description="Price per share at execution")
-    newBalance: float = Field(ge=0, description="Updated cash balance after trade")
-
-
-# =============================================================================
-# Tool Error Model (for standardized error responses from LLM tools)
-# =============================================================================
+    tradeId: int = Field(gt=0)
+    symbol: str = Field(min_length=1, max_length=5)
+    quantity: int = Field(gt=0)
+    price: float = Field(gt=0)
+    newBalance: float = Field(ge=0)
 
 
 class ToolError(BaseModel):
-    """Standardized error response for LLM tools.
-
-    Used when a tool cannot return its normal response due to an error.
-    The LLM receives this as a structured response it can interpret.
-    """
-
-    error: str = Field(min_length=1, description="Human-readable error message")
-    error_type: str = Field(
-        default="unknown", description="Error category: not_found, validation, api_error"
-    )
-    context: dict = Field(
-        default_factory=dict, description="Additional context (symbol, agent_name, etc.)"
-    )
+    error: str = Field(min_length=1)
+    error_type: str = "unknown"
+    context: dict = Field(default_factory=dict)

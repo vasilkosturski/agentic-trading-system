@@ -3,11 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Container, Title, TextInput, PasswordInput, Button, Paper, Alert } from '@mantine/core'
 import { login } from './auth'
 
-/**
- * Login page component.
- * Displays username/password form and handles authentication.
- * Redirects back to the original URL with query parameters after login.
- */
 function Login() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -23,7 +18,6 @@ function Login() {
 
     try {
       await login(username, password)
-      // Redirect back to the original URL with query parameters
       const returnUrl = searchParams.get('returnUrl') || '/'
       navigate(returnUrl)
     } catch {

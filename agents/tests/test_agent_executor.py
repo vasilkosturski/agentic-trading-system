@@ -1,5 +1,3 @@
-"""Tests for AgentExecutor with explicit phase returns."""
-
 import json
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
@@ -18,10 +16,6 @@ from models.orchestration import (
 )
 from phases.decision_phase import run_decision_phase
 from phases.research_phase import run_research_phase
-
-# ============================================================================
-# Fixtures
-# ============================================================================
 
 
 @pytest.fixture
@@ -61,7 +55,6 @@ def sample_holdings():
 
 @pytest.fixture
 def sample_recent_activity():
-    """Sample recent activity for testing (typed Pydantic model)."""
     from models.api_responses import ActivityRun, ActivityTrade, RecentActivityResponse
 
     return RecentActivityResponse(
@@ -116,16 +109,11 @@ def mock_mcp_pool():
     return MagicMock()
 
 
-# ============================================================================
-# Test: Initialization
-# ============================================================================
 
 
 class TestAgentExecutorInitialization:
-    """Test AgentExecutor initialization."""
 
     def test_init(self, sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name):
-        """Test executor initializes with correct attributes."""
         executor = AgentExecutor(
             sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
         )
@@ -136,14 +124,10 @@ class TestAgentExecutorInitialization:
         assert executor.model_name == sample_model_name
 
 
-# ============================================================================
-# Test: Fetch Account Data
-# ============================================================================
 
 
 @pytest.mark.asyncio
 class TestAgentExecutorFetchData:
-    """Test data fetching methods."""
 
     @patch("agent_executor._get_account_report_raw")
     async def test_fetch_account_data_returns_account_data(
@@ -155,7 +139,6 @@ class TestAgentExecutorFetchData:
         sample_balance,
         sample_holdings,
     ):
-        """Test _fetch_account_data returns AccountData."""
         from models.api_responses import AccountReport
 
         mock_get_report.return_value = AccountReport(
@@ -187,13 +170,6 @@ class TestAgentExecutorFetchData:
         sample_agent_name,
         sample_agent_style,
     ):
-        """_fetch_account_data must propagate BackendAPIError unchanged.
-
-        Pins the contract that the helper no longer wraps backend failures as
-        RuntimeError — matching the sibling _fetch_recent_activity style and
-        the file's fail-fast philosophy. The typed exception (with status_code)
-        must survive so callers and logs see the real cause.
-        """
         from infra.exceptions import BackendAPIError
 
         mock_get_report.side_effect = BackendAPIError(
@@ -205,19 +181,13 @@ class TestAgentExecutorFetchData:
         with pytest.raises(BackendAPIError) as exc_info:
             await executor._fetch_account_data(sample_agent_id)
 
-        # Status code must survive — proves the typed exception was not
-        # rewrapped as a RuntimeError (which would drop status_code).
         assert exc_info.value.status_code == 500
 
 
-# ============================================================================
-# Test: Market Analyst
-# ============================================================================
 
 
 @pytest.mark.asyncio
 class TestAgentExecutorMarketAnalyst:
-    """Test _run_market_analyst method."""
 
     @patch("phases.research_phase.MarketAnalyst")
     @patch("ai_agents.guardrail_retry.Runner")
@@ -233,7 +203,6 @@ class TestAgentExecutorMarketAnalyst:
         sample_recent_activity,
         mock_mcp_pool,
     ):
-        """Test _run_market_analyst returns ResearchResult."""
         mock_analyst_instance = MagicMock()
         mock_analyst_instance.agent = MagicMock()
         mock_analyst_instance.build_prompt.return_value = "test prompt"
@@ -251,9 +220,6 @@ class TestAgentExecutorMarketAnalyst:
         mock_result.context_wrapper.usage.request_usage_entries = []
         mock_runner_class.run = AsyncMock(return_value=mock_result)
         mock_analyst_instance.model_name = "gpt-4o"
-
-        # No AgentExecutor instance needed — run_research_phase is a
-        # module-level function (Task 6 of the decomposition plan).
 
         ctx = RunContext(
             run_id=123,
@@ -275,14 +241,10 @@ class TestAgentExecutorMarketAnalyst:
         assert result.candidates == ["AAPL", "NVDA"]
 
 
-# ============================================================================
-# Test: Full Cycle
-# ============================================================================
 
 
 @pytest.mark.asyncio
 class TestAgentExecutorFullCycle:
-    """Test full execute_cycle."""
 
     @patch("backend.run_lifecycle.complete_run")
     @patch("phases.execution_phase.buy_shares")
@@ -319,7 +281,6 @@ class TestAgentExecutorFullCycle:
         sample_decision,
         mock_mcp_pool,
     ):
-        """Test full cycle with successful BUY decision."""
         # Setup mocks
         from models.api_responses import AccountReport
 
@@ -404,27 +365,10 @@ class TestAgentExecutorFullCycle:
         assert result.run_id == 123
 
 
-# ============================================================================
-# Test: Error-path branches (I11) — BackendAPIError, MaxTurnsExceeded,
-#                                   _handle_cycle_error
-# ============================================================================
 
 
 @pytest.mark.asyncio
 class TestAgentExecutorErrorPaths:
-    """Error-path coverage for AgentExecutor (I11).
-
-    These tests exercise branches not covered by the happy-path tests above:
-      * ``execute_cycle`` routes phase errors through ``_handle_cycle_error``
-        which broadcasts an ERROR status and re-raises.
-      * ``execute_cycle`` propagates ``MaxTurnsExceeded`` from the market
-        analyst run with the run marked FAILED.
-      * ``_handle_cycle_error`` with ``ctx=None`` (failure before context was
-        built) must NOT touch ``update_phase`` since no run exists yet.
-      * ``_handle_cycle_error`` swallows secondary cleanup errors from
-        ``update_phase`` so the original exception is still re-raised.
-    """
-
     @patch("backend.run_lifecycle.update_phase")
     @patch("backend.run_lifecycle.complete_run")
     @patch("backend.run_lifecycle.create_run")
@@ -447,9 +391,6 @@ class TestAgentExecutorErrorPaths:
         sample_model_name,
         mock_mcp_pool,
     ):
-        """If _fetch_recent_activity raises BackendAPIError, the orchestrator
-        must call _handle_cycle_error (PHASE_ERROR broadcast + mark FAILED)
-        and re-raise the original exception."""
         from infra.exceptions import BackendAPIError
         from models.api_responses import AccountReport
 
@@ -528,8 +469,6 @@ class TestAgentExecutorErrorPaths:
         sample_recent_activity,
         mock_mcp_pool,
     ):
-        """MaxTurnsExceeded raised inside the Market Analyst run must propagate
-        out of execute_cycle after _handle_cycle_error records the failure."""
         from agents.exceptions import MaxTurnsExceeded
 
         from models.api_responses import AccountReport
@@ -561,7 +500,6 @@ class TestAgentExecutorErrorPaths:
         mock_analyst_instance.model_name = "gpt-4o"
         mock_market_analyst_class.create = AsyncMock(return_value=mock_analyst_instance)
 
-        # Guardrail retry runner blows up with MaxTurnsExceeded.
         mock_guardrail_runner_class.run = AsyncMock(
             side_effect=MaxTurnsExceeded("agent looped too long")
         )
@@ -573,17 +511,13 @@ class TestAgentExecutorErrorPaths:
         with pytest.raises(MaxTurnsExceeded):
             await executor.execute_cycle(mcp_pool=mock_mcp_pool, force_trade=False)
 
-        # The error must have been recorded against the existing run (run_id=555)
-        # via update_phase(FAILED, error_message=...). Find that call.
         failed_calls = [
             call
             for call in mock_update_phase.call_args_list
             if len(call.args) >= 2 and getattr(call.args[1], "name", None) == "FAILED"
         ]
         assert failed_calls, "expected update_phase(run_id, RunPhase.FAILED) on MaxTurnsExceeded"
-        # complete_run must NOT be called — failed runs are not "completed".
         mock_complete_run.assert_not_called()
-        # DecisionMaker.create must NOT have been called — research crashed first.
         mock_decision_maker_class.create.assert_not_called()
 
     async def test_handle_cycle_error_without_ctx_skips_update_phase(
@@ -592,9 +526,6 @@ class TestAgentExecutorErrorPaths:
         sample_agent_name,
         sample_agent_style,
     ):
-        """When ctx is None (failure before run creation), _handle_cycle_error
-        must delegate to lifecycle.fail with run_id=None (lifecycle handles the
-        skip-update-phase contract — verified separately in test_run_lifecycle.py)."""
         mock_lifecycle = Mock(spec=RunLifecycle)
         mock_lifecycle.fail = AsyncMock()
 
@@ -603,8 +534,6 @@ class TestAgentExecutorErrorPaths:
 
         await executor._handle_cycle_error(err, ctx=None, lifecycle=mock_lifecycle)
 
-        # Boundary contract: _handle_cycle_error must call lifecycle.fail with
-        # run_id=None when ctx is None.
         mock_lifecycle.fail.assert_called_once_with(None, err)
 
     async def test_handle_cycle_error_swallows_cleanup_error(
@@ -615,11 +544,6 @@ class TestAgentExecutorErrorPaths:
         sample_model_name,
         sample_recent_activity,
     ):
-        """_handle_cycle_error delegates to lifecycle.fail. The actual
-        swallowed-cleanup-error contract lives inside RunLifecycle.fail and is
-        verified by test_run_lifecycle.py:test_fail_swallows_cleanup_errors_and_does_not_raise.
-        This test pins the boundary: _handle_cycle_error calls lifecycle.fail
-        with the right args and does not raise."""
         mock_lifecycle = Mock(spec=RunLifecycle)
         mock_lifecycle.fail = AsyncMock()
 
@@ -641,15 +565,11 @@ class TestAgentExecutorErrorPaths:
 
         err = RuntimeError("cycle boom")
 
-        # Must return normally — never raise from _handle_cycle_error itself.
         await executor._handle_cycle_error(err, ctx=ctx, lifecycle=mock_lifecycle)
 
         mock_lifecycle.fail.assert_called_once_with(777, err)
 
 
-# ============================================================================
-# Test: Module-level constants (refactor #1 — promote magic numbers)
-# ============================================================================
 #
 # These tests pin the contract that six magic numbers in agent_executor.py have
 # been promoted to module-level UPPER_CASE constants and that the call sites
@@ -658,61 +578,40 @@ class TestAgentExecutorErrorPaths:
 
 
 class TestAgentExecutorModuleConstants:
-    """Pin module-level constants required by the magic-numbers refactor."""
 
     def test_max_positions_constant_value(self):
-        """MAX_POSITIONS = 10 (used at market analyst + decision maker call sites)."""
         import agent_executor
 
         assert agent_executor.MAX_POSITIONS == 10
 
     def test_research_max_attempts_constant_value(self):
-        """RESEARCH_MAX_ATTEMPTS = 3 (used by run_with_guardrail_retry)."""
         import agent_executor
 
         assert agent_executor.RESEARCH_MAX_ATTEMPTS == 3
 
     def test_agent_max_turns_constant_value(self):
-        """AGENT_MAX_TURNS = 30 (used by guardrail retry + Runner.run)."""
         import agent_executor
 
         assert agent_executor.AGENT_MAX_TURNS == 30
 
     def test_recent_activity_lookback_days_constant_value(self):
-        """RECENT_ACTIVITY_LOOKBACK_DAYS = 30 (used by get_recent_activity)."""
         import agent_executor
 
         assert agent_executor.RECENT_ACTIVITY_LOOKBACK_DAYS == 30
 
     def test_max_reasoning_field_len_constant_value(self):
-        """MAX_REASONING_FIELD_LEN = 2000 (truncation of reasoning fields)."""
         import agent_executor
 
         assert agent_executor.MAX_REASONING_FIELD_LEN == 2000
 
     def test_max_error_message_len_constant_value(self):
-        """MAX_ERROR_MESSAGE_LEN = 500 (truncation of error message)."""
         import agent_executor
 
         assert agent_executor.MAX_ERROR_MESSAGE_LEN == 500
 
     def test_call_sites_use_named_constants_not_literals(self):
-        """The six call sites listed in the task description must reference the
-        named constants by identifier — not inline the integer literal.
-
-        This guards against a partial refactor where the constant is defined
-        but a call site still has the raw number.
-
-        Note: Task 6 of the decomposition lifted _run_market_analyst into
-        phases/research_phase.py — the max_attempts=RESEARCH_MAX_ATTEMPTS
-        call site moved with it. Task 7 lifted _run_decision_maker into
-        phases/decision_phase.py — the max_positions=MAX_POSITIONS and
-        max_turns=AGENT_MAX_TURNS call sites at the decision-maker site
-        moved with it. Task 9 lifted _finalize_run into
-        phases/finalization.py — the [:MAX_REASONING_FIELD_LEN] call
-        sites moved with it. The test now scans all four modules so the
-        invariant survives the phase-module extractions.
-        """
+        # Scans every phase module so the constants survive any future
+        # decomposition that moves the call sites between files.
         import inspect
 
         import agent_executor
@@ -760,9 +659,6 @@ class TestAgentExecutorModuleConstants:
             )
 
 
-# ============================================================================
-# Test: Class docstring — Concurrency clarification (refactor #2)
-# ============================================================================
 #
 # These tests pin the contract that the AgentExecutor class docstring carries
 # an explicit "Concurrency:" block stating single-cycle-per-instance semantics
@@ -772,10 +668,8 @@ class TestAgentExecutorModuleConstants:
 
 
 class TestAgentExecutorClassDocstringConcurrency:
-    """Pin the Concurrency block required by the docstring-tightening refactor."""
 
     def test_class_docstring_has_concurrency_section(self):
-        """A 'Concurrency:' section header must be present in the class docstring."""
         doc = AgentExecutor.__doc__
         assert doc is not None, "AgentExecutor must have a class docstring"
         assert "Concurrency:" in doc, (
@@ -784,7 +678,6 @@ class TestAgentExecutorClassDocstringConcurrency:
         )
 
     def test_class_docstring_states_single_cycle_semantics(self):
-        """Docstring must explicitly state single-cycle-per-instance-at-a-time."""
         doc = AgentExecutor.__doc__ or ""
         assert "single cycle per executor instance at a time" in doc, (
             "Concurrency block must spell out 'single cycle per executor "
@@ -792,7 +685,6 @@ class TestAgentExecutorClassDocstringConcurrency:
         )
 
     def test_class_docstring_warns_against_concurrent_execute_cycle(self):
-        """Docstring must explicitly forbid concurrent execute_cycle on one instance."""
         doc = AgentExecutor.__doc__ or ""
         assert "Do not call" in doc and "execute_cycle" in doc, (
             "Concurrency block must explicitly warn against concurrent "
@@ -800,7 +692,6 @@ class TestAgentExecutorClassDocstringConcurrency:
         )
 
     def test_class_docstring_references_supported_parallelism_model(self):
-        """Docstring must reference trading_system.py and asyncio.gather fan-out."""
         doc = AgentExecutor.__doc__ or ""
         assert "trading_system.py" in doc, (
             "Concurrency block must reference trading_system.py as the "
@@ -813,7 +704,6 @@ class TestAgentExecutorClassDocstringConcurrency:
         )
 
     def test_class_docstring_preserves_existing_content(self):
-        """All pre-existing docstring content must be preserved verbatim."""
         doc = AgentExecutor.__doc__ or ""
         # Opening summary
         assert "Handles agent execution orchestration for trading cycles." in doc
@@ -835,12 +725,6 @@ class TestAgentExecutorClassDocstringConcurrency:
         assert "No instance variables for per-run state" in doc
 
     def test_concurrency_block_appears_after_data_flow_block(self):
-        """The new 'Concurrency:' block must follow the existing 'Data Flow:' block.
-
-        Ordering matters for readability: the existing content lays out what
-        the class does and how data flows; the Concurrency block then clarifies
-        what those claims do and do not guarantee.
-        """
         doc = AgentExecutor.__doc__ or ""
         data_flow_idx = doc.find("Data Flow:")
         concurrency_idx = doc.find("Concurrency:")
@@ -853,26 +737,9 @@ class TestAgentExecutorClassDocstringConcurrency:
         )
 
 
-# ============================================================================
-# Test: Cycle-start/end print() -> logger.info migration (refactor #3)
-# ============================================================================
-#
-# These tests pin the contract that the two outlier print() calls in
-# agent_executor.py (cycle start with 🤖 emoji and cycle end with ✅ emoji)
-# have been converted to logger.info(...) so the events flow through Python's
-# logging infrastructure (file rotators, JSON serializers, log shippers) like
-# every other observable event in the module.
-
-
 class TestAgentExecutorCycleLoggerMigration:
-    """Pin the print() -> logger.info() migration for cycle-start/end events."""
 
     def test_no_print_calls_remain_in_module_source(self):
-        """No raw print( calls may remain in agent_executor.py source.
-
-        Every observable event in the module is expected to flow through the
-        module-level logger. Raw print() calls bypass configured handlers.
-        """
         import inspect
 
         import agent_executor
@@ -888,7 +755,6 @@ class TestAgentExecutorCycleLoggerMigration:
 
 @pytest.mark.asyncio
 class TestAgentExecutorCycleLoggerBehavior:
-    """Pin behavioral evidence that cycle-start/end emit INFO log records."""
 
     @patch("backend.run_lifecycle.complete_run")
     @patch("phases.execution_phase.buy_shares")
@@ -926,8 +792,6 @@ class TestAgentExecutorCycleLoggerBehavior:
         mock_mcp_pool,
         caplog,
     ):
-        """execute_cycle must emit cycle-start (🤖) and cycle-end (✅) as INFO
-        log records on the agent_executor logger — not via raw print()."""
         import logging
 
         from models.api_responses import AccountReport
@@ -1031,9 +895,6 @@ class TestAgentExecutorCycleLoggerBehavior:
         )
 
 
-# ============================================================================
-# Test: Model pricing table + Usage type hint (Item #6 — live bug fix)
-# ============================================================================
 #
 # These tests pin the contract that:
 #   * `_extract_usage_metrics` no longer uses a hardcoded $0.15/$0.60 formula.
@@ -1044,11 +905,9 @@ class TestAgentExecutorCycleLoggerBehavior:
 
 
 class TestExtractUsageMetricsPricing:
-    """Pin behaviour of the MODEL_PRICING lookup in extract_usage_metrics."""
 
     @pytest.fixture(autouse=True)
     def _reset_warned_set(self):
-        """Clear the module-level dedupe set between tests for isolation."""
         import infra.pricing as pricing
 
         pricing._UNKNOWN_MODELS_WARNED.clear()
@@ -1057,12 +916,6 @@ class TestExtractUsageMetricsPricing:
 
     @staticmethod
     def _make_usage_mock(input_tokens: int, output_tokens: int, model_name: str | None):
-        """Build a Usage-shaped MagicMock matching the SDK's attribute surface.
-
-        ``model_name=None`` simulates an SDK response with no request entries —
-        callers will then fall back to the ``model_name`` argument passed to
-        ``extract_usage_metrics``.
-        """
         usage = MagicMock()
         usage.input_tokens = input_tokens
         usage.output_tokens = output_tokens
@@ -1079,11 +932,6 @@ class TestExtractUsageMetricsPricing:
         return usage
 
     def test_known_model_uses_table_for_exact_cost(self):
-        """gpt-4o-mini @ 1M input + 500k output must yield $0.15 + $0.30 = $0.45.
-
-        Uses the table's published rate (0.15, 0.60) per 1M tokens to verify
-        the formula and the lookup, not a single magic number.
-        """
         from infra.telemetry import extract_usage_metrics
 
         usage = self._make_usage_mock(
@@ -1094,21 +942,10 @@ class TestExtractUsageMetricsPricing:
 
         metrics = extract_usage_metrics(usage, model_name="ignored-fallback")
 
-        # 1_000_000 * 0.15 / 1_000_000 = 0.15
-        # 500_000   * 0.60 / 1_000_000 = 0.30
-        # total = 0.45 — exact, no rounding artefacts at these magnitudes.
         assert metrics.costUsd == 0.45
         assert metrics.modelName == "gpt-4o-mini"
 
     def test_gpt_5_mini_uses_current_table_rates(self):
-        """gpt-5-mini must compute cost from the table (not the legacy formula).
-
-        At gpt-5-mini's $0.25/$2.00 rates, 1M input + 500k output is
-        $0.25 + $1.00 = $1.25 — which is materially different from the
-        legacy gpt-4o-mini hardcoded $0.15/$0.60 -> $0.45 computation.
-        Asserting on $1.25 specifically catches the regression where the
-        table is added but a call site still routes through the old formula.
-        """
         from infra.telemetry import extract_usage_metrics
 
         usage = self._make_usage_mock(
@@ -1123,7 +960,6 @@ class TestExtractUsageMetricsPricing:
         assert metrics.modelName == "gpt-5-mini"
 
     def test_unknown_model_returns_none_and_logs_warning(self, caplog):
-        """Unknown model → costUsd is None AND a WARNING log is emitted."""
         import logging
 
         from infra.telemetry import extract_usage_metrics
@@ -1155,12 +991,6 @@ class TestExtractUsageMetricsPricing:
         )
 
     def test_warning_is_deduped_across_repeated_unknown_model_calls(self, caplog):
-        """Two calls with the same unknown model → exactly ONE warning log.
-
-        The module-level _UNKNOWN_MODELS_WARNED set must suppress the second
-        warning so a single misconfigured model doesn't flood the log on
-        every trading cycle.
-        """
         import logging
 
         from infra.telemetry import extract_usage_metrics
@@ -1195,9 +1025,6 @@ class TestExtractUsageMetricsPricing:
         )
 
 
-# ============================================================================
-# Test: _load_model_pricing — vendored LiteLLM JSON loader
-# ============================================================================
 #
 # These tests pin the contract that:
 #   * `_load_model_pricing()` reads the vendored model_prices.json and returns
@@ -1210,12 +1037,8 @@ class TestExtractUsageMetricsPricing:
 
 
 class TestLoadModelPricing:
-    """Pin behaviour of _load_model_pricing() against the vendored JSON."""
 
     def test_load_model_pricing_returns_dict_with_known_openai_models(self):
-        """Loader returns a dict containing gpt-4o-mini and gpt-5-mini with
-        positive non-zero (input, output) per-1M tuples — guards against an
-        empty/corrupt vendored file."""
         from infra.pricing import _load_model_pricing
 
         pricing = _load_model_pricing()
@@ -1240,23 +1063,17 @@ class TestLoadModelPricing:
             assert output_per_m > 0, f"{name} output rate must be positive, got {output_per_m}"
 
     def test_load_model_pricing_skips_entries_without_cost_fields(self, tmp_path):
-        """Loader must skip entries that don't have both `input_cost_per_token`
-        and `output_cost_per_token` — covers LiteLLM's leading "sample_spec"
-        placeholder plus any future malformed entries. Multiplies per-token
-        values by 1_000_000 to match the per-1M convention."""
         from infra.pricing import _load_model_pricing
 
         fake_json = {
             "sample_spec": {
                 "max_tokens": 1024,
                 "litellm_provider": "openai",
-                # no cost fields → must be skipped
             },
             "missing-output-cost": {
                 "input_cost_per_token": 0.0000002,
-                # no output_cost_per_token → must be skipped
             },
-            "model-with-extra-string-entry": "not-a-dict",  # must be skipped
+            "model-with-extra-string-entry": "not-a-dict",
             "real-model": {
                 "input_cost_per_token": 0.0000002,
                 "output_cost_per_token": 0.0000008,
@@ -1271,39 +1088,14 @@ class TestLoadModelPricing:
         assert "sample_spec" not in pricing
         assert "missing-output-cost" not in pricing
         assert "model-with-extra-string-entry" not in pricing
-        # The only valid entry survives and is converted per-token → per-1M.
-        # pytest.approx for fp safety — 2e-07 * 1_000_000 binary-floats to
-        # 0.19999999999999998, not exactly 0.2.
         assert "real-model" in pricing
         input_per_m, output_per_m = pricing["real-model"]
         assert input_per_m == pytest.approx(0.2)
         assert output_per_m == pytest.approx(0.8)
 
 
-# ============================================================================
-# Test: Prompt-Capture isinstance Narrowing (Item #5 — remove type: ignore)
-# ============================================================================
-
-
 @pytest.mark.asyncio
 class TestAgentExecutorPromptCaptureNarrowing:
-    """Test the isinstance narrow at the two prompt-capture sites.
-
-    Background: ``Agent.instructions`` is typed ``str | Callable[..., str] | None``
-    by the SDK while ``RunContext.market_analyst_system_prompt`` and
-    ``RunContext.decision_maker_system_prompt`` are ``str | None``. The
-    capture sites at ``agent_executor.py`` lines 426 and 555 used to silence
-    the resulting mypy ``[assignment]`` error with ``# type: ignore``; those
-    suppressions have been replaced with an explicit ``isinstance`` narrow.
-
-    These tests pin the runtime behaviour of that narrow:
-      * When ``agent.instructions`` is a ``str``, the corresponding ctx field
-        captures it verbatim.
-      * When ``agent.instructions`` is a callable (e.g. a lambda dynamic
-        prompt resolver), the ctx field is set to ``None`` AND a
-        ``logger.debug`` message is emitted so the swap is visible in logs.
-    """
-
     @patch("phases.research_phase.MarketAnalyst")
     @patch("ai_agents.guardrail_retry.Runner")
     async def test_market_analyst_string_instructions_captured_on_ctx(
@@ -1318,8 +1110,6 @@ class TestAgentExecutorPromptCaptureNarrowing:
         sample_recent_activity,
         mock_mcp_pool,
     ):
-        """When agent.instructions is a str, ctx.market_analyst_system_prompt
-        captures that exact string."""
         mock_analyst_instance = MagicMock()
         mock_analyst_instance.agent = MagicMock()
         mock_analyst_instance.agent.instructions = "you are a market analyst"
@@ -1339,9 +1129,6 @@ class TestAgentExecutorPromptCaptureNarrowing:
         mock_result.context_wrapper.usage.request_usage_entries = []
         mock_runner_class.run = AsyncMock(return_value=mock_result)
 
-        # No AgentExecutor instance needed — run_research_phase is a
-        # module-level function (Task 6 of the decomposition plan).
-
         ctx = RunContext(
             run_id=123,
             agent_id=sample_agent_id,
@@ -1356,7 +1143,6 @@ class TestAgentExecutorPromptCaptureNarrowing:
 
         await run_research_phase(ctx, mock_mcp_pool)
 
-        # The string flowed through unchanged.
         assert ctx.market_analyst_system_prompt == "you are a market analyst"
 
     @patch("phases.research_phase.MarketAnalyst")
@@ -1374,8 +1160,6 @@ class TestAgentExecutorPromptCaptureNarrowing:
         mock_mcp_pool,
         caplog,
     ):
-        """When agent.instructions is a callable, ctx.market_analyst_system_prompt
-        is None and a debug log is emitted on the agent_executor logger."""
         import logging
 
         dynamic_prompt = lambda *a, **kw: "dynamically rendered prompt"  # noqa: E731
@@ -1399,9 +1183,6 @@ class TestAgentExecutorPromptCaptureNarrowing:
         mock_result.context_wrapper.usage.request_usage_entries = []
         mock_runner_class.run = AsyncMock(return_value=mock_result)
 
-        # No AgentExecutor instance needed — run_research_phase is a
-        # module-level function (Task 6 of the decomposition plan).
-
         ctx = RunContext(
             run_id=123,
             agent_id=sample_agent_id,
@@ -1417,13 +1198,8 @@ class TestAgentExecutorPromptCaptureNarrowing:
         with caplog.at_level(logging.DEBUG, logger="phases.research_phase"):
             await run_research_phase(ctx, mock_mcp_pool)
 
-        # The function object must not leak through to the context.
         assert ctx.market_analyst_system_prompt is None
 
-        # A debug log entry must announce the callable-branch was taken.
-        # After Task 6 of the decomposition plan the function was lifted out
-        # of agent_executor.py into phases/research_phase.py — the logger
-        # name follows that move.
         callable_debug_records = [
             r
             for r in caplog.records
@@ -1455,12 +1231,6 @@ class TestAgentExecutorPromptCaptureNarrowing:
         mock_mcp_pool,
         caplog,
     ):
-        """Same narrow at the Decision Maker site — callable → None + DEBUG log.
-
-        Decision Maker is structurally identical to Market Analyst, so a single
-        callable-branch test for it is enough to lock the symmetric behaviour
-        (and to catch the case where only one of the two sites was migrated).
-        """
         import logging
 
         mock_update_phase.return_value = True
@@ -1533,27 +1303,10 @@ class TestAgentExecutorPromptCaptureNarrowing:
         )
 
 
-# ============================================================================
-# Test: _extract_run_telemetry helper (Item #8 — DRY refactor)
-# ============================================================================
-#
-# These tests pin the contract that a private ``_extract_run_telemetry`` method
-# exists on ``AgentExecutor`` and consolidates the previously-duplicated
-# 17-line tool-calls + usage-metrics + log-lines blocks that appeared in both
-# ``_run_market_analyst`` and ``_run_decision_maker``. The helper accepts an
-# SDK ``RunResult`` plus a model name and an agent label, and returns a
-# ``(list[ToolCallDto], UsageMetrics)`` tuple. It must also emit the two
-# observable INFO log lines so we don't silently regress observability when
-# refactoring.
-
-
 class TestAgentExecutorExtractRunTelemetry:
-    """Pin behaviour of the extract_run_telemetry helper directly."""
 
     @pytest.fixture(autouse=True)
     def _reset_warned_set(self):
-        """Clear the module-level dedupe set so unknown-model warnings don't
-        leak across tests in this module."""
         import infra.pricing as pricing
 
         pricing._UNKNOWN_MODELS_WARNED.clear()
@@ -1562,20 +1315,8 @@ class TestAgentExecutorExtractRunTelemetry:
 
     @staticmethod
     def _make_run_result_mock(num_tool_calls: int):
-        """Build a RunResult-shaped MagicMock.
-
-        ``new_items`` is a list of opaque sentinels — the test patches
-        ``extract_tool_calls`` so the helper's tool-call branch can be
-        exercised independently of the SDK's item parsing.
-
-        ``context_wrapper.usage`` carries the Usage-shaped attribute surface
-        that ``extract_usage_metrics`` reads at runtime.
-        """
         result = MagicMock()
-        # new_items: opaque list passed through to extract_tool_calls (patched).
         result.new_items = [MagicMock() for _ in range(num_tool_calls)]
-        # Usage shape — values chosen so costUsd is exactly computable from
-        # the MODEL_PRICING entry for 'gpt-4o-mini' ($0.15 / $0.60 per 1M).
         result.context_wrapper.usage.total_tokens = 300
         result.context_wrapper.usage.input_tokens = 100
         result.context_wrapper.usage.output_tokens = 200
@@ -1589,8 +1330,6 @@ class TestAgentExecutorExtractRunTelemetry:
     def _make_parsed_call(
         name: str, params: dict, is_error: bool = False, error_message: str | None = None
     ):
-        """Build a ParsedToolCall-shaped mock matching the fields the helper
-        copies into ToolCallDto."""
         pc = MagicMock()
         pc.name = name
         pc.params = params
@@ -1602,17 +1341,12 @@ class TestAgentExecutorExtractRunTelemetry:
         self,
         caplog,
     ):
-        """The helper must return (list[ToolCallDto], UsageMetrics) with the
-        right shapes, log both observability lines containing the agent label,
-        and compute costUsd via the MODEL_PRICING table.
-        """
         import logging
 
         from infra.telemetry import extract_run_telemetry
         from models.run_tracking import ToolCallDto
         from models.usage_metrics import UsageMetrics
 
-        # Build a result mock with 2 tool calls and a known usage shape.
         mock_result = self._make_run_result_mock(num_tool_calls=2)
 
         parsed_calls = [
@@ -1620,7 +1354,6 @@ class TestAgentExecutorExtractRunTelemetry:
             self._make_parsed_call("broken_tool", {"x": 1}, is_error=True, error_message="boom"),
         ]
 
-        # Patch extract_tool_calls so we control the parsed-call list directly.
         with patch("infra.telemetry.extract_tool_calls", return_value=parsed_calls) as mock_extract:
             with caplog.at_level(logging.INFO, logger="infra.telemetry"):
                 tool_calls, usage_metrics = extract_run_telemetry(
@@ -1629,10 +1362,8 @@ class TestAgentExecutorExtractRunTelemetry:
                     agent_label="Test Agent",
                 )
 
-        # extract_tool_calls must have been invoked on result.new_items.
         mock_extract.assert_called_once_with(mock_result.new_items)
 
-        # Return tuple shape.
         assert isinstance(tool_calls, list)
         assert all(isinstance(tc, ToolCallDto) for tc in tool_calls)
         assert len(tool_calls) == 2
@@ -1684,9 +1415,6 @@ class TestAgentExecutorExtractRunTelemetry:
         )
 
 
-# ============================================================================
-# Test: Completion message branches on execution_status (Minor #12)
-# ============================================================================
 #
 # Before this fix, the PHASE_COMPLETED broadcast outcome message branched on
 # `ctx.trade_id` truthiness. A FAILED BUY/SELL leaves trade_id=None, so it was
@@ -1698,7 +1426,6 @@ class TestAgentExecutorExtractRunTelemetry:
 
 @pytest.mark.asyncio
 class TestAgentExecutorCompletionMessageOnFailure:
-    """Pin the FAILED-execution completion-message branch."""
 
     @patch("backend.run_lifecycle.complete_run")
     @patch("phases.execution_phase.buy_shares")
@@ -1735,16 +1462,9 @@ class TestAgentExecutorCompletionMessageOnFailure:
         sample_decision,
         mock_mcp_pool,
     ):
-        """A FAILED BUY/SELL must broadcast 'Completed - Trade attempted but failed'.
-
-        Pre-fix bug: the PHASE_COMPLETED outcome_message branched on
-        ``ctx.trade_id`` truthiness, so a FAILED BUY (trade_id=None) was
-        mislabeled as 'Completed - No trades (HOLD decision)'.
-        """
         from backend.status_broadcaster import PHASE_COMPLETED
         from models.api_responses import AccountReport
 
-        # ----- Standard happy-path setup, except buy_shares raises -----
         mock_initialize.return_value = None
         mock_get_report.return_value = AccountReport(
             agentName=sample_agent_name,
@@ -1847,18 +1567,7 @@ class TestAgentExecutorCompletionMessageOnFailure:
         )
 
 
-# ============================================================================
-# Test: pricing.py module extraction (refactor Task 1)
-# ============================================================================
-#
-# Pins the contract that the model-pricing block has been extracted from
-# agent_executor.py into its own pricing module. agent_executor still
-# re-exports MODEL_PRICING and _UNKNOWN_MODELS_WARNED for backwards
-# compatibility within the package.
-
-
 def test_pricing_module_exports_model_pricing():
-    """Pricing constants live in their own module after Task 1 extraction."""
     from infra.pricing import _UNKNOWN_MODELS_WARNED, MODEL_PRICING, _load_model_pricing
 
     assert isinstance(MODEL_PRICING, dict), (
@@ -1875,17 +1584,7 @@ def test_pricing_module_exports_model_pricing():
     )
 
 
-# ============================================================================
-# Test: telemetry.py module extraction (refactor Task 2)
-# ============================================================================
-#
-# Pins the contract that extract_usage_metrics (was _extract_usage_metrics)
-# and extract_run_telemetry (was a method on AgentExecutor that didn't use
-# self) live in a new telemetry module after Task 2 extraction.
-
-
 def test_telemetry_module_exports_functions():
-    """Telemetry helpers live in their own module after Task 2 extraction."""
     from infra.telemetry import extract_run_telemetry, extract_usage_metrics
 
     assert callable(extract_usage_metrics), (

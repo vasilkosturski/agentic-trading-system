@@ -17,7 +17,6 @@ describe('App.tsx — Promise.all partial-failure resilience (R1)', () => {
   })
 
   it('still renders the runs table when fetchAgents rejects (cosmetic fetch must not block primary content)', async () => {
-    // Arrange — primary fetch succeeds, cosmetic fetch (agents) fails.
     vi.mocked(api.fetchRuns).mockResolvedValue({
       runs: [
         {
@@ -38,7 +37,6 @@ describe('App.tsx — Promise.all partial-failure resilience (R1)', () => {
     vi.mocked(api.fetchAgents).mockRejectedValue(new Error('agents endpoint down'))
     vi.mocked(api.fetchSnapshots).mockResolvedValue([])
 
-    // Act
     render(
       <MantineProvider>
         <MemoryRouter initialEntries={['/']}>
@@ -47,15 +45,12 @@ describe('App.tsx — Promise.all partial-failure resilience (R1)', () => {
       </MantineProvider>
     )
 
-    // Assert — the runs table must render even though fetchAgents rejected.
     await waitFor(() => {
       expect(screen.getByText('42')).toBeInTheDocument()
     })
 
-    // Fallback agent name "Agent #7" should appear since the agents map is empty.
     expect(screen.getByText('Agent #7')).toBeInTheDocument()
 
-    // No error message should be painted from the rejected cosmetic fetch.
     expect(screen.queryByText(/agents endpoint down/i)).toBeNull()
   })
 })

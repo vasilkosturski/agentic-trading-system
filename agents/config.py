@@ -1,5 +1,3 @@
-"""Centralized configuration for trading agents."""
-
 import os
 
 
@@ -27,8 +25,6 @@ class Config:
 
     BRAVE_API_KEY: str = os.getenv("BRAVE_API_KEY", "")
 
-    # Admin credentials the agents pod uses to obtain a JWT from
-    # POST /api/auth/login before any state-changing backend call.
     BACKEND_ADMIN_USERNAME: str = os.getenv("BACKEND_ADMIN_USERNAME", "admin")
     BACKEND_ADMIN_PASSWORD: str = os.getenv("BACKEND_ADMIN_PASSWORD", "")
 

@@ -68,6 +68,7 @@ public class TradingRunController {
      * @return TradingRunDto with 201 Created and Location header
      */
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<TradingRunDto> createRun(@Valid @RequestBody CreateRunRequest request) {
         TradingRunDto result = tradingRunService.createRun(request.getAgentId());
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
@@ -86,6 +87,7 @@ public class TradingRunController {
      * @return 200 OK on success
      */
     @PatchMapping("/{id}/phase")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> updatePhase(@PathVariable Long id, @Valid @RequestBody UpdatePhaseRequest request) {
         tradingRunService.updatePhase(id, request.getPhase(), request.getErrorMessage());
         return ResponseEntity.ok().build();
@@ -100,6 +102,7 @@ public class TradingRunController {
      * @return 200 OK on success
      */
     @PutMapping("/{id}/complete")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> completeRun(@PathVariable Long id, @Valid @RequestBody CompleteRunRequest request) {
         tradingRunService.completeRun(id, request);
         return ResponseEntity.ok().build();

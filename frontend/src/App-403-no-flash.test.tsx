@@ -42,14 +42,12 @@ describe('App.tsx + api.ts integration — 403 no-flash redirect', () => {
   })
 
   it('does not paint "Failed to fetch ... 403" when backend returns 403 for /api/runs/admin', async () => {
-    // Arrange — every request returns 403.
     vi.mocked(global.fetch).mockResolvedValue({
       ok: false,
       status: 403,
       statusText: 'Forbidden',
     } as Response)
 
-    // Act
     render(
       <MantineProvider>
         <MemoryRouter initialEntries={['/?showAll=true']}>
@@ -58,20 +56,15 @@ describe('App.tsx + api.ts integration — 403 no-flash redirect', () => {
       </MantineProvider>
     )
 
-    // Wait for the navigate-on-403 side effect to fire — that confirms the
-    // 403 was actually processed by fetchJson.
     await waitFor(() => {
       expect(navigation.navigate).toHaveBeenCalled()
     })
 
-    // Give React extra time to commit any spurious error render.
     await new Promise((r) => setTimeout(r, 50))
 
-    // Assert — no flash of "Failed to fetch" / "403" anywhere on screen.
     expect(screen.queryByText(/Failed to fetch/i)).toBeNull()
     expect(screen.queryByText(/\b403\b/)).toBeNull()
 
-    // Confirm the redirect contract.
     expect(auth.logout).toHaveBeenCalled()
     expect(navigation.navigate).toHaveBeenCalledWith(
       expect.stringMatching(/^\/login\?returnUrl=/),
