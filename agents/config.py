@@ -1,62 +1,45 @@
-"""
-Centralized configuration for trading agents.
-
-Best practices:
-- Single source of truth for all configuration
-- Environment variables with sensible defaults
-- Type-safe configuration values
-- Separate configs for dev/prod via env vars
-"""
+"""Centralized configuration for trading agents."""
 
 import os
 
 
 class Config:
-    """Configuration manager for trading agents."""
-
-    # Backend API Configuration
     BACKEND_BASE_URL: str = os.getenv("BACKEND_URL", "http://backend-service:8080")
 
-    # Derived API endpoints
     @property
     def BACKEND_API_ACCOUNTS(self) -> str:
-        """Accounts API endpoint."""
         return f"{self.BACKEND_BASE_URL}/api/accounts"
 
     @property
     def BACKEND_API_MARKET(self) -> str:
-        """Market data API endpoint."""
         return f"{self.BACKEND_BASE_URL}/api/market"
 
     @property
     def BACKEND_API_TRADING_RUNS(self) -> str:
-        """New Trading Runs API endpoint (phase-based tracking)."""
         return f"{self.BACKEND_BASE_URL}/api/runs"
 
     @property
     def BACKEND_API_AGENTS(self) -> str:
-        """Agent metadata API endpoint."""
         return f"{self.BACKEND_BASE_URL}/api/agents"
 
-    # OpenAI Configuration
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-5-mini")
 
-    # MCP Servers Configuration
     BRAVE_API_KEY: str = os.getenv("BRAVE_API_KEY", "")
 
-    # Trading Configuration
-    CYCLE_INTERVAL_SECONDS: int = int(os.getenv("CYCLE_INTERVAL_SECONDS", "1800"))  # 30 minutes
+    # Admin credentials the agents pod uses to obtain a JWT from
+    # POST /api/auth/login before any state-changing backend call.
+    BACKEND_ADMIN_USERNAME: str = os.getenv("BACKEND_ADMIN_USERNAME", "admin")
+    BACKEND_ADMIN_PASSWORD: str = os.getenv("BACKEND_ADMIN_PASSWORD", "")
 
-    # Logging Configuration
+    CYCLE_INTERVAL_SECONDS: int = int(os.getenv("CYCLE_INTERVAL_SECONDS", "1800"))
+
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
     def __init__(self) -> None:
-        """Initialize configuration and validate required values."""
         self._validate()
 
     def _validate(self) -> None:
-        """Validate that required configuration values are set."""
         if not self.OPENAI_API_KEY:
             raise ValueError("OPENAI_API_KEY environment variable is required")
 
@@ -66,7 +49,6 @@ class Config:
             )
 
     def __repr__(self) -> str:
-        """String representation (safe - no secrets)."""
         return (
             f"Config(\n"
             f"  BACKEND_BASE_URL={self.BACKEND_BASE_URL}\n"
@@ -77,14 +59,13 @@ class Config:
         )
 
 
-# Global configuration instance
-# This ensures single source of truth across all modules
 config = Config()
 
 
-# Export commonly used values for convenience
 BACKEND_BASE_URL = config.BACKEND_BASE_URL
 BACKEND_API_ACCOUNTS = config.BACKEND_API_ACCOUNTS
 BACKEND_API_MARKET = config.BACKEND_API_MARKET
 BACKEND_API_TRADING_RUNS = config.BACKEND_API_TRADING_RUNS
 BACKEND_API_AGENTS = config.BACKEND_API_AGENTS
+BACKEND_ADMIN_USERNAME = config.BACKEND_ADMIN_USERNAME
+BACKEND_ADMIN_PASSWORD = config.BACKEND_ADMIN_PASSWORD
