@@ -18,13 +18,8 @@ as "Completed - No trades (HOLD decision)". Do not rewrite this block.
 import logging
 from datetime import datetime
 
-# Constants live in agent_executor.py for now; Task 10 of the
-# decomposition plan may reconcile if a shared constants module emerges.
-# Importing here is safe because agent_executor imports run_finalization_phase
-# AFTER its module-level constants are declared, so by the time this
-# module is initialized those names are already bound on agent_executor.
-from agent_executor import MAX_REASONING_FIELD_LEN
 from backend.run_lifecycle import RunLifecycle
+from infra.constants import MAX_REASONING_FIELD_LEN
 from models.orchestration import RunContext
 from models.run_tracking import (
     CompleteRunData,

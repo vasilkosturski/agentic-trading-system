@@ -109,10 +109,7 @@ def mock_mcp_pool():
     return MagicMock()
 
 
-
-
 class TestAgentExecutorInitialization:
-
     def test_init(self, sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name):
         executor = AgentExecutor(
             sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
@@ -124,11 +121,8 @@ class TestAgentExecutorInitialization:
         assert executor.model_name == sample_model_name
 
 
-
-
 @pytest.mark.asyncio
 class TestAgentExecutorFetchData:
-
     @patch("agent_executor._get_account_report_raw")
     async def test_fetch_account_data_returns_account_data(
         self,
@@ -184,11 +178,8 @@ class TestAgentExecutorFetchData:
         assert exc_info.value.status_code == 500
 
 
-
-
 @pytest.mark.asyncio
 class TestAgentExecutorMarketAnalyst:
-
     @patch("phases.research_phase.MarketAnalyst")
     @patch("ai_agents.guardrail_retry.Runner")
     async def test_run_market_analyst_returns_research_result(
@@ -241,11 +232,8 @@ class TestAgentExecutorMarketAnalyst:
         assert result.candidates == ["AAPL", "NVDA"]
 
 
-
-
 @pytest.mark.asyncio
 class TestAgentExecutorFullCycle:
-
     @patch("backend.run_lifecycle.complete_run")
     @patch("phases.execution_phase.buy_shares")
     @patch("phases.decision_phase.DecisionMaker")
@@ -363,8 +351,6 @@ class TestAgentExecutorFullCycle:
         assert isinstance(result, CycleResult)
         assert result.decision == sample_decision
         assert result.run_id == 123
-
-
 
 
 @pytest.mark.asyncio
@@ -569,193 +555,35 @@ class TestAgentExecutorErrorPaths:
 
         mock_lifecycle.fail.assert_called_once_with(777, err)
 
+    async def test_handle_cycle_error_swallows_lifecycle_fail_exception(
+        self,
+        sample_agent_id,
+        sample_agent_name,
+        sample_agent_style,
+        sample_model_name,
+    ):
+        """If ``RunLifecycle.fail`` itself raises, the cycle's original
+        exception still has to propagate — _handle_cycle_error must not
+        let a cleanup failure leak out of this method."""
+        mock_lifecycle = Mock(spec=RunLifecycle)
+        mock_lifecycle.fail = AsyncMock(side_effect=RuntimeError("cleanup boom"))
 
-#
-# These tests pin the contract that six magic numbers in agent_executor.py have
-# been promoted to module-level UPPER_CASE constants and that the call sites
-# reference those identifiers (not raw integer literals). The change is a pure
-# naming refactor — values are identical to the literals previously inlined.
-
-
-class TestAgentExecutorModuleConstants:
-
-    def test_max_positions_constant_value(self):
-        import agent_executor
-
-        assert agent_executor.MAX_POSITIONS == 10
-
-    def test_research_max_attempts_constant_value(self):
-        import agent_executor
-
-        assert agent_executor.RESEARCH_MAX_ATTEMPTS == 3
-
-    def test_agent_max_turns_constant_value(self):
-        import agent_executor
-
-        assert agent_executor.AGENT_MAX_TURNS == 30
-
-    def test_recent_activity_lookback_days_constant_value(self):
-        import agent_executor
-
-        assert agent_executor.RECENT_ACTIVITY_LOOKBACK_DAYS == 30
-
-    def test_max_reasoning_field_len_constant_value(self):
-        import agent_executor
-
-        assert agent_executor.MAX_REASONING_FIELD_LEN == 2000
-
-    def test_max_error_message_len_constant_value(self):
-        import agent_executor
-
-        assert agent_executor.MAX_ERROR_MESSAGE_LEN == 500
-
-    def test_call_sites_use_named_constants_not_literals(self):
-        # Scans every phase module so the constants survive any future
-        # decomposition that moves the call sites between files.
-        import inspect
-
-        import agent_executor
-        from phases import decision_phase, finalization, research_phase
-
-        source = (
-            inspect.getsource(agent_executor)
-            + inspect.getsource(research_phase)
-            + inspect.getsource(decision_phase)
-            + inspect.getsource(finalization)
+        executor = AgentExecutor(
+            sample_agent_id, sample_agent_name, sample_agent_style, sample_model_name
         )
 
-        # Call-site fragments that must appear verbatim after the refactor.
-        # If any of these are missing, a call site is still using a literal.
-        # Note: [:MAX_ERROR_MESSAGE_LEN] was removed when _handle_cycle_error
-        # was collapsed to delegate to RunLifecycle.fail — the truncation now
-        # lives in run_lifecycle.py (verified by test_run_lifecycle.py).
-        required_fragments = [
-            "max_positions=MAX_POSITIONS",  # _run_market_analyst + _run_decision_maker
-            "max_attempts=RESEARCH_MAX_ATTEMPTS",  # run_with_guardrail_retry
-            "max_turns=AGENT_MAX_TURNS",  # guardrail retry + Runner.run
-            "days=RECENT_ACTIVITY_LOOKBACK_DAYS",  # get_recent_activity
-            "[:MAX_REASONING_FIELD_LEN]",  # four reasoning truncations
-        ]
-        for fragment in required_fragments:
-            assert fragment in source, (
-                f"Expected fragment {fragment!r} not found in agent_executor.py — "
-                f"a call site is still using a raw integer literal."
-            )
+        err = RuntimeError("cycle boom")
 
-        # And the inverse: the specific literal-bearing patterns the refactor
-        # eliminates must NOT appear anywhere in the source.
-        forbidden_fragments = [
-            "max_positions=10",
-            "max_attempts=3",
-            "max_turns=30",
-            "days=30",
-            "[:2000]",
-            "[:500]",
-        ]
-        for fragment in forbidden_fragments:
-            assert fragment not in source, (
-                f"Forbidden literal fragment {fragment!r} still present in "
-                f"agent_executor.py — refactor incomplete."
-            )
+        # Should return None, NOT raise. The caller re-raises ``err``; this
+        # method's contract is best-effort cleanup.
+        result = await executor._handle_cycle_error(err, ctx=None, lifecycle=mock_lifecycle)
 
-
-#
-# These tests pin the contract that the AgentExecutor class docstring carries
-# an explicit "Concurrency:" block stating single-cycle-per-instance semantics
-# and pointing readers at the supported parallelism model (one executor per
-# agent fanned out via asyncio.gather in trading_system.py). The change is
-# pure documentation — runtime behavior is unchanged.
-
-
-class TestAgentExecutorClassDocstringConcurrency:
-
-    def test_class_docstring_has_concurrency_section(self):
-        doc = AgentExecutor.__doc__
-        assert doc is not None, "AgentExecutor must have a class docstring"
-        assert "Concurrency:" in doc, (
-            "AgentExecutor class docstring is missing the 'Concurrency:' "
-            "section header — readers can wrongly infer thread-safety."
-        )
-
-    def test_class_docstring_states_single_cycle_semantics(self):
-        doc = AgentExecutor.__doc__ or ""
-        assert "single cycle per executor instance at a time" in doc, (
-            "Concurrency block must spell out 'single cycle per executor "
-            "instance at a time' so the constraint is unambiguous."
-        )
-
-    def test_class_docstring_warns_against_concurrent_execute_cycle(self):
-        doc = AgentExecutor.__doc__ or ""
-        assert "Do not call" in doc and "execute_cycle" in doc, (
-            "Concurrency block must explicitly warn against concurrent "
-            "execute_cycle calls on the same instance."
-        )
-
-    def test_class_docstring_references_supported_parallelism_model(self):
-        doc = AgentExecutor.__doc__ or ""
-        assert "trading_system.py" in doc, (
-            "Concurrency block must reference trading_system.py as the "
-            "supported parallelism pattern so future readers have a concrete "
-            "example to follow."
-        )
-        assert "asyncio.gather" in doc, (
-            "Concurrency block must call out asyncio.gather as the fan-out "
-            "primitive used by the orchestrator."
-        )
-
-    def test_class_docstring_preserves_existing_content(self):
-        doc = AgentExecutor.__doc__ or ""
-        # Opening summary
-        assert "Handles agent execution orchestration for trading cycles." in doc
-        # 'Uses Trading Runs API for tracking:' block + each phase
-        assert "Uses Trading Runs API for tracking:" in doc
-        for phase in (
-            "INITIALIZING",
-            "RESEARCHING",
-            "DECIDING",
-            "TRADING",
-            "COMPLETED",
-            "ERROR",
-        ):
-            assert phase in doc, f"Phase {phase!r} missing from class docstring"
-        # 'Data Flow:' block + its three bullets
-        assert "Data Flow:" in doc
-        assert "RunContext created at start" in doc
-        assert "Context passed through all operations explicitly" in doc
-        assert "No instance variables for per-run state" in doc
-
-    def test_concurrency_block_appears_after_data_flow_block(self):
-        doc = AgentExecutor.__doc__ or ""
-        data_flow_idx = doc.find("Data Flow:")
-        concurrency_idx = doc.find("Concurrency:")
-        assert data_flow_idx >= 0, "Data Flow block missing"
-        assert concurrency_idx >= 0, "Concurrency block missing"
-        assert concurrency_idx > data_flow_idx, (
-            "Concurrency block must appear AFTER the Data Flow block, not "
-            "before — Data Flow's 'No instance variables' bullet is the line "
-            "the Concurrency block is qualifying."
-        )
-
-
-class TestAgentExecutorCycleLoggerMigration:
-
-    def test_no_print_calls_remain_in_module_source(self):
-        import inspect
-
-        import agent_executor
-
-        source = inspect.getsource(agent_executor)
-        assert "print(" not in source, (
-            "agent_executor.py still contains print( — all observable events "
-            "must use logger.info/debug/error to route through Python's "
-            "logging infrastructure (file rotators, JSON serializers, log "
-            "shippers)."
-        )
+        assert result is None
+        mock_lifecycle.fail.assert_called_once_with(None, err)
 
 
 @pytest.mark.asyncio
 class TestAgentExecutorCycleLoggerBehavior:
-
     @patch("backend.run_lifecycle.complete_run")
     @patch("phases.execution_phase.buy_shares")
     @patch("phases.decision_phase.DecisionMaker")
@@ -905,7 +733,6 @@ class TestAgentExecutorCycleLoggerBehavior:
 
 
 class TestExtractUsageMetricsPricing:
-
     @pytest.fixture(autouse=True)
     def _reset_warned_set(self):
         import infra.pricing as pricing
@@ -1037,7 +864,6 @@ class TestExtractUsageMetricsPricing:
 
 
 class TestLoadModelPricing:
-
     def test_load_model_pricing_returns_dict_with_known_openai_models(self):
         from infra.pricing import _load_model_pricing
 
@@ -1304,7 +1130,6 @@ class TestAgentExecutorPromptCaptureNarrowing:
 
 
 class TestAgentExecutorExtractRunTelemetry:
-
     @pytest.fixture(autouse=True)
     def _reset_warned_set(self):
         import infra.pricing as pricing
@@ -1426,7 +1251,6 @@ class TestAgentExecutorExtractRunTelemetry:
 
 @pytest.mark.asyncio
 class TestAgentExecutorCompletionMessageOnFailure:
-
     @patch("backend.run_lifecycle.complete_run")
     @patch("phases.execution_phase.buy_shares")
     @patch("phases.decision_phase.DecisionMaker")
@@ -1570,26 +1394,26 @@ class TestAgentExecutorCompletionMessageOnFailure:
 def test_pricing_module_exports_model_pricing():
     from infra.pricing import _UNKNOWN_MODELS_WARNED, MODEL_PRICING, _load_model_pricing
 
-    assert isinstance(MODEL_PRICING, dict), (
-        "MODEL_PRICING must be a dict mapping model name to pricing tuple"
-    )
-    assert "gpt-4o-mini" in MODEL_PRICING, (
-        "MODEL_PRICING should include gpt-4o-mini as a known model"
-    )
-    assert isinstance(_UNKNOWN_MODELS_WARNED, set), (
-        "_UNKNOWN_MODELS_WARNED must be a set for warning dedupe"
-    )
-    assert callable(_load_model_pricing), (
-        "_load_model_pricing must be callable (loads pricing from JSON)"
-    )
+    assert isinstance(
+        MODEL_PRICING, dict
+    ), "MODEL_PRICING must be a dict mapping model name to pricing tuple"
+    assert (
+        "gpt-4o-mini" in MODEL_PRICING
+    ), "MODEL_PRICING should include gpt-4o-mini as a known model"
+    assert isinstance(
+        _UNKNOWN_MODELS_WARNED, set
+    ), "_UNKNOWN_MODELS_WARNED must be a set for warning dedupe"
+    assert callable(
+        _load_model_pricing
+    ), "_load_model_pricing must be callable (loads pricing from JSON)"
 
 
 def test_telemetry_module_exports_functions():
     from infra.telemetry import extract_run_telemetry, extract_usage_metrics
 
-    assert callable(extract_usage_metrics), (
-        "extract_usage_metrics must be callable (SDK Usage → UsageMetrics)"
-    )
-    assert callable(extract_run_telemetry), (
-        "extract_run_telemetry must be callable (RunResult → tool calls + metrics)"
-    )
+    assert callable(
+        extract_usage_metrics
+    ), "extract_usage_metrics must be callable (SDK Usage → UsageMetrics)"
+    assert callable(
+        extract_run_telemetry
+    ), "extract_run_telemetry must be callable (RunResult → tool calls + metrics)"

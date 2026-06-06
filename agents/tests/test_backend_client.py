@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-import backend.client as backend_client_module
 from backend.client import BackendClient
 from infra.exceptions import BackendAPIError
 from models import TradeResult
@@ -36,9 +35,9 @@ class TestBackendClientHttp2:
         with patch("backend.client.httpx.AsyncClient", side_effect=fake_async_client):
             client._get_client()
 
-        assert captured_kwargs.get("http2") is True, (
-            f"Expected http2=True in AsyncClient kwargs, got: {captured_kwargs}"
-        )
+        assert (
+            captured_kwargs.get("http2") is True
+        ), f"Expected http2=True in AsyncClient kwargs, got: {captured_kwargs}"
 
     def test_owned_client_uses_granular_httpx_timeout(self):
         """The AsyncClient must be constructed with a granular httpx.Timeout.
@@ -60,9 +59,9 @@ class TestBackendClientHttp2:
             client._get_client()
 
         timeout = captured_kwargs.get("timeout")
-        assert isinstance(timeout, httpx.Timeout), (
-            f"Expected httpx.Timeout instance, got: {type(timeout).__name__}"
-        )
+        assert isinstance(
+            timeout, httpx.Timeout
+        ), f"Expected httpx.Timeout instance, got: {type(timeout).__name__}"
         assert timeout.connect == 5.0, f"connect timeout: {timeout.connect}"
         assert timeout.read == 15.0, f"read timeout: {timeout.read}"
         assert timeout.write == 10.0, f"write timeout: {timeout.write}"
@@ -257,8 +256,10 @@ class TestBackendClientJwtLogin:
     @pytest.fixture(autouse=True)
     def _patch_admin_creds(self, monkeypatch):
         """Make sure the BackendClient sees deterministic admin credentials."""
-        monkeypatch.setattr(backend_client_module, "ADMIN_USERNAME", "admin", raising=True)
-        monkeypatch.setattr(backend_client_module, "ADMIN_PASSWORD", "admin-pw", raising=True)
+        from config import config as _config
+
+        monkeypatch.setattr(_config, "BACKEND_ADMIN_USERNAME", "admin", raising=True)
+        monkeypatch.setattr(_config, "BACKEND_ADMIN_PASSWORD", "admin-pw", raising=True)
 
     @pytest.mark.asyncio
     async def test_login_happens_before_first_state_changing_call(self):
@@ -362,9 +363,7 @@ class TestBackendClientJwtLogin:
         await client.get_account_report(agent_id=1)
 
         # Exactly one login was performed (first call), the rest reused the cached token.
-        login_count = sum(
-            1 for c in fake_http.calls if c["url"].endswith("/api/auth/login")
-        )
+        login_count = sum(1 for c in fake_http.calls if c["url"].endswith("/api/auth/login"))
         assert login_count == 1
         # The account-report call must also carry the bearer header.
         assert fake_http.calls[2]["headers"].get("Authorization") == "Bearer jwt-cache"

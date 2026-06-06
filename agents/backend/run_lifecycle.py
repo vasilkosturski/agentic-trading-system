@@ -1,24 +1,20 @@
-"""Trading-Runs-API + status-broadcast facade for AgentExecutor.
+"""Trading-Runs-API + status-broadcast facade for the cycle orchestrator.
 
-Encapsulates the run-tracking protocol (`create_run` / `update_phase` /
-`complete_run`) and the paired status broadcasts that AgentExecutor
-currently performs inline at five separate sites:
+`RunLifecycle` encapsulates the run-tracking protocol
+(``create_run`` / ``update_phase`` / ``complete_run``) together with the
+paired status broadcasts. One instance per agent owns the per-cycle
+sequence of:
 
-* _start_run                 → RunLifecycle.start
-* _run_decision_maker        → RunLifecycle.transition_to_deciding
-* _execute_trade             → RunLifecycle.transition_to_trading
-* _finalize_run (completion) → RunLifecycle.complete
-* _handle_cycle_error        → RunLifecycle.fail
+* ``start`` — initialize agent, open a run, transition to RESEARCHING
+* ``transition_to_deciding`` — RESEARCHING → DECIDING
+* ``transition_to_trading`` — DECIDING → TRADING
+* ``complete`` — record completion + broadcast COMPLETED
+* ``fail`` — best-effort failure recording (never raises)
 
-Task 3 of the decomposition plan
-(`docs/superpowers/plans/2026-05-13-aegr-decomposition.md`) is purely
-additive: this module exists, but `agent_executor.py` continues to call
-`run_tracking` / `status_broadcaster` directly. Task 4 will wire
-RunLifecycle into AgentExecutor.
-
-The `fail()` swallowed-cleanup-error contract is load-bearing — it
-mirrors the existing _handle_cycle_error behavior so the original
-exception is always the one the caller re-raises.
+Failure recording in ``fail`` deliberately swallows cleanup errors so the
+caller can re-raise the original exception — the one that actually
+matters — without it being masked by a transient broadcast or
+``update_phase`` failure.
 """
 
 import logging
@@ -33,27 +29,21 @@ from backend.status_broadcaster import (
     PHASE_TRADING,
     broadcast_status,
 )
+from infra.constants import MAX_ERROR_MESSAGE_LEN
 from models.run_tracking import CompleteRunData, RunPhase
 from tools.trading_tools import initialize_agent
 
 logger = logging.getLogger(__name__)
 
-# Mirrors `MAX_ERROR_MESSAGE_LEN` in agent_executor.py. Duplicated here
-# intentionally to avoid a circular-import seam (Task 4 will import this
-# module from agent_executor). Task 10 will reconcile the duplication.
-MAX_ERROR_MESSAGE_LEN = 500
-
 
 class RunLifecycle:
     """Trading Runs API + status-broadcast protocol for a single agent.
 
-    Owns the per-cycle sequence of `create_run` → phase transitions →
-    `complete_run` (or FAILED via `fail`). Holds only agent identity
-    (id + name) — `run_id` is passed as an argument to each transition
+    Owns the per-cycle sequence of ``create_run`` → phase transitions →
+    ``complete_run`` (or FAILED via ``fail``). Holds only agent identity
+    (id + name); ``run_id`` is passed as an argument to each transition
     method so the same instance can be reused across cycles without
     carrying stale state.
-
-    See module docstring for the mapping from AgentExecutor sites.
     """
 
     def __init__(self, agent_id: int, agent_name: str) -> None:
@@ -63,22 +53,21 @@ class RunLifecycle:
     async def start(self) -> int:
         """Initialize agent account, create run, transition to RESEARCHING.
 
-        Sequence (mirrors AgentExecutor._start_run):
-          1. initialize_agent(agent_name)
-          2. guard: agent_id must be set
+        Sequence:
+          1. ``initialize_agent(agent_name)``
+          2. guard: ``agent_id`` must be set
           3. broadcast INITIALIZING
-          4. run_id = create_run(agent_id)
-          5. update_phase(run_id, RESEARCHING)
+          4. ``run_id = create_run(agent_id)``
+          5. ``update_phase(run_id, RESEARCHING)``
           6. broadcast RESEARCHING
 
         Returns:
-            The newly created run_id from the backend.
+            The newly created ``run_id`` from the backend.
 
         Raises:
-            RuntimeError: If `self.agent_id` is None/falsy. Mirrors the
-                existing _start_run guard in agent_executor.py — agents
-                must be created via `TradingSystem.create()` so the
-                backend assigns an id.
+            RuntimeError: If ``self.agent_id`` is None/falsy. Agents must
+                be created via ``TradingSystem.create()`` so the backend
+                assigns an id before this method runs.
         """
         await initialize_agent(self.agent_name)
 
@@ -110,8 +99,7 @@ class RunLifecycle:
         return run_id
 
     async def transition_to_deciding(self, run_id: int) -> None:
-        """RESEARCHING → DECIDING. Mirrors the inline call pair in
-        AgentExecutor._run_decision_maker (lines ~477-484)."""
+        """RESEARCHING → DECIDING phase transition + status broadcast."""
         await update_phase(run_id, RunPhase.DECIDING)
         broadcast_status(
             self.agent_id,
@@ -122,8 +110,7 @@ class RunLifecycle:
         )
 
     async def transition_to_trading(self, run_id: int) -> None:
-        """DECIDING → TRADING. Mirrors the inline call pair in
-        AgentExecutor._execute_trade (lines ~581-585)."""
+        """DECIDING → TRADING phase transition + status broadcast."""
         await update_phase(run_id, RunPhase.TRADING)
         broadcast_status(
             self.agent_id,
@@ -141,9 +128,8 @@ class RunLifecycle:
     ) -> None:
         """Complete the run with all phase data and broadcast COMPLETED.
 
-        Mirrors the tail of AgentExecutor._finalize_run (lines ~702-724).
-        The outcome_message is passed in by the caller because the
-        message depends on PhaseStatus (COMPLETED / SKIPPED / FAILED)
+        The ``outcome_message`` is supplied by the caller because the
+        wording depends on ``PhaseStatus`` (COMPLETED / SKIPPED / FAILED)
         which lives at the orchestrator layer.
         """
         await complete_run(run_id, data)
@@ -159,13 +145,12 @@ class RunLifecycle:
     async def fail(self, run_id: int | None, error: Exception) -> None:
         """Best-effort failure recording — NEVER raises.
 
-        Mirrors AgentExecutor._handle_cycle_error (lines ~726-760):
-          1. Log the cycle error at ERROR.
-          2. Broadcast PHASE_ERROR (best-effort; never raises).
-          3. If a run exists, set it to FAILED via update_phase.
-             Cleanup failures are caught + logged but never propagated —
-             the caller re-raises the ORIGINAL exception, which is the
-             one that matters.
+        1. Log the cycle error at ERROR.
+        2. Broadcast PHASE_ERROR (best-effort; never raises).
+        3. If a run exists, set it to FAILED via ``update_phase``.
+           Cleanup failures are caught + logged but never propagated —
+           the caller re-raises the ORIGINAL exception, which is the
+           one that matters.
         """
         logger.error(f"Cycle error for {self.agent_name}: {error}")
 

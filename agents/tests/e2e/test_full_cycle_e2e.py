@@ -12,7 +12,7 @@ import pytest
 import requests
 from agents.mcp import MCPServerStdio
 
-from agent_executor import AgentExecutor
+from agent_executor import execute_cycle
 from mcp_helpers.params import get_mcp_server_params
 from mcp_helpers.types import MCPPool
 from models import CycleResult, TradeAction
@@ -38,14 +38,14 @@ async def real_mcp_pool():
 
 
 @pytest.fixture
-def real_agent_executor(test_agent_id, test_agent_name, test_agent_style, test_model_name):
-    """Create a real AgentExecutor instance."""
-    return AgentExecutor(
-        agent_id=test_agent_id,
-        name=test_agent_name,
-        agent_style=test_agent_style,
-        model_name=test_model_name,
-    )
+def real_agent_identity(test_agent_id, test_agent_name, test_agent_style, test_model_name):
+    """Agent-identity bundle used by the e2e cycle invocation."""
+    return {
+        "agent_id": test_agent_id,
+        "name": test_agent_name,
+        "agent_style": test_agent_style,
+        "model_name": test_model_name,
+    }
 
 
 @pytest.mark.e2e
@@ -58,7 +58,7 @@ class TestFullCycleE2E:
     @pytest.mark.asyncio
     async def test_full_cycle_executes_trade(
         self,
-        real_agent_executor: AgentExecutor,
+        real_agent_identity: dict,
         real_mcp_pool: MCPPool,
         require_backend: str,
     ):
@@ -76,10 +76,11 @@ class TestFullCycleE2E:
         logger.info("=" * 60)
         logger.info("E2E SMOKE TEST: Full Trading Cycle")
         logger.info("=" * 60)
-        logger.info(f"Agent: {real_agent_executor.name} ({real_agent_executor.agent_style})")
+        logger.info(f"Agent: {real_agent_identity['name']} ({real_agent_identity['agent_style']})")
 
         # Execute full cycle with forced trade
-        result = await real_agent_executor.execute_cycle(
+        result = await execute_cycle(
+            **real_agent_identity,
             mcp_pool=real_mcp_pool,
             force_trade=True,  # Ensures BUY or SELL (no HOLD)
         )
@@ -100,9 +101,10 @@ class TestFullCycleE2E:
         assert result.run_id is not None and result.run_id > 0
 
         # With force_trade=True, must be BUY or SELL
-        assert result.decision.action in (TradeAction.BUY, TradeAction.SELL), (
-            f"Expected BUY/SELL with force_trade, got {result.decision.action}"
-        )
+        assert result.decision.action in (
+            TradeAction.BUY,
+            TradeAction.SELL,
+        ), f"Expected BUY/SELL with force_trade, got {result.decision.action}"
         assert result.decision.symbol is not None
         assert result.decision.quantity is not None
         assert result.decision.quantity > 0
@@ -115,23 +117,23 @@ class TestFullCycleE2E:
         # Symbol format (BUY/SELL guaranteed by force_trade)
         # Allow dots for class shares (e.g., BRK.B, BF.B)
         symbol_clean = result.decision.symbol.replace(".", "")
-        assert symbol_clean.isalpha(), (
-            f"Symbol should be alphabetic (dots allowed): {result.decision.symbol}"
-        )
-        assert result.decision.symbol.isupper(), (
-            f"Symbol should be uppercase: {result.decision.symbol}"
-        )
-        assert 1 <= len(result.decision.symbol) <= 6, (
-            f"Symbol length should be 1-6: {result.decision.symbol}"
-        )
+        assert (
+            symbol_clean.isalpha()
+        ), f"Symbol should be alphabetic (dots allowed): {result.decision.symbol}"
+        assert (
+            result.decision.symbol.isupper()
+        ), f"Symbol should be uppercase: {result.decision.symbol}"
+        assert (
+            1 <= len(result.decision.symbol) <= 6
+        ), f"Symbol length should be 1-6: {result.decision.symbol}"
 
         # Structured reasoning fields should be populated for trade decisions
-        assert len(result.decision.portfolioContext) > 0, (
-            "portfolioContext should be populated for BUY/SELL"
-        )
-        assert len(result.decision.researchContext) > 0, (
-            "researchContext should be populated for BUY/SELL"
-        )
+        assert (
+            len(result.decision.portfolioContext) > 0
+        ), "portfolioContext should be populated for BUY/SELL"
+        assert (
+            len(result.decision.researchContext) > 0
+        ), "researchContext should be populated for BUY/SELL"
 
         # Trade should have been attempted (count is 0 or 1 depending on execution success)
         assert result.trade_count in [0, 1]

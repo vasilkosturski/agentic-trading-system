@@ -4,7 +4,7 @@ from datetime import datetime
 
 from agents import trace
 
-from agent_executor import AgentExecutor
+from agent_executor import execute_cycle
 from config import config
 from mcp_helpers.types import MCPPool
 from models.investment_style import InvestmentStyle
@@ -22,14 +22,11 @@ async def run_trader_cycle(trader: "SimpleTrader", mcp_pool: MCPPool, force_trad
         trace_id = f"trace_{trader.name.lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
         with trace(trace_name, trace_id=trace_id):
-            executor = AgentExecutor(
+            await execute_cycle(
                 agent_id=trader.agent_id,
                 name=trader.name,
                 agent_style=trader.agent_style,
                 model_name=trader.model_name,
-            )
-
-            await executor.execute_cycle(
                 mcp_pool=mcp_pool,
                 force_trade=force_trade,
             )

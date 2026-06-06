@@ -16,16 +16,12 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
-from config import (
-    BACKEND_ADMIN_PASSWORD as ADMIN_PASSWORD,  # noqa: F401
-)
-from config import (
-    BACKEND_ADMIN_USERNAME as ADMIN_USERNAME,  # noqa: F401
-)
+from backend.auth import JwtAuth
 from config import (
     BACKEND_API_ACCOUNTS,
     BACKEND_API_TRADING_RUNS,
     BACKEND_BASE_URL,
+    config,
 )
 from infra.exceptions import BackendAPIError
 from models import TradeResult
@@ -46,18 +42,36 @@ _retry_on_transient = retry(
 )
 
 
+def _default_credentials_provider() -> tuple[str, str]:
+    """Read admin credentials from ``config`` at login time."""
+    return config.BACKEND_ADMIN_USERNAME, config.BACKEND_ADMIN_PASSWORD
+
+
 class BackendClient:
     def __init__(
         self,
         client: httpx.AsyncClient | None = None,
         timeout: float = 30.0,
+        credentials_provider=_default_credentials_provider,
     ):
         self._external_client: httpx.AsyncClient | None = client
         self._owned_client: httpx.AsyncClient | None = None
         self._timeout = timeout
         self._loop_id: int | None = None
-        # Cached JWT obtained from POST /api/auth/login. Invalidated on 401.
-        self._token: str | None = None
+        # One JwtAuth per BackendClient — the token cache lives in the auth
+        # object, so a fresh BackendClient implies a fresh login. Lazily
+        # constructed so tests can swap ``credentials_provider`` between
+        # construction and first use.
+        self._credentials_provider = credentials_provider
+        self._auth: JwtAuth | None = None
+
+    def _get_auth(self) -> JwtAuth:
+        if self._auth is None:
+            self._auth = JwtAuth(
+                login_url=f"{BACKEND_BASE_URL}/api/auth/login",
+                credentials_provider=self._credentials_provider,
+            )
+        return self._auth
 
     def _get_client(self) -> httpx.AsyncClient:
         if self._external_client is not None:
@@ -99,40 +113,59 @@ class BackendClient:
             logger.debug("Closed httpx AsyncClient")
         self._owned_client = None
 
-    async def _login(self) -> str:
-        client = self._get_client()
-        url = f"{BACKEND_BASE_URL}/api/auth/login"
-        try:
-            # Read the credentials live from the module so tests that
-            # monkeypatch ``backend.client.ADMIN_PASSWORD`` after import are
-            # honoured.
-            import backend.client as _self_module
+    async def _dispatch_with_auth(
+        self,
+        client: httpx.AsyncClient,
+        *,
+        method: str,
+        url: str,
+        params: dict[str, Any] | None,
+        json_data: dict[str, Any] | None,
+    ) -> httpx.Response:
+        """Drive ``JwtAuth.auth_flow`` against ``client``.
 
-            payload = {
-                "username": _self_module.ADMIN_USERNAME,
-                "password": _self_module.ADMIN_PASSWORD,
-            }
-            response = await client.request("POST", url, json=payload)
-            if response.status_code != 200:
-                raise BackendAPIError(
-                    f"Login failed: HTTP {response.status_code}",
-                    status_code=response.status_code,
+        The auth flow is a generator that yields ``httpx.Request`` objects and
+        is sent back the corresponding ``httpx.Response`` — exactly the
+        protocol ``httpx.Auth`` defines. Driving it explicitly here means the
+        auth pipeline works against both the production owned client and the
+        ``_FakeHttpxClient`` test doubles that don't go through httpx's own
+        auth machinery. JSON payloads are tracked alongside the seed request
+        so each dispatch passes the original ``params`` / ``json_data`` while
+        the auth flow only contributes the ``Authorization`` header and the
+        login POST.
+        """
+        auth = self._get_auth()
+        seed = httpx.Request(method=method, url=url)
+        flow = auth.auth_flow(seed)
+        request = next(flow)
+        login_url = f"{BACKEND_BASE_URL}/api/auth/login"
+        while True:
+            is_login = str(request.url) == login_url
+            if is_login:
+                # The login request body lives on the httpx.Request object the
+                # auth flow built — extract it and forward as JSON to the
+                # underlying client. The flow always sets ``Content-Type:
+                # application/json`` on login.
+                body = _json_body_from_request(request)
+                response = await client.request(
+                    method=request.method,
+                    url=str(request.url),
+                    params=None,
+                    json=body,
+                    headers=None,
                 )
-            body = response.json()
-            token = body.get("token")
-            if not token:
-                raise BackendAPIError("Login response missing 'token' field")
-            return token
-        except httpx.TimeoutException as e:
-            raise BackendAPIError("Login timeout") from e
-        except httpx.RequestError as e:
-            raise BackendAPIError(f"Login network error: {str(e)}") from e
-
-    async def _ensure_authenticated(self) -> str:
-        if self._token is None:
-            self._token = await self._login()
-            logger.debug("Obtained new JWT for backend calls")
-        return self._token
+            else:
+                response = await client.request(
+                    method=method,
+                    url=url,
+                    params=params,
+                    json=json_data,
+                    headers={"Authorization": request.headers["Authorization"]},
+                )
+            try:
+                request = flow.send(response)
+            except StopIteration:
+                return response
 
     async def _request(
         self,
@@ -147,31 +180,13 @@ class BackendClient:
         try:
             logger.debug(f"{method} {url} params={params} json={json_data}")
 
-            token = await self._ensure_authenticated()
-            headers = {"Authorization": f"Bearer {token}"}
-            response = await client.request(
+            response = await self._dispatch_with_auth(
+                client,
                 method=method,
                 url=url,
                 params=params,
-                json=json_data,
-                headers=headers,
+                json_data=json_data,
             )
-
-            # Token may have expired mid-flight — drop the cached value,
-            # re-login once, and retry the call. A second 401 is escalated
-            # to a hard failure so callers can't silently spin.
-            if response.status_code == 401:
-                logger.warning(f"HTTP 401 on {method} {url}; refreshing JWT and retrying once")
-                self._token = None
-                token = await self._ensure_authenticated()
-                headers = {"Authorization": f"Bearer {token}"}
-                response = await client.request(
-                    method=method,
-                    url=url,
-                    params=params,
-                    json=json_data,
-                    headers=headers,
-                )
 
             logger.debug(f"{method} {url} -> HTTP {response.status_code}")
             response.raise_for_status()
@@ -208,7 +223,10 @@ class BackendClient:
 
     async def initialize_agent(self, name: str, initial_balance: float = 100000.0) -> int:
         # Idempotent: when the agent already exists the backend returns HTTP
-        # 400, in which case we fall back to looking it up by name.
+        # 400 with an "already exists" message — fall back to lookup. Any
+        # other 400 (validation, forbidden chars, etc.) propagates as-is so
+        # the real cause isn't hidden behind a misleading "not found in
+        # registry" error.
         url = BACKEND_API_ACCOUNTS
         try:
             response = await self._request(
@@ -221,8 +239,8 @@ class BackendClient:
             logger.info(f"Agent {name} (id={agent_id}) initialized with ${initial_balance:,.2f}")
             return agent_id
         except BackendAPIError as e:
-            if e.status_code == 400:
-                logger.info(f"Agent {name} may already exist (HTTP 400), looking up...")
+            if e.status_code == 400 and "already exists" in str(e).lower():
+                logger.info(f"Agent {name} already exists (HTTP 400), looking up...")
                 return await self._lookup_agent_id(name)
             raise
 
@@ -326,7 +344,15 @@ _default_client: BackendClient | None = None
 
 
 def get_backend_client() -> BackendClient:
-    asyncio.get_running_loop()
+    # The running-loop check is load-bearing: a sync thread calling this would
+    # build a BackendClient bound to no event loop, which then fails at request
+    # time with a confusing "Event loop is closed" error. Crash early with a
+    # domain exception instead.
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError as e:
+        raise BackendAPIError("get_backend_client called outside an event loop") from e
+
     global _default_client
     if _default_client is None:
         _default_client = BackendClient()
@@ -338,3 +364,13 @@ async def close_backend_client() -> None:
     if _default_client is not None:
         await _default_client.close()
         _default_client = None
+
+
+def _json_body_from_request(request: httpx.Request) -> dict | None:
+    """Decode the JSON body httpx serialized into a Request."""
+    import json
+
+    body = request.read()
+    if not body:
+        return None
+    return json.loads(body)
