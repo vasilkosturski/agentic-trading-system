@@ -3,6 +3,7 @@ package com.trading.controller;
 import com.trading.service.PromptLoader;
 import java.io.IOException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,6 +31,7 @@ public class PromptController {
      * @return Composed prompt with personality substituted
      */
     @GetMapping("/{agentType}/{agentName}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> getPrompt(@PathVariable String agentType, @PathVariable String agentName) {
         try {
             String prompt = promptLoader.composePrompt(agentType, agentName);
