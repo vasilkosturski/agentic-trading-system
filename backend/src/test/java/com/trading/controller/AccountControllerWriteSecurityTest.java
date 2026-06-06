@@ -150,8 +150,7 @@ class AccountControllerWriteSecurityTest {
     void executeTrade_WithAdminRole_Returns201() throws Exception {
         when(agentIdentityService.requireAgentName(anyLong())).thenReturn("Warren");
         when(tradeOrchestrator.buyShares(anyString(), anyString(), anyInt(), any()))
-                .thenReturn(new com.trading.dto.response.TradeResult(
-                        1L, "AAPL", 10, 150.0, 98500.0));
+                .thenReturn(new com.trading.dto.response.TradeResult(1L, "AAPL", 10, 150.0, 98500.0));
 
         mockMvc.perform(post("/api/accounts/1/trades")
                         .contentType(MediaType.APPLICATION_JSON)

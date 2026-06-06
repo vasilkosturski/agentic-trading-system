@@ -42,7 +42,6 @@ public class TradingAccount {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    // One-to-many relationships
     @OneToMany(mappedBy = "account", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<AccountTransaction> transactions = new ArrayList<>();
 
@@ -52,18 +51,15 @@ public class TradingAccount {
     @OneToMany(mappedBy = "account", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<AccountPortfolioSnapshot> portfolioSnapshots = new ArrayList<>();
 
-    // One-to-one relationship with trading agent
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "agent_id")
     private TradingAgent agent;
 
-    // Constructor with agent and balance
     public TradingAccount(TradingAgent agent, Double balance) {
         this.agent = agent;
         this.balance = balance;
     }
 
-    // JPA lifecycle callbacks
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();

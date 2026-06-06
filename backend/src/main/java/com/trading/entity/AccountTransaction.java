@@ -53,8 +53,6 @@ public class AccountTransaction {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
-    // Constructor with parameters
-    // NOTE: This constructor does NOT set transactionType - it must be set explicitly
     public AccountTransaction(
             TradingAccount account, String symbol, Integer quantity, Double price, Instant timestamp) {
         this.account = account;
@@ -62,11 +60,9 @@ public class AccountTransaction {
         this.quantity = quantity;
         this.price = price;
         this.timestamp = timestamp;
-        // transactionType must be set explicitly after construction
         this.totalAmount = Math.abs(quantity) * price;
     }
 
-    // Business methods
     public Double calculateTotal() {
         return Math.abs(quantity) * price;
     }
@@ -79,13 +75,11 @@ public class AccountTransaction {
         return transactionType == TransactionType.SELL;
     }
 
-    // Custom setters that need business logic
     public void setQuantity(Integer quantity) {
         this.quantity = quantity;
-        // IMPORTANT: Do NOT auto-set transactionType here!
-        // Transaction type must be set explicitly by the service layer.
-        // Setting it based on quantity sign caused critical bug where SELL
-        // transactions were recorded as BUY because quantity was positive.
+        // Do NOT auto-set transactionType from quantity sign here — service layer
+        // must set it explicitly. Inferring from sign caused SELL transactions to
+        // be recorded as BUY when quantity was positive.
         if (this.price != null) {
             this.totalAmount = Math.abs(quantity) * this.price;
         }

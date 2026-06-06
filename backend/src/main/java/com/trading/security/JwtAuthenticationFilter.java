@@ -17,24 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * JWT authentication filter for validating JWT tokens on each request.
- * Extends OncePerRequestFilter to guarantee single execution per request.
- *
- * <p>Filter logic:
- * <ol>
- *   <li>Extract JWT token from Authorization header (Bearer scheme)</li>
- *   <li>Extract username from token</li>
- *   <li>Load user details from UserDetailsService</li>
- *   <li>Validate token against user details</li>
- *   <li>Set authentication in SecurityContext if valid (and not already set)</li>
- * </ol>
- *
- * <p>If no token, expired token, or otherwise invalid token, the filter passes through
- * without setting authentication. Spring Security and method-level authorization will
- * then decide whether to allow or deny the request. This deliberately makes
- * expired/malformed/missing tokens behave identically for downstream authorization.
- *
- * <p>Exception handling policy:
+ * Exception handling policy:
  * <ul>
  *   <li>{@link ExpiredJwtException} - logged at DEBUG (expected client state, e.g.
  *       stale browser session), chain continues anonymous.</li>
@@ -83,28 +66,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 logger.debug("JWT expired; treating request as anonymous: " + e.getMessage());
             } catch (JwtException | IllegalArgumentException e) {
                 // Malformed / invalid signature / unsupported algorithm / null-empty.
-                // Treat as anonymous; surface at WARN since this could indicate tampering or misconfiguration.
                 logger.warn("JWT invalid; treating request as anonymous: " + e.getMessage());
             } catch (UsernameNotFoundException e) {
-                // Token subject doesn't match a known user. Treat as anonymous.
+                // Token subject doesn't match a known user.
                 logger.warn("JWT subject not found; treating request as anonymous: " + e.getMessage());
             }
-            // NOTE: deliberately NOT catching generic Exception. If something truly
-            // unexpected happens (e.g., DB outage in UserDetailsService), let it
-            // propagate so GlobalExceptionHandler returns 500 instead of silently
-            // downgrading the request to anonymous.
+            // Deliberately NOT catching generic Exception — unexpected failures
+            // (e.g., DB outage in UserDetailsService) must propagate to the
+            // global handler instead of silently downgrading to anonymous.
         }
 
         filterChain.doFilter(request, response);
     }
 
-    /**
-     * Extract JWT token from Authorization header.
-     * Expected format: "Bearer {token}"
-     *
-     * @param request HTTP request
-     * @return JWT token or null if not present or invalid format
-     */
     private String extractJwtFromRequest(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (bearerToken != null && bearerToken.startsWith("Bearer ")) {

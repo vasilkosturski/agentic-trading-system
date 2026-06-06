@@ -1,0 +1,13 @@
+{
+    "recommendations": [
+        "charliermarsh.ruff",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "dbaeumer.vscode-eslint",
+        "redhat.java",
+        "vscjava.vscode-gradle",
+        "shengchen.vscode-checkstyle",
+        "vscjava.vscode-lombok",
+        "redhat.vscode-yaml"
+    ]
+}

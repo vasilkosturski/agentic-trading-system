@@ -69,23 +69,19 @@ public class TradingAgent {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
-    // One-to-one relationship with trading account
     @OneToOne(mappedBy = "agent", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private TradingAccount tradingAccount;
 
-    // Constructor with parameters
     public TradingAgent(String name, String description) {
         this.name = name;
         this.description = description;
     }
 
-    // JPA lifecycle callbacks
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = Instant.now();
     }
 
-    // Business methods
     public void updateActivity() {
         this.lastActivity = Instant.now();
         this.updatedAt = Instant.now();

@@ -20,13 +20,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Trading run entity - tracks each autonomous trading cycle.
- * Per design doc: Parent record with phase lifecycle (INITIALIZING → RESEARCHING → DECIDING → TRADING → COMPLETED).
- *
- * Replaces: analytics.agent_runs
- * Schema: trading.trading_runs
- */
 @Entity
 @Table(
         name = "trading_runs",
@@ -48,16 +41,10 @@ public class TradingRun {
     @JoinColumn(name = "agent_id", nullable = false)
     private TradingAgent agent;
 
-    /**
-     * Run status: IN_PROGRESS, COMPLETED, FAILED
-     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private RunStatus status;
 
-    /**
-     * Current phase: INITIALIZING, RESEARCHING, DECIDING, TRADING, COMPLETED, ERROR
-     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private RunPhase phase;
@@ -71,14 +58,12 @@ public class TradingRun {
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
-    // Bidirectional relationships (Issue #7 fix)
     @OneToOne(mappedBy = "run", fetch = FetchType.LAZY)
     private DecisionPhase decision;
 
     @OneToOne(mappedBy = "run", fetch = FetchType.LAZY)
     private ExecutionPhase execution;
 
-    // Constructor for creating a new run
     public TradingRun(TradingAgent agent) {
         this.agent = agent;
         this.status = RunStatus.IN_PROGRESS;
@@ -86,7 +71,6 @@ public class TradingRun {
         this.startedAt = Instant.now();
     }
 
-    // Business methods
     public void updatePhase(RunPhase newPhase) {
         this.phase = newPhase;
         if (newPhase == RunPhase.COMPLETED || newPhase == RunPhase.FAILED) {
@@ -109,7 +93,6 @@ public class TradingRun {
         this.completedAt = Instant.now();
     }
 
-    // Bidirectional navigation convenience methods
     public boolean hasDecision() {
         return decision != null;
     }

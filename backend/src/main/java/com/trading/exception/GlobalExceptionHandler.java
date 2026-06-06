@@ -12,27 +12,11 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.RestClientException;
 
-/**
- * Global exception handler for all REST controllers.
- *
- * Handles common/generic exceptions that occur across multiple endpoints.
- * Endpoint-specific business logic errors should remain in their respective
- * controllers for clarity.
- *
- * Uses @RestControllerAdvice to automatically handle exceptions thrown from
- * any @RestController in the application.
- *
- * Returns RFC 7807 ProblemDetail responses for consistent error formatting.
- */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    /**
-     * Handles illegal argument exceptions (invalid input parameters).
-     * Returns 400 Bad Request.
-     */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ProblemDetail> handleIllegalArgument(
             IllegalArgumentException ex, HttpServletRequest request) {
@@ -41,10 +25,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(problem);
     }
 
-    /**
-     * Handles not found exceptions (missing resources).
-     * Returns 404 Not Found.
-     */
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<ProblemDetail> handleNotFound(NoSuchElementException ex, HttpServletRequest request) {
         logger.warn("Resource not found: {}", ex.getMessage());
@@ -52,10 +32,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem);
     }
 
-    /**
-     * Handles ResourceNotFoundException (custom not found exception).
-     * Returns 404 Not Found.
-     */
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ProblemDetail> handleResourceNotFound(
             ResourceNotFoundException ex, HttpServletRequest request) {
@@ -64,13 +40,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem);
     }
 
-    /**
-     * Handles REST client exceptions (external service calls).
-     * Returns 503 Service Unavailable.
-     *
-     * Note: Endpoint-specific RestClientException handling can override this
-     * by catching the exception in the controller before it reaches here.
-     */
     @ExceptionHandler(RestClientException.class)
     public ResponseEntity<ProblemDetail> handleRestClientException(RestClientException ex, HttpServletRequest request) {
         logger.error("External service call failed: {}", ex.getMessage());
@@ -95,12 +64,6 @@ public class GlobalExceptionHandler {
         throw ex; // Re-throw for Spring Security to handle
     }
 
-    /**
-     * Fallback handler for any unexpected exceptions.
-     * Returns 500 Internal Server Error.
-     *
-     * This should catch any exceptions not handled by more specific handlers.
-     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleGenericException(Exception ex, HttpServletRequest request) {
         logger.error("Unexpected error occurred: {}", ex.getMessage(), ex);

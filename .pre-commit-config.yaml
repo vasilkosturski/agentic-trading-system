@@ -1,0 +1,51 @@
+exclude: |
+  (?x)^(
+    build/.*|
+    backend/build/.*|
+    backend/gradlew|
+    backend/gradlew\.bat|
+    backend/gradle/wrapper/.*|
+    .*\.jar|
+    .*\.class|
+    backend/src/main/resources/prompts/.*|
+    .*MANIFEST\.MF
+  )$
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^agents/.*\.py$
+      - id: ruff-format
+        files: ^agents/.*\.py$
+
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && exec ./node_modules/.bin/eslint --fix "${@/#frontend\//}"' --
+        language: system
+        files: ^frontend/src/.*\.(ts|tsx|js|jsx)$
+        require_serial: true
+
+      - id: spotless
+        name: spotless (backend)
+        entry: bash -c 'cd backend && ./gradlew --quiet spotlessApply'
+        language: system
+        files: ^backend/.*\.java$
+        pass_filenames: false
+        require_serial: true
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+        exclude: ^backend/src/main/resources/application.*\.yml$
+      - id: check-added-large-files
+        args: [--maxkb=512]

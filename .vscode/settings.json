@@ -1,4 +1,27 @@
 {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit",
+        "source.fixAll.ruff": "explicit",
+        "source.organizeImports.ruff": "explicit"
+    },
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true
+    },
+    "[typescript]": {
+        "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+    },
+    "[typescriptreact]": {
+        "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+    },
+    "[java]": {
+        "editor.formatOnSave": false
+    },
+    "eslint.workingDirectories": [
+        { "pattern": "frontend" }
+    ],
+    "eslint.validate": ["typescript", "typescriptreact"],
     "java.jdt.ls.lombokSupport.enabled": true,
     "java.configuration.updateBuildConfiguration": "interactive",
     "java.compile.nullAnalysis.mode": "automatic",
@@ -34,6 +57,8 @@
     "java.format.onType.enabled": true,
     "java.format.settings.url": null,
     "java.format.settings.profile": null,
+    "java.checkstyle.configuration": "${workspaceFolder}/backend/config/checkstyle/checkstyle.xml",
+    "java.checkstyle.version": "10.17.0",
     "files.exclude": {
         "**/build": true,
         "**/.gradle": true,
@@ -42,9 +67,10 @@
         "**/.DS_Store": true,
         "**/__pycache__": true,
         "**/.pytest_cache": true,
+        "**/.ruff_cache": true,
+        "**/.mypy_cache": true,
         "**/*.pyc": true
     },
-    // Python configuration for agents
     "python.defaultInterpreterPath": "${workspaceFolder}/agents/venv/bin/python",
     "python.terminal.activateEnvironment": true,
     "python.testing.pytestEnabled": true,

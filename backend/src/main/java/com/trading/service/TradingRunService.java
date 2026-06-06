@@ -1,6 +1,5 @@
 package com.trading.service;
 
-import com.trading.config.TradingPublicProperties;
 import com.trading.dto.request.CompleteRunRequest;
 import com.trading.dto.request.RunQueryFilter;
 import com.trading.dto.response.DecisionPhaseDto;
@@ -35,14 +34,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Service for managing trading runs and their phases.
- * Handles the complete trading cycle lifecycle:
- * INITIALIZING -> RESEARCHING -> DECIDING -> TRADING -> COMPLETED
- *
- * <p>Read-only by default; write operations override with their own
- * {@code @Transactional} so the read-only flag does not silently drop saves.
- */
 @Service
 @Transactional(readOnly = true)
 public class TradingRunService {
@@ -164,11 +155,6 @@ public class TradingRunService {
         logger.info("Run {} completed with decision: {}, trade ID: {}", runId, tradeDecision, tradeId);
     }
 
-    /**
-     * Builds the synthetic FAILED execution phase used when {@code completeRun}
-     * receives a BUY/SELL decision without an execution DTO. Matches the
-     * fallback the previous inline binding produced.
-     */
     private ExecutionPhase failedExecution(TradingRun run, DecisionPhase decisionPhase) {
         ExecutionPhase phase = new ExecutionPhase();
         phase.setRun(run);
@@ -235,27 +221,12 @@ public class TradingRunService {
                 .orElseThrow(() -> new ResourceNotFoundException("Trading run not found with ID: " + runId));
     }
 
-    /**
-     * List trading runs with optional filtering, pagination, and a cutoff date
-     * for legal display-delay enforcement.
-     *
-     * @param filter     optional filter criteria; {@code null} or
-     *                   {@code !filter.hasFilters()} skips the filter predicates.
-     * @param cutoffDate ceiling for {@code TradingRun.startedAt}; {@code null}
-     *                   means "no cutoff" (admin mode — see all runs regardless
-     *                   of age). Callers wishing to enforce the public
-     *                   display-delay should compute the cutoff from
-     *                   {@link TradingPublicProperties#getDisplayDelayDays()}
-     *                   and pass it in.
-     * @param pageable   page request.
-     */
     public RunListResponseDto listRuns(RunQueryFilter filter, Instant cutoffDate, Pageable pageable) {
         logger.debug("Listing runs with filter: {}, cutoffDate: {}, pageable: {}", filter, cutoffDate, pageable);
 
         Page<TradingRun> page =
                 tradingRunRepository.findAll(runSpecificationFactory.build(filter, cutoffDate), pageable);
 
-        // Map to DTOs with decision data
         List<TradingRunDto> runDtos = page.getContent().stream()
                 .map(run -> {
                     DecisionPhase decisionPhase =

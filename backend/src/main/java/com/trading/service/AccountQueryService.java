@@ -16,12 +16,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-/**
- * Read-path queries against trading accounts: balance, holdings, portfolio
- * value, and the full account report. Throws {@link ResourceNotFoundException}
- * when an unknown agent is queried — the typed exception propagates through to
- * {@code AccountControllerAdvice} which maps it to a 404 ProblemDetail.
- */
 @Service
 public class AccountQueryService {
 
@@ -49,28 +43,17 @@ public class AccountQueryService {
         this.holdingsValuationService = holdingsValuationService;
     }
 
-    /**
-     * Get account balance for an agent.
-     */
     public Double getBalance(String agentName) {
         TradingAccount account = getAccount(agentName);
         return account.getBalance();
     }
 
-    /**
-     * Get holdings for an agent as List<HoldingDto>.
-     */
     public List<HoldingDto> getHoldings(String agentName) {
         TradingAccount account = getAccount(agentName);
         List<AccountHolding> holdings = holdingRepository.findByAccount(account);
         return toHoldingDtos(holdings);
     }
 
-    /**
-     * Get account report for an agent.
-     * Returns DTO that Spring auto-serializes to JSON for MCP resource endpoint.
-     * Used by Python agents to provide context to AI for trading decisions.
-     */
     public AccountReportDto getAccountReport(String agentName) {
         TradingAccount account = getAccount(agentName);
 
@@ -95,9 +78,6 @@ public class AccountQueryService {
                 toHoldingDtos(holdings));
     }
 
-    /**
-     * Get total portfolio value for an agent.
-     */
     public Double getTotalPortfolioValue(String agentName) {
         Double balance = getBalance(agentName);
         Optional<TradingAccount> accountOpt = tradingAccountRepository.findByAgentName(agentName);

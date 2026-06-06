@@ -165,7 +165,7 @@ def test_agent_configs_zips_names_with_styles_in_registry_order():
         assert cfg["name"] == expected_name
         assert "style" in cfg
         assert "balance" in cfg
-        assert isinstance(cfg["balance"], (int, float))
+        assert isinstance(cfg["balance"], int | float)
         assert cfg["balance"] > 0
 
 

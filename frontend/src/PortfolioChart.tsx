@@ -53,8 +53,7 @@ function formatDateLabel(iso: string): string {
   return d.toLocaleString('en-US', { month: 'short', day: 'numeric' })
 }
 
-/** Keep only the last snapshot per agent per day, then pivot into chart rows. */
-function transformToChartData(snapshots: PortfolioSnapshot[]): ChartDataPoint[] {
+function pivotLatestDailySnapshotsByDay(snapshots: PortfolioSnapshot[]): ChartDataPoint[] {
   const daily = new Map<string, Map<string, { iso: string; value: number }>>()
 
   for (const s of snapshots) {
@@ -84,7 +83,7 @@ function PortfolioChart({ snapshots }: { snapshots: PortfolioSnapshot[] }) {
   const filtered = useMemo(() => filterByTimeRange(snapshots, timeRange), [snapshots, timeRange])
 
   const { chartData, series } = useMemo(() => {
-    const data = transformToChartData(filtered)
+    const data = pivotLatestDailySnapshotsByDay(filtered)
     const names = [...new Set(filtered.map((s) => s.agentName))]
     const s = names.map((name) => ({
       name,

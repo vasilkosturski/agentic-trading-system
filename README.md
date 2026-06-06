@@ -24,6 +24,19 @@ Schemas (`agents`, `trading`, `analytics`) are created automatically by the back
 
 See [`.env.example`](.env.example) for what each variable does and where to get the API keys.
 
+## Developer setup
+
+If you're going to commit, install pre-commit once so formatters and linters run on every commit:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+That wires up Ruff (Python), ESLint (TypeScript), and Spotless (Java) to format and fix staged changes before they land. VS Code users get format-on-save and inline diagnostics automatically via the checked-in `.vscode/settings.json` — accept the recommended extensions prompt on first open.
+
+CI runs the same checks on every PR (`.github/workflows/{python,backend,frontend,dockerfile}-lint.yml`); the local hooks just catch drift earlier.
+
 ## Architecture
 
 The system is full-stack: Python agents on the OpenAI Agents SDK driving a two-agent pipeline (Market Analyst → Decision Maker), a Java Spring Boot backend for stateful concerns (accounts, trade execution, run/audit persistence, prompt composition, WebSocket broadcasting), a React + TypeScript dashboard, and PostgreSQL for persistence across three schemas. The Market Analyst and Decision Maker both use Brave Search and Fetch via MCP for web research; Finnhub.io feeds market quotes through the backend's price cache.
