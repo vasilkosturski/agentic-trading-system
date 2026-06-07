@@ -34,6 +34,16 @@ public class PriceCacheService {
     @Value("${market.finnhub.base-url:https://finnhub.io/api/v1}")
     private String finnhubBaseUrl;
 
+    @Value("${market.finnhub.rate-limit-cooldown-seconds:60}")
+    private int rateLimitCooldownSeconds;
+
+    // Finnhub's free-tier limit is per-minute, so once we see a 429 the entire bucket is
+    // exhausted until the next window. We trip a process-local cool-down so the rest of the
+    // burst skips Finnhub and falls through to stale cache instead of independently
+    // rediscovering the same 429.
+    private volatile Instant rateLimitedUntil = Instant.EPOCH;
+    private volatile Instant cooldownLoggedFor = Instant.EPOCH;
+
     public PriceCacheService(
             PriceCacheRepository priceCacheRepository, RetryTemplate retryTemplate, RestTemplate restTemplate) {
         this.priceCacheRepository = priceCacheRepository;
@@ -56,8 +66,17 @@ public class PriceCacheService {
                     cached.price(), true, cached.cachedAt(), "DB Cache (age: " + ageMinutes + " min)");
         }
 
-        Double fresh = fetchFromFinnhub(symbol);
+        Double fresh = now.isBefore(rateLimitedUntil) ? null : fetchFromFinnhub(symbol);
         if (fresh == null) {
+            if (now.isBefore(rateLimitedUntil)) {
+                Instant currentWindow = rateLimitedUntil;
+                if (!currentWindow.equals(cooldownLoggedFor)) {
+                    cooldownLoggedFor = currentWindow;
+                    logger.info(
+                            "Finnhub rate-limit cool-down active until {} - using cache fallback for all symbols",
+                            currentWindow);
+                }
+            }
             // Finnhub failed (rate limit or error) - try to use stale cache as fallback
             Optional<PriceCache> staleCache = priceCacheRepository.findBySymbol(symbol);
             if (staleCache.isPresent()) {
@@ -143,6 +162,7 @@ public class PriceCacheService {
         } catch (RestClientException e) {
             // Log as INFO if it's a 429 rate limit (expected), ERROR for other failures
             if (e.getMessage() != null && e.getMessage().contains("429")) {
+                rateLimitedUntil = Instant.now().plusSeconds(rateLimitCooldownSeconds);
                 logger.info("Finnhub rate limit hit for {} - will use cache fallback", symbol);
             } else {
                 logger.error("Finnhub failed after retries for {}: {}", symbol, e.getMessage());

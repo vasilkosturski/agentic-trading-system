@@ -4,10 +4,15 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.trading.entity.PriceCache;
 import com.trading.repository.PriceCacheRepository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,9 +21,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.retry.policy.NeverRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
@@ -27,6 +35,7 @@ import org.springframework.web.client.RestTemplate;
 class PriceCacheServiceTest {
 
     private static final int TTL_MINUTES = 60;
+    private static final int COOLDOWN_SECONDS = 60;
     private static final String FINNHUB_BASE_URL = "https://finnhub.io/api/v1";
     private static final String FINNHUB_API_KEY = "test-key";
 
@@ -49,6 +58,97 @@ class PriceCacheServiceTest {
         ReflectionTestUtils.setField(priceCacheService, "ttlMinutes", TTL_MINUTES);
         ReflectionTestUtils.setField(priceCacheService, "finnhubApiKey", FINNHUB_API_KEY);
         ReflectionTestUtils.setField(priceCacheService, "finnhubBaseUrl", FINNHUB_BASE_URL);
+        ReflectionTestUtils.setField(priceCacheService, "rateLimitCooldownSeconds", COOLDOWN_SECONDS);
+    }
+
+    private ListAppender<ILoggingEvent> attachAppender() {
+        Logger svcLogger = (Logger) LoggerFactory.getLogger(PriceCacheService.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        svcLogger.addAppender(appender);
+        return appender;
+    }
+
+    @Test
+    @DisplayName("getPrice() sets the circuit breaker when Finnhub returns 429")
+    @SuppressWarnings("unchecked")
+    void getPrice_setsCircuitBreaker_whenFinnhubReturns429() {
+        when(priceCacheRepository.findBySymbol("AAPL")).thenReturn(Optional.empty());
+        doThrow(HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests", null, null, null))
+                .when(restTemplate)
+                .getForObject(anyString(), any(Class.class));
+
+        Instant before = Instant.now();
+        MarketService.PriceData result = priceCacheService.getPrice("AAPL");
+        Instant after = Instant.now();
+
+        assertNull(result, "no stale cache exists - should return null per existing semantics");
+
+        Instant rateLimitedUntil = (Instant) ReflectionTestUtils.getField(priceCacheService, "rateLimitedUntil");
+        assertNotNull(rateLimitedUntil);
+        Instant earliest = before.plusSeconds(COOLDOWN_SECONDS).minusSeconds(2);
+        Instant latest = after.plusSeconds(COOLDOWN_SECONDS).plusSeconds(2);
+        assertFalse(rateLimitedUntil.isBefore(earliest), "rateLimitedUntil should be ~60s in the future");
+        assertFalse(rateLimitedUntil.isAfter(latest), "rateLimitedUntil should be ~60s in the future");
+    }
+
+    @Test
+    @DisplayName("getPrice() skips Finnhub during cool-down and uses stale cache")
+    @SuppressWarnings("unchecked")
+    void getPrice_skipsFinnhubDuringCooldown_andUsesStaleCache() {
+        ReflectionTestUtils.setField(
+                priceCacheService, "rateLimitedUntil", Instant.now().plusSeconds(30));
+
+        Instant staleCachedAt = Instant.now().minus(TTL_MINUTES + 10, ChronoUnit.MINUTES);
+        PriceCache stale = new PriceCache("AAPL", 142.5, staleCachedAt, "Finnhub");
+        when(priceCacheRepository.findBySymbol("AAPL")).thenReturn(Optional.of(stale));
+
+        MarketService.PriceData result = priceCacheService.getPrice("AAPL");
+
+        assertNotNull(result);
+        assertEquals(142.5, result.getPrice());
+        assertTrue(
+                result.getSource().startsWith("Stale Cache"),
+                "expected Stale Cache source but was: " + result.getSource());
+        verify(restTemplate, never()).getForObject(anyString(), any(Class.class));
+    }
+
+    @Test
+    @DisplayName("getPrice() resumes calling Finnhub after the cool-down expires")
+    @SuppressWarnings("unchecked")
+    void getPrice_resumesFinnhubAfterCooldownExpires() {
+        ReflectionTestUtils.setField(
+                priceCacheService, "rateLimitedUntil", Instant.now().minusSeconds(1));
+        when(priceCacheRepository.findBySymbol("AAPL")).thenReturn(Optional.empty());
+
+        var quote = new PriceCacheService.FinnhubQuoteResponse(200.0, 0, 0, 0, 0, 0, 0, 0L);
+        doReturn(quote).when(restTemplate).getForObject(anyString(), any(Class.class));
+
+        MarketService.PriceData result = priceCacheService.getPrice("AAPL");
+
+        assertNotNull(result);
+        assertEquals(200.0, result.getPrice());
+        verify(restTemplate, times(1)).getForObject(anyString(), any(Class.class));
+    }
+
+    @Test
+    @DisplayName("getPrice() logs the cool-down notice only once per window")
+    void getPrice_singleCooldownLogPerWindow() {
+        ReflectionTestUtils.setField(
+                priceCacheService, "rateLimitedUntil", Instant.now().plusSeconds(30));
+        when(priceCacheRepository.findBySymbol(anyString())).thenReturn(Optional.empty());
+
+        ListAppender<ILoggingEvent> appender = attachAppender();
+
+        for (String sym : List.of("AAPL", "MSFT", "GOOG", "TSLA", "NVDA")) {
+            priceCacheService.getPrice(sym);
+        }
+
+        long cooldownLogs = appender.list.stream()
+                .filter(e -> e.getLevel() == Level.INFO)
+                .filter(e -> e.getFormattedMessage().contains("rate-limit cool-down active"))
+                .count();
+        assertEquals(1, cooldownLogs, "expected exactly ONE cool-down INFO log per window");
     }
 
     @Test
