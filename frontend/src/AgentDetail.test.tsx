@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { MantineProvider } from '@mantine/core'
 import AgentDetail from './AgentDetail'
 import * as api from './api'
+import { makeMockPortfolio, makeMockAgent } from './test/factories'
 
 vi.mock('./api', () => ({
   fetchAgentPortfolio: vi.fn(),
@@ -19,45 +20,28 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
+function renderAgentDetail() {
+  return render(
+    <MantineProvider>
+      <BrowserRouter>
+        <AgentDetail />
+      </BrowserRouter>
+    </MantineProvider>,
+  )
+}
+
 describe('AgentDetail - System Prompt Section', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   it('displays the system prompt section with user-friendly label "Strategy"', async () => {
-    const mockPortfolio = {
-      agentName: 'Warren',
-      balance: 10000,
-      holdingsValue: 5000,
-      totalPortfolioValue: 15000,
-      initialBalance: 10000,
-      totalProfitLoss: 500,
-      profitLossPercent: 3.45,
-      lastUpdated: '2025-01-01T00:00:00Z',
-      holdingsCount: 3,
-      transactionCount: 5,
-      holdings: [],
-    }
+    vi.mocked(api.fetchAgentPortfolio).mockResolvedValue(makeMockPortfolio({ agentName: 'Warren' }))
+    vi.mocked(api.fetchAgents).mockResolvedValue([
+      makeMockAgent({ id: 1, name: 'Warren', systemPrompt: 'You are a value investor.' }),
+    ])
 
-    const mockAgents = [
-      {
-        id: 1,
-        name: 'Warren',
-        style: 'Value Investing',
-        systemPrompt: 'You are a value investor.',
-      },
-    ]
-
-    vi.mocked(api.fetchAgentPortfolio).mockResolvedValue(mockPortfolio)
-    vi.mocked(api.fetchAgents).mockResolvedValue(mockAgents)
-
-    render(
-      <MantineProvider>
-        <BrowserRouter>
-          <AgentDetail />
-        </BrowserRouter>
-      </MantineProvider>
-    )
+    renderAgentDetail()
 
     await waitFor(() => {
       expect(screen.queryByText('Loading portfolio...')).not.toBeInTheDocument()
@@ -68,39 +52,13 @@ describe('AgentDetail - System Prompt Section', () => {
   })
 
   it('renders the system prompt accordion expanded by default', async () => {
-    const mockPortfolio = {
-      agentName: 'Warren',
-      balance: 10000,
-      holdingsValue: 5000,
-      totalPortfolioValue: 15000,
-      initialBalance: 10000,
-      totalProfitLoss: 500,
-      profitLossPercent: 3.45,
-      lastUpdated: '2025-01-01T00:00:00Z',
-      holdingsCount: 3,
-      transactionCount: 5,
-      holdings: [],
-    }
+    const prompt = 'You are a value investor focused on finding undervalued stocks.'
+    vi.mocked(api.fetchAgentPortfolio).mockResolvedValue(makeMockPortfolio({ agentName: 'Warren' }))
+    vi.mocked(api.fetchAgents).mockResolvedValue([
+      makeMockAgent({ id: 1, name: 'Warren', systemPrompt: prompt }),
+    ])
 
-    const mockAgents = [
-      {
-        id: 1,
-        name: 'Warren',
-        style: 'Value Investing',
-        systemPrompt: 'You are a value investor focused on finding undervalued stocks.',
-      },
-    ]
-
-    vi.mocked(api.fetchAgentPortfolio).mockResolvedValue(mockPortfolio)
-    vi.mocked(api.fetchAgents).mockResolvedValue(mockAgents)
-
-    render(
-      <MantineProvider>
-        <BrowserRouter>
-          <AgentDetail />
-        </BrowserRouter>
-      </MantineProvider>
-    )
+    renderAgentDetail()
 
     await waitFor(() => {
       expect(screen.queryByText('Loading portfolio...')).not.toBeInTheDocument()
@@ -110,46 +68,30 @@ describe('AgentDetail - System Prompt Section', () => {
       expect(screen.getByText(/You are a value investor focused on finding undervalued stocks/i)).toBeVisible()
     })
   })
-
 })
 
-describe('AgentDetail - Promise.all partial-failure resilience (R1)', () => {
+describe('AgentDetail - Promise.all partial-failure resilience', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   it('still renders the portfolio with fallback agent name when fetchAgents rejects', async () => {
-    const mockPortfolio = {
-      agentName: 'Warren Backend',
-      balance: 10000,
-      holdingsValue: 5000,
-      totalPortfolioValue: 15000,
-      initialBalance: 10000,
-      totalProfitLoss: 500,
-      profitLossPercent: 3.45,
-      lastUpdated: '2025-01-01T00:00:00Z',
-      holdingsCount: 0,
-      transactionCount: 0,
-      holdings: [],
-    }
-
-    vi.mocked(api.fetchAgentPortfolio).mockResolvedValue(mockPortfolio)
+    vi.mocked(api.fetchAgentPortfolio).mockResolvedValue(
+      makeMockPortfolio({
+        agentName: 'Warren Backend',
+        holdingsCount: 0,
+        transactionCount: 0,
+      }),
+    )
     vi.mocked(api.fetchAgents).mockRejectedValue(new Error('agents endpoint down'))
 
-    render(
-      <MantineProvider>
-        <BrowserRouter>
-          <AgentDetail />
-        </BrowserRouter>
-      </MantineProvider>
-    )
+    renderAgentDetail()
 
     await waitFor(() => {
       expect(screen.queryByText('Loading portfolio...')).not.toBeInTheDocument()
     })
 
     expect(screen.getByText('Warren Backend')).toBeInTheDocument()
-
     expect(screen.queryByText(/agents endpoint down/i)).toBeNull()
   })
 })
@@ -160,46 +102,16 @@ describe('AgentDetail - Disclaimer and Timestamp Components', () => {
   })
 
   it('displays historical data notice disclaimer before portfolio summary', async () => {
-    const mockPortfolio = {
-      agentName: 'Warren',
-      balance: 10000,
-      holdingsValue: 5000,
-      totalPortfolioValue: 15000,
-      initialBalance: 10000,
-      totalProfitLoss: 500,
-      profitLossPercent: 3.45,
-      lastUpdated: '2025-01-01T00:00:00Z',
-      holdingsCount: 3,
-      transactionCount: 5,
-      holdings: [],
-    }
+    vi.mocked(api.fetchAgentPortfolio).mockResolvedValue(makeMockPortfolio({ agentName: 'Warren' }))
+    vi.mocked(api.fetchAgents).mockResolvedValue([makeMockAgent({ id: 1, name: 'Warren' })])
 
-    const mockAgents = [
-      {
-        id: 1,
-        name: 'Warren',
-        style: 'Value Investing',
-        systemPrompt: 'You are a value investor.',
-      },
-    ]
-
-    vi.mocked(api.fetchAgentPortfolio).mockResolvedValue(mockPortfolio)
-    vi.mocked(api.fetchAgents).mockResolvedValue(mockAgents)
-
-    render(
-      <MantineProvider>
-        <BrowserRouter>
-          <AgentDetail />
-        </BrowserRouter>
-      </MantineProvider>
-    )
+    renderAgentDetail()
 
     await waitFor(() => {
       expect(screen.queryByText('Loading portfolio...')).not.toBeInTheDocument()
     })
 
     expect(screen.getByText('Historical Data Notice')).toBeInTheDocument()
-
     expect(screen.getByText(/7 days/i)).toBeInTheDocument()
     expect(screen.getByText(/educational purposes/i)).toBeInTheDocument()
   })
@@ -208,39 +120,15 @@ describe('AgentDetail - Disclaimer and Timestamp Components', () => {
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
-    const mockPortfolio = {
-      agentName: 'Warren',
-      balance: 10000,
-      holdingsValue: 5000,
-      totalPortfolioValue: 15000,
-      initialBalance: 10000,
-      totalProfitLoss: 500,
-      profitLossPercent: 3.45,
-      lastUpdated: sevenDaysAgo.toISOString(),
-      holdingsCount: 3,
-      transactionCount: 5,
-      holdings: [],
-    }
-
-    const mockAgents = [
-      {
-        id: 1,
-        name: 'Warren',
-        style: 'Value Investing',
-        systemPrompt: 'You are a value investor.',
-      },
-    ]
-
-    vi.mocked(api.fetchAgentPortfolio).mockResolvedValue(mockPortfolio)
-    vi.mocked(api.fetchAgents).mockResolvedValue(mockAgents)
-
-    render(
-      <MantineProvider>
-        <BrowserRouter>
-          <AgentDetail />
-        </BrowserRouter>
-      </MantineProvider>
+    vi.mocked(api.fetchAgentPortfolio).mockResolvedValue(
+      makeMockPortfolio({
+        agentName: 'Warren',
+        lastUpdated: sevenDaysAgo.toISOString(),
+      }),
     )
+    vi.mocked(api.fetchAgents).mockResolvedValue([makeMockAgent({ id: 1, name: 'Warren' })])
+
+    renderAgentDetail()
 
     await waitFor(() => {
       expect(screen.queryByText('Loading portfolio...')).not.toBeInTheDocument()

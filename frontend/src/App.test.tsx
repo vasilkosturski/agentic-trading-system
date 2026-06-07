@@ -11,9 +11,10 @@ vi.mock('./api', () => ({
   fetchSnapshots: vi.fn(),
 }))
 
-describe('App.tsx — Promise.all partial-failure resilience (R1)', () => {
+describe('App.tsx — Promise.all partial-failure resilience', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(api.fetchSnapshots).mockResolvedValue([])
   })
 
   it('still renders the runs table when fetchAgents rejects (cosmetic fetch must not block primary content)', async () => {
@@ -35,14 +36,13 @@ describe('App.tsx — Promise.all partial-failure resilience (R1)', () => {
       limit: 20,
     })
     vi.mocked(api.fetchAgents).mockRejectedValue(new Error('agents endpoint down'))
-    vi.mocked(api.fetchSnapshots).mockResolvedValue([])
 
     render(
       <MantineProvider>
         <MemoryRouter initialEntries={['/']}>
           <RunsTable />
         </MemoryRouter>
-      </MantineProvider>
+      </MantineProvider>,
     )
 
     await waitFor(() => {
@@ -50,7 +50,161 @@ describe('App.tsx — Promise.all partial-failure resilience (R1)', () => {
     })
 
     expect(screen.getByText('Agent #7')).toBeInTheDocument()
-
     expect(screen.queryByText(/agents endpoint down/i)).toBeNull()
+  })
+})
+
+describe('App.tsx — showAll parameter for admin endpoint', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(api.fetchAgents).mockResolvedValue([
+      {
+        id: 1,
+        name: 'Test Agent',
+        style: 'Value',
+        systemPrompt: 'Test prompt',
+      },
+    ])
+    vi.mocked(api.fetchSnapshots).mockResolvedValue([])
+  })
+
+  it('calls fetchRuns with showAll=false when URL has no showAll parameter', async () => {
+    vi.mocked(api.fetchRuns).mockResolvedValue({
+      runs: [
+        {
+          runId: '1',
+          agentId: 1,
+          status: 'COMPLETED',
+          decision: 'BUY',
+          symbol: 'AAPL',
+          startedAt: '2025-01-01T00:00:00Z',
+          completedAt: '2025-01-01T01:00:00Z',
+        },
+      ],
+      total: 104,
+      page: 0,
+      limit: 20,
+    })
+
+    render(
+      <MantineProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <RunsTable />
+        </MemoryRouter>
+      </MantineProvider>,
+    )
+
+    await waitFor(() => expect(api.fetchRuns).toHaveBeenCalled())
+
+    const firstCall = vi.mocked(api.fetchRuns).mock.calls[0]
+    expect(firstCall[0]).toBe(0)
+    expect(firstCall[1]).toBe(20)
+    expect(firstCall[3]).toBe(false)
+  })
+
+  it('calls fetchRuns with showAll=true when URL has ?showAll=true', async () => {
+    vi.mocked(api.fetchRuns).mockResolvedValue({
+      runs: [
+        {
+          runId: '1',
+          agentId: 1,
+          status: 'COMPLETED',
+          decision: 'BUY',
+          symbol: 'AAPL',
+          startedAt: '2025-01-01T00:00:00Z',
+          completedAt: '2025-01-01T01:00:00Z',
+        },
+      ],
+      total: 188,
+      page: 0,
+      limit: 20,
+    })
+
+    render(
+      <MantineProvider>
+        <MemoryRouter initialEntries={['/?showAll=true']}>
+          <RunsTable />
+        </MemoryRouter>
+      </MantineProvider>,
+    )
+
+    await waitFor(() => expect(api.fetchRuns).toHaveBeenCalled())
+    expect(vi.mocked(api.fetchRuns).mock.calls[0][3]).toBe(true)
+  })
+
+  it('treats any value other than "true" as showAll=false', async () => {
+    vi.mocked(api.fetchRuns).mockResolvedValue({
+      runs: [],
+      total: 0,
+      page: 0,
+      limit: 20,
+    })
+
+    const { unmount } = render(
+      <MantineProvider>
+        <MemoryRouter initialEntries={['/?showAll=false']}>
+          <RunsTable />
+        </MemoryRouter>
+      </MantineProvider>,
+    )
+
+    await waitFor(() => expect(api.fetchRuns).toHaveBeenCalled())
+    expect(vi.mocked(api.fetchRuns).mock.calls[0][3]).toBe(false)
+    unmount()
+    vi.clearAllMocks()
+    vi.mocked(api.fetchAgents).mockResolvedValue([])
+    vi.mocked(api.fetchSnapshots).mockResolvedValue([])
+    vi.mocked(api.fetchRuns).mockResolvedValue({
+      runs: [],
+      total: 0,
+      page: 0,
+      limit: 20,
+    })
+
+    render(
+      <MantineProvider>
+        <MemoryRouter initialEntries={['/?showAll=yes']}>
+          <RunsTable />
+        </MemoryRouter>
+      </MantineProvider>,
+    )
+
+    await waitFor(() => expect(api.fetchRuns).toHaveBeenCalled())
+    expect(vi.mocked(api.fetchRuns).mock.calls[0][3]).toBe(false)
+  })
+
+  it('displays runs from the admin endpoint when showAll=true', async () => {
+    vi.mocked(api.fetchRuns).mockResolvedValue({
+      runs: [
+        {
+          runId: 'admin-run-1',
+          agentId: 1,
+          status: 'COMPLETED',
+          decision: 'HOLD',
+          symbol: 'TSLA',
+          startedAt: '2025-01-02T10:00:00Z',
+          completedAt: '2025-01-02T11:00:00Z',
+        },
+      ],
+      total: 188,
+      page: 0,
+      limit: 20,
+    })
+
+    render(
+      <MantineProvider>
+        <MemoryRouter initialEntries={['/?showAll=true']}>
+          <RunsTable />
+        </MemoryRouter>
+      </MantineProvider>,
+    )
+
+    await waitFor(() => {
+      expect(api.fetchRuns).toHaveBeenCalledWith(0, 20, expect.any(Object), true)
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('admin-run-1')).toBeInTheDocument()
+    })
   })
 })

@@ -5,6 +5,7 @@ import { useInView } from 'react-intersection-observer'
 import type { TradingRun, Agent, PortfolioSnapshot } from './types.ts'
 import { fetchRuns, fetchAgents, fetchSnapshots } from './api.ts'
 import { fetchOrEmpty } from './fetchHelpers.ts'
+import { useFetchOnce } from './useFetchOnce.ts'
 import { statusColor, decisionColor, formatTimestamp } from './utils.ts'
 import PortfolioChart from './PortfolioChart.tsx'
 import AgentComparison from './AgentComparison.tsx'
@@ -12,58 +13,60 @@ import classes from './App.module.css'
 
 const PAGE_SIZE = 20
 
+interface InitialPayload {
+  runs: TradingRun[]
+  totalRuns: number
+  agents: Agent[]
+  snapshots: PortfolioSnapshot[]
+}
+
 function RunsTable() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const showAll = searchParams.get('showAll') === 'true'
 
-  const [runs, setRuns] = useState<TradingRun[]>([])
-  const [totalRuns, setTotalRuns] = useState(0)
-  const [agents, setAgents] = useState<Agent[]>([])
-  const [snapshots, setSnapshots] = useState<PortfolioSnapshot[]>([])
-  const [loading, setLoading] = useState(true)
+  // Initial load via shared hook; pagination state lives separately so the
+  // load-more callback can append without re-firing the initial fetch.
+  const initial = useFetchOnce<InitialPayload>(
+    async (signal) => {
+      // Cosmetic fetch (agents map for friendly names) must not collapse the
+      // primary runs fetch if it fails — fall back to [] so the runs table
+      // still renders with the "Agent #N" fallback in the agent column.
+      const [runsData, agentsData, snapshotsData] = await Promise.all([
+        fetchRuns(0, PAGE_SIZE, signal, showAll),
+        fetchOrEmpty(fetchAgents(signal)),
+        fetchSnapshots(signal),
+      ])
+      return {
+        runs: runsData.runs ?? [],
+        totalRuns: runsData.total ?? 0,
+        agents: agentsData,
+        snapshots: snapshotsData,
+      }
+    },
+    [showAll],
+  )
+
+  const [extraRuns, setExtraRuns] = useState<TradingRun[]>([])
+  const [paginatedTotal, setPaginatedTotal] = useState<number | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const pageRef = useRef(0)
 
+  // Reset pagination state when the data source flips (public ↔ admin),
+  // otherwise the next infinite-scroll trigger asks for `prev + 1` against
+  // an unrelated dataset.
+  useEffect(() => {
+    pageRef.current = 0
+    setExtraRuns([])
+    setPaginatedTotal(null)
+  }, [showAll])
+
+  const runs = useMemo(() => [...(initial.data?.runs ?? []), ...extraRuns], [initial.data, extraRuns])
+  const totalRuns = paginatedTotal ?? initial.data?.totalRuns ?? 0
   const hasMore = runs.length < totalRuns
 
   const { ref: loadMoreRef, inView } = useInView({ threshold: 0 })
 
-  // Initial load
-  useEffect(() => {
-    const controller = new AbortController()
-
-    async function fetchData() {
-      try {
-        // Cosmetic fetch (agents map for friendly names) must not collapse the
-        // primary runs fetch if it fails — fall back to [] so the runs table
-        // still renders with the "Agent #N" fallback in the agent column.
-        const [runsData, agentsData, snapshotsData] = await Promise.all([
-          fetchRuns(0, PAGE_SIZE, controller.signal, showAll),
-          fetchOrEmpty(fetchAgents(controller.signal)),
-          fetchSnapshots(controller.signal),
-        ])
-
-        setRuns(runsData.runs ?? [])
-        setTotalRuns(runsData.total ?? 0)
-        setAgents(agentsData)
-        setSnapshots(snapshotsData)
-      } catch (err) {
-        if (controller.signal.aborted) return
-        setError(err instanceof Error ? err.message : 'Unknown error')
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false)
-        }
-      }
-    }
-
-    fetchData()
-    return () => controller.abort()
-  }, [showAll])
-
-  // Load more when sentinel comes into view
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
@@ -71,8 +74,8 @@ function RunsTable() {
 
     try {
       const data = await fetchRuns(nextPage, PAGE_SIZE, undefined, showAll)
-      setRuns((prev) => [...prev, ...(data.runs ?? [])])
-      setTotalRuns(data.total ?? 0)
+      setExtraRuns((prev) => [...prev, ...(data.runs ?? [])])
+      setPaginatedTotal(data.total ?? 0)
       pageRef.current = nextPage
     } catch {
       // Silently fail on load-more — user can scroll again
@@ -87,9 +90,12 @@ function RunsTable() {
     }
   }, [inView, hasMore, loadingMore, loadMore])
 
-  const agentMap = useMemo(() => new Map(agents.map((a) => [a.id, a.name])), [agents])
+  const agentMap = useMemo(
+    () => new Map((initial.data?.agents ?? []).map((a) => [a.id, a.name])),
+    [initial.data],
+  )
 
-  if (loading) {
+  if (initial.loading) {
     return (
       <Container size="lg" py="xl">
         <Title order={1} mb="lg">Trading Dashboard</Title>
@@ -98,11 +104,11 @@ function RunsTable() {
     )
   }
 
-  if (error) {
+  if (initial.error) {
     return (
       <Container size="lg" py="xl">
         <Title order={1} mb="lg">Trading Dashboard</Title>
-        <Text size="lg" c="red">{error}</Text>
+        <Text size="lg" c="red">{initial.error}</Text>
       </Container>
     )
   }
@@ -115,6 +121,9 @@ function RunsTable() {
       </Container>
     )
   }
+
+  const snapshots = initial.data?.snapshots ?? []
+  const agents = initial.data?.agents ?? []
 
   return (
     <Container size="lg" py="xl">
@@ -153,17 +162,17 @@ function RunsTable() {
                     {run.decision}
                   </Badge>
                 ) : (
-                  '\u2014'
+                  '—'
                 )}
               </Table.Td>
-              <Table.Td>{run.symbol ?? '\u2014'}</Table.Td>
+              <Table.Td>{run.symbol ?? '—'}</Table.Td>
               <Table.Td>{formatTimestamp(run.startedAt)}</Table.Td>
               <Table.Td>
                 {run.completedAt
                   ? formatTimestamp(run.completedAt)
                   : run.status === 'IN_PROGRESS'
                     ? `Running since ${formatTimestamp(run.startedAt)}`
-                    : '\u2014'}
+                    : '—'}
               </Table.Td>
             </Table.Tr>
           ))}

@@ -1,4 +1,5 @@
 import type { MantineColor } from '@mantine/core'
+import { format } from 'date-fns'
 import type { RunStatus, TradeDecision } from './types.ts'
 
 export function formatCurrency(value: number | null): string {
@@ -29,20 +30,28 @@ export function statusColor(status: RunStatus | string): MantineColor {
   }
 }
 
-export function decisionColor(decision: TradeDecision | null): MantineColor {
+export function decisionColor(decision: TradeDecision | string | null): MantineColor {
   switch (decision) {
     case 'BUY':
       return 'green'
     case 'SELL':
       return 'red'
+    case 'SHORT':
+      return 'orange'
     case 'HOLD':
       return 'gray'
     default:
+      // Unknown wire-shape values (e.g., backend introduces a new transaction
+      // type) fall back to a neutral pill instead of crashing the badge.
       return 'gray'
   }
 }
 
 export function formatTimestamp(ts: string | null): string {
   if (!ts) return '\u2014'
-  return new Date(ts).toLocaleString()
+  // Use a fixed pattern so the rendered string is identical across hosts and
+  // does not drift with the user's locale settings (the previous
+  // toLocaleString() output broke snapshot comparisons and made CI logs
+  // hard to grep).
+  return format(new Date(ts), 'yyyy-MM-dd HH:mm')
 }

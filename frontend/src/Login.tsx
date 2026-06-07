@@ -54,7 +54,7 @@ function Login() {
           />
 
           {error && (
-            <Alert color="red" mb="md">
+            <Alert color="red" mb="md" role="alert" aria-live="polite">
               {error}
             </Alert>
           )}

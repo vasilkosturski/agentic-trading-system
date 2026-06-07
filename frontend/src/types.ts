@@ -6,7 +6,7 @@ export type RunPhase =
   | 'TRADING'
   | 'COMPLETED'
   | 'FAILED'
-export type TradeDecision = 'BUY' | 'SELL' | 'HOLD'
+export type TradeDecision = 'BUY' | 'SELL' | 'HOLD' | 'SHORT'
 
 export interface TradingRun {
   runId: number

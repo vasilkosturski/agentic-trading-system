@@ -3,6 +3,7 @@ import { LineChart } from '@mantine/charts'
 import { Group, Paper, SegmentedControl, Title } from '@mantine/core'
 import type { PortfolioSnapshot } from './types.ts'
 import { AGENT_COLORS } from './constants.ts'
+import { pivotLatestDailySnapshotsByDay } from './portfolioChart.ts'
 
 type TimeRange = '1W' | '1M' | '1Y' | 'All'
 
@@ -34,47 +35,6 @@ function filterByTimeRange(snapshots: PortfolioSnapshot[], range: TimeRange): Po
   const cutoff = getCutoffDate(range)
   if (!cutoff) return snapshots
   return snapshots.filter((s) => new Date(s.timestamp) >= cutoff)
-}
-
-interface ChartDataPoint {
-  timestamp: string
-  [agentName: string]: number | string
-}
-
-function toDateKey(iso: string): string {
-  const d = new Date(iso)
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${d.getFullYear()}-${month}-${day}`
-}
-
-function formatDateLabel(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleString('en-US', { month: 'short', day: 'numeric' })
-}
-
-function pivotLatestDailySnapshotsByDay(snapshots: PortfolioSnapshot[]): ChartDataPoint[] {
-  const daily = new Map<string, Map<string, { iso: string; value: number }>>()
-
-  for (const s of snapshots) {
-    const dk = toDateKey(s.timestamp)
-    if (!daily.has(dk)) daily.set(dk, new Map())
-    daily.get(dk)!.set(s.agentName, {
-      iso: s.timestamp,
-      value: Math.round(s.totalValue * 100) / 100,
-    })
-  }
-
-  return Array.from(daily.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([, agents]) => {
-      const firstIso = agents.values().next().value!.iso
-      const row: ChartDataPoint = { timestamp: formatDateLabel(firstIso) }
-      for (const [name, { value }] of agents) {
-        row[name] = value
-      }
-      return row
-    })
 }
 
 function PortfolioChart({ snapshots }: { snapshots: PortfolioSnapshot[] }) {

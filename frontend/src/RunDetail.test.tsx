@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { MantineProvider } from '@mantine/core'
 import RunDetail from './RunDetail'
 import * as api from './api'
+import { makeMockRunDetail } from './test/factories'
 
 vi.mock('./api', () => ({
   fetchRunDetail: vi.fn(),
@@ -19,27 +20,13 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-describe('RunDetail.tsx — Promise.all partial-failure resilience (R1)', () => {
+describe('RunDetail.tsx — Promise.all partial-failure resilience', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   it('still renders run detail with fallback agent name when fetchAgents rejects', async () => {
-    vi.mocked(api.fetchRunDetail).mockResolvedValue({
-      run: {
-        runId: 42,
-        agentId: 7,
-        status: 'COMPLETED',
-        phase: 'COMPLETED',
-        decision: 'BUY',
-        symbol: 'AAPL',
-        startedAt: '2025-01-01T00:00:00Z',
-        completedAt: '2025-01-01T01:00:00Z',
-      },
-      research: null,
-      decision: null,
-      execution: null,
-    })
+    vi.mocked(api.fetchRunDetail).mockResolvedValue(makeMockRunDetail())
     vi.mocked(api.fetchAgents).mockRejectedValue(new Error('agents endpoint down'))
 
     render(
@@ -47,7 +34,7 @@ describe('RunDetail.tsx — Promise.all partial-failure resilience (R1)', () => 
         <MemoryRouter initialEntries={['/runs/42']}>
           <RunDetail />
         </MemoryRouter>
-      </MantineProvider>
+      </MantineProvider>,
     )
 
     await waitFor(() => {
@@ -55,7 +42,6 @@ describe('RunDetail.tsx — Promise.all partial-failure resilience (R1)', () => 
     })
 
     expect(screen.getByText(/Agent #7/)).toBeInTheDocument()
-
     expect(screen.queryByText(/agents endpoint down/i)).toBeNull()
   })
 })

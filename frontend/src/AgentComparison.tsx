@@ -4,49 +4,10 @@ import { Paper, SimpleGrid, Text, Group, Title, Badge, Popover, ActionIcon } fro
 import Markdown from 'react-markdown'
 import { IconInfoCircle } from '@tabler/icons-react'
 import type { PortfolioSnapshot, Agent } from './types.ts'
-import { AGENT_COLORS, AGENT_ORDER } from './constants.ts'
+import { AGENT_COLORS } from './constants.ts'
 import { formatCurrency, formatPercent, pnlColor } from './utils.ts'
+import { latestPerAgent } from './agentComparison.ts'
 import classes from './AgentComparison.module.css'
-
-interface AgentSummary {
-  id: number | null
-  name: string
-  totalValue: number
-  cashBalance: number | null
-  totalPnl: number | null
-  totalReturnPercent: number | null
-  style?: string
-  systemPrompt?: string
-}
-
-function latestPerAgent(snapshots: PortfolioSnapshot[], agents: Agent[]): AgentSummary[] {
-  const latest = new Map<string, PortfolioSnapshot>()
-  const agentMap = new Map(agents.map(a => [a.name, a]))
-
-  for (const s of snapshots) {
-    const existing = latest.get(s.agentName)
-    if (!existing || s.timestamp > existing.timestamp) {
-      latest.set(s.agentName, s)
-    }
-  }
-
-  return AGENT_ORDER
-    .filter((name) => latest.has(name))
-    .map((name) => {
-      const s = latest.get(name)!
-      const agent = agentMap.get(name)
-      return {
-        id: agent?.id ?? null,
-        name: s.agentName,
-        totalValue: s.totalValue,
-        cashBalance: s.cashBalance,
-        totalPnl: s.totalPnl,
-        totalReturnPercent: s.totalReturnPercent,
-        style: agent?.style,
-        systemPrompt: agent?.systemPrompt,
-      }
-    })
-}
 
 function AgentComparison({ snapshots, agents }: { snapshots: PortfolioSnapshot[], agents: Agent[] }) {
   const navigate = useNavigate()

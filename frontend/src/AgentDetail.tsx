@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Accordion,
@@ -7,7 +6,6 @@ import {
   Text,
   Paper,
   Group,
-  Table,
   Anchor,
   Loader,
   Badge,
@@ -15,56 +13,46 @@ import {
 import { IconClock, IconAlertTriangle } from '@tabler/icons-react'
 import { formatDistanceToNow } from 'date-fns'
 import Markdown from 'react-markdown'
-import type { AgentPortfolio, Holding } from './types.ts'
+import type { AgentPortfolio } from './types.ts'
 import { fetchAgentPortfolio, fetchAgents } from './api.ts'
 import { fetchOrEmpty } from './fetchHelpers.ts'
+import { useFetchOnce } from './useFetchOnce.ts'
 import { AGENT_COLORS } from './constants.ts'
 import { formatCurrency, formatPercent, pnlColor } from './utils.ts'
+import PositionsTable from './PositionsTable.tsx'
 import classes from './AgentDetail.module.css'
 
-function sortByMarketValue(holdings: Holding[]): Holding[] {
-  return [...holdings].sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0))
+interface AgentPayload {
+  portfolio: AgentPortfolio
+  agentName: string
+  agentStyle: string | null
+  systemPrompt: string | null
 }
 
 function AgentDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [portfolio, setPortfolio] = useState<AgentPortfolio | null>(null)
-  const [agentName, setAgentName] = useState<string | null>(null)
-  const [agentStyle, setAgentStyle] = useState<string | null>(null)
-  const [systemPrompt, setSystemPrompt] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const controller = new AbortController()
-
-    async function load() {
-      try {
-        const agentId = Number(id)
-        // Cosmetic fetch (agents map for friendly name + style + system prompt)
-        // must not collapse the primary portfolio fetch if it fails — fall back
-        // to [] so the page still renders with portfolio.agentName + no style.
-        const [portfolioData, agents] = await Promise.all([
-          fetchAgentPortfolio(agentId, controller.signal),
-          fetchOrEmpty(fetchAgents(controller.signal)),
-        ])
-        setPortfolio(portfolioData)
-        const agent = agents.find(a => a.id === agentId)
-        setAgentName(agent?.name ?? portfolioData.agentName)
-        setAgentStyle(agent?.style ?? null)
-        setSystemPrompt(agent?.systemPrompt ?? null)
-      } catch (err) {
-        if (controller.signal.aborted) return
-        setError(err instanceof Error ? err.message : 'Unknown error')
-      } finally {
-        if (!controller.signal.aborted) setLoading(false)
+  const { data, loading, error } = useFetchOnce<AgentPayload>(
+    async (signal) => {
+      const agentId = Number(id)
+      // Cosmetic fetch (agents map for friendly name + style + system prompt)
+      // must not collapse the primary portfolio fetch if it fails — fall back
+      // to [] so the page still renders with portfolio.agentName + no style.
+      const [portfolioData, agents] = await Promise.all([
+        fetchAgentPortfolio(agentId, signal),
+        fetchOrEmpty(fetchAgents(signal)),
+      ])
+      const agent = agents.find((a) => a.id === agentId)
+      return {
+        portfolio: portfolioData,
+        agentName: agent?.name ?? portfolioData.agentName,
+        agentStyle: agent?.style ?? null,
+        systemPrompt: agent?.systemPrompt ?? null,
       }
-    }
-
-    load()
-    return () => controller.abort()
-  }, [id])
+    },
+    [id],
+  )
 
   if (loading) {
     return (
@@ -77,7 +65,7 @@ function AgentDetail() {
     )
   }
 
-  if (error || !portfolio) {
+  if (error || !data) {
     return (
       <Container size="lg" py="xl">
         <Anchor component="button" onClick={() => navigate('/')}>
@@ -89,9 +77,8 @@ function AgentDetail() {
     )
   }
 
-  const color = AGENT_COLORS[agentName ?? ''] ?? 'gray'
-  const sorted = sortByMarketValue(portfolio.holdings)
-  const hasPrices = sorted.some(h => h.currentPrice != null)
+  const { portfolio, agentName, agentStyle, systemPrompt } = data
+  const color = AGENT_COLORS[agentName] ?? 'gray'
 
   return (
     <Container size="lg" py="xl">
@@ -161,10 +148,14 @@ function AgentDetail() {
         </Group>
       </Paper>
 
-      {/* System Prompt */}
+      {/* System Prompt — keyed on id so a route change to a different agent
+          remounts the Accordion. Without this remount, defaultValue is bound
+          on first mount only, so the panel state for the previous agent
+          carries over (e.g., the "collapsed by user" choice persists into the
+          next agent's view). */}
       {systemPrompt && (
         <Paper p="lg" shadow="xs" mb="lg">
-          <Accordion variant="separated" defaultValue="system-prompt">
+          <Accordion key={id} variant="separated" defaultValue="system-prompt">
             <Accordion.Item value="system-prompt">
               <Accordion.Control>
                 <Text fw={600}>Strategy</Text>
@@ -179,65 +170,7 @@ function AgentDetail() {
         </Paper>
       )}
 
-      {/* Positions Table */}
-      <Paper p="lg" shadow="xs">
-        <Title order={3} mb="md">
-          Positions ({portfolio.holdingsCount})
-        </Title>
-
-        {sorted.length === 0 ? (
-          <Text c="dimmed">No positions</Text>
-        ) : (
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Symbol</Table.Th>
-                <Table.Th className={classes.rightAlign}>Shares</Table.Th>
-                <Table.Th className={classes.rightAlign}>Avg Cost</Table.Th>
-                {hasPrices && <Table.Th className={classes.rightAlign}>Price</Table.Th>}
-                {hasPrices && <Table.Th className={classes.rightAlign}>Market Value</Table.Th>}
-                {hasPrices && <Table.Th className={classes.rightAlign}>P&L</Table.Th>}
-                {hasPrices && <Table.Th className={classes.rightAlign}>P&L %</Table.Th>}
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {sorted.map(h => (
-                <Table.Tr key={h.symbol}>
-                  <Table.Td>
-                    <Text fw={600}>{h.symbol}</Text>
-                  </Table.Td>
-                  <Table.Td className={classes.rightAlign}>{h.quantity}</Table.Td>
-                  <Table.Td className={classes.rightAlign}>{formatCurrency(h.averagePrice)}</Table.Td>
-                  {hasPrices && (
-                    <Table.Td className={classes.rightAlign}>
-                      {h.currentPrice != null ? formatCurrency(h.currentPrice) : <Text c="dimmed" size="sm">N/A</Text>}
-                    </Table.Td>
-                  )}
-                  {hasPrices && (
-                    <Table.Td className={classes.rightAlign}>
-                      {h.marketValue != null ? <Text fw={600}>{formatCurrency(h.marketValue)}</Text> : <Text c="dimmed" size="sm">N/A</Text>}
-                    </Table.Td>
-                  )}
-                  {hasPrices && (
-                    <Table.Td className={classes.rightAlign}>
-                      {h.unrealizedPnl != null ? (
-                        <Text c={pnlColor(h.unrealizedPnl)} fw={600}>{formatCurrency(h.unrealizedPnl)}</Text>
-                      ) : <Text c="dimmed" size="sm">N/A</Text>}
-                    </Table.Td>
-                  )}
-                  {hasPrices && (
-                    <Table.Td className={classes.rightAlign}>
-                      {h.gainLossPercent != null ? (
-                        <Text c={pnlColor(h.gainLossPercent)} fw={600}>{formatPercent(h.gainLossPercent)}</Text>
-                      ) : <Text c="dimmed" size="sm">N/A</Text>}
-                    </Table.Td>
-                  )}
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        )}
-      </Paper>
+      <PositionsTable holdings={portfolio.holdings} count={portfolio.holdingsCount} />
     </Container>
   )
 }

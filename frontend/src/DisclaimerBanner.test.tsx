@@ -3,56 +3,26 @@ import { render, screen } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { MantineProvider } from '@mantine/core'
 import DisclaimerBanner from './DisclaimerBanner'
+import { assertDisclaimerSemantics } from './test/disclaimer-assertions'
+
+function renderBanner() {
+  return render(
+    <MantineProvider>
+      <BrowserRouter>
+        <DisclaimerBanner />
+      </BrowserRouter>
+    </MantineProvider>,
+  )
+}
 
 describe('DisclaimerBanner', () => {
-  it('displays educational demonstration warning', () => {
-    render(
-      <MantineProvider>
-        <BrowserRouter>
-          <DisclaimerBanner />
-        </BrowserRouter>
-      </MantineProvider>
-    )
-
-    expect(screen.getByText(/Educational Demonstration Only/i)).toBeInTheDocument()
+  it('communicates the educational-only framing, 7-day delay, and disclaimer link', () => {
+    const { container } = renderBanner()
+    assertDisclaimerSemantics(container)
   })
 
-  it('mentions the 7-day delay explicitly', () => {
-    render(
-      <MantineProvider>
-        <BrowserRouter>
-          <DisclaimerBanner />
-        </BrowserRouter>
-      </MantineProvider>
-    )
-
-    expect(screen.getByText(/7\+? days?/i)).toBeInTheDocument()
-  })
-
-  it('states this is not financial advice', () => {
-    render(
-      <MantineProvider>
-        <BrowserRouter>
-          <DisclaimerBanner />
-        </BrowserRouter>
-      </MantineProvider>
-    )
-
+  it('states explicitly that this is not financial advice', () => {
+    renderBanner()
     expect(screen.getByText(/not financial advice/i)).toBeInTheDocument()
   })
-
-  it('includes a link to the disclaimer page', () => {
-    render(
-      <MantineProvider>
-        <BrowserRouter>
-          <DisclaimerBanner />
-        </BrowserRouter>
-      </MantineProvider>
-    )
-
-    const link = screen.getByRole('link', { name: /disclaimer|learn more/i })
-    expect(link).toBeInTheDocument()
-    expect(link).toHaveAttribute('href', '/disclaimer')
-  })
-
 })

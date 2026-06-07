@@ -20,7 +20,7 @@ function ToolCallsTable({ toolCalls }: ToolCallsTableProps) {
         </Table.Thead>
         <Table.Tbody>
           {toolCalls.map((tc, i) => (
-            <Table.Tr key={i}>
+            <Table.Tr key={`${tc.tool}-${i}`}>
               <Table.Td><Text size="sm" ff="monospace">{tc.tool}</Text></Table.Td>
               <Table.Td><Text size="sm" ff="monospace">{formatParams(tc.params)}</Text></Table.Td>
             </Table.Tr>
