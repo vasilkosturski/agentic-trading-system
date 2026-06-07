@@ -1,4 +1,4 @@
-import type { AgentPortfolio, Agent, RunDetailResponse, TradingRun } from '../types.ts'
+import type { AgentPortfolio, Agent, RunDetailResponse, TradingRun } from '@/lib/types.ts'
 
 const BASE_RUN: TradingRun = {
   runId: 42,
