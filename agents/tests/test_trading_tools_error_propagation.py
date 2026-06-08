@@ -37,35 +37,31 @@ class TestPlainHelpersPropagateBackendAPIError:
     they are called by code directly, so BackendAPIError must propagate raw.
     """
 
-    async def test_buy_shares_propagates_backend_api_error(self):
-        from tools.trading_tools import buy_shares
+    @pytest.mark.parametrize(
+        "helper_name, client_method_name, status_code, detail",
+        [
+            ("buy_shares", "buy_shares", 400, "Insufficient funds"),
+            ("sell_shares", "sell_shares", 400, "Position too small"),
+        ],
+    )
+    async def test_trade_helper_propagates_backend_api_error(
+        self, helper_name: str, client_method_name: str, status_code: int, detail: str
+    ):
+        import tools.trading_tools as trading_tools
 
         mock_client = MagicMock()
-        mock_client.buy_shares = AsyncMock(
-            side_effect=BackendAPIError("Insufficient funds", status_code=400)
+        setattr(
+            mock_client,
+            client_method_name,
+            AsyncMock(side_effect=BackendAPIError(detail, status_code=status_code)),
         )
 
         with patch("tools.trading_tools.get_backend_client", return_value=mock_client):
             with pytest.raises(BackendAPIError) as exc_info:
-                await buy_shares(agent_id=1, symbol="AAPL", quantity=10)
+                await getattr(trading_tools, helper_name)(agent_id=1, symbol="AAPL", quantity=10)
 
-        assert exc_info.value.status_code == 400
-        assert "Insufficient funds" in str(exc_info.value)
-
-    async def test_sell_shares_propagates_backend_api_error(self):
-        from tools.trading_tools import sell_shares
-
-        mock_client = MagicMock()
-        mock_client.sell_shares = AsyncMock(
-            side_effect=BackendAPIError("Position too small", status_code=400)
-        )
-
-        with patch("tools.trading_tools.get_backend_client", return_value=mock_client):
-            with pytest.raises(BackendAPIError) as exc_info:
-                await sell_shares(agent_id=1, symbol="AAPL", quantity=10)
-
-        assert exc_info.value.status_code == 400
-        assert "Position too small" in str(exc_info.value)
+        assert exc_info.value.status_code == status_code
+        assert detail in str(exc_info.value)
 
     async def test_initialize_agent_propagates_backend_api_error(self):
         from tools.trading_tools import initialize_agent

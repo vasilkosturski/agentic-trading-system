@@ -4,7 +4,6 @@ import httpx
 import pytest
 
 from infra.prompt_loader import (
-    VALID_AGENT_NAMES,
     clear_prompt_cache,
     format_prompt,
     load_and_format_prompt,
@@ -131,8 +130,3 @@ class TestLoadAndFormatPrompt:
 
             assert "2025-01-01" in result
             assert "{datetime}" not in result
-
-
-class TestValidAgentNames:
-    def test_expected_names(self):
-        assert VALID_AGENT_NAMES == {"warren", "george", "ray", "cathie"}

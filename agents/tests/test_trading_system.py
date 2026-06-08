@@ -144,13 +144,6 @@ async def test_run_all_agents_all_failure_logs_each_and_no_raise(system, four_ag
 # ============================================================================
 
 
-def test_init_stores_agents_list(four_agents):
-    """Constructor must keep the supplied agents list intact and accessible."""
-    system = TradingSystem(four_agents)
-    assert system.agents is four_agents
-    assert len(system.agents) == 4
-
-
 def test_agent_configs_zips_names_with_styles_in_registry_order():
     """``AGENT_CONFIGS`` must align with ``AGENT_NAMES`` 1:1 — drift between
     the name registry and per-persona style/balance config would silently

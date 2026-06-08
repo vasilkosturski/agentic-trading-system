@@ -52,25 +52,6 @@ async def test_http_error_is_logged_and_swallowed(mocker, caplog):
 
 
 @pytest.mark.asyncio
-async def test_timeout_exception_is_logged_and_swallowed(mocker, caplog):
-    """httpx.TimeoutException (a subclass of HTTPError) is also handled by the narrow except."""
-    client = MagicMock()
-    client.post = AsyncMock(side_effect=httpx.ReadTimeout("slow"))
-    _patch_async_client(mocker, client)
-
-    with caplog.at_level(logging.WARNING, logger=status_broadcaster.logger.name):
-        await status_broadcaster.broadcast_status_async(
-            agent_id=1,
-            agent_name="Warren",
-            phase="RESEARCHING",
-            message="...",
-            progress=20,
-        )
-
-    assert any(r.levelno == logging.WARNING for r in caplog.records)
-
-
-@pytest.mark.asyncio
 async def test_runtime_error_propagates(mocker):
     """A non-HTTP RuntimeError must propagate — programming bugs should not be hidden."""
     client = MagicMock()

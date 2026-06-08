@@ -67,8 +67,26 @@ async def test_start_raises_runtime_error_if_agent_id_falsy(
     assert "warren" in msg or "agent" in msg
 
 
-async def test_transition_to_deciding_emits_phase_update_then_broadcast(
+@pytest.mark.parametrize(
+    "transition_method, run_phase, broadcast_phase, message, progress",
+    [
+        (
+            "transition_to_deciding",
+            RunPhase.DECIDING,
+            PHASE_DECIDING,
+            "Making investment decision",
+            70,
+        ),
+        ("transition_to_trading", RunPhase.TRADING, PHASE_TRADING, "Executing trade", 90),
+    ],
+)
+async def test_transition_emits_phase_update_then_broadcast(
     lifecycle: RunLifecycle,
+    transition_method: str,
+    run_phase: RunPhase,
+    broadcast_phase: str,
+    message: str,
+    progress: int,
 ) -> None:
     parent = MagicMock()
     parent.update_phase = AsyncMock()
@@ -78,36 +96,10 @@ async def test_transition_to_deciding_emits_phase_update_then_broadcast(
         patch("backend.run_lifecycle.update_phase", parent.update_phase),
         patch("backend.run_lifecycle.broadcast_status", parent.broadcast_status),
     ):
-        await lifecycle.transition_to_deciding(run_id=42)
+        await getattr(lifecycle, transition_method)(run_id=42)
 
-    parent.update_phase.assert_awaited_once_with(42, RunPhase.DECIDING)
-    parent.broadcast_status.assert_called_once_with(
-        1, "Warren", PHASE_DECIDING, "Making investment decision", 70
-    )
-
-    call_names = [
-        call[0] for call in parent.mock_calls if call[0] in ("update_phase", "broadcast_status")
-    ]
-    assert call_names == ["update_phase", "broadcast_status"]
-
-
-async def test_transition_to_trading_emits_phase_update_then_broadcast(
-    lifecycle: RunLifecycle,
-) -> None:
-    parent = MagicMock()
-    parent.update_phase = AsyncMock()
-    parent.broadcast_status = MagicMock()
-
-    with (
-        patch("backend.run_lifecycle.update_phase", parent.update_phase),
-        patch("backend.run_lifecycle.broadcast_status", parent.broadcast_status),
-    ):
-        await lifecycle.transition_to_trading(run_id=42)
-
-    parent.update_phase.assert_awaited_once_with(42, RunPhase.TRADING)
-    parent.broadcast_status.assert_called_once_with(
-        1, "Warren", PHASE_TRADING, "Executing trade", 90
-    )
+    parent.update_phase.assert_awaited_once_with(42, run_phase)
+    parent.broadcast_status.assert_called_once_with(1, "Warren", broadcast_phase, message, progress)
 
     call_names = [
         call[0] for call in parent.mock_calls if call[0] in ("update_phase", "broadcast_status")
@@ -188,9 +180,9 @@ async def test_fail_swallows_cleanup_errors_and_does_not_raise(
     # Asserting == (not >=) catches accidental double-logging regressions in
     # fail(): exactly one record for the original error and one for cleanup.
     error_records = [rec for rec in caplog.records if rec.levelno == logging.ERROR]
-    assert len(error_records) == 2, (
-        f"expected exactly 2 ERROR log records (original + cleanup); got {len(error_records)}"
-    )
+    assert (
+        len(error_records) == 2
+    ), f"expected exactly 2 ERROR log records (original + cleanup); got {len(error_records)}"
     messages = " ".join(rec.getMessage() for rec in error_records)
     assert "original" in messages
     assert "cleanup boom" in messages

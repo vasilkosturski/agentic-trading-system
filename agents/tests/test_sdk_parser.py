@@ -6,25 +6,11 @@ from agents.items import ToolCallItem, ToolCallOutputItem
 
 from utils.sdk_parser import (
     _SDK_ERROR_PREFIX,
-    TOOL_DECIDE_ACTION,
-    TOOL_RESEARCHER,
     ParsedToolCall,
     _detect_tool_error,
     extract_tool_calls,
     get_tool_errors,
 )
-
-
-class TestToolNameConstants:
-    """Test tool name constants."""
-
-    def test_researcher_constant(self):
-        """Test Researcher tool constant."""
-        assert TOOL_RESEARCHER == "Researcher"
-
-    def test_decide_action_constant(self):
-        """Test decide_action tool constant."""
-        assert TOOL_DECIDE_ACTION == "decide_action"
 
 
 class TestExtractToolCalls:

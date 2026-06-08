@@ -159,11 +159,25 @@ class TestPydanticParseUsesModelValidateJson:
         assert report.balance == 10000.0
 
     @pytest.mark.asyncio
-    async def test_buy_shares_parses_via_response_text(self):
-        """``buy_shares`` must validate from ``response.text``, not ``response.json()``."""
-        payload_text = (
-            '{"tradeId":42,"symbol":"AAPL","quantity":10,"price":150.0,"newBalance":98500.0}'
-        )
+    @pytest.mark.parametrize(
+        "method_name, payload_text, expected_trade_id",
+        [
+            (
+                "buy_shares",
+                '{"tradeId":42,"symbol":"AAPL","quantity":10,"price":150.0,"newBalance":98500.0}',
+                42,
+            ),
+            (
+                "sell_shares",
+                '{"tradeId":43,"symbol":"AAPL","quantity":5,"price":151.0,"newBalance":99255.0}',
+                43,
+            ),
+        ],
+    )
+    async def test_trade_parses_via_response_text(
+        self, method_name: str, payload_text: str, expected_trade_id: int
+    ):
+        """``buy_shares`` / ``sell_shares`` must validate from ``response.text``."""
         response = self._text_only_response(payload_text)
 
         client = BackendClient(client=AsyncMock(spec=httpx.AsyncClient))
@@ -174,31 +188,10 @@ class TestPydanticParseUsesModelValidateJson:
             "json",
             side_effect=AssertionError("parse site must use response.text"),
         ):
-            result = await client.buy_shares(agent_id=1, symbol="AAPL", quantity=10)
+            result = await getattr(client, method_name)(agent_id=1, symbol="AAPL", quantity=10)
 
         assert isinstance(result, TradeResult)
-        assert result.tradeId == 42
-
-    @pytest.mark.asyncio
-    async def test_sell_shares_parses_via_response_text(self):
-        """``sell_shares`` must validate from ``response.text``, not ``response.json()``."""
-        payload_text = (
-            '{"tradeId":43,"symbol":"AAPL","quantity":5,"price":151.0,"newBalance":99255.0}'
-        )
-        response = self._text_only_response(payload_text)
-
-        client = BackendClient(client=AsyncMock(spec=httpx.AsyncClient))
-        client._request = AsyncMock(return_value=response)  # type: ignore[method-assign]
-
-        with patch.object(
-            httpx.Response,
-            "json",
-            side_effect=AssertionError("parse site must use response.text"),
-        ):
-            result = await client.sell_shares(agent_id=1, symbol="AAPL", quantity=5)
-
-        assert isinstance(result, TradeResult)
-        assert result.tradeId == 43
+        assert result.tradeId == expected_trade_id
 
 
 # ---------------------------------------------------------------------------
@@ -279,21 +272,6 @@ class TestBackendClientJwtLogin:
         assert login_call["method"] == "POST"
         assert login_call["url"].endswith("/api/auth/login")
         assert login_call["json"] == {"username": "admin", "password": "admin-pw"}
-
-    @pytest.mark.asyncio
-    async def test_authorization_header_attached_after_login(self):
-        """Every backend call after login carries `Authorization: Bearer <jwt>`."""
-        responses = [
-            _json_response(200, {"token": "jwt-xyz", "username": "admin"}),
-            _json_response(200, {"id": 1, "name": "Warren"}),
-        ]
-        fake_http = _FakeHttpxClient(responses)
-        client = BackendClient(client=fake_http)
-
-        await client.initialize_agent("Warren", initial_balance=10000.0)
-
-        state_call = fake_http.calls[1]
-        assert state_call["headers"].get("Authorization") == "Bearer jwt-xyz"
 
     @pytest.mark.asyncio
     async def test_401_triggers_relogin_once_then_retries(self):

@@ -94,89 +94,68 @@ def _make_request_error() -> httpx.RequestError:
 # ---------- retry-on-transient: get_account_report ----------
 
 
+def _complete_run_data() -> CompleteRunData:
+    return CompleteRunData(decision=DecisionPhaseData(decision=TradeDecision.HOLD))
+
+
 class TestRetryOnTransientErrors:
     """Idempotent methods retry on httpx transient errors and succeed."""
 
+    # The retry semantics are uniform across all five idempotent methods —
+    # one transient httpx error followed by a successful response should yield
+    # exactly two attempts. Each row supplies the method, its kwargs, and the
+    # success payload + result-shape check (None for void returns).
     @pytest.mark.asyncio
-    async def test_get_account_report_retries_then_succeeds(self):
+    @pytest.mark.parametrize(
+        "method_name, kwargs, response_payload, result_check",
+        [
+            (
+                "get_account_report",
+                {"agent_id": 1},
+                _account_report_payload(),
+                lambda r: isinstance(r, AccountReport),
+            ),
+            (
+                "get_recent_activity",
+                {"agent_id": 1, "days": 7},
+                _recent_activity_payload(),
+                lambda r: isinstance(r, RecentActivityResponse),
+            ),
+            (
+                "create_run",
+                {"agent_id": 1},
+                {"runId": 42},
+                lambda r: r == 42,
+            ),
+            (
+                "update_phase",
+                {"run_id": 42, "phase": "RESEARCHING"},
+                {},
+                lambda r: r is None,
+            ),
+            (
+                "complete_run",
+                {"run_id": 42, "data": _complete_run_data()},
+                {},
+                lambda r: r is None,
+            ),
+        ],
+    )
+    async def test_idempotent_methods_retry_then_succeed(
+        self, method_name, kwargs, response_payload, result_check
+    ):
         client = BackendClient(client=AsyncMock(spec=httpx.AsyncClient))
         _disable_waits(client)
 
-        good_response = _make_response(_account_report_payload())
+        good_response = _make_response(response_payload)
 
         client._request = AsyncMock(  # type: ignore[method-assign]
             side_effect=[_make_request_error(), good_response]
         )
 
-        report = await client.get_account_report(agent_id=1)
+        result = await getattr(client, method_name)(**kwargs)
 
-        assert isinstance(report, AccountReport)
-        assert client._request.await_count == 2
-
-    @pytest.mark.asyncio
-    async def test_get_recent_activity_retries_then_succeeds(self):
-        client = BackendClient(client=AsyncMock(spec=httpx.AsyncClient))
-        _disable_waits(client)
-
-        good_response = _make_response(_recent_activity_payload())
-
-        client._request = AsyncMock(  # type: ignore[method-assign]
-            side_effect=[_make_request_error(), good_response]
-        )
-
-        result = await client.get_recent_activity(agent_id=1, days=7)
-
-        assert isinstance(result, RecentActivityResponse)
-        assert client._request.await_count == 2
-
-    @pytest.mark.asyncio
-    async def test_create_run_retries_then_succeeds(self):
-        client = BackendClient(client=AsyncMock(spec=httpx.AsyncClient))
-        _disable_waits(client)
-
-        good_response = _make_response({"runId": 42})
-
-        client._request = AsyncMock(  # type: ignore[method-assign]
-            side_effect=[_make_request_error(), good_response]
-        )
-
-        run_id = await client.create_run(agent_id=1)
-
-        assert run_id == 42
-        assert client._request.await_count == 2
-
-    @pytest.mark.asyncio
-    async def test_update_phase_retries_then_succeeds(self):
-        client = BackendClient(client=AsyncMock(spec=httpx.AsyncClient))
-        _disable_waits(client)
-
-        good_response = _make_response({})
-
-        client._request = AsyncMock(  # type: ignore[method-assign]
-            side_effect=[_make_request_error(), good_response]
-        )
-
-        await client.update_phase(run_id=42, phase="RESEARCHING")
-
-        assert client._request.await_count == 2
-
-    @pytest.mark.asyncio
-    async def test_complete_run_retries_then_succeeds(self):
-        client = BackendClient(client=AsyncMock(spec=httpx.AsyncClient))
-        _disable_waits(client)
-
-        good_response = _make_response({})
-
-        client._request = AsyncMock(  # type: ignore[method-assign]
-            side_effect=[_make_request_error(), good_response]
-        )
-
-        data = CompleteRunData(
-            decision=DecisionPhaseData(decision=TradeDecision.HOLD),
-        )
-
-        await client.complete_run(run_id=42, data=data)
-
+        assert result_check(result)
         assert client._request.await_count == 2
 
 
@@ -212,7 +191,8 @@ class TestTradeMethodsNotRetried:
     """buy_shares / sell_shares fail on the first transient error (no retry)."""
 
     @pytest.mark.asyncio
-    async def test_buy_shares_does_not_retry(self):
+    @pytest.mark.parametrize("method_name", ["buy_shares", "sell_shares"])
+    async def test_trade_method_does_not_retry(self, method_name: str):
         client = BackendClient(client=AsyncMock(spec=httpx.AsyncClient))
 
         client._request = AsyncMock(  # type: ignore[method-assign]
@@ -220,19 +200,6 @@ class TestTradeMethodsNotRetried:
         )
 
         with pytest.raises(httpx.RequestError):
-            await client.buy_shares(agent_id=1, symbol="AAPL", quantity=10)
-
-        assert client._request.await_count == 1
-
-    @pytest.mark.asyncio
-    async def test_sell_shares_does_not_retry(self):
-        client = BackendClient(client=AsyncMock(spec=httpx.AsyncClient))
-
-        client._request = AsyncMock(  # type: ignore[method-assign]
-            side_effect=[_make_request_error()]
-        )
-
-        with pytest.raises(httpx.RequestError):
-            await client.sell_shares(agent_id=1, symbol="AAPL", quantity=10)
+            await getattr(client, method_name)(agent_id=1, symbol="AAPL", quantity=10)
 
         assert client._request.await_count == 1

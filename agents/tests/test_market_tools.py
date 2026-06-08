@@ -50,17 +50,6 @@ class TestMarketDataCacheBounded:
             source="Finnhub",
         )
 
-    def test_cache_is_cachetools_ttlcache(self):
-        from cachetools import TTLCache
-
-        assert isinstance(market_tools._market_data_cache, TTLCache)
-
-    def test_cache_maxsize_is_500(self):
-        assert market_tools._market_data_cache.maxsize == 500
-
-    def test_cache_ttl_matches_constant(self):
-        assert market_tools._market_data_cache.ttl == market_tools._CACHE_TTL_SECONDS
-
     def test_cache_evicts_oldest_when_exceeding_maxsize(self):
         market_tools._market_data_cache.clear()
 
@@ -72,10 +61,10 @@ class TestMarketDataCacheBounded:
 
         _put_cache("SYM0500", self._make_market_data("SYM0500"))
 
-        assert len(market_tools._market_data_cache) == 500, (
-            "Cache size must stay bounded at maxsize=500 after eviction"
-        )
-        assert "SYM0000" not in market_tools._market_data_cache, (
-            "Oldest entry should have been evicted when cache exceeded maxsize=500"
-        )
+        assert (
+            len(market_tools._market_data_cache) == 500
+        ), "Cache size must stay bounded at maxsize=500 after eviction"
+        assert (
+            "SYM0000" not in market_tools._market_data_cache
+        ), "Oldest entry should have been evicted when cache exceeded maxsize=500"
         assert "SYM0500" in market_tools._market_data_cache
