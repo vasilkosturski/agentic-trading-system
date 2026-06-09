@@ -22,8 +22,12 @@ import com.trading.security.JwtAuthenticationFilter;
 import com.trading.security.JwtTokenProvider;
 import com.trading.service.TradingRunService;
 import java.time.Instant;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -34,6 +38,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
  * Security tests for state-changing endpoints on TradingRunController:
@@ -74,6 +79,100 @@ class TradingRunControllerWriteSecurityTest {
         }
     }
 
+    private enum Endpoint {
+        CREATE_RUN,
+        UPDATE_PHASE,
+        COMPLETE_RUN
+    }
+
+    private MockHttpServletRequestBuilder buildRequest(Endpoint endpoint) throws Exception {
+        return switch (endpoint) {
+            case CREATE_RUN -> post("/api/runs")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(createRunRequest()));
+            case UPDATE_PHASE -> patch("/api/runs/1/phase")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(updatePhaseRequest()));
+            case COMPLETE_RUN -> put("/api/runs/1/complete")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(completeRunJson());
+        };
+    }
+
+    private void verifyServiceNotCalled(Endpoint endpoint) {
+        switch (endpoint) {
+            case CREATE_RUN -> verify(tradingRunService, never()).createRun(any());
+            case UPDATE_PHASE -> verify(tradingRunService, never()).updatePhase(anyLong(), any(), any());
+            case COMPLETE_RUN -> verify(tradingRunService, never()).completeRun(anyLong(), any());
+        }
+    }
+
+    private static Stream<Arguments> writeEndpoints() {
+        // createRun returns 201, the other two return 200.
+        return Stream.of(
+                Arguments.of(Endpoint.CREATE_RUN, 201),
+                Arguments.of(Endpoint.UPDATE_PHASE, 200),
+                Arguments.of(Endpoint.COMPLETE_RUN, 200));
+    }
+
+    @ParameterizedTest(name = "ADMIN: {0} → {1}")
+    @MethodSource("writeEndpoints")
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("ADMIN role passes @PreAuthorize on all write endpoints")
+    void writeEndpoint_WithAdminRole_Succeeds(Endpoint endpoint, int expectedStatus) throws Exception {
+        when(tradingRunService.createRun(anyLong())).thenReturn(runDto());
+        mockMvc.perform(buildRequest(endpoint)).andExpect(status().is(expectedStatus));
+    }
+
+    @ParameterizedTest(name = "USER: {0} → 403")
+    @MethodSource("writeEndpoints")
+    @WithMockUser(roles = "USER")
+    @DisplayName("USER role is rejected by @PreAuthorize on all write endpoints")
+    void writeEndpoint_WithUserRole_Returns403(Endpoint endpoint, int ignored) throws Exception {
+        mockMvc.perform(buildRequest(endpoint)).andExpect(status().isForbidden());
+        verifyServiceNotCalled(endpoint);
+    }
+
+    // Each anonymous test kept standalone (no @WithMockUser context) — the
+    // entry-point/access-denied handler choice can differ per endpoint, so each
+    // assertion lives separately for clean failure attribution.
+
+    @Test
+    @DisplayName("Anonymous: POST /api/runs is denied and service not called")
+    void createRun_Unauthenticated_IsDenied() throws Exception {
+        mockMvc.perform(buildRequest(Endpoint.CREATE_RUN)).andExpect(result -> {
+            int status = result.getResponse().getStatus();
+            if (status != 401 && status != 403) {
+                throw new AssertionError("Expected 401 or 403 for anonymous, got " + status);
+            }
+        });
+        verifyServiceNotCalled(Endpoint.CREATE_RUN);
+    }
+
+    @Test
+    @DisplayName("Anonymous: PATCH /api/runs/{id}/phase is denied")
+    void updatePhase_Unauthenticated_IsDenied() throws Exception {
+        mockMvc.perform(buildRequest(Endpoint.UPDATE_PHASE)).andExpect(result -> {
+            int status = result.getResponse().getStatus();
+            if (status != 401 && status != 403) {
+                throw new AssertionError("Expected 401 or 403 for anonymous, got " + status);
+            }
+        });
+        verifyServiceNotCalled(Endpoint.UPDATE_PHASE);
+    }
+
+    @Test
+    @DisplayName("Anonymous: PUT /api/runs/{id}/complete is denied")
+    void completeRun_Unauthenticated_IsDenied() throws Exception {
+        mockMvc.perform(buildRequest(Endpoint.COMPLETE_RUN)).andExpect(result -> {
+            int status = result.getResponse().getStatus();
+            if (status != 401 && status != 403) {
+                throw new AssertionError("Expected 401 or 403 for anonymous, got " + status);
+            }
+        });
+        verifyServiceNotCalled(Endpoint.COMPLETE_RUN);
+    }
+
     private CreateRunRequest createRunRequest() {
         CreateRunRequest req = new CreateRunRequest();
         req.setAgentId(1L);
@@ -98,127 +197,5 @@ class TradingRunControllerWriteSecurityTest {
         dto.setPhase(RunPhase.INITIALIZING);
         dto.setStartedAt(Instant.now());
         return dto;
-    }
-
-    // ===== createRun =====
-
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    @DisplayName("ADMIN: POST /api/runs returns 201")
-    void createRun_WithAdminRole_Returns201() throws Exception {
-        when(tradingRunService.createRun(anyLong())).thenReturn(runDto());
-
-        mockMvc.perform(post("/api/runs")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createRunRequest())))
-                .andExpect(status().isCreated());
-    }
-
-    @Test
-    @WithMockUser(roles = "USER")
-    @DisplayName("USER: POST /api/runs returns 403 and service not called")
-    void createRun_WithUserRole_Returns403() throws Exception {
-        mockMvc.perform(post("/api/runs")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createRunRequest())))
-                .andExpect(status().isForbidden());
-
-        verify(tradingRunService, never()).createRun(any());
-    }
-
-    @Test
-    @DisplayName("Anonymous: POST /api/runs is denied and service not called")
-    void createRun_Unauthenticated_IsDenied() throws Exception {
-        mockMvc.perform(post("/api/runs")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createRunRequest())))
-                .andExpect(result -> {
-                    int status = result.getResponse().getStatus();
-                    if (status != 401 && status != 403) {
-                        throw new AssertionError("Expected 401 or 403 for anonymous, got " + status);
-                    }
-                });
-
-        verify(tradingRunService, never()).createRun(any());
-    }
-
-    // ===== updatePhase =====
-
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    @DisplayName("ADMIN: PATCH /api/runs/{id}/phase returns 200")
-    void updatePhase_WithAdminRole_Returns200() throws Exception {
-        mockMvc.perform(patch("/api/runs/1/phase")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updatePhaseRequest())))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    @WithMockUser(roles = "USER")
-    @DisplayName("USER: PATCH /api/runs/{id}/phase returns 403")
-    void updatePhase_WithUserRole_Returns403() throws Exception {
-        mockMvc.perform(patch("/api/runs/1/phase")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updatePhaseRequest())))
-                .andExpect(status().isForbidden());
-
-        verify(tradingRunService, never()).updatePhase(anyLong(), any(), any());
-    }
-
-    @Test
-    @DisplayName("Anonymous: PATCH /api/runs/{id}/phase is denied")
-    void updatePhase_Unauthenticated_IsDenied() throws Exception {
-        mockMvc.perform(patch("/api/runs/1/phase")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updatePhaseRequest())))
-                .andExpect(result -> {
-                    int status = result.getResponse().getStatus();
-                    if (status != 401 && status != 403) {
-                        throw new AssertionError("Expected 401 or 403 for anonymous, got " + status);
-                    }
-                });
-
-        verify(tradingRunService, never()).updatePhase(anyLong(), any(), any());
-    }
-
-    // ===== completeRun =====
-
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    @DisplayName("ADMIN: PUT /api/runs/{id}/complete returns 200")
-    void completeRun_WithAdminRole_Returns200() throws Exception {
-        mockMvc.perform(put("/api/runs/1/complete")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(completeRunJson()))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    @WithMockUser(roles = "USER")
-    @DisplayName("USER: PUT /api/runs/{id}/complete returns 403")
-    void completeRun_WithUserRole_Returns403() throws Exception {
-        mockMvc.perform(put("/api/runs/1/complete")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(completeRunJson()))
-                .andExpect(status().isForbidden());
-
-        verify(tradingRunService, never()).completeRun(anyLong(), any());
-    }
-
-    @Test
-    @DisplayName("Anonymous: PUT /api/runs/{id}/complete is denied")
-    void completeRun_Unauthenticated_IsDenied() throws Exception {
-        mockMvc.perform(put("/api/runs/1/complete")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(completeRunJson()))
-                .andExpect(result -> {
-                    int status = result.getResponse().getStatus();
-                    if (status != 401 && status != 403) {
-                        throw new AssertionError("Expected 401 or 403 for anonymous, got " + status);
-                    }
-                });
-
-        verify(tradingRunService, never()).completeRun(anyLong(), any());
     }
 }

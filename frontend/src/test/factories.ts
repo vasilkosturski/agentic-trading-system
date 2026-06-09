@@ -1,4 +1,11 @@
-import type { AgentPortfolio, Agent, RunDetailResponse, TradingRun } from '@/lib/types.ts'
+import type {
+  Agent,
+  AgentPortfolio,
+  DecisionPhase,
+  ResearchPhase,
+  RunDetailResponse,
+  TradingRun,
+} from '@/lib/types.ts'
 
 const BASE_RUN: TradingRun = {
   runId: 42,
@@ -53,4 +60,51 @@ export function makeMockRunDetail(overrides: Partial<RunDetailResponse> = {}): R
     ...overrides,
     run: { ...BASE_RUN_DETAIL.run, ...(overrides.run ?? {}) },
   }
+}
+
+const BASE_RESEARCH_PHASE: ResearchPhase = {
+  researchId: 100,
+  candidates: ['JPM', 'BAC'],
+  sources: [],
+  researchNotes: 'Mock research notes',
+  toolCalls: [],
+  latencyMs: 1500,
+  metrics: null,
+  systemPrompt: null,
+  taskPrompt: null,
+  guardrailAttempts: 1,
+  guardrailIssues: null,
+  guardrailOutcome: 'first_try',
+  guardrailFailedOutput: null,
+}
+
+const BASE_DECISION_PHASE: DecisionPhase = {
+  decisionId: 200,
+  decision: 'BUY',
+  symbol: 'JPM',
+  quantity: 10,
+  reasoning: {
+    rationale: 'mock rationale',
+    portfolioContext: 'mock portfolio context',
+    historicalContext: 'mock historical context',
+    researchContext: 'mock research context',
+  },
+  sources: [],
+  toolCalls: [],
+  latencyMs: 2500,
+  metrics: null,
+  systemPrompt: null,
+  taskPrompt: null,
+  guardrailAttempts: 1,
+  guardrailIssues: null,
+  guardrailOutcome: 'first_try',
+  guardrailFailedOutput: null,
+}
+
+export function makeMockResearchPhase(overrides: Partial<ResearchPhase> = {}): ResearchPhase {
+  return { ...BASE_RESEARCH_PHASE, ...overrides }
+}
+
+export function makeMockDecisionPhase(overrides: Partial<DecisionPhase> = {}): DecisionPhase {
+  return { ...BASE_DECISION_PHASE, ...overrides }
 }

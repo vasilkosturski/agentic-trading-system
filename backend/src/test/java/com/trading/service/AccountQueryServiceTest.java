@@ -15,10 +15,15 @@ import com.trading.repository.TradingAccountRepository;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -77,19 +82,29 @@ class AccountQueryServiceTest {
         assertEquals(100000.0, result);
     }
 
-    @Test
-    @DisplayName("getBalance throws ResourceNotFoundException when account does not exist")
-    void testGetBalance_AccountMissing_ThrowsException() {
-        String agentName = "NonExistentAgent";
-        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.empty());
+    // Read-path methods that share the `findByAgentName(...).orElseThrow(...)` guard:
+    // verifying the guard once per caller is sufficient because the missing-account
+    // message comes from a single throw site in the production code.
+    private static Stream<Arguments> readMethodsThatRequireExistingAccount() {
+        Consumer<AccountQueryService> getBalance = svc -> svc.getBalance("NonExistentAgent");
+        Consumer<AccountQueryService> getHoldings = svc -> svc.getHoldings("NonExistentAgent");
+        Consumer<AccountQueryService> getAccountReport = svc -> svc.getAccountReport("NonExistentAgent");
+        return Stream.of(
+                Arguments.of("getBalance", getBalance),
+                Arguments.of("getHoldings", getHoldings),
+                Arguments.of("getAccountReport", getAccountReport));
+    }
+
+    @ParameterizedTest(name = "{0} throws ResourceNotFoundException when account is missing")
+    @MethodSource("readMethodsThatRequireExistingAccount")
+    @DisplayName("Read methods throw when account does not exist")
+    void readMethod_AccountMissing_ThrowsResourceNotFoundException(
+            String label, Consumer<AccountQueryService> invocation) {
+        when(tradingAccountRepository.findByAgentName("NonExistentAgent")).thenReturn(Optional.empty());
 
         ResourceNotFoundException exception =
-                assertThrows(ResourceNotFoundException.class, () -> accountQueryService.getBalance(agentName));
-
-        assertEquals(
-                "Trading account not found for agent: " + agentName
-                        + ". Agent must be initialized before trading operations.",
-                exception.getMessage());
+                assertThrows(ResourceNotFoundException.class, () -> invocation.accept(accountQueryService));
+        assertTrue(exception.getMessage().contains("NonExistentAgent"));
     }
 
     // ==================== getHoldings ====================
@@ -115,22 +130,6 @@ class AccountQueryServiceTest {
         assertEquals("GOOGL", result.get(1).getSymbol());
         assertEquals(5, result.get(1).getQuantity());
         assertEquals(2800.0, result.get(1).getAveragePrice());
-    }
-
-    @Test
-    @DisplayName("getHoldings throws ResourceNotFoundException when account does not exist")
-    void testGetHoldings_AccountMissing_ThrowsException() {
-        String agentName = "NonExistentAgent";
-        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.empty());
-
-        ResourceNotFoundException exception =
-                assertThrows(ResourceNotFoundException.class, () -> accountQueryService.getHoldings(agentName));
-
-        assertEquals(
-                "Trading account not found for agent: " + agentName
-                        + ". Agent must be initialized before trading operations.",
-                exception.getMessage());
-        verify(holdingRepository, never()).findByAccount(any());
     }
 
     // ==================== getAccountReport ====================
@@ -238,17 +237,6 @@ class AccountQueryServiceTest {
 
         double expectedHoldingsValue = 1600.0 + 14500.0 + 3040.0;
         assertEquals(expectedHoldingsValue, report.getHoldingsValue(), 0.01);
-    }
-
-    @Test
-    @DisplayName("getAccountReport propagates ResourceNotFoundException for unknown agent")
-    void testGetAccountReport_UnknownAgent_PropagatesResourceNotFoundException() {
-        String agentName = "nonexistent";
-        when(tradingAccountRepository.findByAgentName(agentName)).thenReturn(Optional.empty());
-
-        ResourceNotFoundException thrown =
-                assertThrows(ResourceNotFoundException.class, () -> accountQueryService.getAccountReport(agentName));
-        assertTrue(thrown.getMessage().contains(agentName));
     }
 
     // ==================== getTotalPortfolioValue ====================

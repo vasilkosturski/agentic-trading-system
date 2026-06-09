@@ -11,10 +11,14 @@ import com.trading.repository.AccountPortfolioSnapshotRepository;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -47,60 +51,55 @@ class PortfolioServiceTest {
         snapshot.setTotalReturnPercent(5.0);
     }
 
-    @Test
-    @DisplayName("returns snapshots filtered by agent name")
-    void testGetSnapshotsByAgentName() {
-        when(snapshotRepository.findByAgentNameOrderByTimestampDesc("Warren")).thenReturn(Arrays.asList(snapshot));
+    // The 4 filter-routing branches dispatch on the (agentName, start, end) triple
+    // to one of 4 repository methods. Parametrize the triple + an enum tag that
+    // selects which repository method the test stubs and verifies.
+    private static final Instant FILTER_START = Instant.parse("2026-03-01T00:00:00Z");
+    private static final Instant FILTER_END = Instant.parse("2026-03-31T23:59:59Z");
 
-        List<PortfolioSnapshotDto> result = portfolioService.getSnapshots("Warren", null, null, null);
-
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals("Warren", result.get(0).getAgentName());
-        assertEquals(105000.0, result.get(0).getTotalValue());
-        verify(snapshotRepository, times(1)).findByAgentNameOrderByTimestampDesc("Warren");
+    private enum RepoMethod {
+        BY_AGENT,
+        BY_DATE_RANGE,
+        BY_AGENT_AND_DATE_RANGE,
+        ALL
     }
 
-    @Test
-    @DisplayName("returns snapshots filtered by date range")
-    void testGetSnapshotsByDateRange() {
-        Instant start = Instant.parse("2026-03-01T00:00:00Z");
-        Instant end = Instant.parse("2026-03-31T23:59:59Z");
-        when(snapshotRepository.findByTimestampBetween(start, end)).thenReturn(Arrays.asList(snapshot));
-
-        List<PortfolioSnapshotDto> result = portfolioService.getSnapshots(null, start, end, null);
-
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        verify(snapshotRepository, times(1)).findByTimestampBetween(start, end);
+    static Stream<Arguments> filterRoutingCases() {
+        return Stream.of(
+                Arguments.of("agent only", "Warren", null, null, RepoMethod.BY_AGENT),
+                Arguments.of("date range only", null, FILTER_START, FILTER_END, RepoMethod.BY_DATE_RANGE),
+                Arguments.of(
+                        "agent + date range", "Warren", FILTER_START, FILTER_END, RepoMethod.BY_AGENT_AND_DATE_RANGE),
+                Arguments.of("no filters", null, null, null, RepoMethod.ALL));
     }
 
-    @Test
-    @DisplayName("returns snapshots filtered by agent name and date range")
-    void testGetSnapshotsByAgentNameAndDateRange() {
-        Instant start = Instant.parse("2026-03-01T00:00:00Z");
-        Instant end = Instant.parse("2026-03-31T23:59:59Z");
-        when(snapshotRepository.findByAgentNameAndDateRange("Warren", start, end))
-                .thenReturn(Arrays.asList(snapshot));
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("filterRoutingCases")
+    @DisplayName("getSnapshots routes to the right repository method per filter combination")
+    void getSnapshots_RoutesFilterToCorrectRepositoryMethod(
+            String label, String agentName, Instant start, Instant end, RepoMethod expected) {
+        switch (expected) {
+            case BY_AGENT -> when(snapshotRepository.findByAgentNameOrderByTimestampDesc("Warren"))
+                    .thenReturn(Arrays.asList(snapshot));
+            case BY_DATE_RANGE -> when(snapshotRepository.findByTimestampBetween(FILTER_START, FILTER_END))
+                    .thenReturn(Arrays.asList(snapshot));
+            case BY_AGENT_AND_DATE_RANGE -> when(snapshotRepository.findByAgentNameAndDateRange(
+                            "Warren", FILTER_START, FILTER_END))
+                    .thenReturn(Arrays.asList(snapshot));
+            case ALL -> when(snapshotRepository.findAllOrderByTimestampDesc()).thenReturn(Arrays.asList(snapshot));
+        }
 
-        List<PortfolioSnapshotDto> result = portfolioService.getSnapshots("Warren", start, end, null);
-
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals("Warren", result.get(0).getAgentName());
-        verify(snapshotRepository, times(1)).findByAgentNameAndDateRange("Warren", start, end);
-    }
-
-    @Test
-    @DisplayName("returns all snapshots when no filters provided")
-    void testGetAllSnapshots() {
-        when(snapshotRepository.findAllOrderByTimestampDesc()).thenReturn(Arrays.asList(snapshot));
-
-        List<PortfolioSnapshotDto> result = portfolioService.getSnapshots(null, null, null, null);
+        List<PortfolioSnapshotDto> result = portfolioService.getSnapshots(agentName, start, end, null);
 
         assertNotNull(result);
         assertEquals(1, result.size());
-        verify(snapshotRepository, times(1)).findAllOrderByTimestampDesc();
+        switch (expected) {
+            case BY_AGENT -> verify(snapshotRepository, times(1)).findByAgentNameOrderByTimestampDesc("Warren");
+            case BY_DATE_RANGE -> verify(snapshotRepository, times(1)).findByTimestampBetween(FILTER_START, FILTER_END);
+            case BY_AGENT_AND_DATE_RANGE -> verify(snapshotRepository, times(1))
+                    .findByAgentNameAndDateRange("Warren", FILTER_START, FILTER_END);
+            case ALL -> verify(snapshotRepository, times(1)).findAllOrderByTimestampDesc();
+        }
     }
 
     @Test

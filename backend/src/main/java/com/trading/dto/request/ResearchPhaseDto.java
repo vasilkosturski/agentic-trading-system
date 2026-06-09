@@ -6,6 +6,7 @@ import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.entity.ResearchPhase;
 import com.trading.entity.TradingRun;
 import java.util.List;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -54,6 +55,27 @@ public class ResearchPhaseDto {
     private String taskPrompt;
 
     /**
+     * Number of attempts the guardrail-retry loop used for this phase.
+     * Defaults to 1 (first-try success).
+     */
+    private Integer guardrailAttempts;
+
+    /**
+     * Issue strings from the LAST failed attempt; NULL on first-try success.
+     */
+    private List<String> guardrailIssues;
+
+    /**
+     * Per-phase guardrail outcome label: 'first_try', 'recovered', or 'exhausted'.
+     */
+    private String guardrailOutcome;
+
+    /**
+     * Last rejected LLM output as a JSON-safe object; NULL on first-try success.
+     */
+    private Map<String, Object> guardrailFailedOutput;
+
+    /**
      * Convert this request DTO into a {@link ResearchPhase} entity attached to
      * the given run. Mirrors the per-DTO mapping convention already used by
      * {@link UsageMetricsDto#toEntity()}.
@@ -70,6 +92,14 @@ public class ResearchPhaseDto {
         }
         phase.setSystemPrompt(systemPrompt);
         phase.setTaskPrompt(taskPrompt);
+        if (guardrailAttempts != null) {
+            phase.setGuardrailAttempts(guardrailAttempts);
+        }
+        phase.setGuardrailIssues(guardrailIssues);
+        if (guardrailOutcome != null) {
+            phase.setGuardrailOutcome(guardrailOutcome);
+        }
+        phase.setGuardrailFailedOutput(guardrailFailedOutput);
         return phase;
     }
 }

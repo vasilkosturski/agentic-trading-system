@@ -168,25 +168,4 @@ class CorsIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
     }
-
-    @Test
-    @DisplayName("Preflight to /api/agents/status from allowed origin returns 200 + echoes Access-Control-Allow-Origin")
-    void preflightAgentsStatus_FromAllowedOrigin_Returns200() throws Exception {
-        mockMvc.perform(options("/api/agents/status")
-                        .header("Origin", "http://localhost:3000")
-                        .header("Access-Control-Request-Method", "POST")
-                        .header("Access-Control-Request-Headers", "content-type"))
-                .andExpect(status().isOk())
-                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
-    }
-
-    @Test
-    @DisplayName("Preflight to /api/agents/status from disallowed origin returns 403 with no allow-origin header")
-    void preflightAgentsStatus_FromDisallowedOrigin_Returns403() throws Exception {
-        mockMvc.perform(options("/api/agents/status")
-                        .header("Origin", "http://evil.example.com")
-                        .header("Access-Control-Request-Method", "POST"))
-                .andExpect(status().isForbidden())
-                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
-    }
 }

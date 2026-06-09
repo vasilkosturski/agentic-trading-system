@@ -75,9 +75,11 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
     }
 
     @Test
-    @DisplayName("Should round-trip reasoning JSONB object")
-    void shouldRoundTripReasoningJsonb() {
-        // Arrange
+    @DisplayName("Should round-trip reasoning + tool_calls + sources JSONB columns")
+    void shouldRoundTripAllJsonbColumns() {
+        // Single round-trip exercises all 3 JSONB columns — the Hibernate
+        // serializer wiring is shared across them, so one save/load proves
+        // the same path for every column.
         DecisionPhase phase = new DecisionPhase(testRun);
         phase.setDecision(TradeDecision.BUY);
         phase.setSymbol("BAC");
@@ -88,15 +90,25 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         reasoning.setPortfolioContext("Current cash: $50,000. Holdings: 5 positions.");
         reasoning.setHistoricalContext("No previous trades in BAC. Last financials trade was GS.");
         reasoning.setResearchContext("Market Analyst identified BAC as top candidate based on earnings.");
-
         phase.setReasoning(reasoning);
 
-        // Act
+        ToolCallDto toolCall1 = new ToolCallDto();
+        toolCall1.setTool("get_symbol_trade_history");
+        toolCall1.setParams(Map.of("symbol", "BAC", "limit", 10));
+        ToolCallDto toolCall2 = new ToolCallDto();
+        toolCall2.setTool("get_current_price");
+        toolCall2.setParams(Map.of("symbol", "BAC"));
+        phase.setToolCalls(List.of(toolCall1, toolCall2));
+
+        SourceDto source = new SourceDto();
+        source.setType("system_context");
+        source.setDescription("Earnings beat consensus by 12%");
+        phase.setSources(List.of(source));
+
         decisionPhaseRepository.save(phase);
         DecisionPhase loaded =
                 decisionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
 
-        // Assert
         ReasoningDto loadedReasoning = loaded.getReasoning();
         assertThat(loadedReasoning).isNotNull();
         assertThat(loadedReasoning.getRationale())
@@ -106,65 +118,15 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
                 .isEqualTo("No previous trades in BAC. Last financials trade was GS.");
         assertThat(loadedReasoning.getResearchContext())
                 .isEqualTo("Market Analyst identified BAC as top candidate based on earnings.");
-    }
 
-    @Test
-    @DisplayName("Should round-trip tool_calls JSONB with params")
-    void shouldRoundTripToolCallsWithParams() {
-        // Arrange
-        DecisionPhase phase = new DecisionPhase(testRun);
-        phase.setDecision(TradeDecision.SELL);
-        phase.setSymbol("AAPL");
-        phase.setQuantity(5);
-
-        ToolCallDto toolCall1 = new ToolCallDto();
-        toolCall1.setTool("get_symbol_trade_history");
-        toolCall1.setParams(Map.of("symbol", "AAPL", "limit", 10));
-
-        ToolCallDto toolCall2 = new ToolCallDto();
-        toolCall2.setTool("get_current_price");
-        toolCall2.setParams(Map.of("symbol", "AAPL"));
-
-        phase.setToolCalls(List.of(toolCall1, toolCall2));
-
-        // Act
-        decisionPhaseRepository.save(phase);
-        DecisionPhase loaded =
-                decisionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
-
-        // Assert
         assertThat(loaded.getToolCalls()).hasSize(2);
+        assertThat(loaded.getToolCalls().get(0).getTool()).isEqualTo("get_symbol_trade_history");
+        assertThat(loaded.getToolCalls().get(0).getParams()).containsEntry("symbol", "BAC");
+        assertThat(loaded.getToolCalls().get(1).getTool()).isEqualTo("get_current_price");
 
-        ToolCallDto loadedCall1 = loaded.getToolCalls().get(0);
-        assertThat(loadedCall1.getTool()).isEqualTo("get_symbol_trade_history");
-        assertThat(loadedCall1.getParams()).containsEntry("symbol", "AAPL");
-
-        ToolCallDto loadedCall2 = loaded.getToolCalls().get(1);
-        assertThat(loadedCall2.getTool()).isEqualTo("get_current_price");
-    }
-
-    @Test
-    @DisplayName("Should round-trip sources JSONB")
-    void shouldRoundTripSourcesJsonb() {
-        // Arrange
-        DecisionPhase phase = new DecisionPhase(testRun);
-        phase.setDecision(TradeDecision.HOLD);
-
-        SourceDto source = new SourceDto();
-        source.setType("system_context");
-        source.setDescription("Portfolio already has maximum positions");
-
-        phase.setSources(List.of(source));
-
-        // Act
-        decisionPhaseRepository.save(phase);
-        DecisionPhase loaded =
-                decisionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
-
-        // Assert
         assertThat(loaded.getSources()).hasSize(1);
         assertThat(loaded.getSources().get(0).getType()).isEqualTo("system_context");
-        assertThat(loaded.getSources().get(0).getDescription()).isEqualTo("Portfolio already has maximum positions");
+        assertThat(loaded.getSources().get(0).getDescription()).isEqualTo("Earnings beat consensus by 12%");
     }
 
     @Test
@@ -220,5 +182,82 @@ class DecisionPhaseRepositoryTest extends BaseRepositoryTest {
         // Act & Assert
         assertThat(decisionPhaseRepository.existsByRunId(testRun.getId())).isTrue();
         assertThat(decisionPhaseRepository.existsByRunId(99999L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should default guardrail outcome columns to first_try / 1 / null")
+    void shouldDefaultGuardrailOutcomeColumns() {
+        DecisionPhase phase = new DecisionPhase(testRun);
+        phase.setDecision(TradeDecision.HOLD);
+        decisionPhaseRepository.save(phase);
+        DecisionPhase loaded =
+                decisionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
+
+        assertThat(loaded.getGuardrailAttempts()).isEqualTo(1);
+        assertThat(loaded.getGuardrailOutcome()).isEqualTo("first_try");
+        assertThat(loaded.getGuardrailIssues()).isNull();
+    }
+
+    @Test
+    @DisplayName("Should round-trip recovered guardrail outcome with JSONB issues array")
+    void shouldRoundTripRecoveredGuardrailOutcome() {
+        DecisionPhase phase = new DecisionPhase(testRun);
+        phase.setDecision(TradeDecision.HOLD);
+        phase.setGuardrailAttempts(3);
+        phase.setGuardrailOutcome("recovered");
+        phase.setGuardrailIssues(List.of("invalid_quantity"));
+
+        decisionPhaseRepository.save(phase);
+        DecisionPhase loaded =
+                decisionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
+
+        assertThat(loaded.getGuardrailAttempts()).isEqualTo(3);
+        assertThat(loaded.getGuardrailOutcome()).isEqualTo("recovered");
+        assertThat(loaded.getGuardrailIssues()).containsExactly("invalid_quantity");
+    }
+
+    @Test
+    @DisplayName("Should round-trip guardrail_failed_output JSONB with TradingDecision-shaped payload")
+    void shouldRoundTripGuardrailFailedOutput() {
+        // Representative payload mirroring a TradingDecision the LLM might
+        // have produced that got flagged — invalid action/quantity combo.
+        Map<String, Object> failedOutput = Map.of(
+                "action", "BUY",
+                "symbol", "JPM",
+                "quantity", 0,
+                "rationale", "Hesitant buy.",
+                "portfolioContext", "5 holdings.",
+                "historicalContext", "No prior JPM trades.",
+                "researchContext", "Analyst flagged JPM as candidate.");
+
+        DecisionPhase phase = new DecisionPhase(testRun);
+        phase.setDecision(TradeDecision.HOLD);
+        phase.setGuardrailAttempts(2);
+        phase.setGuardrailOutcome("recovered");
+        phase.setGuardrailIssues(List.of("invalid_quantity"));
+        phase.setGuardrailFailedOutput(failedOutput);
+
+        decisionPhaseRepository.save(phase);
+        DecisionPhase loaded =
+                decisionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
+
+        Map<String, Object> loadedOutput = loaded.getGuardrailFailedOutput();
+        assertThat(loadedOutput).isNotNull();
+        assertThat(loadedOutput.get("action")).isEqualTo("BUY");
+        assertThat(loadedOutput.get("symbol")).isEqualTo("JPM");
+        assertThat(loadedOutput.get("quantity")).isEqualTo(0);
+        assertThat(loadedOutput.get("rationale")).isEqualTo("Hesitant buy.");
+    }
+
+    @Test
+    @DisplayName("Should default guardrail_failed_output to null")
+    void shouldDefaultGuardrailFailedOutputToNull() {
+        DecisionPhase phase = new DecisionPhase(testRun);
+        phase.setDecision(TradeDecision.HOLD);
+        decisionPhaseRepository.save(phase);
+        DecisionPhase loaded =
+                decisionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
+
+        assertThat(loaded.getGuardrailFailedOutput()).isNull();
     }
 }

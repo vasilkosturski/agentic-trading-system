@@ -20,6 +20,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -105,6 +106,39 @@ public class DecisionPhase {
 
     @Column(name = "latency_ms")
     private Long latencyMs;
+
+    /**
+     * Number of attempts the guardrail-retry loop used for this phase.
+     * Defaults to 1 (first-try success). Set to 2 or 3 when the LLM had to
+     * self-correct after a guardrail rejection.
+     */
+    @Column(name = "guardrail_attempts", nullable = false)
+    private Integer guardrailAttempts = 1;
+
+    /**
+     * Issue strings from the LAST failed attempt; NULL on first-try success.
+     * JSONB: ["fake_url", "empty_candidates"]
+     */
+    @Type(JsonType.class)
+    @Column(name = "guardrail_issues", columnDefinition = "jsonb")
+    private List<String> guardrailIssues;
+
+    /**
+     * Per-phase guardrail outcome label. Application-validated enum:
+     * one of 'first_try', 'recovered', 'exhausted'.
+     */
+    @Column(name = "guardrail_outcome", nullable = false, columnDefinition = "TEXT")
+    private String guardrailOutcome = "first_try";
+
+    /**
+     * Last rejected LLM output as a JSON-safe object; NULL on first-try success.
+     * Stores the FULL payload (typically a TradingDecision-shaped dict with
+     * action, symbol, quantity, rationale) so the debug view can show what the
+     * model actually produced before the guardrail caught it.
+     */
+    @Type(JsonType.class)
+    @Column(name = "guardrail_failed_output", columnDefinition = "jsonb")
+    private Map<String, Object> guardrailFailedOutput;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();

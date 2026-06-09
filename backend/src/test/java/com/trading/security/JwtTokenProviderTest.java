@@ -3,9 +3,13 @@ package com.trading.security;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Collections;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -136,46 +140,28 @@ class JwtTokenProviderTest {
         });
     }
 
-    @Test
-    @DisplayName("Constructor throws exception when secret is null")
-    void constructor_WithNullSecret_ThrowsException() {
-        // Act & Assert
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            new JwtTokenProvider(null, TEST_EXPIRATION);
-        });
-
-        assertTrue(exception.getMessage().contains("jwt.secret must be configured"));
+    // Constructor secret-validation branches: null/empty share one error message;
+    // too-short uses a different one; 32-char is the accept boundary. One
+    // parametrized test walks the whole if-chain.
+    private static Stream<Arguments> secretValidationCases() {
+        return Stream.of(
+                Arguments.of("null secret", null, "jwt.secret must be configured"),
+                Arguments.of("empty secret", "", "jwt.secret must be configured"),
+                Arguments.of("too-short secret", "tooshort", "must be at least 32 characters"),
+                Arguments.of("32-char secret (boundary, accepted)", "12345678901234567890123456789012", null));
     }
 
-    @Test
-    @DisplayName("Constructor throws exception when secret is empty")
-    void constructor_WithEmptySecret_ThrowsException() {
-        // Act & Assert
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            new JwtTokenProvider("", TEST_EXPIRATION);
-        });
-
-        assertTrue(exception.getMessage().contains("jwt.secret must be configured"));
-    }
-
-    @Test
-    @DisplayName("Constructor throws exception when secret is too short")
-    void constructor_WithShortSecret_ThrowsException() {
-        // Act & Assert
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            new JwtTokenProvider("tooshort", TEST_EXPIRATION);
-        });
-
-        assertTrue(exception.getMessage().contains("must be at least 32 characters"));
-    }
-
-    @Test
-    @DisplayName("Constructor accepts secret exactly 32 characters long")
-    void constructor_With32CharSecret_Succeeds() {
-        // Act & Assert - should not throw
-        assertDoesNotThrow(() -> {
-            new JwtTokenProvider("12345678901234567890123456789012", TEST_EXPIRATION);
-        });
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("secretValidationCases")
+    @DisplayName("Constructor validates jwt.secret length")
+    void constructor_ValidatesSecret(String label, String secret, String expectedMessageFragment) {
+        if (expectedMessageFragment == null) {
+            assertDoesNotThrow(() -> new JwtTokenProvider(secret, TEST_EXPIRATION));
+        } else {
+            IllegalArgumentException exception =
+                    assertThrows(IllegalArgumentException.class, () -> new JwtTokenProvider(secret, TEST_EXPIRATION));
+            assertTrue(exception.getMessage().contains(expectedMessageFragment));
+        }
     }
 
     @Test

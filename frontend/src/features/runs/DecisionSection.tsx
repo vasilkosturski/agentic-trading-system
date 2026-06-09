@@ -2,6 +2,7 @@ import { Paper, Title, Group, Text, Badge } from '@mantine/core'
 import Markdown from 'react-markdown'
 import type { DecisionPhase } from '@/lib/types.ts'
 import { decisionColor } from '@/lib/utils.ts'
+import GuardrailBadge from './GuardrailBadge.tsx'
 import PhaseMetrics from './PhaseMetrics.tsx'
 import PromptsAccordion from './PromptsAccordion.tsx'
 import ToolCallsTable from './ToolCallsTable.tsx'
@@ -20,7 +21,15 @@ function DecisionSection({ decision }: { decision: DecisionPhase | null }) {
   return (
     <Paper p="lg" shadow="xs" mb="md">
       <Group justify="space-between" mb="sm">
-        <Title order={3}>Decision Phase</Title>
+        <Group gap="sm">
+          <Title order={3}>Decision Phase</Title>
+          <GuardrailBadge
+            outcome={decision.guardrailOutcome}
+            attempts={decision.guardrailAttempts}
+            issues={decision.guardrailIssues}
+            failedOutput={decision.guardrailFailedOutput}
+          />
+        </Group>
         {decision.latencyMs != null && (
           <Text c="dimmed" size="sm">Completed in {decision.latencyMs.toLocaleString()}ms</Text>
         )}

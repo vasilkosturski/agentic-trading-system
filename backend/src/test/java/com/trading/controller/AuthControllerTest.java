@@ -9,8 +9,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trading.dto.request.LoginRequest;
 import com.trading.security.JwtTokenProvider;
 import java.util.Collections;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -94,43 +98,22 @@ class AuthControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    @Test
-    @DisplayName("POST /api/auth/login with empty username returns 400")
-    void login_WithEmptyUsername_Returns400() throws Exception {
-        // Arrange
-        LoginRequest loginRequest = new LoginRequest();
-        loginRequest.setUsername("");
-        loginRequest.setPassword("password");
-
-        // Act & Assert
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(loginRequest)))
-                .andExpect(status().isBadRequest());
+    // All three failure rows hit the same @Valid path; parametrize over the
+    // body shape (empty-username, empty-password, empty-object) and assert 400.
+    private static Stream<Arguments> invalidBodies() {
+        return Stream.of(
+                Arguments.of("empty username", "{\"username\":\"\",\"password\":\"password\"}"),
+                Arguments.of("empty password", "{\"username\":\"admin\",\"password\":\"\"}"),
+                Arguments.of("empty body", "{}"));
     }
 
-    @Test
-    @DisplayName("POST /api/auth/login with empty password returns 400")
-    void login_WithEmptyPassword_Returns400() throws Exception {
-        // Arrange
-        LoginRequest loginRequest = new LoginRequest();
-        loginRequest.setUsername("admin");
-        loginRequest.setPassword("");
-
-        // Act & Assert
+    @ParameterizedTest(name = "{0} → 400")
+    @MethodSource("invalidBodies")
+    @DisplayName("POST /api/auth/login validation failures return 400")
+    void login_WithInvalidPayload_Returns400(String label, String body) throws Exception {
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(loginRequest)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("POST /api/auth/login with null request body returns 400")
-    void login_WithNullBody_Returns400() throws Exception {
-        // Act & Assert
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
+                        .content(body))
                 .andExpect(status().isBadRequest());
     }
 }

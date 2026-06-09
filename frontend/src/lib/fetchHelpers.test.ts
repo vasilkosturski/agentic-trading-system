@@ -17,10 +17,4 @@ describe('fetchOrEmpty', () => {
     abortErr.name = 'AbortError'
     await expect(fetchOrEmpty(Promise.reject(abortErr))).rejects.toThrow('aborted')
   })
-
-  it('re-throws DOMException-style AbortError (signal.abort() native shape)', async () => {
-    // jsdom may not have DOMException with name; emulate the shape the browser produces.
-    const abortErr = Object.assign(new Error('The user aborted a request.'), { name: 'AbortError' })
-    await expect(fetchOrEmpty(Promise.reject(abortErr))).rejects.toMatchObject({ name: 'AbortError' })
-  })
 })

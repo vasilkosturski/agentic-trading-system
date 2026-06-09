@@ -32,23 +32,7 @@ describe('auth.ts - JWT authentication utilities', () => {
     })
   })
 
-  it('login stores JWT token in localStorage on success', async () => {
-    const mockResponse = {
-      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token',
-      username: 'admin'
-    }
-
-    vi.mocked(global.fetch).mockResolvedValue({
-      ok: true,
-      json: async () => mockResponse,
-    } as Response)
-
-    await login('admin', 'password')
-
-    expect(localStorage.getItem('jwt_token')).toBe('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token')
-  })
-
-  it('login returns username on success', async () => {
+  it('login stores JWT token in localStorage and returns username on success', async () => {
     const mockResponse = {
       token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token',
       username: 'admin'
@@ -61,6 +45,7 @@ describe('auth.ts - JWT authentication utilities', () => {
 
     const username = await login('admin', 'password')
 
+    expect(localStorage.getItem('jwt_token')).toBe('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token')
     expect(username).toBe('admin')
   })
 
@@ -95,17 +80,12 @@ describe('auth.ts - JWT authentication utilities', () => {
     expect(token).toBeNull()
   })
 
-  it('isAuthenticated returns true when token exists', () => {
-    localStorage.setItem('jwt_token', 'test.token.value')
+  it.each([
+    ['with token', 'test.token.value', true],
+    ['without token', null, false],
+  ] as const)('isAuthenticated %s returns %s', (_label, token, expected) => {
+    if (token !== null) localStorage.setItem('jwt_token', token)
 
-    const authenticated = isAuthenticated()
-
-    expect(authenticated).toBe(true)
-  })
-
-  it('isAuthenticated returns false when no token exists', () => {
-    const authenticated = isAuthenticated()
-
-    expect(authenticated).toBe(false)
+    expect(isAuthenticated()).toBe(expected)
   })
 })

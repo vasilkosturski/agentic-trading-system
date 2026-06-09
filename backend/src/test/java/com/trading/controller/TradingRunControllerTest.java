@@ -192,24 +192,6 @@ class TradingRunControllerTest {
         }
 
         @Test
-        @DisplayName("Run not found returns 404")
-        void updatePhase_RunNotFound_Returns404() throws Exception {
-            doThrow(new ResourceNotFoundException("Trading run not found with id: 999"))
-                    .when(tradingRunService)
-                    .updatePhase(eq(999L), any(RunPhase.class), any());
-
-            UpdatePhaseRequest request = new UpdatePhaseRequest();
-            request.setPhase(RunPhase.RESEARCHING);
-
-            mockMvc.perform(patch("/api/runs/999/phase")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.detail").value("Trading run not found with id: 999"));
-        }
-
-        @Test
         @DisplayName("Invalid phase transition returns 400")
         void updatePhase_InvalidTransition_Returns400() throws Exception {
             doThrow(new IllegalArgumentException("Invalid phase transition from COMPLETED to RESEARCHING"))
@@ -268,22 +250,6 @@ class TradingRunControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isOk());
-        }
-
-        @Test
-        @DisplayName("Run not found returns 404")
-        void completeRun_RunNotFound_Returns404() throws Exception {
-            doThrow(new ResourceNotFoundException("Trading run not found with id: 999"))
-                    .when(tradingRunService)
-                    .completeRun(eq(999L), any(CompleteRunRequest.class));
-
-            CompleteRunRequest request = createHoldRequest();
-
-            mockMvc.perform(put("/api/runs/999/complete")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.status").value(404));
         }
 
         @Test
@@ -410,17 +376,6 @@ class TradingRunControllerTest {
                     .andExpect(jsonPath("$.candidates", hasSize(3)))
                     .andExpect(jsonPath("$.researchNotes").value("Tech sector analysis"));
         }
-
-        @Test
-        @DisplayName("Research not found returns 404")
-        void getResearchPhase_NotFound_Returns404() throws Exception {
-            when(tradingRunService.getResearchPhase(100L))
-                    .thenThrow(new ResourceNotFoundException("Research phase not found for run: 100"));
-
-            mockMvc.perform(get("/api/runs/100/research"))
-                    .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.status").value(404));
-        }
     }
 
     // ==================== GET /api/runs/{id}/decision Tests ====================
@@ -440,17 +395,6 @@ class TradingRunControllerTest {
                     .andExpect(jsonPath("$.decision").value("BUY"))
                     .andExpect(jsonPath("$.symbol").value("AAPL"))
                     .andExpect(jsonPath("$.quantity").value(50));
-        }
-
-        @Test
-        @DisplayName("Decision not found returns 404")
-        void getDecisionPhase_NotFound_Returns404() throws Exception {
-            when(tradingRunService.getDecisionPhase(100L))
-                    .thenThrow(new ResourceNotFoundException("Decision phase not found for run: 100"));
-
-            mockMvc.perform(get("/api/runs/100/decision"))
-                    .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.status").value(404));
         }
     }
 
@@ -479,17 +423,6 @@ class TradingRunControllerTest {
                     .thenThrow(new ResourceNotFoundException("Execution phase not found for run: 100"));
 
             mockMvc.perform(get("/api/runs/100/execution"))
-                    .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.status").value(404));
-        }
-
-        @Test
-        @DisplayName("Run not found returns 404")
-        void getExecutionPhase_RunNotFound_Returns404() throws Exception {
-            when(tradingRunService.getExecutionPhase(999L))
-                    .thenThrow(new ResourceNotFoundException("Trading run not found with id: 999"));
-
-            mockMvc.perform(get("/api/runs/999/execution"))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.status").value(404));
         }

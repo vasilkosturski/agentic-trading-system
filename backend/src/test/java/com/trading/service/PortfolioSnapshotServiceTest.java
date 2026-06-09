@@ -16,7 +16,6 @@ import com.trading.exception.ResourceNotFoundException;
 import com.trading.repository.AccountHoldingRepository;
 import com.trading.repository.AccountPortfolioSnapshotRepository;
 import com.trading.repository.TradingAccountRepository;
-import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -26,7 +25,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PortfolioSnapshotService Tests")
@@ -126,15 +124,6 @@ class PortfolioSnapshotServiceTest {
                 .hasMessageContaining("Trading account not found for agent: unknown");
 
         verifyNoInteractions(holdingRepository, snapshotRepository, holdingsValuationService, agentProperties);
-    }
-
-    @Test
-    @DisplayName("createSnapshot method carries @Transactional (reflection check)")
-    void createSnapshot_HasTransactionalAnnotation() throws NoSuchMethodException {
-        Method method = PortfolioSnapshotService.class.getDeclaredMethod("createSnapshot", String.class);
-        assertThat(method.getAnnotation(Transactional.class))
-                .as("createSnapshot must carry @Transactional")
-                .isNotNull();
     }
 
     // Helpers

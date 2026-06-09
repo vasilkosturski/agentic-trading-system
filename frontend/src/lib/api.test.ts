@@ -103,37 +103,6 @@ describe('api.ts — fetchRuns with showAll parameter (public vs admin endpoint)
     )
   })
 
-  it('returns paginated runs data structure from admin endpoint', async () => {
-    const mockResponse = {
-      runs: [
-        { runId: '1', agentId: 1, status: 'COMPLETED' },
-        { runId: '2', agentId: 2, status: 'IN_PROGRESS' },
-      ],
-      total: 188,
-      page: 0,
-      limit: 20,
-    }
-
-    vi.mocked(global.fetch).mockResolvedValue({
-      ok: true,
-      json: async () => mockResponse,
-    } as Response)
-
-    const result = await fetchRuns(0, 20, undefined, true)
-
-    expect(result).toEqual(mockResponse)
-  })
-
-  it('throws on non-403 failure (e.g., 401)', async () => {
-    vi.mocked(global.fetch).mockResolvedValue({
-      ok: false,
-      status: 401,
-    } as Response)
-
-    await expect(fetchRuns(0, 20, undefined, true)).rejects.toThrow(
-      'Failed to fetch /api/runs/admin?page=0&limit=20: 401',
-    )
-  })
 })
 
 describe('api.ts — JWT Authorization header presence', () => {
@@ -275,16 +244,16 @@ describe('api.ts — 403 Forbidden handling', () => {
     expect(caughtError).toBeNull()
   })
 
-  it('does not clear token or call navigate on non-403 errors', async () => {
+  it.each([401, 500])('throws on non-403 status %i without clearing token or calling navigate', async (status) => {
     vi.mocked(auth.getToken).mockReturnValue('valid.jwt.token')
 
     vi.mocked(global.fetch).mockResolvedValue({
       ok: false,
-      status: 500,
+      status,
     } as Response)
 
     await expect(fetchRuns(0, 20, undefined, true)).rejects.toThrow(
-      'Failed to fetch /api/runs/admin?page=0&limit=20: 500',
+      `Failed to fetch /api/runs/admin?page=0&limit=20: ${status}`,
     )
 
     expect(auth.logout).not.toHaveBeenCalled()

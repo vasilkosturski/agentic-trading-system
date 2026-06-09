@@ -5,32 +5,38 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.io.IOException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @DisplayName("PromptLoader Tests")
 class PromptLoaderTest {
 
-    @Test
+    // Base-template + personality-file loading is identical across agent types —
+    // parametrize over agentType. Per-agent identity strings (e.g. "Warren Buffett",
+    // "Market Analyst") are validated by the dedicated compose* tests below.
+    @ParameterizedTest(name = "loads {0} base template from classpath")
+    @ValueSource(strings = {"decision_maker", "market_analyst"})
     @DisplayName("loads base template from classpath")
-    void loadsBaseTemplateFromClasspath() throws IOException {
+    void loadsBaseTemplateFromClasspath(String agentType) throws IOException {
         PromptLoader loader = new PromptLoader();
 
-        String template = loader.loadBaseTemplate("decision_maker");
+        String template = loader.loadBaseTemplate(agentType);
 
         assertNotNull(template, "Base template should not be null");
         assertTrue(template.contains("{identity_line}"), "Template should contain identity_line placeholder");
         assertTrue(template.contains("{identity}"), "Template should contain identity placeholder");
     }
 
-    @Test
+    @ParameterizedTest(name = "loads {0} personality file from classpath")
+    @ValueSource(strings = {"decision_maker", "market_analyst"})
     @DisplayName("loads personality file from classpath")
-    void loadsPersonalityFileFromClasspath() throws IOException {
+    void loadsPersonalityFileFromClasspath(String agentType) throws IOException {
         PromptLoader loader = new PromptLoader();
 
-        String content = loader.loadPersonalityFile("decision_maker", "warren");
+        String content = loader.loadPersonalityFile(agentType, "warren");
 
         assertNotNull(content, "Personality content should not be null");
         assertTrue(content.contains("identity_line:"), "Should contain identity_line field");
-        assertTrue(content.contains("Warren Buffett"), "Should contain Warren Buffett reference");
     }
 
     @Test
@@ -117,31 +123,6 @@ class PromptLoaderTest {
         assertThrows(IllegalArgumentException.class, () -> {
             loader.loadBaseTemplate(null);
         });
-    }
-
-    @Test
-    @DisplayName("loads market_analyst base template from classpath")
-    void loadsMarketAnalystBaseTemplate() throws IOException {
-        PromptLoader loader = new PromptLoader();
-
-        String template = loader.loadBaseTemplate("market_analyst");
-
-        assertNotNull(template, "Market analyst base template should not be null");
-        assertTrue(template.contains("{identity_line}"), "Template should contain identity_line placeholder");
-        assertTrue(template.contains("{identity}"), "Template should contain identity placeholder");
-        assertTrue(template.contains("**Your Mission:**"), "Template should contain mission section");
-    }
-
-    @Test
-    @DisplayName("loads market_analyst personality file from classpath")
-    void loadsMarketAnalystPersonalityFile() throws IOException {
-        PromptLoader loader = new PromptLoader();
-
-        String content = loader.loadPersonalityFile("market_analyst", "warren");
-
-        assertNotNull(content, "Market analyst personality content should not be null");
-        assertTrue(content.contains("identity_line:"), "Should contain identity_line field");
-        assertTrue(content.contains("Market Analyst"), "Should contain Market Analyst reference");
     }
 
     @Test

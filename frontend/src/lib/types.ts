@@ -59,6 +59,8 @@ export interface UsageMetrics {
   modelName: string | null
 }
 
+export type GuardrailOutcome = 'first_try' | 'recovered' | 'exhausted'
+
 export interface ResearchPhase {
   researchId: number
   candidates: string[]
@@ -69,6 +71,10 @@ export interface ResearchPhase {
   metrics: UsageMetrics | null
   systemPrompt: string | null
   taskPrompt: string | null
+  guardrailAttempts: number
+  guardrailIssues: string[] | null
+  guardrailOutcome: GuardrailOutcome
+  guardrailFailedOutput: Record<string, unknown> | null
 }
 
 export interface DecisionPhase {
@@ -83,6 +89,10 @@ export interface DecisionPhase {
   metrics: UsageMetrics | null
   systemPrompt: string | null
   taskPrompt: string | null
+  guardrailAttempts: number
+  guardrailIssues: string[] | null
+  guardrailOutcome: GuardrailOutcome
+  guardrailFailedOutput: Record<string, unknown> | null
 }
 
 export interface TradeDetail {

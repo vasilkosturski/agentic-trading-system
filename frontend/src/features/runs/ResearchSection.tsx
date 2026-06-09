@@ -1,6 +1,7 @@
 import { Paper, Title, Group, Text, Badge, Anchor } from '@mantine/core'
 import Markdown from 'react-markdown'
 import type { ResearchPhase } from '@/lib/types.ts'
+import GuardrailBadge from './GuardrailBadge.tsx'
 import PhaseMetrics from './PhaseMetrics.tsx'
 import PromptsAccordion from './PromptsAccordion.tsx'
 import ToolCallsTable from './ToolCallsTable.tsx'
@@ -21,7 +22,15 @@ function ResearchSection({ research }: { research: ResearchPhase | null }) {
   return (
     <Paper p="lg" shadow="xs" mb="md">
       <Group justify="space-between" mb="sm">
-        <Title order={3}>Research Phase</Title>
+        <Group gap="sm">
+          <Title order={3}>Research Phase</Title>
+          <GuardrailBadge
+            outcome={research.guardrailOutcome}
+            attempts={research.guardrailAttempts}
+            issues={research.guardrailIssues}
+            failedOutput={research.guardrailFailedOutput}
+          />
+        </Group>
         {research.latencyMs != null && <Text c="dimmed" size="sm">Completed in {research.latencyMs.toLocaleString()}ms</Text>}
       </Group>
 

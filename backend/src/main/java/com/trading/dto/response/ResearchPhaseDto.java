@@ -28,6 +28,9 @@ public class ResearchPhaseDto {
     private UsageMetricsDto metrics;
     private String systemPrompt;
     private String taskPrompt;
+    private Integer guardrailAttempts;
+    private List<String> guardrailIssues;
+    private String guardrailOutcome;
     private Instant createdAt;
 
     /**
@@ -45,6 +48,9 @@ public class ResearchPhaseDto {
         dto.setMetrics(UsageMetricsDto.fromEntity(researchPhase.getMetrics()));
         dto.setSystemPrompt(researchPhase.getSystemPrompt());
         dto.setTaskPrompt(researchPhase.getTaskPrompt());
+        dto.setGuardrailAttempts(researchPhase.getGuardrailAttempts());
+        dto.setGuardrailIssues(researchPhase.getGuardrailIssues());
+        dto.setGuardrailOutcome(researchPhase.getGuardrailOutcome());
         dto.setCreatedAt(researchPhase.getCreatedAt());
         return dto;
     }

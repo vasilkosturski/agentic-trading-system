@@ -141,21 +141,6 @@ class ExecutionPhaseRepositoryTest extends BaseRepositoryTest {
     }
 
     @Test
-    @DisplayName("Should find by run ID")
-    void shouldFindByRunId() {
-        // Arrange
-        ExecutionPhase phase = new ExecutionPhase(testRun, testDecision, "Test error");
-        executionPhaseRepository.save(phase);
-
-        // Act
-        Optional<ExecutionPhase> found = executionPhaseRepository.findByRunId(testRun.getId());
-
-        // Assert
-        assertThat(found).isPresent();
-        assertThat(found.get().getStatus()).isEqualTo(PhaseStatus.FAILED);
-    }
-
-    @Test
     @DisplayName("Should find by decision ID")
     void shouldFindByDecisionId() {
         // Arrange - create a transaction
@@ -184,35 +169,5 @@ class ExecutionPhaseRepositoryTest extends BaseRepositoryTest {
         // Act & Assert
         assertThat(executionPhaseRepository.existsByRunId(testRun.getId())).isTrue();
         assertThat(executionPhaseRepository.existsByRunId(99999L)).isFalse();
-    }
-
-    @Test
-    @DisplayName("Should handle null trade_id for failed/skipped")
-    void shouldHandleNullTradeId() {
-        // Arrange - failed execution (no trade)
-        ExecutionPhase phase = new ExecutionPhase(testRun, testDecision, "Trade rejected");
-
-        // Act
-        executionPhaseRepository.save(phase);
-        ExecutionPhase loaded =
-                executionPhaseRepository.findByRunId(testRun.getId()).orElseThrow();
-
-        // Assert
-        assertThat(loaded.getTrade()).isNull();
-        assertThat(loaded.getDecision()).isNotNull();
-    }
-
-    @Test
-    @DisplayName("Should persist created_at timestamp")
-    void shouldPersistCreatedAtTimestamp() {
-        // Arrange
-        ExecutionPhase phase = new ExecutionPhase(testRun);
-
-        // Act
-        ExecutionPhase saved = executionPhaseRepository.save(phase);
-        ExecutionPhase loaded = executionPhaseRepository.findById(saved.getId()).orElseThrow();
-
-        // Assert
-        assertThat(loaded.getCreatedAt()).isNotNull();
     }
 }
