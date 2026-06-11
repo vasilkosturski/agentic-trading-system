@@ -10,6 +10,8 @@ Uses BackendClient for centralized HTTP handling.
 All functions let exceptions propagate for consistent error handling.
 """
 
+from typing import Any
+
 from backend.client import get_backend_client
 from models.run_tracking import CompleteRunData
 
@@ -63,3 +65,22 @@ async def complete_run(run_id: int, data: CompleteRunData) -> None:
     """
     client = get_backend_client()
     await client.complete_run(run_id, data)
+
+
+async def record_phase_failure(run_id: int, phase_kind: str, outcome: Any) -> None:
+    """Persist a stub phase row with guardrail outcome columns on exhaustion.
+
+    POST /api/runs/{run_id}/phase-failure — called from the phase boundary when
+    the guardrail-retry loop exhausts and the normal complete_run pathway is
+    skipped, so ``outcome='exhausted'`` rows still appear in the audit DB.
+
+    Args:
+        run_id: The run whose phase failed.
+        phase_kind: ``"RESEARCH"`` or ``"DECISION"``.
+        outcome: ``GuardrailOutcome`` with attempts_used/last_issues/outcome/failed_output.
+
+    Raises:
+        BackendAPIError: If the backend write fails.
+    """
+    client = get_backend_client()
+    await client.record_phase_failure(run_id, phase_kind, outcome)

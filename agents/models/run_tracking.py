@@ -65,6 +65,10 @@ class ResearchPhaseData(BaseModel):
     metrics: UsageMetrics | None = None
     systemPrompt: str | None = None
     taskPrompt: str | None = None
+    guardrailAttempts: int = 1
+    guardrailIssues: list[str] | None = None
+    guardrailOutcome: Literal["first_try", "recovered", "exhausted"] = "first_try"
+    guardrailFailedOutput: dict[str, Any] | None = None
 
 
 class DecisionPhaseData(BaseModel):
@@ -78,6 +82,10 @@ class DecisionPhaseData(BaseModel):
     metrics: UsageMetrics | None = None
     systemPrompt: str | None = None
     taskPrompt: str | None = None
+    guardrailAttempts: int = 1
+    guardrailIssues: list[str] | None = None
+    guardrailOutcome: Literal["first_try", "recovered", "exhausted"] = "first_try"
+    guardrailFailedOutput: dict[str, Any] | None = None
 
 
 class ExecutionPhaseData(BaseModel):

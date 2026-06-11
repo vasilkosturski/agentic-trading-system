@@ -24,6 +24,7 @@ import java.util.Map;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Type;
 
 /**
@@ -113,6 +114,7 @@ public class DecisionPhase {
      * self-correct after a guardrail rejection.
      */
     @Column(name = "guardrail_attempts", nullable = false)
+    @ColumnDefault("1")
     private Integer guardrailAttempts = 1;
 
     /**
@@ -128,6 +130,7 @@ public class DecisionPhase {
      * one of 'first_try', 'recovered', 'exhausted'.
      */
     @Column(name = "guardrail_outcome", nullable = false, columnDefinition = "TEXT")
+    @ColumnDefault("'first_try'")
     private String guardrailOutcome = "first_try";
 
     /**

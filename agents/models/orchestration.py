@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, Literal, TypeVar
 
 from pydantic import BaseModel
 
@@ -67,6 +67,10 @@ class ResearchResult:
     tool_calls: list["ToolCallDto"] = field(default_factory=list)
     usage_metrics: UsageMetrics | None = None
     research_latency_ms: int = 0
+    guardrail_attempts: int = 1
+    guardrail_issues: list[str] | None = None
+    guardrail_outcome: Literal["first_try", "recovered", "exhausted"] = "first_try"
+    guardrail_failed_output: dict | None = None
 
 
 @dataclass
@@ -75,6 +79,10 @@ class DecisionResult:
     decision_start_time: datetime
     tool_calls: list["ToolCallDto"] = field(default_factory=list)
     usage_metrics: UsageMetrics | None = None
+    guardrail_attempts: int = 1
+    guardrail_issues: list[str] | None = None
+    guardrail_outcome: Literal["first_try", "recovered", "exhausted"] = "first_try"
+    guardrail_failed_output: dict | None = None
 
 
 @dataclass

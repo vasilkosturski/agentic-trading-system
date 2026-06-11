@@ -125,6 +125,7 @@ async def execute_cycle(
         research_result = await run_research_phase(
             ctx=ctx,
             mcp_pool=mcp_pool,
+            lifecycle=lifecycle,
         )
         ctx.research = research_result
 

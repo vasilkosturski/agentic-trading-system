@@ -92,6 +92,10 @@ async def run_finalization_phase(ctx: RunContext, lifecycle: RunLifecycle) -> No
         metrics=ctx.research.usage_metrics,
         systemPrompt=ctx.market_analyst_system_prompt,
         taskPrompt=ctx.market_analyst_task_prompt,
+        guardrailAttempts=ctx.research.guardrail_attempts,
+        guardrailIssues=ctx.research.guardrail_issues,
+        guardrailOutcome=ctx.research.guardrail_outcome,
+        guardrailFailedOutput=ctx.research.guardrail_failed_output,
     )
 
     decision_data = DecisionPhaseData(
@@ -105,6 +109,10 @@ async def run_finalization_phase(ctx: RunContext, lifecycle: RunLifecycle) -> No
         metrics=ctx.decision_result.usage_metrics,
         systemPrompt=ctx.decision_maker_system_prompt,
         taskPrompt=ctx.decision_maker_task_prompt,
+        guardrailAttempts=ctx.decision_result.guardrail_attempts,
+        guardrailIssues=ctx.decision_result.guardrail_issues,
+        guardrailOutcome=ctx.decision_result.guardrail_outcome,
+        guardrailFailedOutput=ctx.decision_result.guardrail_failed_output,
     )
 
     execution_data = ExecutionPhaseData(

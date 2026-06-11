@@ -1,6 +1,7 @@
 package com.trading.service;
 
 import com.trading.dto.request.CompleteRunRequest;
+import com.trading.dto.request.PhaseFailureRequest;
 import com.trading.dto.request.RunQueryFilter;
 import com.trading.dto.response.DecisionPhaseDto;
 import com.trading.dto.response.ExecutionPhaseDto;
@@ -25,6 +26,7 @@ import com.trading.repository.ResearchPhaseRepository;
 import com.trading.repository.TradingAgentRepository;
 import com.trading.repository.TradingRunRepository;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -153,6 +155,78 @@ public class TradingRunService {
         tradingRunRepository.save(run);
 
         logger.info("Run {} completed with decision: {}, trade ID: {}", runId, tradeDecision, tradeId);
+    }
+
+    /**
+     * Persist a stub research or decision phase row populated with the guardrail
+     * outcome columns. Called from the agent orchestrator when the guardrail-retry
+     * loop exhausts and the normal {@link #completeRun} pathway is skipped — so
+     * {@code outcome='exhausted'} rows still appear in the audit DB.
+     *
+     * <p>Only the guardrail_* columns carry meaning; other required-not-null fields
+     * (latency_ms, candidates, decision) are set to stub defaults to satisfy schema
+     * constraints. The run itself is moved to FAILED via the separate
+     * {@code updatePhase} call in the lifecycle's fail path.
+     *
+     * <p><b>Single-writer contract:</b> Callers MUST NOT fire concurrent
+     * {@code recordPhaseFailure} POSTs for the same {@code runId}. Both
+     * {@code research_phases} and {@code decision_phases} declare a unique
+     * constraint on {@code run_id}; the {@code findByRunId(...).orElseGet(new entity)}
+     * upsert below is a read-modify-write that races under concurrent fires —
+     * two transactions can both read {@code Optional.empty()}, both build a fresh
+     * stub, and one will fail the unique constraint on {@code save()}. The
+     * canonical FAILED-then-FINALIZE path is single-fire per phase boundary
+     * (one agents pod per run), so the race is structurally impossible today.
+     * If a future caller violates that contract, escalate to a pessimistic-write
+     * lock ({@code @Lock(LockModeType.PESSIMISTIC_WRITE)} on a dedicated
+     * {@code findByRunIdForUpdate} repository method).
+     */
+    @Transactional
+    public void recordPhaseFailure(Long runId, PhaseFailureRequest request) {
+        logger.info(
+                "Recording phase failure for run ID: {} kind: {} outcome: {}",
+                runId,
+                request.getPhaseKind(),
+                request.getGuardrailOutcome());
+
+        TradingRun run = getRun(runId);
+        String outcomeWireValue = request.getGuardrailOutcome().getWireValue();
+
+        if (request.getPhaseKind() == PhaseFailureRequest.PhaseKind.RESEARCH) {
+            // Both research_phases and decision_phases declare a unique constraint
+            // on run_id. Fall back to upserting the existing row (its guardrail
+            // columns get overwritten) instead of blind-saving a fresh entity —
+            // a fresh entity would raise DataIntegrityViolationException once a
+            // research/decision row has already been written for the run.
+            ResearchPhase phase = researchPhaseRepository.findByRunId(runId).orElseGet(() -> {
+                ResearchPhase stub = new ResearchPhase(run);
+                stub.setCandidates(Collections.emptyList());
+                stub.setLatencyMs(0L);
+                return stub;
+            });
+            phase.setGuardrailAttempts(request.getGuardrailAttempts());
+            phase.setGuardrailIssues(request.getGuardrailIssues());
+            phase.setGuardrailOutcome(outcomeWireValue);
+            phase.setGuardrailFailedOutput(request.getGuardrailFailedOutput());
+            researchPhaseRepository.save(phase);
+        } else {
+            DecisionPhase phase = decisionPhaseRepository.findByRunId(runId).orElseGet(() -> {
+                DecisionPhase stub = new DecisionPhase(run);
+                // HOLD is the schema-safe stub: symbol/quantity are nullable
+                // for HOLD, and decision itself is non-nullable so it must
+                // carry SOME value.
+                stub.setDecision(TradeDecision.HOLD);
+                stub.setLatencyMs(0L);
+                return stub;
+            });
+            phase.setGuardrailAttempts(request.getGuardrailAttempts());
+            phase.setGuardrailIssues(request.getGuardrailIssues());
+            phase.setGuardrailOutcome(outcomeWireValue);
+            phase.setGuardrailFailedOutput(request.getGuardrailFailedOutput());
+            decisionPhaseRepository.save(phase);
+        }
+
+        logger.info("Recorded phase failure stub row for run {} ({})", runId, request.getPhaseKind());
     }
 
     private ExecutionPhase failedExecution(TradingRun run, DecisionPhase decisionPhase) {

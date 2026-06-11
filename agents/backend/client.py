@@ -336,6 +336,35 @@ class BackendClient:
         await self._request("PUT", url, json_data=data.to_json_dict())
         logger.info(f"Completed run #{run_id} with decision={data.decision.decision}")
 
+    async def record_phase_failure(self, run_id: int, phase_kind: str, outcome: Any) -> None:
+        """Persist a stub phase row with guardrail columns when retry exhausts.
+
+        The backend endpoint accepts ``phaseKind`` (RESEARCH|DECISION) plus the
+        four guardrail_* fields and writes a stub row so ``outcome='exhausted'``
+        rows are queryable. ``outcome`` is a ``GuardrailOutcome`` dataclass
+        (duck-typed here to avoid a cross-package import from
+        ``ai_agents.guardrail_retry``); only ``attempts_used``,
+        ``last_issues``, ``outcome``, and ``failed_output`` are read.
+
+        Intentionally NOT wrapped in ``@_retry_on_transient``: this is a
+        best-effort write on the FAILED-run teardown path, and the caller
+        (``RunLifecycle.record_phase_failure``) already catches everything.
+        Retrying 3x with backoff would stretch teardown latency by 7-30s
+        invisibly; accept losing a stub row on a transient blip instead.
+        """
+        url = f"{BACKEND_API_TRADING_RUNS}/{run_id}/phase-failure"
+        payload: dict[str, Any] = {
+            "phaseKind": phase_kind,
+            "guardrailAttempts": outcome.attempts_used,
+            "guardrailIssues": outcome.last_issues or None,
+            "guardrailOutcome": outcome.outcome,
+            "guardrailFailedOutput": outcome.failed_output,
+        }
+        await self._request("POST", url, json_data=payload)
+        logger.info(
+            f"Recorded phase failure for run #{run_id} kind={phase_kind} outcome={outcome.outcome}"
+        )
+
 
 # Process-wide BackendClient slot — the running-loop check in
 # ``get_backend_client`` makes the check-then-assign race-free under

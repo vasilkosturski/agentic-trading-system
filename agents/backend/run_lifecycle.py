@@ -18,8 +18,11 @@ matters — without it being masked by a transient broadcast or
 """
 
 import logging
+from typing import Any
 
-from backend.run_tracking import complete_run, create_run, update_phase
+import httpx
+
+from backend.run_tracking import complete_run, create_run, record_phase_failure, update_phase
 from backend.status_broadcaster import (
     PHASE_COMPLETED,
     PHASE_DECIDING,
@@ -30,6 +33,7 @@ from backend.status_broadcaster import (
     broadcast_status,
 )
 from infra.constants import MAX_ERROR_MESSAGE_LEN
+from infra.exceptions import BackendAPIError
 from models.run_tracking import CompleteRunData, RunPhase
 from tools.trading_tools import initialize_agent
 
@@ -169,3 +173,25 @@ class RunLifecycle:
                 await update_phase(run_id, RunPhase.FAILED, error_message=error_msg)
             except Exception as cleanup_err:
                 logger.error(f"Failed to record error state for run {run_id}: {cleanup_err}")
+
+    async def record_phase_failure(self, run_id: int, phase_kind: str, outcome: Any) -> None:
+        """Best-effort persistence of the exhausted-guardrail stub row.
+
+        Called from the phase boundary catch in ``research_phase`` / ``decision_phase``
+        when ``OutputGuardrailTripwireTriggered`` re-raises with
+        ``.guardrail_outcome`` attached. Mirrors ``fail``'s best-effort contract:
+        a backend write failure here is logged but never propagates, so the
+        original tripwire exception can re-raise unobstructed and the rest of
+        the FAILED-run pathway still runs.
+
+        Never raises for transient backend or JSON-decode failures
+        (``BackendAPIError``, ``httpx.HTTPError``, ``ValueError``); programming
+        errors (``AssertionError``, ``TypeError``) and ``asyncio.CancelledError``
+        propagate so bugs and cooperative shutdown both surface correctly.
+        """
+        try:
+            await record_phase_failure(run_id, phase_kind, outcome)
+        except (BackendAPIError, httpx.HTTPError, ValueError) as persist_err:
+            logger.error(
+                f"Failed to persist phase-failure stub for run {run_id} ({phase_kind}): {persist_err}"
+            )

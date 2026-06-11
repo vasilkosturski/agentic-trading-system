@@ -2,9 +2,12 @@ import json
 import logging
 from datetime import datetime
 
+from agents.exceptions import OutputGuardrailTripwireTriggered
+
 from agent_executor import AGENT_MAX_TURNS, MAX_POSITIONS, RESEARCH_MAX_ATTEMPTS
 from ai_agents.guardrail_retry import run_with_guardrail_retry
 from ai_agents.market_analyst import MarketAnalyst, MarketAnalystContext
+from backend.run_lifecycle import RunLifecycle
 from infra.telemetry import extract_run_telemetry
 from models import ResearchResponse
 from models.orchestration import ResearchResult, RunContext
@@ -16,6 +19,7 @@ logger = logging.getLogger(__name__)
 async def run_research_phase(
     ctx: RunContext,
     mcp_pool,
+    lifecycle: RunLifecycle,
 ) -> ResearchResult:
     """Side effect: writes captured prompts into ctx.market_analyst_system_prompt / ctx.market_analyst_task_prompt."""
     research_start_time = datetime.now()
@@ -63,13 +67,28 @@ async def run_research_phase(
 
     logger.info(f"🔬 Running Market Analyst for {ctx.agent_name}...")
 
-    result = await run_with_guardrail_retry(
-        market_analyst.agent,
-        research_prompt,
-        max_attempts=RESEARCH_MAX_ATTEMPTS,
-        max_turns=AGENT_MAX_TURNS,
-        agent_name=ctx.agent_name,
-    )
+    try:
+        guardrail_outcome = await run_with_guardrail_retry(
+            market_analyst.agent,
+            research_prompt,
+            max_attempts=RESEARCH_MAX_ATTEMPTS,
+            max_turns=AGENT_MAX_TURNS,
+            agent_name=ctx.agent_name,
+            run_id=ctx.run_id,
+        )
+    except OutputGuardrailTripwireTriggered as e:
+        # Guardrail loop exhausted. The helper attaches a ``GuardrailOutcome``
+        # carrying attempts/issues/failed_output to the re-raised exception;
+        # persist it via the best-effort lifecycle method so the audit DB has
+        # an ``outcome='exhausted'`` row even though ``complete_run`` is skipped
+        # on the FAILED path. Re-raise so the orchestrator still marks the run
+        # FAILED downstream.
+        exhausted_outcome = getattr(e, "guardrail_outcome", None)
+        if exhausted_outcome is not None:
+            await lifecycle.record_phase_failure(ctx.run_id, "RESEARCH", exhausted_outcome)
+        raise
+    result = guardrail_outcome.result
+    assert result is not None, "guardrail_outcome.result is None only when the helper re-raises"
 
     try:
         research_response = result.final_output_as(ResearchResponse)
@@ -106,4 +125,8 @@ async def run_research_phase(
         tool_calls=tool_calls,
         usage_metrics=usage_metrics,
         research_latency_ms=research_latency_ms,
+        guardrail_attempts=guardrail_outcome.attempts_used,
+        guardrail_issues=guardrail_outcome.last_issues or None,
+        guardrail_outcome=guardrail_outcome.outcome,
+        guardrail_failed_output=guardrail_outcome.failed_output,
     )

@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trading.config.SecurityConfig;
 import com.trading.config.TradingPublicProperties;
 import com.trading.dto.request.CreateRunRequest;
+import com.trading.dto.request.PhaseFailureRequest;
 import com.trading.dto.request.UpdatePhaseRequest;
 import com.trading.dto.response.TradingRunDto;
 import com.trading.enums.RunPhase;
@@ -82,7 +83,8 @@ class TradingRunControllerWriteSecurityTest {
     private enum Endpoint {
         CREATE_RUN,
         UPDATE_PHASE,
-        COMPLETE_RUN
+        COMPLETE_RUN,
+        PHASE_FAILURE
     }
 
     private MockHttpServletRequestBuilder buildRequest(Endpoint endpoint) throws Exception {
@@ -96,6 +98,9 @@ class TradingRunControllerWriteSecurityTest {
             case COMPLETE_RUN -> put("/api/runs/1/complete")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(completeRunJson());
+            case PHASE_FAILURE -> post("/api/runs/1/phase-failure")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(phaseFailureRequest()));
         };
     }
 
@@ -104,15 +109,17 @@ class TradingRunControllerWriteSecurityTest {
             case CREATE_RUN -> verify(tradingRunService, never()).createRun(any());
             case UPDATE_PHASE -> verify(tradingRunService, never()).updatePhase(anyLong(), any(), any());
             case COMPLETE_RUN -> verify(tradingRunService, never()).completeRun(anyLong(), any());
+            case PHASE_FAILURE -> verify(tradingRunService, never()).recordPhaseFailure(anyLong(), any());
         }
     }
 
     private static Stream<Arguments> writeEndpoints() {
-        // createRun returns 201, the other two return 200.
+        // createRun returns 201, the other three return 200.
         return Stream.of(
                 Arguments.of(Endpoint.CREATE_RUN, 201),
                 Arguments.of(Endpoint.UPDATE_PHASE, 200),
-                Arguments.of(Endpoint.COMPLETE_RUN, 200));
+                Arguments.of(Endpoint.COMPLETE_RUN, 200),
+                Arguments.of(Endpoint.PHASE_FAILURE, 200));
     }
 
     @ParameterizedTest(name = "ADMIN: {0} → {1}")
@@ -173,6 +180,18 @@ class TradingRunControllerWriteSecurityTest {
         verifyServiceNotCalled(Endpoint.COMPLETE_RUN);
     }
 
+    @Test
+    @DisplayName("Anonymous: POST /api/runs/{id}/phase-failure is denied")
+    void recordPhaseFailure_Unauthenticated_IsDenied() throws Exception {
+        mockMvc.perform(buildRequest(Endpoint.PHASE_FAILURE)).andExpect(result -> {
+            int status = result.getResponse().getStatus();
+            if (status != 401 && status != 403) {
+                throw new AssertionError("Expected 401 or 403 for anonymous, got " + status);
+            }
+        });
+        verifyServiceNotCalled(Endpoint.PHASE_FAILURE);
+    }
+
     private CreateRunRequest createRunRequest() {
         CreateRunRequest req = new CreateRunRequest();
         req.setAgentId(1L);
@@ -187,6 +206,14 @@ class TradingRunControllerWriteSecurityTest {
 
     private String completeRunJson() {
         return "{\"decision\":{\"decision\":\"HOLD\"}}";
+    }
+
+    private PhaseFailureRequest phaseFailureRequest() {
+        PhaseFailureRequest req = new PhaseFailureRequest();
+        req.setPhaseKind(PhaseFailureRequest.PhaseKind.RESEARCH);
+        req.setGuardrailAttempts(3);
+        req.setGuardrailOutcome(com.trading.enums.GuardrailOutcomeKind.EXHAUSTED);
+        return req;
     }
 
     private TradingRunDto runDto() {

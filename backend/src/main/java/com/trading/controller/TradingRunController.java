@@ -3,6 +3,7 @@ package com.trading.controller;
 import com.trading.config.TradingPublicProperties;
 import com.trading.dto.request.CompleteRunRequest;
 import com.trading.dto.request.CreateRunRequest;
+import com.trading.dto.request.PhaseFailureRequest;
 import com.trading.dto.request.RunQueryFilter;
 import com.trading.dto.request.UpdatePhaseRequest;
 import com.trading.dto.response.DecisionPhaseDto;
@@ -68,6 +69,14 @@ public class TradingRunController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> completeRun(@PathVariable Long id, @Valid @RequestBody CompleteRunRequest request) {
         tradingRunService.completeRun(id, request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/phase-failure")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> recordPhaseFailure(
+            @PathVariable Long id, @Valid @RequestBody PhaseFailureRequest request) {
+        tradingRunService.recordPhaseFailure(id, request);
         return ResponseEntity.ok().build();
     }
 

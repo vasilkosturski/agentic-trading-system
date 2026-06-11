@@ -16,6 +16,7 @@ import logging
 from datetime import datetime
 
 from agents import Runner
+from agents.exceptions import OutputGuardrailTripwireTriggered
 
 # Constants live in agent_executor.py for now; Task 10 of the
 # decomposition plan may reconcile if a shared constants module emerges.
@@ -98,8 +99,16 @@ async def run_decision_phase(
 
     logger.info(f"🧠 Running Decision Maker for {ctx.agent_name}...")
 
-    # Run Decision Maker agent - get structured output directly
-    result = await Runner.run(decision_maker.agent, decision_prompt, max_turns=AGENT_MAX_TURNS)
+    # Reserved for Decision Maker guardrails; the bare Runner.run path can only
+    # raise OutputGuardrailTripwireTriggered with .guardrail_outcome once a
+    # retry helper wraps it (currently only the analyst path does).
+    try:
+        result = await Runner.run(decision_maker.agent, decision_prompt, max_turns=AGENT_MAX_TURNS)
+    except OutputGuardrailTripwireTriggered as e:
+        exhausted_outcome = getattr(e, "guardrail_outcome", None)
+        if exhausted_outcome is not None:
+            await lifecycle.record_phase_failure(ctx.run_id, "DECISION", exhausted_outcome)
+        raise
 
     # Extract TradingDecision - type-safe using SDK's final_output_as()
     try:

@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import com.trading.dto.request.CompleteRunRequest;
+import com.trading.dto.request.PhaseFailureRequest;
 import com.trading.dto.request.RunQueryFilter;
 import com.trading.dto.response.DecisionPhaseDto;
 import com.trading.dto.response.ExecutionPhaseDto;
@@ -33,6 +34,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -757,6 +759,155 @@ class TradingRunServiceTest {
             assertNotNull(result);
             assertEquals(400L, result.getExecutionId());
             assertEquals(PhaseStatus.COMPLETED, result.getStatus());
+        }
+    }
+
+    // ========== recordPhaseFailure() tests ==========
+
+    @Nested
+    @DisplayName("recordPhaseFailure() Tests")
+    class RecordPhaseFailureTests {
+
+        @Test
+        @DisplayName("RESEARCH kind persists ResearchPhase stub row with guardrail columns")
+        void recordPhaseFailure_ResearchKind_PersistsResearchStub() {
+            PhaseFailureRequest req = new PhaseFailureRequest();
+            req.setPhaseKind(PhaseFailureRequest.PhaseKind.RESEARCH);
+            req.setGuardrailAttempts(3);
+            req.setGuardrailIssues(List.of("fake_url", "empty_candidates"));
+            req.setGuardrailOutcome(com.trading.enums.GuardrailOutcomeKind.EXHAUSTED);
+            req.setGuardrailFailedOutput(Map.of("summary", "bad", "candidates", List.of()));
+
+            when(tradingRunRepository.findById(100L)).thenReturn(Optional.of(testRun));
+            when(researchPhaseRepository.save(researchPhaseCaptor.capture())).thenReturn(testResearchPhase);
+
+            tradingRunService.recordPhaseFailure(100L, req);
+
+            ResearchPhase saved = researchPhaseCaptor.getValue();
+            assertEquals(testRun, saved.getRun(), "Stub row must be linked to the run");
+            assertEquals(3, saved.getGuardrailAttempts(), "guardrail_attempts must be persisted");
+            assertEquals(List.of("fake_url", "empty_candidates"), saved.getGuardrailIssues());
+            assertEquals("exhausted", saved.getGuardrailOutcome());
+            assertEquals("bad", saved.getGuardrailFailedOutput().get("summary"));
+            // Stub fields satisfy non-null schema constraints
+            assertNotNull(saved.getCandidates(), "candidates stub must be set");
+            assertEquals(0L, saved.getLatencyMs(), "latency_ms stub must be 0");
+            verify(decisionPhaseRepository, never()).save(any(DecisionPhase.class));
+        }
+
+        @Test
+        @DisplayName("DECISION kind persists DecisionPhase stub row with guardrail columns")
+        void recordPhaseFailure_DecisionKind_PersistsDecisionStub() {
+            PhaseFailureRequest req = new PhaseFailureRequest();
+            req.setPhaseKind(PhaseFailureRequest.PhaseKind.DECISION);
+            req.setGuardrailAttempts(3);
+            req.setGuardrailIssues(List.of("invalid_action"));
+            req.setGuardrailOutcome(com.trading.enums.GuardrailOutcomeKind.EXHAUSTED);
+            req.setGuardrailFailedOutput(Map.of("action", "BUY", "quantity", 0));
+
+            when(tradingRunRepository.findById(100L)).thenReturn(Optional.of(testRun));
+            when(decisionPhaseRepository.save(decisionPhaseCaptor.capture())).thenReturn(testDecisionPhase);
+
+            tradingRunService.recordPhaseFailure(100L, req);
+
+            DecisionPhase saved = decisionPhaseCaptor.getValue();
+            assertEquals(testRun, saved.getRun(), "Stub row must be linked to the run");
+            assertEquals(TradeDecision.HOLD, saved.getDecision(), "Decision stub must be HOLD (schema-safe)");
+            assertEquals(3, saved.getGuardrailAttempts());
+            assertEquals(List.of("invalid_action"), saved.getGuardrailIssues());
+            assertEquals("exhausted", saved.getGuardrailOutcome());
+            assertEquals("BUY", saved.getGuardrailFailedOutput().get("action"));
+            assertEquals(0L, saved.getLatencyMs(), "latency_ms stub must be 0");
+            verify(researchPhaseRepository, never()).save(any(ResearchPhase.class));
+        }
+
+        @Test
+        @DisplayName("Run not found throws ResourceNotFoundException")
+        void recordPhaseFailure_RunNotFound_Throws() {
+            PhaseFailureRequest req = new PhaseFailureRequest();
+            req.setPhaseKind(PhaseFailureRequest.PhaseKind.RESEARCH);
+            req.setGuardrailAttempts(3);
+            req.setGuardrailOutcome(com.trading.enums.GuardrailOutcomeKind.EXHAUSTED);
+            when(tradingRunRepository.findById(999L)).thenReturn(Optional.empty());
+
+            ResourceNotFoundException exception = assertThrows(
+                    ResourceNotFoundException.class, () -> tradingRunService.recordPhaseFailure(999L, req));
+            assertTrue(exception.getMessage().contains("Trading run not found"));
+            verify(researchPhaseRepository, never()).save(any(ResearchPhase.class));
+            verify(decisionPhaseRepository, never()).save(any(DecisionPhase.class));
+        }
+
+        @Test
+        @DisplayName("RESEARCH kind upserts existing ResearchPhase row (no unique-constraint crash)")
+        void recordPhaseFailure_ResearchKind_UpsertsExistingRow() {
+            // Pre-existing research_phase row for this run — a fresh `new ResearchPhase(run)`
+            // would collide with the unique constraint on run_id. The service must update
+            // the existing row's guardrail columns instead.
+            ResearchPhase existing = new ResearchPhase(testRun);
+            existing.setId(200L);
+            existing.setCandidates(List.of("JPM", "BAC"));
+            existing.setLatencyMs(1234L);
+            existing.setGuardrailAttempts(1);
+            existing.setGuardrailOutcome("first_try");
+
+            PhaseFailureRequest req = new PhaseFailureRequest();
+            req.setPhaseKind(PhaseFailureRequest.PhaseKind.RESEARCH);
+            req.setGuardrailAttempts(3);
+            req.setGuardrailIssues(List.of("fake_url"));
+            req.setGuardrailOutcome(com.trading.enums.GuardrailOutcomeKind.EXHAUSTED);
+            req.setGuardrailFailedOutput(Map.of("summary", "bad"));
+
+            when(tradingRunRepository.findById(100L)).thenReturn(Optional.of(testRun));
+            when(researchPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(existing));
+            when(researchPhaseRepository.save(researchPhaseCaptor.capture())).thenReturn(existing);
+
+            tradingRunService.recordPhaseFailure(100L, req);
+
+            ResearchPhase saved = researchPhaseCaptor.getValue();
+            assertSame(existing, saved, "Service must update the existing row, not save a fresh entity");
+            assertEquals(200L, saved.getId(), "Existing row id must be preserved");
+            assertEquals("exhausted", saved.getGuardrailOutcome(), "Outcome must be overwritten");
+            assertEquals(3, saved.getGuardrailAttempts(), "Attempts must be overwritten");
+            assertEquals(List.of("fake_url"), saved.getGuardrailIssues());
+            // Stub defaults must NOT clobber pre-existing payload columns
+            assertEquals(List.of("JPM", "BAC"), saved.getCandidates(), "Pre-existing candidates must be preserved");
+            assertEquals(1234L, saved.getLatencyMs(), "Pre-existing latency must be preserved");
+        }
+
+        @Test
+        @DisplayName("DECISION kind upserts existing DecisionPhase row (no unique-constraint crash)")
+        void recordPhaseFailure_DecisionKind_UpsertsExistingRow() {
+            DecisionPhase existing = new DecisionPhase(testRun);
+            existing.setId(300L);
+            existing.setDecision(TradeDecision.BUY);
+            existing.setSymbol("JPM");
+            existing.setQuantity(10);
+            existing.setLatencyMs(5678L);
+            existing.setGuardrailAttempts(1);
+            existing.setGuardrailOutcome("first_try");
+
+            PhaseFailureRequest req = new PhaseFailureRequest();
+            req.setPhaseKind(PhaseFailureRequest.PhaseKind.DECISION);
+            req.setGuardrailAttempts(3);
+            req.setGuardrailIssues(List.of("invalid_action"));
+            req.setGuardrailOutcome(com.trading.enums.GuardrailOutcomeKind.EXHAUSTED);
+            req.setGuardrailFailedOutput(Map.of("action", "BUY"));
+
+            when(tradingRunRepository.findById(100L)).thenReturn(Optional.of(testRun));
+            when(decisionPhaseRepository.findByRunId(100L)).thenReturn(Optional.of(existing));
+            when(decisionPhaseRepository.save(decisionPhaseCaptor.capture())).thenReturn(existing);
+
+            tradingRunService.recordPhaseFailure(100L, req);
+
+            DecisionPhase saved = decisionPhaseCaptor.getValue();
+            assertSame(existing, saved, "Service must update the existing row, not save a fresh entity");
+            assertEquals(300L, saved.getId());
+            assertEquals(TradeDecision.BUY, saved.getDecision(), "Pre-existing decision must be preserved");
+            assertEquals("JPM", saved.getSymbol(), "Pre-existing symbol must be preserved");
+            assertEquals("exhausted", saved.getGuardrailOutcome());
+            assertEquals(3, saved.getGuardrailAttempts());
+            assertEquals(List.of("invalid_action"), saved.getGuardrailIssues());
+            assertEquals(5678L, saved.getLatencyMs(), "Pre-existing latency must be preserved");
         }
     }
 

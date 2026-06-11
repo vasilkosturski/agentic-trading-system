@@ -345,3 +345,67 @@ class TestBackendClientJwtLogin:
         assert login_count == 1
         # The account-report call must also carry the bearer header.
         assert fake_http.calls[2]["headers"].get("Authorization") == "Bearer jwt-cache"
+
+
+class TestBackendClientRecordPhaseFailure:
+    """`record_phase_failure` POSTs to /api/runs/{id}/phase-failure with guardrail payload."""
+
+    @pytest.fixture(autouse=True)
+    def _patch_admin_creds(self, monkeypatch):
+        from config import config as _config
+
+        monkeypatch.setattr(_config, "BACKEND_ADMIN_USERNAME", "admin", raising=True)
+        monkeypatch.setattr(_config, "BACKEND_ADMIN_PASSWORD", "admin-pw", raising=True)
+
+    @pytest.mark.asyncio
+    async def test_post_to_phase_failure_endpoint_with_guardrail_payload(self):
+        responses = [
+            _json_response(200, {"token": "jwt-x", "username": "admin"}),
+            _json_response(200, {}),
+        ]
+        fake_http = _FakeHttpxClient(responses)
+        client = BackendClient(client=fake_http)
+
+        outcome = MagicMock()
+        outcome.attempts_used = 3
+        outcome.last_issues = ["fake_url", "empty_candidates"]
+        outcome.outcome = "exhausted"
+        outcome.failed_output = {"summary": "bad", "candidates": []}
+
+        await client.record_phase_failure(run_id=77, phase_kind="RESEARCH", outcome=outcome)
+
+        # First call is login; second is the phase-failure POST.
+        post_call = fake_http.calls[1]
+        assert post_call["method"] == "POST"
+        assert post_call["url"].endswith("/api/runs/77/phase-failure")
+        assert post_call["json"] == {
+            "phaseKind": "RESEARCH",
+            "guardrailAttempts": 3,
+            "guardrailIssues": ["fake_url", "empty_candidates"],
+            "guardrailOutcome": "exhausted",
+            "guardrailFailedOutput": {"summary": "bad", "candidates": []},
+        }
+        assert post_call["headers"].get("Authorization") == "Bearer jwt-x"
+
+    @pytest.mark.asyncio
+    async def test_empty_issues_serialize_to_null(self):
+        """An empty ``last_issues`` list serializes as JSON null to keep DB JSONB clean."""
+        responses = [
+            _json_response(200, {"token": "jwt-x", "username": "admin"}),
+            _json_response(200, {}),
+        ]
+        fake_http = _FakeHttpxClient(responses)
+        client = BackendClient(client=fake_http)
+
+        outcome = MagicMock()
+        outcome.attempts_used = 3
+        outcome.last_issues = []
+        outcome.outcome = "exhausted"
+        outcome.failed_output = None
+
+        await client.record_phase_failure(run_id=12, phase_kind="DECISION", outcome=outcome)
+
+        post_call = fake_http.calls[1]
+        assert post_call["json"]["guardrailIssues"] is None
+        assert post_call["json"]["guardrailFailedOutput"] is None
+        assert post_call["json"]["phaseKind"] == "DECISION"
