@@ -232,9 +232,44 @@ async def test_fail_swallows_cleanup_errors_and_does_not_raise(
     assert (
         len(error_records) == 2
     ), f"expected exactly 2 ERROR log records (original + cleanup); got {len(error_records)}"
-    messages = " ".join(rec.getMessage() for rec in error_records)
-    assert "original" in messages
-    assert "cleanup boom" in messages
+    cycle_error_messages = " ".join(rec.getMessage() for rec in error_records)
+    assert "original" in cycle_error_messages
+    cleanup_records = [
+        rec for rec in error_records if getattr(rec, "event_type", None) == "run_finalize_failed"
+    ]
+    assert len(cleanup_records) == 1
+    assert cleanup_records[0].cleanup_error == "cleanup boom"
+    assert cleanup_records[0].original_error == "original"
+
+
+@patch("backend.run_lifecycle.broadcast_status")
+@patch("backend.run_lifecycle.update_phase", new_callable=AsyncMock)
+async def test_fail_emits_structured_run_finalize_failed_event_on_cleanup_error(
+    mock_update_phase: AsyncMock,
+    mock_broadcast_status: MagicMock,
+    lifecycle: RunLifecycle,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mock_update_phase.side_effect = BackendAPIError("backend 500", status_code=500)
+
+    with caplog.at_level(logging.ERROR, logger="backend.run_lifecycle"):
+        await lifecycle.fail(run_id=42, error=Exception("boom"))
+
+    finalize_records = [
+        rec
+        for rec in caplog.records
+        if rec.levelno == logging.ERROR
+        and getattr(rec, "event_type", None) == "run_finalize_failed"
+    ]
+    assert (
+        len(finalize_records) == 1
+    ), "expected exactly one structured run_finalize_failed ERROR record"
+    rec = finalize_records[0]
+    assert rec.getMessage() == "run_finalize_failed"
+    assert rec.run_id == 42
+    assert rec.agent_name == "Warren"
+    assert rec.original_error == "boom"
+    assert "backend 500" in rec.cleanup_error
 
 
 @patch("backend.run_lifecycle.record_phase_failure", new_callable=AsyncMock)

@@ -172,7 +172,16 @@ class RunLifecycle:
                 error_msg = str(error)[:MAX_ERROR_MESSAGE_LEN] or "Unknown error"
                 await update_phase(run_id, RunPhase.FAILED, error_message=error_msg)
             except Exception as cleanup_err:
-                logger.error(f"Failed to record error state for run {run_id}: {cleanup_err}")
+                logger.error(
+                    "run_finalize_failed",
+                    extra={
+                        "event_type": "run_finalize_failed",
+                        "run_id": run_id,
+                        "agent_name": self.agent_name,
+                        "original_error": str(error),
+                        "cleanup_error": str(cleanup_err),
+                    },
+                )
 
     async def record_phase_failure(self, run_id: int, phase_kind: str, outcome: Any) -> None:
         """Best-effort persistence of the exhausted-guardrail stub row.

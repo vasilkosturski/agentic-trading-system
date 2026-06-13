@@ -19,6 +19,7 @@ import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.Check;
 
 @Entity
 @Table(
@@ -47,6 +48,7 @@ public class TradingRun {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Check(constraints = "phase IN ('INITIALIZING','RESEARCHING','DECIDING','TRADING','COMPLETED','ERROR','FAILED')")
     private RunPhase phase;
 
     @Column(name = "started_at", nullable = false)
