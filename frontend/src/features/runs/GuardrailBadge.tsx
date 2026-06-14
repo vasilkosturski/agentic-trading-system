@@ -1,4 +1,15 @@
-import { Badge, Tooltip, List, Stack, Code } from '@mantine/core'
+import { useState } from 'react'
+import {
+  Badge,
+  Popover,
+  ActionIcon,
+  List,
+  Stack,
+  Code,
+  Group,
+  Box,
+} from '@mantine/core'
+import { IconInfoCircle } from '@tabler/icons-react'
 import type { GuardrailOutcome } from '@/lib/types.ts'
 
 interface GuardrailBadgeProps {
@@ -8,54 +19,71 @@ interface GuardrailBadgeProps {
   failedOutput?: Record<string, unknown> | null
 }
 
-/**
- * Per-phase guardrail outcome indicator. Renders nothing for first-try
- * success so clean runs stay visually quiet; an orange / red badge with
- * a hover-Tooltip listing the last failed attempt's issues surfaces only
- * on recovery or exhaustion. When the backend captured the LLM's rejected
- * output, a collapsible accordion underneath the badge pretty-prints the
- * payload so operators can inspect what the model produced.
- */
 function GuardrailBadge({ outcome, attempts, issues, failedOutput }: GuardrailBadgeProps) {
+  const [opened, setOpened] = useState(false)
+
   if (outcome === 'first_try') {
     return null
   }
 
-  const tooltipLabel = issues && issues.length > 0
-    ? (
-      <List size="sm" spacing={2}>
-        {issues.map((issue, i) => (
-          <List.Item key={`${issue}-${i}`}>{issue}</List.Item>
-        ))}
-      </List>
-    )
-    : 'No issue details captured'
+  const hasIssues = issues != null && issues.length > 0
 
-  const badge = outcome === 'recovered' ? (
-    <Tooltip label={tooltipLabel} multiline w={280} withArrow>
-      <Badge color="orange" variant="light" aria-label="guardrail recovered">
-        ⚠️ Recovered after {attempts} attempts
-      </Badge>
-    </Tooltip>
+  const badgeElement = outcome === 'recovered' ? (
+    <Badge color="orange" variant="light" aria-label="guardrail recovered">
+      ⚠️ Recovered after {attempts} attempts
+    </Badge>
   ) : (
-    <Tooltip label={tooltipLabel} multiline w={280} withArrow>
-      <Badge color="red" variant="light" aria-label="guardrail exhausted">
-        🚨 Guardrail exhausted
-      </Badge>
-    </Tooltip>
+    <Badge color="red" variant="light" aria-label="guardrail exhausted">
+      🚨 Guardrail exhausted
+    </Badge>
+  )
+
+  const badgeWithPopover = (
+    <Group gap={6} wrap="nowrap">
+      {badgeElement}
+      {hasIssues && (
+        <Popover
+          opened={opened}
+          onChange={setOpened}
+          withinPortal
+          position="bottom"
+          shadow="md"
+          radius="md"
+          closeOnClickOutside
+          closeOnEscape
+          transitionProps={{ duration: 0 }}
+        >
+          <Popover.Target>
+            <ActionIcon
+              variant="subtle"
+              size="sm"
+              aria-label="Show validation issues"
+              onClick={() => setOpened((o) => !o)}
+            >
+              <IconInfoCircle size={16} />
+            </ActionIcon>
+          </Popover.Target>
+          <Popover.Dropdown>
+            <Box style={{ maxWidth: 560, overflowX: 'auto' }}>
+              <List size="sm" spacing={2}>
+                {issues!.map((issue, i) => (
+                  <List.Item key={`${issue}-${i}`}>{issue}</List.Item>
+                ))}
+              </List>
+            </Box>
+          </Popover.Dropdown>
+        </Popover>
+      )}
+    </Group>
   )
 
   if (!failedOutput) {
-    return badge
+    return badgeWithPopover
   }
 
-  // Native <details> element keeps the panel collapsed by default and
-  // mounts the formatted JSON straight into the DOM (no transitions, no
-  // lazy mount) so it's trivially testable and adds zero runtime cost
-  // when the user never expands it.
   return (
     <Stack gap={4}>
-      {badge}
+      {badgeWithPopover}
       <details>
         <summary
           style={{ cursor: 'pointer', fontSize: 'var(--mantine-font-size-sm)' }}

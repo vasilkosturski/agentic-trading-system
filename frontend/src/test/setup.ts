@@ -28,3 +28,14 @@ Object.defineProperty(window, 'IntersectionObserver', {
     unobserve() {}
   },
 })
+
+// Mock ResizeObserver for Mantine's Floating UI (used by Popover, etc.)
+Object.defineProperty(window, 'ResizeObserver', {
+  writable: true,
+  value: class ResizeObserver {
+    constructor() {}
+    disconnect() {}
+    observe() {}
+    unobserve() {}
+  },
+})
