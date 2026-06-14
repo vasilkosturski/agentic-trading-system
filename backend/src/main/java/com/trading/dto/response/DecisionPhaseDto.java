@@ -8,6 +8,7 @@ import com.trading.entity.DecisionPhase;
 import com.trading.enums.TradeDecision;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -35,6 +36,7 @@ public class DecisionPhaseDto {
     private Integer guardrailAttempts;
     private List<String> guardrailIssues;
     private String guardrailOutcome;
+    private Map<String, Object> guardrailFailedOutput;
     private Instant createdAt;
 
     /**
@@ -57,6 +59,7 @@ public class DecisionPhaseDto {
         dto.setGuardrailAttempts(decisionPhase.getGuardrailAttempts());
         dto.setGuardrailIssues(decisionPhase.getGuardrailIssues());
         dto.setGuardrailOutcome(decisionPhase.getGuardrailOutcome());
+        dto.setGuardrailFailedOutput(decisionPhase.getGuardrailFailedOutput());
         dto.setCreatedAt(decisionPhase.getCreatedAt());
         return dto;
     }

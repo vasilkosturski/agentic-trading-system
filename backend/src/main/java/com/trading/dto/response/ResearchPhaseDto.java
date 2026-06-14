@@ -6,6 +6,7 @@ import com.trading.dto.jsonb.ToolCallDto;
 import com.trading.entity.ResearchPhase;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -31,6 +32,7 @@ public class ResearchPhaseDto {
     private Integer guardrailAttempts;
     private List<String> guardrailIssues;
     private String guardrailOutcome;
+    private Map<String, Object> guardrailFailedOutput;
     private Instant createdAt;
 
     /**
@@ -51,6 +53,7 @@ public class ResearchPhaseDto {
         dto.setGuardrailAttempts(researchPhase.getGuardrailAttempts());
         dto.setGuardrailIssues(researchPhase.getGuardrailIssues());
         dto.setGuardrailOutcome(researchPhase.getGuardrailOutcome());
+        dto.setGuardrailFailedOutput(researchPhase.getGuardrailFailedOutput());
         dto.setCreatedAt(researchPhase.getCreatedAt());
         return dto;
     }
