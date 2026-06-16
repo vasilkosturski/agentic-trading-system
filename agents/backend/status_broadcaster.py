@@ -14,9 +14,9 @@ import asyncio
 import logging
 from datetime import UTC, datetime
 
-import httpx
-
+from backend.client import get_backend_client
 from config import BACKEND_BASE_URL
+from infra.exceptions import BackendAPIError
 from models.run_tracking import RunPhase
 
 logger = logging.getLogger(__name__)
@@ -52,30 +52,27 @@ async def broadcast_status_async(
         progress: Progress percentage (0-100)
         outcome: Final outcome message (for COMPLETED phase)
     """
+    url = f"{BACKEND_BASE_URL}/api/agents/status"
+    payload = {
+        "agentId": agent_id,
+        "agentName": agent_name,
+        "phase": phase,
+        "message": message,
+        "progress": progress,
+        "outcome": outcome,
+        "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+    }
+
     try:
-        url = f"{BACKEND_BASE_URL}/api/agents/status"
-        payload = {
-            "agentId": agent_id,
-            "agentName": agent_name,
-            "phase": phase,
-            "message": message,
-            "progress": progress,
-            "outcome": outcome,
-            "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-        }
-
-        async with httpx.AsyncClient(timeout=2.0) as client:
-            response = await client.post(url, json=payload)
-
-            if response.status_code not in [204, 200]:
-                logger.warning(f"Status broadcast failed with status {response.status_code}")
-
-    except httpx.HTTPError as e:
-        # Never fail trading logic due to HTTP-level status broadcast issues.
-        # Narrow to httpx.HTTPError so asyncio.CancelledError and genuine
-        # programming errors (e.g. RuntimeError) are not silently swallowed.
-        # httpx.TimeoutException is a subclass of HTTPError, so timeouts are
-        # still handled here.
+        # Route through the authenticated BackendClient so the JWT bearer
+        # token is attached — /api/agents/status is @PreAuthorize("hasRole('ADMIN')").
+        # Without it the endpoint returns 403 and the broadcast is silently lost.
+        await get_backend_client().request("POST", url, json_data=payload)
+    except BackendAPIError as e:
+        # Backend client maps HTTP/timeout/network errors here. Status
+        # broadcasts must never fail trading logic — log and move on.
+        # asyncio.CancelledError and genuine programming errors are not
+        # caught and propagate normally.
         logger.warning(f"Failed to broadcast status for {agent_name}: {e}")
 
 

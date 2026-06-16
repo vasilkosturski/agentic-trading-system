@@ -1,8 +1,9 @@
-"""Tests for status_broadcaster.broadcast_status_async exception handling (W10).
+"""Tests for status_broadcaster.broadcast_status_async exception handling.
 
-Verifies that the outer except clause is narrowed to httpx.HTTPError so that:
-  * httpx.HTTPError (including TimeoutException and HTTPStatusError) is logged
-    at WARN and swallowed.
+Verifies that:
+  * BackendAPIError (HTTP status / timeout / network — what BackendClient maps
+    everything HTTP-level into) is logged at WARN and swallowed so status
+    broadcasts never fail trading logic.
   * Non-HTTP exceptions (e.g. RuntimeError, asyncio.CancelledError) propagate,
     so we don't accidentally hide programming errors or break cooperative
     cancellation.
@@ -14,27 +15,26 @@ import asyncio
 import logging
 from unittest.mock import AsyncMock, MagicMock
 
-import httpx
 import pytest
 
 import backend.status_broadcaster as status_broadcaster
+from infra.exceptions import BackendAPIError
 
 
-def _patch_async_client(mocker, client_mock):
-    """Patch httpx.AsyncClient so `async with httpx.AsyncClient(...)` yields client_mock."""
-    cm = MagicMock()
-    cm.__aenter__ = AsyncMock(return_value=client_mock)
-    cm.__aexit__ = AsyncMock(return_value=None)
-    return mocker.patch.object(status_broadcaster.httpx, "AsyncClient", return_value=cm)
+def _patch_backend_client(mocker, request_mock):
+    """Patch get_backend_client() to return a stub whose .request is request_mock."""
+    client = MagicMock()
+    client.request = request_mock
+    return mocker.patch.object(status_broadcaster, "get_backend_client", return_value=client)
 
 
 @pytest.mark.asyncio
-async def test_http_error_is_logged_and_swallowed(mocker, caplog):
-    """An httpx.HTTPError raised during POST is logged at WARN and does not propagate."""
-    client = MagicMock()
-    request = httpx.Request("POST", "http://localhost:8080/api/agents/status")
-    client.post = AsyncMock(side_effect=httpx.ConnectError("boom", request=request))
-    _patch_async_client(mocker, client)
+async def test_backend_api_error_is_logged_and_swallowed(mocker, caplog):
+    """A BackendAPIError raised during POST is logged at WARN and does not propagate."""
+    request_mock = AsyncMock(
+        side_effect=BackendAPIError("HTTP 403: Access Denied", status_code=403)
+    )
+    _patch_backend_client(mocker, request_mock)
 
     with caplog.at_level(logging.WARNING, logger=status_broadcaster.logger.name):
         # Must not raise — broadcasts never fail trading logic for HTTP-level issues.
@@ -47,16 +47,15 @@ async def test_http_error_is_logged_and_swallowed(mocker, caplog):
         )
 
     warning_records = [r for r in caplog.records if r.levelno == logging.WARNING]
-    assert warning_records, "expected a WARN log for the HTTP error"
+    assert warning_records, "expected a WARN log for the BackendAPIError"
     assert any("Warren" in r.getMessage() for r in warning_records)
 
 
 @pytest.mark.asyncio
 async def test_runtime_error_propagates(mocker):
     """A non-HTTP RuntimeError must propagate — programming bugs should not be hidden."""
-    client = MagicMock()
-    client.post = AsyncMock(side_effect=RuntimeError("genuine bug"))
-    _patch_async_client(mocker, client)
+    request_mock = AsyncMock(side_effect=RuntimeError("genuine bug"))
+    _patch_backend_client(mocker, request_mock)
 
     with pytest.raises(RuntimeError, match="genuine bug"):
         await status_broadcaster.broadcast_status_async(
@@ -71,9 +70,8 @@ async def test_runtime_error_propagates(mocker):
 @pytest.mark.asyncio
 async def test_cancelled_error_propagates(mocker):
     """asyncio.CancelledError must propagate so cooperative cancellation works."""
-    client = MagicMock()
-    client.post = AsyncMock(side_effect=asyncio.CancelledError())
-    _patch_async_client(mocker, client)
+    request_mock = AsyncMock(side_effect=asyncio.CancelledError())
+    _patch_backend_client(mocker, request_mock)
 
     with pytest.raises(asyncio.CancelledError):
         await status_broadcaster.broadcast_status_async(
@@ -85,45 +83,11 @@ async def test_cancelled_error_propagates(mocker):
         )
 
 
-# ============================================================================
-# Additional retry / response-handling branches (I11)
-# ============================================================================
-
-
 @pytest.mark.asyncio
-async def test_non_2xx_status_logs_warning_but_does_not_raise(mocker, caplog):
-    """A successful HTTP exchange returning a non-2xx (e.g. 500) status must
-    log at WARN and return normally — broadcasts never fail trading logic.
-    """
-    response = MagicMock()
-    response.status_code = 500
-    client = MagicMock()
-    client.post = AsyncMock(return_value=response)
-    _patch_async_client(mocker, client)
-
-    with caplog.at_level(logging.WARNING, logger=status_broadcaster.logger.name):
-        await status_broadcaster.broadcast_status_async(
-            agent_id=1,
-            agent_name="Warren",
-            phase="RESEARCHING",
-            message="...",
-            progress=50,
-        )
-
-    warning_records = [r for r in caplog.records if r.levelno == logging.WARNING]
-    assert warning_records, "expected a WARN log for non-2xx status"
-    assert any("500" in r.getMessage() for r in warning_records)
-
-
-@pytest.mark.asyncio
-async def test_204_response_treated_as_success_no_warning(mocker, caplog):
-    """A 204 No Content response is the documented success path and must
-    not produce any WARN log records."""
-    response = MagicMock()
-    response.status_code = 204
-    client = MagicMock()
-    client.post = AsyncMock(return_value=response)
-    _patch_async_client(mocker, client)
+async def test_successful_broadcast_emits_no_warning(mocker, caplog):
+    """A successful BackendClient.request returns normally with no WARN logs."""
+    request_mock = AsyncMock(return_value=MagicMock())
+    _patch_backend_client(mocker, request_mock)
 
     with caplog.at_level(logging.WARNING, logger=status_broadcaster.logger.name):
         await status_broadcaster.broadcast_status_async(
@@ -137,6 +101,10 @@ async def test_204_response_treated_as_success_no_warning(mocker, caplog):
 
     warning_records = [r for r in caplog.records if r.levelno == logging.WARNING]
     assert warning_records == []
+    request_mock.assert_awaited_once()
+    call_kwargs = request_mock.await_args.kwargs
+    assert call_kwargs["json_data"]["agentName"] == "Warren"
+    assert call_kwargs["json_data"]["phase"] == "COMPLETED"
 
 
 def test_broadcast_status_sync_schedules_task_on_running_loop(mocker):
