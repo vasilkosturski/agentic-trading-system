@@ -22,6 +22,7 @@ import org.springframework.retry.support.RetryTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -56,6 +57,9 @@ class PriceCacheServiceIntegrationTest {
     @Autowired
     private PriceCacheRepository priceCacheRepository;
 
+    @Autowired
+    private PlatformTransactionManager txManager;
+
     // Service under test - manually instantiated so we can mock RestTemplate.
     private PriceCacheService priceCacheService;
     private RestTemplate mockRestTemplate;
@@ -71,7 +75,7 @@ class PriceCacheServiceIntegrationTest {
         // Mock Finnhub HTTP layer so we never make real network calls.
         mockRestTemplate = mock(RestTemplate.class);
 
-        priceCacheService = new PriceCacheService(priceCacheRepository, retryTemplate, mockRestTemplate);
+        priceCacheService = new PriceCacheService(priceCacheRepository, retryTemplate, mockRestTemplate, txManager);
         ReflectionTestUtils.setField(priceCacheService, "ttlMinutes", TTL_MINUTES);
         ReflectionTestUtils.setField(priceCacheService, "finnhubApiKey", FINNHUB_API_KEY);
         ReflectionTestUtils.setField(priceCacheService, "finnhubBaseUrl", FINNHUB_BASE_URL);

@@ -3,6 +3,12 @@
 #   - security.jwt.secret  (no YAML default in main; would require JWT_SECRET env var)
 #   - security.admin.password  (no YAML default in main; would require ADMIN_PASSWORD env var)
 # Existing tests @MockBean JwtTokenProvider so the test secret here is inert at runtime.
+#
+# SecurityConfig reads ADMIN_PASSWORD via @Value("${ADMIN_PASSWORD}") with no default —
+# production fails to start if the env var is unset (intentional fail-safe), tests
+# resolve it from this YAML key so the full-context @SpringBootTest classes boot.
+ADMIN_PASSWORD: changeme
+
 spring:
   application:
     name: agentic-trading-system

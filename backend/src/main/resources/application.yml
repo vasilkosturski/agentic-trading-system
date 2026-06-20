@@ -135,3 +135,21 @@ security:
   admin:
     username: ${ADMIN_USERNAME:admin}
     password: ${ADMIN_PASSWORD}
+
+# Per-IP rate limits in front of the API. Defense-in-depth alongside the Traefik
+# `ratelimit-global` middleware at the ingress: the ingress limit (30 req/s burst 60)
+# is a blanket DoS guard; these limits target the two endpoints that warrant
+# stricter, per-resource throttling — login (brute-force window) and the run-listing
+# read path (most expensive public DB query).
+#
+# Consumed by com.trading.config.RateLimitFilter; in-memory ConcurrentHashMap of
+# bucket4j buckets, per backend pod. If the backend scales beyond one replica, swap
+# the in-process bucket store for a shared cache (Redis/Hazelcast) so bucket state
+# is cluster-wide.
+ratelimit:
+  login:
+    capacity: 5
+    refill-period-minutes: 1
+  runs-list:
+    capacity: 60
+    refill-period-minutes: 1

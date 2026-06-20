@@ -34,7 +34,7 @@ public class SecurityConfig {
     @Value("${ADMIN_USERNAME:admin}")
     private String adminUsername;
 
-    @Value("${ADMIN_PASSWORD:changeme}")
+    @Value("${ADMIN_PASSWORD}")
     private String adminPassword;
 
     public SecurityConfig(SecurityProperties securityProperties) {

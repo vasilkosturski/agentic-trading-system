@@ -12,7 +12,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
@@ -24,6 +27,12 @@ public class PriceCacheService {
     private final PriceCacheRepository priceCacheRepository;
     private final RetryTemplate retryTemplate;
     private final RestTemplate restTemplate;
+
+    // REQUIRES_NEW so the cache-fill upsert runs in its own writable transaction even when the
+    // outer caller is `@Transactional(readOnly = true)` (e.g. TradingRunService, MemoryService).
+    // Without this, getPrice() on a cache miss fails with PostgreSQL error 25006
+    // "cannot execute INSERT in a read-only transaction" and the whole outer transaction aborts.
+    private final TransactionTemplate cacheWriteTx;
 
     @Value("${market.cache.ttl-minutes:60}")
     private int ttlMinutes;
@@ -45,10 +54,16 @@ public class PriceCacheService {
     private volatile Instant cooldownLoggedFor = Instant.EPOCH;
 
     public PriceCacheService(
-            PriceCacheRepository priceCacheRepository, RetryTemplate retryTemplate, RestTemplate restTemplate) {
+            PriceCacheRepository priceCacheRepository,
+            RetryTemplate retryTemplate,
+            RestTemplate restTemplate,
+            PlatformTransactionManager txManager) {
         this.priceCacheRepository = priceCacheRepository;
         this.retryTemplate = retryTemplate;
         this.restTemplate = restTemplate;
+        this.cacheWriteTx = new TransactionTemplate(txManager);
+        this.cacheWriteTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.cacheWriteTx.setReadOnly(false);
     }
 
     /**
@@ -92,7 +107,7 @@ public class PriceCacheService {
             return null;
         }
         try {
-            priceCacheRepository.upsert(symbol, fresh, now, "Finnhub");
+            cacheWriteTx.executeWithoutResult(status -> priceCacheRepository.upsert(symbol, fresh, now, "Finnhub"));
             logger.debug("Saved price to DB cache: {} = ${}", symbol, fresh);
         } catch (org.springframework.dao.ConcurrencyFailureException e) {
             // Concurrent upsert lost the race (CannotAcquireLockException, DeadlockLoserDataAccessException,

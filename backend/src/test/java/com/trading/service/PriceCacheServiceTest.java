@@ -26,6 +26,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.retry.policy.NeverRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -49,12 +53,28 @@ class PriceCacheServiceTest {
 
     private PriceCacheService priceCacheService;
 
+    // Pass-through tx manager: every getTransaction returns a stub status and commit/rollback are no-ops,
+    // so the TransactionTemplate wrapping the cache upsert just runs the callback synchronously.
+    // The actual transactional behaviour is exercised by PriceCacheServiceIntegrationTest.
+    private static final PlatformTransactionManager NOOP_TX_MANAGER = new PlatformTransactionManager() {
+        @Override
+        public TransactionStatus getTransaction(TransactionDefinition definition) {
+            return new SimpleTransactionStatus();
+        }
+
+        @Override
+        public void commit(TransactionStatus status) {}
+
+        @Override
+        public void rollback(TransactionStatus status) {}
+    };
+
     @BeforeEach
     void setUp() {
         retryTemplate = new RetryTemplate();
         retryTemplate.setRetryPolicy(new NeverRetryPolicy());
 
-        priceCacheService = new PriceCacheService(priceCacheRepository, retryTemplate, restTemplate);
+        priceCacheService = new PriceCacheService(priceCacheRepository, retryTemplate, restTemplate, NOOP_TX_MANAGER);
         ReflectionTestUtils.setField(priceCacheService, "ttlMinutes", TTL_MINUTES);
         ReflectionTestUtils.setField(priceCacheService, "finnhubApiKey", FINNHUB_API_KEY);
         ReflectionTestUtils.setField(priceCacheService, "finnhubBaseUrl", FINNHUB_BASE_URL);

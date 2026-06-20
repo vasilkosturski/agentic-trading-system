@@ -22,7 +22,7 @@ dependencies {
     // Lombok
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
-    
+
     // Spring Boot starters
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -36,40 +36,48 @@ dependencies {
     implementation("io.jsonwebtoken:jjwt-api:0.13.0")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.13.0")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
-    
+
     // Database
     implementation("org.xerial:sqlite-jdbc:3.44.1.0")
     implementation("org.postgresql:postgresql:42.7.1")
     implementation("org.hibernate.orm:hibernate-community-dialects:6.3.1.Final")
-    
+
     // JSONB support for Hibernate (for trading runs phase tables).
     // NOTE: The hypersistence-utils-hibernate-63 artifact supports Hibernate ORM 6.3-6.6
     // (no separate "-66" artifact exists; series jumps to -71/-72/-73 for Hibernate 7.x).
     // Bumped from 3.7.0 to 3.15.2 (latest 3.x) for Spring Boot 3.5 / Hibernate 6.6 compatibility.
     implementation("io.hypersistence:hypersistence-utils-hibernate-63:3.15.2")
-    
+
     // JSON processing
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
-    
+
     // OpenAI integration
     implementation("com.theokanning.openai-gpt3-java:service:0.18.2")
-    
+
     // HTTP client
     implementation("org.springframework.boot:spring-boot-starter-webflux")
 
     // Retry with exponential backoff for external API calls
     implementation("org.springframework.retry:spring-retry")
     implementation("org.springframework:spring-aspects")
-    
+
     // Logging
     implementation("ch.qos.logback:logback-classic")
-    
+
+    // Per-IP rate limiting (Bucket4j core). Consumed by the custom RateLimitFilter
+    // that throttles /api/auth/login (5/min) and /api/runs (60/min) per source IP.
+    // In-memory, in-process / per-pod; adequate while the backend deployment runs as
+    // a single replica. If the backend ever scales to >1 replica, swap the
+    // in-process ConcurrentHashMap for a shared cache (Redis/Hazelcast) so bucket
+    // state is cluster-wide.
+    implementation("com.bucket4j:bucket4j-core:8.10.1")
+
     // Testing
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    
+
     // Testcontainers for real PostgreSQL testing
     testImplementation("org.testcontainers:testcontainers:1.19.3")
     testImplementation("org.testcontainers:postgresql:1.19.3")

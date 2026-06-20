@@ -160,3 +160,6 @@ agents/tests/e2e/results/
 context_portal/# Test hook - Fri Dec  5 23:38:11 EET 2025
 # Test hook - Fri Dec  5 23:40:01 EET 2025
 .ruff_cache/
+
+# Git worktrees
+.worktrees/
