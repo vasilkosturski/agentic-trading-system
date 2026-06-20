@@ -86,6 +86,10 @@ services:
       BRAVE_API_KEY: ${BRAVE_API_KEY:?BRAVE_API_KEY is required, set it in .env (see .env.example)}
       BACKEND_URL: "http://backend-service:8080"
       DATABASE_URL: "postgresql://${POSTGRES_USER:-trading_user}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required, set it in .env (see .env.example)}@postgres:5432/agentic_trading"
+      # JWT login against the backend. Must match ADMIN_USERNAME / ADMIN_PASSWORD above —
+      # without these the agents pod boots but fails authentication on every cycle.
+      BACKEND_ADMIN_USERNAME: ${BACKEND_ADMIN_USERNAME:-${ADMIN_USERNAME:-admin}}
+      BACKEND_ADMIN_PASSWORD: ${BACKEND_ADMIN_PASSWORD:?BACKEND_ADMIN_PASSWORD is required and must match ADMIN_PASSWORD, set it in .env (see .env.example)}
       ENVIRONMENT: "development"
       LOG_LEVEL: "DEBUG"
       CONTINUOUS_MODE: "true"

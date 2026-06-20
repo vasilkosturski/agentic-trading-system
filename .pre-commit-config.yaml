@@ -49,3 +49,4 @@ repos:
         exclude: ^backend/src/main/resources/application.*\.yml$
       - id: check-added-large-files
         args: [--maxkb=512]
+        exclude: ^docs/images/
