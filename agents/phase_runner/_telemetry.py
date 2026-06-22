@@ -1,25 +1,17 @@
-"""Telemetry helpers — SDK RunResult/Usage → backend DTO translators.
+"""SDK telemetry → backend DTO translation. Private to phase_runner.
 
-Two pure functions that translate openai-agents SDK telemetry objects into
-the typed DTOs the backend consumes:
+Two pure functions both phase helpers call:
+* ``extract_usage_metrics`` translates a ``Usage`` object into a ``UsageMetrics``
+  DTO with attached ``costUsd`` computed via ``MODEL_PRICING``. Unknown models
+  log once via the shared ``_UNKNOWN_MODELS_WARNED`` set and serialize
+  ``costUsd=None`` so analytics never silently aggregate wrong values.
+* ``extract_run_telemetry`` is the DRY helper that pairs ``extract_tool_calls``
+  (from ``utils.sdk_parser``) with ``extract_usage_metrics`` and emits the two
+  observable INFO log lines.
 
-* ``extract_usage_metrics`` reads a ``Usage`` object (token counts +
-  optional model-name override from request entries) and produces a
-  ``UsageMetrics`` DTO with an attached ``costUsd`` computed via the
-  ``MODEL_PRICING`` table. Unknown models log a warning once via the
-  shared ``_UNKNOWN_MODELS_WARNED`` set and serialize ``costUsd`` as
-  ``None`` so analytics don't silently aggregate wrong values.
-
-* ``extract_run_telemetry`` is the DRY helper both phase runners
-  (``_run_market_analyst`` and ``_run_decision_maker`` in
-  ``agent_executor.py``) call to extract the tool-calls list + usage
-  metrics from a ``RunResult``. It also emits the two observable INFO
-  log lines so refactors don't silently regress observability.
-
-Extracted from ``agent_executor.py`` (Task 2 of the decomposition plan at
-``docs/superpowers/plans/2026-05-13-aegr-decomposition.md``). Zero
-coupling to ``AgentExecutor`` — ``extract_run_telemetry`` was a method
-that never used ``self``, so the lift to a module function is mechanical.
+``utils.sdk_parser`` is NOT absorbed — ``ai_agents.market_analyst`` and
+``ai_agents.decision_maker`` import its tool-call extraction directly. It stays
+a shared utility; this module just consumes it.
 """
 
 import logging
@@ -35,15 +27,12 @@ logger = logging.getLogger(__name__)
 
 
 def extract_usage_metrics(usage: Usage, model_name: str) -> UsageMetrics:
-    """Extract token usage metrics from SDK RunResultBase.context_wrapper.usage.
+    """Translate SDK ``Usage`` to a ``UsageMetrics`` DTO with computed cost.
 
     Args:
-        usage: Usage object from result.context_wrapper.usage
-        model_name: Model name passed to Agent() constructor (fallback if
-            SDK doesn't provide it).
-
-    Returns:
-        UsageMetrics with token metric fields matching backend DTOs.
+        usage: From ``result.context_wrapper.usage``.
+        model_name: Model name passed to the Agent constructor (fallback when
+            the SDK's ``request_usage_entries`` doesn't carry one).
     """
     cached = 0
     if usage.input_tokens_details:
@@ -53,7 +42,6 @@ def extract_usage_metrics(usage: Usage, model_name: str) -> UsageMetrics:
     if usage.output_tokens_details:
         reasoning = getattr(usage.output_tokens_details, "reasoning_tokens", 0) or 0
 
-    # Try SDK first, fall back to the model name we passed to Agent()
     sdk_model = None
     if usage.request_usage_entries:
         sdk_model = getattr(usage.request_usage_entries[0], "model_name", None)
@@ -94,11 +82,7 @@ def extract_run_telemetry(
     model_name: str,
     agent_label: str,
 ) -> tuple[list[ToolCallDto], UsageMetrics]:
-    """Extract tool calls + usage metrics from an SDK RunResult and log both.
-
-    Used by `_run_market_analyst` and `_run_decision_maker` to keep both
-    agent runners structurally symmetric.
-    """
+    """Extract tool calls + usage metrics from a ``RunResult`` and log both."""
     parsed_calls = extract_tool_calls(result.new_items)
     tool_calls = [
         ToolCallDto(
@@ -118,3 +102,21 @@ def extract_run_telemetry(
         f"model={usage_metrics.modelName}"
     )
     return tool_calls, usage_metrics
+
+
+def capture_agent_prompts(agent, task_prompt: str) -> tuple[str | None, str]:
+    """Return ``(system_prompt, task_prompt)`` for observability persistence.
+
+    ``Agent.instructions`` is typed ``str | Callable[..., str] | None`` by the SDK
+    but project agents always set a str. The isinstance narrow keeps prompt
+    capture safe if anyone later swaps to a dynamic callable, and logs the
+    skip at DEBUG so a regression in observability is visible.
+    """
+    instructions = agent.instructions
+    if not isinstance(instructions, str) and instructions is not None:
+        logger.debug(
+            "%s.instructions is callable, not str — skipping prompt capture for observability",
+            type(agent).__name__,
+        )
+    system_prompt = instructions if isinstance(instructions, str) else None
+    return system_prompt, task_prompt

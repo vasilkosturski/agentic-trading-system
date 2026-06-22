@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from agents import Runner
 from agents.exceptions import MaxTurnsExceeded
 from agents.mcp import MCPServerStdio
 
@@ -20,6 +21,7 @@ from ai_agents.market_analyst import MarketAnalyst, MarketAnalystContext
 from mcp_helpers.params import get_mcp_server_params
 from mcp_helpers.types import MCPPool
 from models.llm_output import ResearchResponse
+from utils.sdk_parser import extract_tool_calls, get_tool_errors
 
 logger = logging.getLogger("e2e_tests.market_analyst")
 
@@ -28,11 +30,13 @@ _RESULTS_DIR = Path(__file__).parent / "results"
 
 def _dump_result_to_json(
     test_name: str,
-    result,
+    output,
+    tool_calls,
+    tool_errors,
     system_prompt: str = "",
     task_prompt: str = "",
 ) -> None:
-    """Serialize AgentRunResult to JSON for manual inspection.
+    """Serialize agent result + tool telemetry to JSON for manual inspection.
 
     Writes to tests/e2e/results/{test_name}_{timestamp}.json.
     Silently logs on failure -- must never mask the real test outcome.
@@ -45,9 +49,9 @@ def _dump_result_to_json(
 
         # Build serializable dict
         output_data = None
-        if result.output is not None:
+        if output is not None:
             # Pydantic model -- use .model_dump()
-            output_data = result.output.model_dump()
+            output_data = output.model_dump()
 
         data = {
             "test_name": test_name,
@@ -55,8 +59,8 @@ def _dump_result_to_json(
             "system_prompt": system_prompt,
             "task_prompt": task_prompt,
             "output": output_data,
-            "tool_calls": [asdict(tc) for tc in result.tool_calls],
-            "tool_errors": [asdict(tc) for tc in result.tool_errors],
+            "tool_calls": [asdict(tc) for tc in tool_calls],
+            "tool_errors": [asdict(tc) for tc in tool_errors],
         }
 
         filepath = _RESULTS_DIR / filename
@@ -148,10 +152,10 @@ class TestMarketAnalystE2E:
 
         logger.info("Running Market Analyst...")
 
-        # Run agent - returns AgentRunResult with tool_calls and tool_errors
-        # MaxTurnsExceeded can still be thrown by SDK
+        # Call the SDK Runner directly — same shape the production cycle uses
+        # (phase_runner/cycle.py). MaxTurnsExceeded can still be thrown by SDK.
         try:
-            result = await market_analyst.run(context, max_turns=15)
+            result = await Runner.run(market_analyst.agent, task_prompt, max_turns=15)
         except MaxTurnsExceeded as e:
             logger.error("=" * 60)
             logger.error("MAX TURNS EXCEEDED")
@@ -159,11 +163,15 @@ class TestMarketAnalystE2E:
             logger.error("=" * 60)
             raise
 
+        # Extract tool telemetry manually (was wrapped by the old .run() helper).
+        tool_calls = extract_tool_calls(result.new_items)
+        tool_errors = get_tool_errors(tool_calls)
+        response = result.final_output_as(ResearchResponse)
+
         # Dump result to JSON for manual inspection (always, even on failure)
         try:
-            # Log tool calls from AgentRunResult
-            logger.info(f"Tool calls made: {len(result.tool_calls)}")
-            for tc in result.tool_calls:
+            logger.info(f"Tool calls made: {len(tool_calls)}")
+            for tc in tool_calls:
                 logger.info(f"  - {tc.name}: {tc.params}")
 
             # Portfolio context (holdings, activity) is now passed inline in
@@ -171,12 +179,9 @@ class TestMarketAnalystE2E:
 
             # Log tool errors but don't fail — agents skip unsupported symbols
             # and continue with other candidates. This matches production behavior.
-            if result.tool_errors:
-                for err in result.tool_errors:
+            if tool_errors:
+                for err in tool_errors:
                     logger.warning(f"TOOL ERROR (non-fatal): {err.name}: {err.output[:200]}")
-
-            # Extract response from AgentRunResult
-            response = result.output
 
             # Log results
             logger.info("-" * 40)
@@ -196,9 +201,9 @@ class TestMarketAnalystE2E:
 
             # Agent should always find at least one candidate stock
             assert isinstance(response.candidates, list)
-            assert len(response.candidates) >= 1, (
-                "Market Analyst should find at least one candidate"
-            )
+            assert (
+                len(response.candidates) >= 1
+            ), "Market Analyst should find at least one candidate"
             from models.llm_output import CandidateStock
 
             for candidate in response.candidates:
@@ -213,18 +218,18 @@ class TestMarketAnalystE2E:
                 assert source.url, "Source must have a URL"
 
             # Portfolio context should be populated (agent must explain how portfolio influenced research)
-            assert len(response.portfolio_context) > 20, (
-                "portfolio_context should explain how portfolio influenced research"
-            )
+            assert (
+                len(response.portfolio_context) > 20
+            ), "portfolio_context should explain how portfolio influenced research"
 
             # Agent should have made at least one tool call (brave_web_search at minimum)
-            assert len(result.tool_calls) >= 1, "Market Analyst should make at least one tool call"
+            assert len(tool_calls) >= 1, "Market Analyst should make at least one tool call"
 
             # Verify brave_web_search was specifically used (core research tool)
-            tool_names = [tc.name for tc in result.tool_calls]
-            assert "brave_web_search" in tool_names, (
-                "MarketAnalyst should use brave_web_search for research"
-            )
+            tool_names = [tc.name for tc in tool_calls]
+            assert (
+                "brave_web_search" in tool_names
+            ), "MarketAnalyst should use brave_web_search for research"
 
             # Tool errors are expected (LLM may pick symbols Finnhub doesn't support)
             # What matters is the research output is valid despite any lookup failures
@@ -233,7 +238,9 @@ class TestMarketAnalystE2E:
         finally:
             _dump_result_to_json(
                 "test_market_analyst_returns_candidates",
-                result,
+                response,
+                tool_calls,
+                tool_errors,
                 system_prompt=system_prompt,
                 task_prompt=task_prompt,
             )

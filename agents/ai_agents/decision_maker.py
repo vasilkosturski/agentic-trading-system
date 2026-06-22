@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from agents import Agent, Runner, Tool, function_tool
+from agents import Agent, Tool, function_tool
 from agents.mcp import MCPServer
 
 # Import backend client
@@ -24,15 +24,11 @@ from infra.prompt_loader import load_and_format_prompt
 
 # Import MCP types
 from mcp_helpers.types import MCPName
-from models import AgentRunResult
 from models.api_responses import RecentActivityResponse
 from models.investment_style import InvestmentStyle
 
 # Import models
 from models.llm_output import ResearchResponse, TradingDecision
-
-# Import SDK parsing utilities
-from utils.sdk_parser import extract_tool_calls, get_tool_errors
 
 if TYPE_CHECKING:
     from mcp_helpers.types import MCPPool
@@ -193,51 +189,6 @@ class DecisionMaker:
             historical_context=context.historical_context,
             force_trade=context.force_trade,
             agent_style=context.agent_style,
-        )
-
-    async def run(
-        self, context: DecisionContext, max_turns: int = 10
-    ) -> AgentRunResult[TradingDecision]:
-        """Run decision maker agent and return result with full visibility.
-
-        Encapsulates prompt building, agent execution, and response extraction.
-        Returns tool errors in result - caller decides how to handle.
-
-        Args:
-            context: DecisionContext with typed models
-            max_turns: Maximum agent turns (default: 10)
-
-        Returns:
-            AgentRunResult containing:
-            - output: TradingDecision with action, symbol, quantity, rationale
-            - tool_calls: All tool calls made during execution
-            - tool_errors: Any tools that returned error responses
-
-        Raises:
-            MaxTurnsExceeded: If agent doesn't complete within max_turns
-
-        Usage:
-            result = await maker.run(context)
-            result.raise_if_errors()  # Opt-in fail-fast
-            # OR check result.has_errors for graceful handling
-        """
-        prompt = self.build_prompt(context)
-        result = await Runner.run(self.agent, prompt, max_turns=max_turns)
-
-        # Extract tool calls for visibility
-        tool_calls = extract_tool_calls(result.new_items)
-        tool_errors = get_tool_errors(tool_calls)
-
-        # Log errors but let caller decide how to handle
-        if tool_errors:
-            error_details = "; ".join([f"{e.name}: {e.output[:100]}" for e in tool_errors])
-            logger.warning(f"Tool errors detected (caller decides handling): {error_details}")
-
-        # Return result with full visibility - caller calls raise_if_errors() if they want fail-fast
-        return AgentRunResult(
-            output=result.final_output_as(TradingDecision),
-            tool_calls=tool_calls,
-            tool_errors=tool_errors,
         )
 
 

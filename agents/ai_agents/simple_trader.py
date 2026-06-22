@@ -4,37 +4,35 @@ from datetime import datetime
 
 from agents import trace
 
-from agent_executor import execute_cycle
 from config import config
 from mcp_helpers.types import MCPPool
 from models.investment_style import InvestmentStyle
+from phase_runner import run_cycle
 
 logger = logging.getLogger(__name__)
 
 
 async def run_trader_cycle(trader: "SimpleTrader", mcp_pool: MCPPool, force_trade: bool = False):
-    try:
-        logger.info(f"Starting {trader.name} agent with two-agent architecture...")
-        if force_trade:
-            logger.info(f"🎯 {trader.name} must make a trade this cycle (manual trigger)")
+    logger.info(f"Starting {trader.name} agent with two-agent architecture...")
+    if force_trade:
+        logger.info(f"🎯 {trader.name} must make a trade this cycle (manual trigger)")
 
-        trace_name = f"{trader.name}-portfolio-review"
-        trace_id = f"trace_{trader.name.lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    trace_name = f"{trader.name}-portfolio-review"
+    trace_id = f"trace_{trader.name.lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-        with trace(trace_name, trace_id=trace_id):
-            await execute_cycle(
-                agent_id=trader.agent_id,
-                name=trader.name,
-                agent_style=trader.agent_style,
-                model_name=trader.model_name,
-                mcp_pool=mcp_pool,
-                force_trade=force_trade,
-            )
+    # run_cycle records its own failures via Lifecycle.fail and never raises,
+    # so the previous try/except around it here would only catch programmer errors.
+    with trace(trace_name, trace_id=trace_id):
+        await run_cycle(
+            agent_id=trader.agent_id,
+            name=trader.name,
+            agent_style=trader.agent_style,
+            mcp_pool=mcp_pool,
+            model_name=trader.model_name,
+            force_trade=force_trade,
+        )
 
-        logger.info(f"{trader.name} agent completed successfully")
-
-    except Exception as e:
-        logger.error(f"Error running {trader.name} agent: {e}", exc_info=True)
+    logger.info(f"{trader.name} agent completed")
 
 
 @dataclass

@@ -260,100 +260,11 @@ def mock_agent():
     return mock
 
 
-@pytest.fixture(autouse=True)
-def _redirect_run_lifecycle_to_agent_executor(monkeypatch):
-    """Forward `run_lifecycle.<symbol>` calls to `agent_executor.<symbol>`.
-
-    Many existing tests in `test_agent_executor.py` patch the run-tracking
-    and broadcast functions at `agent_executor.<symbol>` (via
-    `@patch("agent_executor.create_run")` etc.). Run-tracking calls now
-    happen inside `RunLifecycle.start()` (and the other lifecycle
-    transitions), which call `run_lifecycle.create_run` directly — those
-    existing patches would no longer intercept.
-
-    This autouse fixture installs lazy forwarders in `run_lifecycle` so
-    that whatever value lives at `agent_executor.<symbol>` at call time
-    is invoked. When a test patches `agent_executor.create_run` with a
-    Mock, the forwarder picks it up automatically and the test's
-    `return_value` / `side_effect` settings take effect through the
-    lifecycle code path too.
-
-    `agent_executor` no longer re-exports `create_run`, `update_phase`,
-    `complete_run`, `initialize_agent`, or `broadcast_status`, so the
-    forwarders fall back to the real `run_lifecycle.<symbol>` value when
-    the symbol is not accessible via `agent_executor`. Tests that still
-    patch at `agent_executor.<symbol>` continue to work because the
-    patcher installs the attribute on the module for the test duration.
-
-    Skipping the forwarder for any test that *does* set its own
-    `run_lifecycle.<symbol>` patch is handled implicitly: that test's
-    `@patch` decorator overrides our `monkeypatch.setattr` (unittest
-    `patch` rebinds the module attribute and restores it on teardown).
-    """
-    import agent_executor
-    import backend.run_lifecycle as run_lifecycle
-
-    # Capture the real run_lifecycle.<symbol> values BEFORE installing
-    # forwarders so the fallback can reach the actual production functions
-    # when agent_executor no longer re-exports them.
-    _real = {
-        name: getattr(run_lifecycle, name)
-        for name in (
-            "create_run",
-            "update_phase",
-            "complete_run",
-            "initialize_agent",
-            "broadcast_status",
-        )
-    }
-
-    async def _forward_async(name, *args, **kwargs):
-        target = getattr(agent_executor, name, _real[name])
-        result = target(*args, **kwargs)
-        # ``target`` may be the real coroutine function, or an AsyncMock
-        # / MagicMock installed by a test. Coroutines and AsyncMock both
-        # return awaitables; bare MagicMock does not. Handle both.
-        if hasattr(result, "__await__"):
-            return await result
-        return result
-
-    def _forward_sync(name, *args, **kwargs):
-        return getattr(agent_executor, name, _real[name])(*args, **kwargs)
-
-    async def _create_run(*a, **k):
-        return await _forward_async("create_run", *a, **k)
-
-    async def _update_phase(*a, **k):
-        return await _forward_async("update_phase", *a, **k)
-
-    async def _complete_run(*a, **k):
-        return await _forward_async("complete_run", *a, **k)
-
-    async def _initialize_agent(*a, **k):
-        return await _forward_async("initialize_agent", *a, **k)
-
-    def _broadcast_status(*a, **k):
-        return _forward_sync("broadcast_status", *a, **k)
-
-    monkeypatch.setattr(run_lifecycle, "create_run", _create_run)
-    monkeypatch.setattr(run_lifecycle, "update_phase", _update_phase)
-    monkeypatch.setattr(run_lifecycle, "complete_run", _complete_run)
-    monkeypatch.setattr(run_lifecycle, "initialize_agent", _initialize_agent)
-    monkeypatch.setattr(run_lifecycle, "broadcast_status", _broadcast_status)
-
-
 @pytest.fixture
 def mock_broadcast_status(mocker):
-    """Mock status broadcasting.
-
-    Patches at BOTH `agent_executor.broadcast_status` AND
-    `run_lifecycle.broadcast_status` so the same Mock intercepts calls
-    from either module (Task 4 of the AgentExecutor decomposition routes
-    several broadcasts through `RunLifecycle`).
-    """
-    mock = mocker.patch("agent_executor.broadcast_status")
-    mocker.patch("backend.run_lifecycle.broadcast_status", new=mock)
-    return mock
+    """Mock status broadcasting at the only place it's called from now —
+    ``phase_runner._lifecycle.broadcast_status``."""
+    return mocker.patch("phase_runner._lifecycle.broadcast_status")
 
 
 @pytest.fixture
@@ -440,33 +351,23 @@ def mock_prompt_fetch(mocker):
 
 @pytest.fixture
 def mock_run_tracking(mocker):
-    """Mock run tracking functions (new phase-based API).
+    """Mock the BackendClient calls Lifecycle drives (create_run / update_phase /
+    complete_run). Returns the underlying client mock plus per-method handles."""
+    client = MagicMock()
+    client.initialize_agent = AsyncMock(return_value=1)
+    client.create_run = AsyncMock(return_value=123)
+    client.update_phase = AsyncMock(return_value=None)
+    client.complete_run = AsyncMock(return_value=None)
+    client.record_phase_failure = AsyncMock(return_value=None)
 
-    Patches at BOTH `agent_executor.*` AND `run_lifecycle.*` module-level
-    references using the SAME Mock objects so calls intercepted from
-    either layer route through the same assertion surface — run-tracking
-    calls now happen inside `RunLifecycle.start()` (and the other
-    lifecycle transitions), which call `run_lifecycle.create_run` etc.
-    """
-    create_run = mocker.patch("agent_executor.create_run")
-    update_phase = mocker.patch("agent_executor.update_phase")
-    complete_run = mocker.patch("agent_executor.complete_run")
-
-    # Wire run_lifecycle.* to the same mocks so calls inside RunLifecycle
-    # are also intercepted.
-    mocker.patch("backend.run_lifecycle.create_run", new=create_run)
-    mocker.patch("backend.run_lifecycle.update_phase", new=update_phase)
-    mocker.patch("backend.run_lifecycle.complete_run", new=complete_run)
-
-    # create_run returns run_id, update_phase/complete_run return bool
-    create_run.return_value = 123  # Sample run ID
-    update_phase.return_value = True
-    complete_run.return_value = True
+    mocker.patch("phase_runner._lifecycle.get_backend_client", return_value=client)
+    mocker.patch("phase_runner._lifecycle.broadcast_status")
 
     return {
-        "create_run": create_run,
-        "update_phase": update_phase,
-        "complete_run": complete_run,
+        "client": client,
+        "create_run": client.create_run,
+        "update_phase": client.update_phase,
+        "complete_run": client.complete_run,
     }
 
 

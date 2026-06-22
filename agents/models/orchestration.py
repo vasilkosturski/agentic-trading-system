@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel
 
@@ -14,37 +14,6 @@ from models.usage_metrics import UsageMetrics
 if TYPE_CHECKING:
     from models import Holding
     from models.run_tracking import ToolCallDto
-    from utils.sdk_parser import ParsedToolCall
-
-
-T = TypeVar("T")
-
-
-@dataclass
-class AgentRunResult(Generic[T]):
-    output: T
-    tool_calls: list["ParsedToolCall"] = field(default_factory=list)
-    tool_errors: list["ParsedToolCall"] = field(default_factory=list)
-
-    @property
-    def has_errors(self) -> bool:
-        return len(self.tool_errors) > 0
-
-    @property
-    def error_summary(self) -> str:
-        if not self.tool_errors:
-            return ""
-        return "; ".join([f"{e.name}: {e.output[:100]}" for e in self.tool_errors])
-
-    def raise_if_errors(self) -> None:
-        if self.tool_errors:
-            # Import here to avoid circular dependency
-            from infra.exceptions import ToolExecutionError
-
-            raise ToolExecutionError(
-                f"Tools failed during execution: {[e.name for e in self.tool_errors]}",
-                tool_errors=self.tool_errors,
-            )
 
 
 class SourceType(str, Enum):

@@ -47,7 +47,6 @@ from agents import (
     Agent,
     GuardrailFunctionOutput,
     RunContextWrapper,
-    Runner,
     Tool,
     function_tool,
     output_guardrail,
@@ -61,7 +60,6 @@ from config import config
 from infra.prompt_loader import load_and_format_prompt
 from mcp_helpers.types import MCPName
 from models import (
-    AgentRunResult,
     RecentActivityResponse,
     ToolError,
 )
@@ -70,7 +68,6 @@ from models.investment_style import InvestmentStyle
 # Import model for structured output
 from models.llm_output import ResearchResponse
 from tools.market_tools import _lookup_share_price
-from utils.sdk_parser import extract_tool_calls, get_tool_errors
 
 if TYPE_CHECKING:
     from mcp_helpers.types import MCPPool
@@ -240,51 +237,6 @@ class MarketAnalyst:
             max_positions=context.max_positions,
             holdings_summary=context.holdings_summary,
             historical_context=context.historical_context,
-        )
-
-    async def run(
-        self, context: MarketAnalystContext, max_turns: int = 15
-    ) -> AgentRunResult[ResearchResponse]:
-        """Run market analyst agent and return result with full visibility.
-
-        Encapsulates prompt building, agent execution, and response extraction.
-        Returns tool errors in result - caller decides how to handle.
-
-        Args:
-            context: MarketAnalystContext with typed models
-            max_turns: Maximum agent turns (default: 15)
-
-        Returns:
-            AgentRunResult containing:
-            - output: ResearchResponse with candidates, summary, and sources
-            - tool_calls: All tool calls made during execution
-            - tool_errors: Any tools that returned error responses
-
-        Raises:
-            MaxTurnsExceeded: If agent doesn't complete within max_turns
-
-        Usage:
-            result = await analyst.run(context)
-            result.raise_if_errors()  # Opt-in fail-fast
-            # OR check result.has_errors for graceful handling
-        """
-        prompt = self.build_prompt(context)
-        result = await Runner.run(self.agent, prompt, max_turns=max_turns)
-
-        # Extract tool calls for visibility
-        tool_calls = extract_tool_calls(result.new_items)
-        tool_errors = get_tool_errors(tool_calls)
-
-        # Log errors but let caller decide how to handle
-        if tool_errors:
-            error_details = "; ".join([f"{e.name}: {e.output[:100]}" for e in tool_errors])
-            logger.warning(f"Tool errors detected (caller decides handling): {error_details}")
-
-        # Return result with full visibility - caller calls raise_if_errors() if they want fail-fast
-        return AgentRunResult(
-            output=result.final_output_as(ResearchResponse),
-            tool_calls=tool_calls,
-            tool_errors=tool_errors,
         )
 
 

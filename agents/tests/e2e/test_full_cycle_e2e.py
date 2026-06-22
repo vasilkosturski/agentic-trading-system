@@ -12,10 +12,10 @@ import pytest
 import requests
 from agents.mcp import MCPServerStdio
 
-from agent_executor import execute_cycle
 from mcp_helpers.params import get_mcp_server_params
 from mcp_helpers.types import MCPPool
-from models import CycleResult, TradeAction
+from models import TradeAction
+from phase_runner import run_cycle
 
 logger = logging.getLogger("e2e_tests.full_cycle")
 
@@ -78,76 +78,46 @@ class TestFullCycleE2E:
         logger.info("=" * 60)
         logger.info(f"Agent: {real_agent_identity['name']} ({real_agent_identity['agent_style']})")
 
+        backend_url = require_backend
+        agent_id = real_agent_identity["agent_id"]
+
+        # Baseline: capture the most recent run-id for this agent BEFORE the
+        # cycle so we can identify the cycle's row afterwards. ``run_cycle``
+        # is fire-and-forget (no return value); the backend DB is the source
+        # of truth for what happened.
+        latest_before = requests.get(
+            f"{backend_url}/api/runs", params={"agentId": agent_id, "limit": 1}, timeout=10
+        )
+        latest_before.raise_for_status()
+        before_runs = latest_before.json().get("runs") or latest_before.json()
+        baseline_run_id = before_runs[0]["runId"] if before_runs else 0
+
         # Execute full cycle with forced trade
-        result = await execute_cycle(
+        await run_cycle(
             **real_agent_identity,
             mcp_pool=real_mcp_pool,
             force_trade=True,  # Ensures BUY or SELL (no HOLD)
         )
 
-        # Log results
-        logger.info("-" * 40)
-        logger.info("CYCLE RESULT:")
-        logger.info(f"Run ID: {result.run_id}")
-        logger.info(f"Decision: {result.decision.action} {result.decision.symbol}")
-        logger.info(f"Quantity: {result.decision.quantity}")
-        logger.info(f"Trade Count: {result.trade_count}")
-        logger.info(f"Rationale: {result.decision.rationale[:200]}...")
-        logger.info("-" * 40)
-
-        # Assertions on in-memory result
-        assert result is not None
-        assert isinstance(result, CycleResult)
-        assert result.run_id is not None and result.run_id > 0
-
-        # With force_trade=True, must be BUY or SELL
-        assert result.decision.action in (
-            TradeAction.BUY,
-            TradeAction.SELL,
-        ), f"Expected BUY/SELL with force_trade, got {result.decision.action}"
-        assert result.decision.symbol is not None
-        assert result.decision.quantity is not None
-        assert result.decision.quantity > 0
-
-        # Structural assertions on decision quality — deterministic guarantees
-        # from the TradingDecision model, not LLM content judgments.
-        assert len(result.decision.rationale) > 10, "Rationale should be meaningful"
-        result.decision.validate_consistency()  # Validates action↔symbol↔quantity coherence
-
-        # Symbol format (BUY/SELL guaranteed by force_trade)
-        # Allow dots for class shares (e.g., BRK.B, BF.B)
-        symbol_clean = result.decision.symbol.replace(".", "")
+        # Pick up the cycle's new run-id from the backend.
+        latest_after = requests.get(
+            f"{backend_url}/api/runs", params={"agentId": agent_id, "limit": 1}, timeout=10
+        )
+        latest_after.raise_for_status()
+        after_runs = latest_after.json().get("runs") or latest_after.json()
+        assert after_runs, "Backend returned no runs after the cycle"
+        run_id = after_runs[0]["runId"]
         assert (
-            symbol_clean.isalpha()
-        ), f"Symbol should be alphabetic (dots allowed): {result.decision.symbol}"
-        assert (
-            result.decision.symbol.isupper()
-        ), f"Symbol should be uppercase: {result.decision.symbol}"
-        assert (
-            1 <= len(result.decision.symbol) <= 6
-        ), f"Symbol length should be 1-6: {result.decision.symbol}"
-
-        # Structured reasoning fields should be populated for trade decisions
-        assert (
-            len(result.decision.portfolioContext) > 0
-        ), "portfolioContext should be populated for BUY/SELL"
-        assert (
-            len(result.decision.researchContext) > 0
-        ), "researchContext should be populated for BUY/SELL"
-
-        # Trade should have been attempted (count is 0 or 1 depending on execution success)
-        assert result.trade_count in [0, 1]
+            run_id > baseline_run_id
+        ), f"Cycle did not create a new run (baseline={baseline_run_id}, latest={run_id})"
 
         # =================================================================
         # Phase-based API verification
         # Verify the full data pipeline round-tripped through the database
         # =================================================================
         logger.info("=" * 60)
-        logger.info("VERIFYING PHASE-BASED APIs")
+        logger.info(f"VERIFYING PHASE-BASED APIs (run_id={run_id})")
         logger.info("=" * 60)
-
-        backend_url = require_backend
-        run_id = result.run_id
 
         # GET /api/runs/{run_id} — complete run with all phases
         resp = requests.get(f"{backend_url}/api/runs/{run_id}", timeout=10)
@@ -159,10 +129,20 @@ class TestFullCycleE2E:
         assert run_meta["runId"] == run_id
         assert run_meta["status"] == "COMPLETED"
         assert run_meta["phase"] == "COMPLETED"
-        assert run_meta["decision"] == result.decision.action
-        assert run_meta["symbol"] == result.decision.symbol
+        # With force_trade=True, must be BUY or SELL.
+        assert run_meta["decision"] in (
+            TradeAction.BUY.value,
+            TradeAction.SELL.value,
+        ), f"Expected BUY/SELL with force_trade, got {run_meta['decision']}"
+        symbol = run_meta["symbol"]
+        assert symbol is not None
+        # Allow dots for class shares (e.g., BRK.B, BF.B).
+        symbol_clean = symbol.replace(".", "")
+        assert symbol_clean.isalpha(), f"Symbol should be alphabetic (dots allowed): {symbol}"
+        assert symbol.isupper(), f"Symbol should be uppercase: {symbol}"
+        assert 1 <= len(symbol) <= 6, f"Symbol length should be 1-6: {symbol}"
         logger.info(
-            f"  Run metadata: OK (status={run_meta['status']}, decision={run_meta['decision']})"
+            f"  Run metadata: OK (status={run_meta['status']}, decision={run_meta['decision']}, symbol={symbol})"
         )
 
         # --- Research phase ---
@@ -180,31 +160,24 @@ class TestFullCycleE2E:
         decision = run_detail["decision"]
         assert decision is not None, "Decision phase should be present"
         assert decision["runId"] == run_id
-        assert decision["decision"] == result.decision.action
-        assert decision["symbol"] == result.decision.symbol
-        assert decision["quantity"] == result.decision.quantity
+        assert decision["decision"] == run_meta["decision"]
+        assert decision["symbol"] == symbol
+        assert decision["quantity"] is not None and decision["quantity"] > 0
 
         # Structured reasoning (3 fields)
         reasoning = decision.get("reasoning")
         if reasoning is not None:
-            reasoning_fields = [
-                "portfolioContext",
-                "historicalContext",
-                "researchContext",
-            ]
-            for field in reasoning_fields:
+            for field in ("portfolioContext", "historicalContext", "researchContext"):
                 assert field in reasoning, f"Reasoning missing field: {field}"
             logger.info("  Decision reasoning: OK (all 3 fields present)")
-
         logger.info(f"  Decision: OK (action={decision['decision']}, symbol={decision['symbol']})")
 
         # --- Execution phase ---
         execution = run_detail.get("execution")
-        if result.decision.action in (TradeAction.BUY, TradeAction.SELL):
-            assert execution is not None, "Execution phase should be present for BUY/SELL"
-            assert execution["runId"] == run_id
-            assert execution["status"] in ["COMPLETED", "FAILED"]
-            logger.info(f"  Execution: OK (status={execution['status']})")
+        assert execution is not None, "Execution phase should be present for BUY/SELL"
+        assert execution["runId"] == run_id
+        assert execution["status"] in ["COMPLETED", "FAILED"]
+        logger.info(f"  Execution: OK (status={execution['status']})")
 
         logger.info("=" * 60)
         logger.info("PHASE-BASED API VERIFICATION PASSED")

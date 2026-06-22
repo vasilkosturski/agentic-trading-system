@@ -348,7 +348,8 @@ class BackendClient:
 
         Intentionally NOT wrapped in ``@_retry_on_transient``: this is a
         best-effort write on the FAILED-run teardown path, and the caller
-        (``RunLifecycle.record_phase_failure``) already catches everything.
+        (``Lifecycle.record_phase_failure`` in ``phase_runner``) already
+        catches everything.
         Retrying 3x with backoff would stretch teardown latency by 7-30s
         invisibly; accept losing a stub row on a transient blip instead.
         """
