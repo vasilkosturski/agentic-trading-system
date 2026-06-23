@@ -6,6 +6,8 @@ A multi-agent stock trading system, built as a realistic demo for agentic AI sof
 
 A live instance runs at [agentic-trading.vkontech.com](https://agentic-trading.vkontech.com/).
 
+For the design walkthrough — two-agent pipeline, output guardrails, per-run audit trail — see the companion article: [*Generation Got Cheap, Trust Didn't: A Multi-Agent Trading System with Guardrails and Traceability*](https://vkontech.com/multi-agent-trading-guardrails-traceability/).
+
 ## Quickstart
 
 Requirements: Docker with the Compose plugin, or Podman 5+ (`podman compose` delegates to `docker-compose` and works the same; `podman-compose` also works).
