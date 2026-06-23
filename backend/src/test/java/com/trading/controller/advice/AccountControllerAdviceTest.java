@@ -12,7 +12,7 @@ import com.trading.service.AccountProvisioner;
 import com.trading.service.AccountQueryService;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.MemoryService;
-import com.trading.service.TradeOrchestrator;
+import com.trading.service.TradeService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,7 +49,7 @@ class AccountControllerAdviceTest {
     private MemoryService memoryService;
 
     @MockitoBean
-    private TradeOrchestrator tradeOrchestrator;
+    private TradeService tradeService;
 
     @Test
     @DisplayName("Unknown agent returns 404 ProblemDetail when AccountQueryService throws ResourceNotFoundException")

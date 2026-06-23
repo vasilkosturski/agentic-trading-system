@@ -31,7 +31,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * Integration tests for {@link TradeOrchestrator} — verifies that the
+ * Integration tests for {@link TradeService} — verifies that the
  * {@code @Transactional} buy flow rolls back atomically when any collaborator
  * inside the transaction throws.
  *
@@ -40,13 +40,13 @@ import org.springframework.test.context.DynamicPropertySource;
  *
  * <p>The ROLLBACK PATH is the load-bearing transactional-safety proof: forcing
  * {@link PortfolioSnapshotService#createSnapshot(String)} to throw inside the
- * orchestrator's transaction must (1) roll back the trade row insert performed
- * by {@code BuyTradeExecutor.executeBuy} and (2) roll back the balance update.</p>
+ * service's transaction must (1) roll back the trade row insert and (2) roll
+ * back the balance update.</p>
  */
 @SpringBootTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@DisplayName("TradeOrchestrator integration tests")
-class TradeOrchestratorIntegrationTest {
+@DisplayName("TradeService integration tests")
+class TradeServiceIntegrationTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -54,7 +54,7 @@ class TradeOrchestratorIntegrationTest {
     }
 
     @Autowired
-    private TradeOrchestrator tradeOrchestrator;
+    private TradeService tradeService;
 
     @Autowired
     private TradingAccountRepository accountRepository;
@@ -128,7 +128,7 @@ class TradeOrchestratorIntegrationTest {
     void happyPathCommits() {
         long txnCountBefore = transactionRepository.count();
 
-        var result = tradeOrchestrator.buyShares(AGENT_NAME, SYMBOL, 10, run.getId());
+        var result = tradeService.buyShares(AGENT_NAME, SYMBOL, 10, run.getId());
 
         assertThat(result).isNotNull();
         assertThat(result.symbol()).isEqualTo(SYMBOL);
@@ -153,7 +153,7 @@ class TradeOrchestratorIntegrationTest {
                 .when(portfolioSnapshotService)
                 .createSnapshot(anyString());
 
-        assertThatThrownBy(() -> tradeOrchestrator.buyShares(AGENT_NAME, SYMBOL, 10, run.getId()))
+        assertThatThrownBy(() -> tradeService.buyShares(AGENT_NAME, SYMBOL, 10, run.getId()))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("forced rollback");
 

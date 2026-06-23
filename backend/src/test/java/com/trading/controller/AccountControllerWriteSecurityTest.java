@@ -17,7 +17,7 @@ import com.trading.service.AccountProvisioner;
 import com.trading.service.AccountQueryService;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.MemoryService;
-import com.trading.service.TradeOrchestrator;
+import com.trading.service.TradeService;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -58,7 +58,7 @@ class AccountControllerWriteSecurityTest {
     private AccountProvisioner accountProvisioner;
 
     @MockBean
-    private TradeOrchestrator tradeOrchestrator;
+    private TradeService tradeService;
 
     @MockBean
     private AgentIdentityService agentIdentityService;
@@ -108,7 +108,7 @@ class AccountControllerWriteSecurityTest {
         // ADMIN happy path must wire downstream stubs so the controller actually returns 201.
         if (expectedStatus == 201) {
             stubProvisioner();
-            stubTradeOrchestrator();
+            stubTradeService();
         }
 
         var request = post(endpoint).contentType(MediaType.APPLICATION_JSON).content(body);
@@ -143,10 +143,10 @@ class AccountControllerWriteSecurityTest {
                 .thenReturn(account);
     }
 
-    private void stubTradeOrchestrator() {
+    private void stubTradeService() {
         org.mockito.Mockito.when(agentIdentityService.requireAgentName(anyLong()))
                 .thenReturn("Warren");
-        org.mockito.Mockito.when(tradeOrchestrator.buyShares(anyString(), anyString(), anyInt(), any()))
+        org.mockito.Mockito.when(tradeService.buyShares(anyString(), anyString(), anyInt(), any()))
                 .thenReturn(new com.trading.dto.response.TradeResult(1L, "AAPL", 10, 150.0, 98500.0));
     }
 }

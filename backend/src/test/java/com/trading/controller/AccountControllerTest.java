@@ -12,7 +12,7 @@ import com.trading.service.AccountProvisioner;
 import com.trading.service.AccountQueryService;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.MemoryService;
-import com.trading.service.TradeOrchestrator;
+import com.trading.service.TradeService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,7 +42,7 @@ class AccountControllerTest {
     private AccountProvisioner accountProvisioner;
 
     @MockBean
-    private TradeOrchestrator tradeOrchestrator;
+    private TradeService tradeService;
 
     @MockBean
     private AgentIdentityService agentIdentityService;

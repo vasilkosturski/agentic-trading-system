@@ -12,7 +12,7 @@ import com.trading.service.AccountProvisioner;
 import com.trading.service.AccountQueryService;
 import com.trading.service.AgentIdentityService;
 import com.trading.service.MemoryService;
-import com.trading.service.TradeOrchestrator;
+import com.trading.service.TradeService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -41,7 +41,7 @@ public class AccountController {
     private AccountProvisioner accountProvisioner;
 
     @Autowired
-    private TradeOrchestrator tradeOrchestrator;
+    private TradeService tradeService;
 
     @Autowired
     private AgentIdentityService agentIdentityService;
@@ -83,9 +83,9 @@ public class AccountController {
         TradeResult result;
 
         if (request.getType() == TradeType.BUY) {
-            result = tradeOrchestrator.buyShares(name, request.getSymbol(), request.getQuantity(), request.getRunId());
+            result = tradeService.buyShares(name, request.getSymbol(), request.getQuantity(), request.getRunId());
         } else {
-            result = tradeOrchestrator.sellShares(name, request.getSymbol(), request.getQuantity(), request.getRunId());
+            result = tradeService.sellShares(name, request.getSymbol(), request.getQuantity(), request.getRunId());
         }
 
         return ResponseEntity.status(201).body(result);
