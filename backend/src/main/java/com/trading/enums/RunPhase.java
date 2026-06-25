@@ -22,4 +22,10 @@ public enum RunPhase {
     public boolean canTransitionTo(RunPhase target) {
         return VALID_TRANSITIONS.getOrDefault(this, Set.of()).contains(target);
     }
+
+    public void requireTransitionTo(RunPhase to) {
+        if (to == null || !this.canTransitionTo(to)) {
+            throw new IllegalArgumentException("Invalid phase transition: " + this + " -> " + to);
+        }
+    }
 }

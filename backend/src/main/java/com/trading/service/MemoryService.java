@@ -221,7 +221,12 @@ public class MemoryService {
 
             // Extract reasoning from DecisionPhase if available
             DecisionPhase decision = run.getDecision();
-            ReasoningSummaryExtractor.extractSummary(decision).ifPresent(runDto::setSummary);
+            if (decision != null && decision.getReasoning() != null) {
+                String summary = decision.getReasoning().getResearchContext();
+                if (summary != null && !summary.isEmpty()) {
+                    runDto.setSummary(summary);
+                }
+            }
 
             // Extract trade info from ExecutionPhase if available
             ExecutionPhase execution = run.getExecution();

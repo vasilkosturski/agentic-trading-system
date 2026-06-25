@@ -1,17 +1,16 @@
-package com.trading.service;
+package com.trading.enums;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.trading.enums.RunPhase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 
-@DisplayName("RunStateMachine tests")
-class RunStateMachineTest {
+@DisplayName("RunPhase tests")
+class RunPhaseTest {
 
     // ========== Valid transitions ==========
 
@@ -30,7 +29,7 @@ class RunStateMachineTest {
     })
     @DisplayName("Valid transitions do not throw")
     void validTransitions_DoNotThrow(RunPhase from, RunPhase to) {
-        assertThatCode(() -> RunStateMachine.requireValidTransition(from, to)).doesNotThrowAnyException();
+        assertThatCode(() -> from.requireTransitionTo(to)).doesNotThrowAnyException();
     }
 
     // ========== Invalid transitions ==========
@@ -71,7 +70,7 @@ class RunStateMachineTest {
     })
     @DisplayName("Invalid transitions throw IllegalArgumentException")
     void invalidTransitions_ThrowIllegalArgumentException(RunPhase from, RunPhase to) {
-        assertThatThrownBy(() -> RunStateMachine.requireValidTransition(from, to))
+        assertThatThrownBy(() -> from.requireTransitionTo(to))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Invalid phase transition: " + from + " -> " + to);
     }
@@ -81,27 +80,17 @@ class RunStateMachineTest {
     @Test
     @DisplayName("Exception message format matches 'Invalid phase transition: X -> Y'")
     void invalidTransition_MessageFormatIsPinned() {
-        assertThatThrownBy(() -> RunStateMachine.requireValidTransition(RunPhase.DECIDING, RunPhase.INITIALIZING))
+        assertThatThrownBy(() -> RunPhase.DECIDING.requireTransitionTo(RunPhase.INITIALIZING))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Invalid phase transition: DECIDING -> INITIALIZING");
     }
 
     // ========== Edge cases ==========
 
-    @ParameterizedTest(name = "null from -> {0} throws NullPointerException")
-    @EnumSource(RunPhase.class)
-    @DisplayName("null from phase throws NullPointerException (pins current behavior)")
-    void nullFromPhase_ThrowsNullPointerException(RunPhase to) {
-        assertThatThrownBy(() -> RunStateMachine.requireValidTransition(null, to))
-                .isInstanceOf(NullPointerException.class);
-    }
-
-    @ParameterizedTest(name = "{0} -> null throws NullPointerException")
+    @ParameterizedTest(name = "{0} -> null throws IllegalArgumentException")
     @EnumSource(value = RunPhase.class)
-    @DisplayName(
-            "null to phase throws NullPointerException (pins current behavior — Set.contains(null) on immutable Set)")
-    void nullToPhase_ThrowsNullPointerException(RunPhase from) {
-        assertThatThrownBy(() -> RunStateMachine.requireValidTransition(from, null))
-                .isInstanceOf(NullPointerException.class);
+    @DisplayName("null to phase throws IllegalArgumentException")
+    void nullToPhase_ThrowsIllegalArgumentException(RunPhase from) {
+        assertThatThrownBy(() -> from.requireTransitionTo(null)).isInstanceOf(IllegalArgumentException.class);
     }
 }

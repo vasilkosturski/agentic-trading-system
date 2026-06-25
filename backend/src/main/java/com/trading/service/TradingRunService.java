@@ -98,7 +98,7 @@ public class TradingRunService {
         TradingRun run = getRun(runId);
         RunPhase currentPhase = run.getPhase();
 
-        RunStateMachine.requireValidTransition(currentPhase, newPhase);
+        currentPhase.requireTransitionTo(newPhase);
 
         if (newPhase == RunPhase.FAILED) {
             run.markAsError(errorMessage);
@@ -150,7 +150,7 @@ public class TradingRunService {
         // transition table only permits DECIDING (HOLD path) and TRADING (BUY/SELL
         // path) to reach COMPLETED — any other source phase is a malformed cycle
         // and must fail loud rather than silently flipping the run to COMPLETED.
-        RunStateMachine.requireValidTransition(run.getPhase(), RunPhase.COMPLETED);
+        run.getPhase().requireTransitionTo(RunPhase.COMPLETED);
         run.markAsCompleted();
         tradingRunRepository.save(run);
 

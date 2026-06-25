@@ -23,12 +23,4 @@ public class AgentIdentityService {
     public String requireAgentName(Long agentId) {
         return requireAgent(agentId).getName();
     }
-
-    public Long requireAgentIdByName(String agentName) {
-        return tradingAgentRepository
-                .findByName(agentName)
-                .map(TradingAgent::getId)
-                .orElseThrow(() ->
-                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found with name: " + agentName));
-    }
 }

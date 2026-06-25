@@ -290,10 +290,10 @@ class TradingRunServiceTest {
 
         @BeforeEach
         void putRunInCompletablePhase() {
-            // RunStateMachine guards completeRun against malformed cycles:
-            // only DECIDING (HOLD path) and TRADING (BUY/SELL path) may legally
-            // transition to COMPLETED. Tests that mock a run for completeRun
-            // must put it in one of those phases first.
+            // RunPhase.requireTransitionTo guards completeRun against malformed
+            // cycles: only DECIDING (HOLD path) and TRADING (BUY/SELL path) may
+            // legally transition to COMPLETED. Tests that mock a run for
+            // completeRun must put it in one of those phases first.
             testRun.updatePhase(RunPhase.TRADING);
         }
 
