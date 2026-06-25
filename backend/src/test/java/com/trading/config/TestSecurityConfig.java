@@ -3,7 +3,7 @@ package com.trading.config;
 import com.trading.security.JwtAuthenticationFilter;
 import com.trading.security.JwtTokenProvider;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Test configuration that provides mock beans for JWT security components.
@@ -12,9 +12,9 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 @TestConfiguration
 public class TestSecurityConfig {
 
-    @MockBean
+    @MockitoBean
     public JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    @MockBean
+    @MockitoBean
     public JwtTokenProvider jwtTokenProvider;
 }
