@@ -157,9 +157,12 @@ agent_logs/
 agents/tests/e2e/results/
 
 # ConPort database and vector data
-context_portal/# Test hook - Fri Dec  5 23:38:11 EET 2025
-# Test hook - Fri Dec  5 23:40:01 EET 2025
+context_portal/
 .ruff_cache/
 
 # Git worktrees
 .worktrees/
+
+# Operational notes — kept locally, not for the public repo
+reports/trading-cycles/
+tasks/
