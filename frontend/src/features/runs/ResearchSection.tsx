@@ -1,47 +1,17 @@
-import { Paper, Title, Group, Text, Badge, Anchor } from '@mantine/core'
+import { Anchor, Badge, Group, Text } from '@mantine/core'
 import Markdown from 'react-markdown'
 import type { ResearchPhase } from '@/lib/types.ts'
-import GuardrailBadge from './GuardrailBadge.tsx'
-import PhaseMetrics from './PhaseMetrics.tsx'
-import PromptsAccordion from './PromptsAccordion.tsx'
-import ToolCallsTable from './ToolCallsTable.tsx'
+import PhaseCard from './PhaseCard.tsx'
+import PhaseEmptyState from './PhaseEmptyState.tsx'
 import classes from './RunDetail.module.css'
 
 function ResearchSection({ research }: { research: ResearchPhase | null }) {
-  if (!research) {
-    return (
-      <Paper p="lg" shadow="xs" mb="md">
-        <Title order={3} mb="sm">Research Phase</Title>
-        <Text c="dimmed">Phase not completed</Text>
-      </Paper>
-    )
-  }
+  if (!research) return <PhaseEmptyState title="Research Phase" />
 
   const webSources = research.sources.filter((s) => s.type !== 'system_context')
 
   return (
-    <Paper p="lg" shadow="xs" mb="md">
-      <Group justify="space-between" mb="sm">
-        <Group gap="sm">
-          <Title order={3}>Research Phase</Title>
-          <GuardrailBadge
-            outcome={research.guardrailOutcome}
-            attempts={research.guardrailAttempts}
-            issues={research.guardrailIssues}
-            failedOutput={research.guardrailFailedOutput}
-          />
-        </Group>
-        {research.latencyMs != null && <Text c="dimmed" size="sm">Completed in {research.latencyMs.toLocaleString()}ms</Text>}
-      </Group>
-
-      <PhaseMetrics phase={research} />
-
-      <PromptsAccordion
-        label="Research Instructions"
-        systemPrompt={research.systemPrompt}
-        taskPrompt={research.taskPrompt}
-      />
-
+    <PhaseCard title="Research Phase" phase={research} promptLabel="Research Instructions">
       <Text fw={600} mb={4}>Candidates</Text>
       <Group gap="xs" mb="md">
         {research.candidates.map((c) => (
@@ -72,9 +42,7 @@ function ResearchSection({ research }: { research: ResearchPhase | null }) {
           </ul>
         </>
       )}
-
-      <ToolCallsTable toolCalls={research.toolCalls} />
-    </Paper>
+    </PhaseCard>
   )
 }
 

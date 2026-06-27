@@ -1,16 +1,10 @@
 import { Paper, Title, Group, Text, Badge, Alert } from '@mantine/core'
 import type { ExecutionPhase } from '@/lib/types.ts'
 import { statusColor, decisionColor } from '@/lib/utils.ts'
+import PhaseEmptyState from './PhaseEmptyState.tsx'
 
 function ExecutionSection({ execution }: { execution: ExecutionPhase | null }) {
-  if (!execution) {
-    return (
-      <Paper p="lg" shadow="xs" mb="md">
-        <Title order={3} mb="sm">Execution Phase</Title>
-        <Text c="dimmed">Phase not completed</Text>
-      </Paper>
-    )
-  }
+  if (!execution) return <PhaseEmptyState title="Execution Phase" />
 
   return (
     <Paper p="lg" shadow="xs" mb="md">

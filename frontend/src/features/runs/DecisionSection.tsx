@@ -1,48 +1,16 @@
-import { Paper, Title, Group, Text, Badge } from '@mantine/core'
+import { Paper, Group, Text, Badge } from '@mantine/core'
 import Markdown from 'react-markdown'
 import type { DecisionPhase } from '@/lib/types.ts'
 import { decisionColor } from '@/lib/utils.ts'
-import GuardrailBadge from './GuardrailBadge.tsx'
-import PhaseMetrics from './PhaseMetrics.tsx'
-import PromptsAccordion from './PromptsAccordion.tsx'
-import ToolCallsTable from './ToolCallsTable.tsx'
+import PhaseCard from './PhaseCard.tsx'
+import PhaseEmptyState from './PhaseEmptyState.tsx'
 import classes from './RunDetail.module.css'
 
 function DecisionSection({ decision }: { decision: DecisionPhase | null }) {
-  if (!decision) {
-    return (
-      <Paper p="lg" shadow="xs" mb="md">
-        <Title order={3} mb="sm">Decision Phase</Title>
-        <Text c="dimmed">Phase not completed</Text>
-      </Paper>
-    )
-  }
+  if (!decision) return <PhaseEmptyState title="Decision Phase" />
 
   return (
-    <Paper p="lg" shadow="xs" mb="md">
-      <Group justify="space-between" mb="sm">
-        <Group gap="sm">
-          <Title order={3}>Decision Phase</Title>
-          <GuardrailBadge
-            outcome={decision.guardrailOutcome}
-            attempts={decision.guardrailAttempts}
-            issues={decision.guardrailIssues}
-            failedOutput={decision.guardrailFailedOutput}
-          />
-        </Group>
-        {decision.latencyMs != null && (
-          <Text c="dimmed" size="sm">Completed in {decision.latencyMs.toLocaleString()}ms</Text>
-        )}
-      </Group>
-
-      <PhaseMetrics phase={decision} />
-
-      <PromptsAccordion
-        label="Decision Instructions"
-        systemPrompt={decision.systemPrompt}
-        taskPrompt={decision.taskPrompt}
-      />
-
+    <PhaseCard title="Decision Phase" phase={decision} promptLabel="Decision Instructions">
       <Group gap="sm" mb="md">
         <Badge color={decisionColor(decision.decision)} variant="light" size="lg">
           {decision.decision}
@@ -84,9 +52,7 @@ function DecisionSection({ decision }: { decision: DecisionPhase | null }) {
           </Paper>
         </>
       )}
-
-      <ToolCallsTable toolCalls={decision.toolCalls} />
-    </Paper>
+    </PhaseCard>
   )
 }
 
