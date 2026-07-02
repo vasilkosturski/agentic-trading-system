@@ -28,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
@@ -39,7 +40,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -53,7 +53,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * real {@link JwtAuthenticationFilter}, so the security filter chain itself is the
  * unit under test across multiple controllers.
  *
- * <p><strong>Critical gotcha — DO NOT {@code @MockitoBean} {@link JwtAuthenticationFilter}.</strong>
+ * <p><strong>Critical gotcha — DO NOT {@code @MockBean} {@link JwtAuthenticationFilter}.</strong>
  * A Mockito mock of a Servlet {@code Filter} returns {@code void} from
  * {@code doFilter(...)} without invoking {@code chain.doFilter()}, which silently
  * short-circuits the chain and produces phantom 200 responses with
@@ -73,7 +73,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * {@code @Scheduled} machinery is noisy here) and the test-only
  * {@code TestSecurityConfig} (which would re-{@code MockBean} {@code JwtTokenProvider}
  * and clash with ours). All controller-facing services are provided as
- * {@code @MockitoBean}s so controllers are reachable by the dispatcher and the filter
+ * {@code @MockBean}s so controllers are reachable by the dispatcher and the filter
  * chain (not a {@code NullPointerException}) decides the status code.
  *
  * <p><strong>What this test pins down.</strong> Two assertions cover the login
@@ -118,7 +118,7 @@ class SecurityChainIntegrationTest {
      * Application context for this test: scans the whole {@code com.trading} package
      * as the real app does, but excludes {@code ScheduledSnapshotService} (whose
      * {@code @Scheduled} methods would activate during refresh) and the test-only
-     * {@code TestSecurityConfig} (which already {@code @MockitoBean}s
+     * {@code TestSecurityConfig} (which already {@code @MockBean}s
      * {@code JwtTokenProvider} and would conflict with our own mock). Spring Boot's
      * default auto-configurations are left active so the real {@code SecurityConfig},
      * {@code JwtAuthenticationFilter}, and MVC dispatcher all wire normally. The
@@ -138,8 +138,8 @@ class SecurityChainIntegrationTest {
                             // the @EnableScheduling refresh phase quiet.
                             "com\\.trading\\.service\\.ScheduledSnapshotService",
                             // Test-only @TestConfiguration that lives in the same package
-                            // and ALSO @MockitoBeans JwtTokenProvider — would clash with our
-                            // own @MockitoBean on the same type.
+                            // and ALSO @MockBeans JwtTokenProvider — would clash with our
+                            // own @MockBean on the same type.
                             "com\\.trading\\.config\\.TestSecurityConfig"
                         })
             })
@@ -160,7 +160,7 @@ class SecurityChainIntegrationTest {
      * {@code UserDetailsService} and {@code BCryptPasswordEncoder} to round-trip
      * credentials; mocking it isolates this test from password-hashing details.
      */
-    @MockitoBean
+    @MockBean
     private AuthenticationManager authenticationManager;
 
     /**
@@ -171,36 +171,36 @@ class SecurityChainIntegrationTest {
      * resolvable at bean-creation time and makes the success path of the login
      * assertion return a deterministic stub token.
      */
-    @MockitoBean
+    @MockBean
     private JwtTokenProvider jwtTokenProvider;
 
     // ----- Service-layer collaborators (all DB-touching) -----
 
-    @MockitoBean
+    @MockBean
     private AccountQueryService accountQueryService;
 
-    @MockitoBean
+    @MockBean
     private AccountProvisioner accountProvisioner;
 
-    @MockitoBean
+    @MockBean
     private AgentIdentityService agentIdentityService;
 
-    @MockitoBean
+    @MockBean
     private MemoryService memoryService;
 
-    @MockitoBean
+    @MockBean
     private TradingRunService tradingRunService;
 
-    @MockitoBean
+    @MockBean
     private PortfolioService portfolioService;
 
-    @MockitoBean
+    @MockBean
     private MarketService marketService;
 
-    @MockitoBean
+    @MockBean
     private PriceCacheService priceCacheService;
 
-    @MockitoBean
+    @MockBean
     private PromptLoader promptLoader;
 
     /**
@@ -208,7 +208,7 @@ class SecurityChainIntegrationTest {
      * (no service in between), so it must be mocked even though every other DB-facing
      * collaborator is a service.
      */
-    @MockitoBean
+    @MockBean
     private TradingAgentRepository tradingAgentRepository;
 
     // =====================================================================

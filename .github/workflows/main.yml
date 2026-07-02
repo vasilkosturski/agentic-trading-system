@@ -47,7 +47,9 @@ jobs:
       - name: install
         run: pip install -e ".[test]"
       - name: pytest (unit only)
-        run: pytest -m "not integration and not e2e" -q
+        env:
+          RUN_EVERY_N_MINUTES: "60"
+        run: pytest --ignore=tests/e2e -m "not integration and not e2e" -q
 
   frontend-test:
     name: Frontend tests + build

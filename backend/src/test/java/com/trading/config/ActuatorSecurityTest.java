@@ -22,12 +22,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -47,7 +47,7 @@ import org.springframework.test.web.servlet.MockMvc;
  *
  * <p>Reuses the DB-free {@code @SpringBootTest} fixture pattern documented on
  * {@link SecurityChainIntegrationTest}: in-memory SQLite stand-in for PostgreSQL so the
- * JPA infrastructure can wire without Testcontainers, and {@code @MockitoBean}s for every
+ * JPA infrastructure can wire without Testcontainers, and {@code @MockBean}s for every
  * DB-touching service so controllers are reachable by the dispatcher and the filter chain
  * (not an NPE) decides the status code.
  *
@@ -99,7 +99,7 @@ class ActuatorSecurityTest {
 
     // ----- Security collaborators -----
 
-    @MockitoBean
+    @MockBean
     private AuthenticationManager authenticationManager;
 
     /**
@@ -107,39 +107,39 @@ class ActuatorSecurityTest {
      * {@code @Component} scanning) calls into the provider. Unauth requests never invoke
      * it; admin requests use {@code @WithMockUser} which bypasses JWT entirely.
      */
-    @MockitoBean
+    @MockBean
     private JwtTokenProvider jwtTokenProvider;
 
     // ----- Service-layer collaborators (all DB-touching) -----
 
-    @MockitoBean
+    @MockBean
     private AccountQueryService accountQueryService;
 
-    @MockitoBean
+    @MockBean
     private AccountProvisioner accountProvisioner;
 
-    @MockitoBean
+    @MockBean
     private AgentIdentityService agentIdentityService;
 
-    @MockitoBean
+    @MockBean
     private MemoryService memoryService;
 
-    @MockitoBean
+    @MockBean
     private TradingRunService tradingRunService;
 
-    @MockitoBean
+    @MockBean
     private PortfolioService portfolioService;
 
-    @MockitoBean
+    @MockBean
     private MarketService marketService;
 
-    @MockitoBean
+    @MockBean
     private PriceCacheService priceCacheService;
 
-    @MockitoBean
+    @MockBean
     private PromptLoader promptLoader;
 
-    @MockitoBean
+    @MockBean
     private TradingAgentRepository tradingAgentRepository;
 
     // =====================================================================

@@ -18,13 +18,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -41,7 +41,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * </ul>
  *
  * <p>This test cannot use the shared TestSecurityConfig because that config
- * mocks JwtAuthenticationFilter via @MockitoBean — and a Mockito mock of a Filter
+ * mocks JwtAuthenticationFilter via @MockBean — and a Mockito mock of a Filter
  * does NOT propagate the chain (it returns void without calling chain.doFilter),
  * which short-circuits MockMvc and produces phantom 200s with Handler=null.
  * Instead we provide a real JwtAuthenticationFilter wired to mocked dependencies,
@@ -56,13 +56,13 @@ class TradingRunControllerAdminSecurityTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockitoBean
+    @MockBean
     private TradingRunService tradingRunService;
 
-    @MockitoBean
+    @MockBean
     private JwtTokenProvider jwtTokenProvider;
 
-    @MockitoBean
+    @MockBean
     private TradingPublicProperties tradingPublicProperties;
 
     /**

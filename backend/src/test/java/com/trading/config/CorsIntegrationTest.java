@@ -23,11 +23,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -61,7 +61,7 @@ import org.springframework.test.web.servlet.MockMvc;
  *
  * <p>Same DB-free SQLite stand-in pattern as {@link SecurityChainIntegrationTest}
  * (see its class-level JavaDoc for the diagnosis around why
- * {@link JwtAuthenticationFilter} must NOT be {@code @MockitoBean}'d and why the
+ * {@link JwtAuthenticationFilter} must NOT be {@code @MockBean}'d and why the
  * SQLite {@code DataSource} is harmless when no test touches a repository).
  */
 @SpringBootTest(
@@ -88,7 +88,7 @@ class CorsIntegrationTest {
      * Same exclusion shape as {@link SecurityChainIntegrationTest.DbFreeContext}:
      * {@link ScheduledSnapshotService} is dropped because its {@code @Scheduled}
      * methods are noise here, and {@code TestSecurityConfig} is dropped because
-     * its {@code @MockitoBean}s would clash with the ones declared below.
+     * its {@code @MockBean}s would clash with the ones declared below.
      */
     @Configuration
     @ComponentScan(
@@ -109,42 +109,42 @@ class CorsIntegrationTest {
 
     // ----- Security collaborators (same rationale as SecurityChainIntegrationTest) -----
 
-    @MockitoBean
+    @MockBean
     private AuthenticationManager authenticationManager;
 
-    @MockitoBean
+    @MockBean
     private JwtTokenProvider jwtTokenProvider;
 
     // ----- Service-layer collaborators (all DB-touching) -----
 
-    @MockitoBean
+    @MockBean
     private AccountQueryService accountQueryService;
 
-    @MockitoBean
+    @MockBean
     private AccountProvisioner accountProvisioner;
 
-    @MockitoBean
+    @MockBean
     private AgentIdentityService agentIdentityService;
 
-    @MockitoBean
+    @MockBean
     private MemoryService memoryService;
 
-    @MockitoBean
+    @MockBean
     private TradingRunService tradingRunService;
 
-    @MockitoBean
+    @MockBean
     private PortfolioService portfolioService;
 
-    @MockitoBean
+    @MockBean
     private MarketService marketService;
 
-    @MockitoBean
+    @MockBean
     private PriceCacheService priceCacheService;
 
-    @MockitoBean
+    @MockBean
     private PromptLoader promptLoader;
 
-    @MockitoBean
+    @MockBean
     private TradingAgentRepository tradingAgentRepository;
 
     @Test
