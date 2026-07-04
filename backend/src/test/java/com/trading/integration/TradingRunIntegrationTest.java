@@ -26,7 +26,7 @@ import com.trading.repository.TradingRunRepository;
 import com.trading.service.RunDtoMapper;
 import com.trading.service.RunSpecificationFactory;
 import com.trading.service.TradingRunService;
-import com.trading.testsupport.SharedPostgresContainer;
+import com.trading.testsupport.TestcontainersConfiguration;
 import java.util.Arrays;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,9 +34,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
 /**
  * Integration tests for Trading Runs API.
@@ -48,13 +47,9 @@ import org.springframework.test.context.DynamicPropertySource;
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Import(TestcontainersConfiguration.class)
 @DisplayName("TradingRun Integration Tests")
 class TradingRunIntegrationTest {
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        SharedPostgresContainer.register(registry);
-    }
 
     @Autowired
     private TradingAgentRepository tradingAgentRepository;

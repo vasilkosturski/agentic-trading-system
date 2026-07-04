@@ -10,7 +10,7 @@ import static org.mockito.Mockito.verify;
 
 import com.trading.entity.PriceCache;
 import com.trading.repository.PriceCacheRepository;
-import com.trading.testsupport.SharedPostgresContainer;
+import com.trading.testsupport.TestcontainersConfiguration;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,9 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.retry.support.RetryTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
@@ -42,17 +41,13 @@ import org.springframework.web.client.RestTemplate;
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Import(TestcontainersConfiguration.class)
 @DisplayName("PriceCacheService Integration Tests")
 class PriceCacheServiceIntegrationTest {
 
     private static final int TTL_MINUTES = 60;
     private static final String FINNHUB_BASE_URL = "https://finnhub.io/api/v1";
     private static final String FINNHUB_API_KEY = "test-key";
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        SharedPostgresContainer.register(registry);
-    }
 
     @Autowired
     private PriceCacheRepository priceCacheRepository;

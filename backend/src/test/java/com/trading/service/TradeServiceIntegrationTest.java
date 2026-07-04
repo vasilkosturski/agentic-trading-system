@@ -18,7 +18,7 @@ import com.trading.repository.AccountTransactionRepository;
 import com.trading.repository.TradingAccountRepository;
 import com.trading.repository.TradingAgentRepository;
 import com.trading.repository.TradingRunRepository;
-import com.trading.testsupport.SharedPostgresContainer;
+import com.trading.testsupport.TestcontainersConfiguration;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,8 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.context.annotation.Import;
 
 /**
  * Integration tests for {@link TradeService} — verifies that the
@@ -45,13 +44,9 @@ import org.springframework.test.context.DynamicPropertySource;
  */
 @SpringBootTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Import(TestcontainersConfiguration.class)
 @DisplayName("TradeService integration tests")
 class TradeServiceIntegrationTest {
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        SharedPostgresContainer.register(registry);
-    }
 
     @Autowired
     private TradeService tradeService;
