@@ -6,6 +6,7 @@ name: CI/CD — main
 on:
   push:
     branches: [main]
+  workflow_dispatch: {}
 
 concurrency:
   group: main-${{ github.ref }}
