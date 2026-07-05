@@ -1,0 +1,77 @@
+name: Promote to production
+
+# Phase 4: manual, approval-gated promotion of a staging-verified build to prod.
+# Retags the exact :sha-<commit> images that ran on staging to :prod-<commit>
+# (bit-identical — no rebuild) and rolls the production deployments.
+#
+# The `environment: production` gate below makes this run WAIT for a required
+# reviewer's approval in the Actions UI before any step executes.
+# One-time setup: repo Settings → Environments → New environment "production"
+# → add yourself as a Required reviewer. Until that reviewer exists there is
+# no gate (GitHub auto-creates an unprotected environment on first use).
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: "Git SHA whose staging-validated images to promote. Blank = latest commit on the ref you run this from."
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    name: Promote to prod
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Resolve SHA to promote
+        id: sha
+        run: |
+          SHA="${{ github.event.inputs.commit_sha }}"
+          [ -z "$SHA" ] && SHA="${{ github.sha }}"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Promoting sha-$SHA"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: vasilkosturski
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Retag staging images to :prod-<sha> (bit-identical, registry-side)
+        env:
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          for c in backend frontend agents; do
+            img=ghcr.io/vasilkosturski/agentic-trading-$c
+            docker buildx imagetools create -t "$img:prod-$SHA" "$img:sha-$SHA"
+          done
+
+      - name: Deploy production
+        env:
+          SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          HOST: ${{ secrets.HETZNER_HOST }}
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          SSH="ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=20 root@$HOST"
+          for c in backend frontend agents; do
+            echo "::group::deploy prod $c"
+            $SSH "kubectl -n agentic-trading set image deployment/$c $c=ghcr.io/vasilkosturski/agentic-trading-$c:prod-$SHA"
+            $SSH "kubectl -n agentic-trading rollout status deployment/$c --timeout=180s"
+            echo "::endgroup::"
+          done
+
+      - name: Prod smoke (confirm it actually serves)
+        run: |
+          base=https://agentic-trading.vkontech.com
+          curl -fsS --max-time 30 "$base/actuator/health" >/dev/null
+          curl -fsS --max-time 30 "$base/api/agents"       >/dev/null
+          echo "prod smoke OK — promoted sha-${{ steps.sha.outputs.sha }}"

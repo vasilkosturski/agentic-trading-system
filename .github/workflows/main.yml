@@ -131,3 +131,9 @@ jobs:
             $SSH "kubectl -n agentic-trading-staging rollout status deployment/$c --timeout=180s"
             echo "::endgroup::"
           done
+      - name: Staging smoke (confirm it actually serves)
+        run: |
+          base=https://staging.agentic-trading.vkontech.com
+          curl -fsS --max-time 30 "$base/actuator/health" >/dev/null
+          curl -fsS --max-time 30 "$base/api/agents"       >/dev/null
+          echo "staging smoke OK"
