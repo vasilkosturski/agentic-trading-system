@@ -87,7 +87,7 @@ async def run_cycle(
     resolved_model = model_name if model_name is not None else config.OPENAI_MODEL
 
     logger.info(
-        f"🤖 {name} starting portfolio review at " f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        f"🤖 {name} starting portfolio review at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     )
 
     lifecycle = Lifecycle(agent_id, name)
@@ -182,8 +182,7 @@ def _build_decision_sources(ctx: RunContext) -> list[SourceDto]:
         ],
         SourceDto.system_context(f"Portfolio: ${ctx.balance:,.2f}, {len(ctx.holdings)} positions"),
         SourceDto.system_context(
-            f"Recent activity: "
-            f"{len(ctx.recent_activity.runs) if ctx.recent_activity else 0} runs"
+            f"Recent activity: {len(ctx.recent_activity.runs) if ctx.recent_activity else 0} runs"
         ),
     ]
 

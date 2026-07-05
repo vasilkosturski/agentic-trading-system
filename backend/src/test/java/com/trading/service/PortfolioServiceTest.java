@@ -87,6 +87,7 @@ class PortfolioServiceTest {
                             "Warren", FILTER_START, FILTER_END))
                     .thenReturn(Arrays.asList(snapshot));
             case ALL -> when(snapshotRepository.findAllOrderByTimestampDesc()).thenReturn(Arrays.asList(snapshot));
+            default -> throw new IllegalStateException("Unhandled RepoMethod: " + expected);
         }
 
         List<PortfolioSnapshotDto> result = portfolioService.getSnapshots(agentName, start, end, null);
@@ -99,6 +100,7 @@ class PortfolioServiceTest {
             case BY_AGENT_AND_DATE_RANGE -> verify(snapshotRepository, times(1))
                     .findByAgentNameAndDateRange("Warren", FILTER_START, FILTER_END);
             case ALL -> verify(snapshotRepository, times(1)).findAllOrderByTimestampDesc();
+            default -> throw new IllegalStateException("Unhandled RepoMethod: " + expected);
         }
     }
 

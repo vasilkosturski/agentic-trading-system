@@ -110,6 +110,7 @@ class TradingRunControllerWriteSecurityTest {
             case UPDATE_PHASE -> verify(tradingRunService, never()).updatePhase(anyLong(), any(), any());
             case COMPLETE_RUN -> verify(tradingRunService, never()).completeRun(anyLong(), any());
             case PHASE_FAILURE -> verify(tradingRunService, never()).recordPhaseFailure(anyLong(), any());
+            default -> throw new IllegalArgumentException("Unexpected endpoint: " + endpoint);
         }
     }
 

@@ -1,7 +1,14 @@
 name: CI/CD — main
 
-# Phase 1b: on every push to main → run unit tests → build+push 3 images to GHCR
-# (:sha-<commit> + :latest) → deploy staging by rolling each deployment to the new SHA.
+# Phase 1b: on every push to main → lint + unit-test each component → build+push
+# 3 images to GHCR (:sha-<commit> + :latest) → deploy staging by rolling each
+# deployment to the new SHA.
+#
+# Lint runs as a HARD GATE inside each component job (before its tests) plus a
+# standalone Dockerfile-lint job — build-push depends on all four, so any lint
+# failure blocks the build and the deploy. This pipeline is the single gate:
+# every check (format, style, types, tests, Dockerfile lint) runs here on push
+# to main, so a dirty commit can never reach staging or production.
 
 on:
   push:
@@ -16,8 +23,8 @@ permissions:
   contents: read
 
 jobs:
-  backend-test:
-    name: Backend tests
+  backend:
+    name: Backend lint + test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -29,11 +36,15 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: gradle
-      - name: gradle test
-        run: ./gradlew test --no-daemon
+      - name: spotlessCheck
+        run: ./gradlew --no-daemon spotlessCheck
+      - name: checkstyle
+        run: ./gradlew --no-daemon checkstyleMain checkstyleTest
+      - name: test
+        run: ./gradlew --no-daemon test
 
-  agents-test:
-    name: Agents tests
+  agents:
+    name: Agents lint + test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -46,14 +57,22 @@ jobs:
           cache: pip
           cache-dependency-path: agents/pyproject.toml
       - name: install
-        run: pip install -e ".[test]"
+        run: pip install -e ".[test,lint]"
+      - name: ruff check
+        run: ruff check .
+      - name: ruff format --check
+        run: ruff format --check .
+      - name: mypy
+        run: |
+          mypy ai_agents api backend infra mcp_helpers models phase_runner tools utils \
+               agent_registry.py config.py logging_config.py trading_system.py
       - name: pytest (unit only)
         env:
           RUN_EVERY_N_MINUTES: "60"
         run: pytest --ignore=tests/e2e -m "not integration and not e2e" -q
 
-  frontend-test:
-    name: Frontend tests + build
+  frontend:
+    name: Frontend lint + test + build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -67,14 +86,33 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: npm ci
         run: npm ci
+      - name: eslint
+        run: npm run lint
+      - name: tsc --noEmit
+        run: npx tsc --noEmit
       - name: test
         run: npm run test -- --run
       - name: build
         run: npm run build
 
+  dockerfile-lint:
+    name: Dockerfile lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: hadolint (all Dockerfiles)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          recursive: true
+          failure-threshold: warning
+          # DL3008/DL3013/DL3018 are apt/npm/apk version-pinning rules and
+          # DL3059 flags consecutive RUN instructions — silenced so the gate
+          # lands without an upfront base-image and package-pinning cleanup.
+          ignore: DL3008,DL3013,DL3018,DL3059
+
   build-push:
     name: Build & push (${{ matrix.component }})
-    needs: [backend-test, agents-test, frontend-test]
+    needs: [backend, agents, frontend, dockerfile-lint]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

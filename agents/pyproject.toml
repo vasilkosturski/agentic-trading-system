@@ -36,11 +36,14 @@ test = [
     "pytest-docker>=3.1.0",
     "aioresponses>=0.7.8",
     "psycopg2-binary>=2.9.0",
-    "mypy>=1.0.0",
+    "mypy==1.15.0",
 ]
+# ruff and mypy are pinned to exact versions: both gate the CI pipeline, and
+# a floating range lets a new release reformat code or surface new findings on
+# an unrelated push. Bump deliberately when we choose to review the churn.
 lint = [
-    "ruff>=0.6.0",
-    "mypy>=1.0.0",
+    "ruff==0.15.20",
+    "mypy==1.15.0",
 ]
 
 [tool.ruff]

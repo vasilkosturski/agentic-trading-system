@@ -448,7 +448,7 @@ class TestFailedOutputCapture:
         ]
         excs = [
             _make_guardrail_exception(
-                output_info={"issues": [f"e{i+1}"]},
+                output_info={"issues": [f"e{i + 1}"]},
                 new_items=[_make_message_output_item(json.dumps(payload))],
             )
             for i, payload in enumerate(attempt_payloads)
