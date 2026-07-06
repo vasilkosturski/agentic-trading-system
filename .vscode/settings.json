@@ -5,6 +5,11 @@
         "source.fixAll.ruff": "explicit",
         "source.organizeImports.ruff": "explicit"
     },
+    // Format-on-save must use the project venv's ruff (pinned to the same
+    // version as CI in agents/pyproject.toml), NOT the extension's bundled
+    // ruff. A version mismatch silently reformats files to a style CI then
+    // rejects. Keep agents/venv on the pinned ruff: pip install -e "agents[lint]".
+    "ruff.importStrategy": "fromEnvironment",
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff",
         "editor.formatOnSave": true
