@@ -201,9 +201,8 @@ class TestMarketAnalystE2E:
 
             # Agent should always find at least one candidate stock
             assert isinstance(response.candidates, list)
-            assert (
-                len(response.candidates) >= 1
-            ), "Market Analyst should find at least one candidate"
+            candidate_msg = "Market Analyst should find at least one candidate"
+            assert len(response.candidates) >= 1, candidate_msg
             from models.llm_output import CandidateStock
 
             for candidate in response.candidates:
@@ -218,18 +217,16 @@ class TestMarketAnalystE2E:
                 assert source.url, "Source must have a URL"
 
             # Portfolio context should be populated (agent must explain how portfolio influenced research)
-            assert (
-                len(response.portfolio_context) > 20
-            ), "portfolio_context should explain how portfolio influenced research"
+            portfolio_msg = "portfolio_context should explain how portfolio influenced research"
+            assert len(response.portfolio_context) > 20, portfolio_msg
 
             # Agent should have made at least one tool call (brave_web_search at minimum)
             assert len(tool_calls) >= 1, "Market Analyst should make at least one tool call"
 
             # Verify brave_web_search was specifically used (core research tool)
             tool_names = [tc.name for tc in tool_calls]
-            assert (
-                "brave_web_search" in tool_names
-            ), "MarketAnalyst should use brave_web_search for research"
+            search_msg = "MarketAnalyst should use brave_web_search for research"
+            assert "brave_web_search" in tool_names, search_msg
 
             # Tool errors are expected (LLM may pick symbols Finnhub doesn't support)
             # What matters is the research output is valid despite any lookup failures

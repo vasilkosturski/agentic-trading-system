@@ -35,9 +35,8 @@ class TestBackendClientHttp2:
         with patch("backend.client.httpx.AsyncClient", side_effect=fake_async_client):
             client._get_client()
 
-        assert (
-            captured_kwargs.get("http2") is True
-        ), f"Expected http2=True in AsyncClient kwargs, got: {captured_kwargs}"
+        http2_msg = f"Expected http2=True in AsyncClient kwargs, got: {captured_kwargs}"
+        assert captured_kwargs.get("http2") is True, http2_msg
 
     def test_owned_client_uses_granular_httpx_timeout(self):
         """The AsyncClient must be constructed with a granular httpx.Timeout.
@@ -59,9 +58,8 @@ class TestBackendClientHttp2:
             client._get_client()
 
         timeout = captured_kwargs.get("timeout")
-        assert isinstance(
-            timeout, httpx.Timeout
-        ), f"Expected httpx.Timeout instance, got: {type(timeout).__name__}"
+        timeout_msg = f"Expected httpx.Timeout instance, got: {type(timeout).__name__}"
+        assert isinstance(timeout, httpx.Timeout), timeout_msg
         assert timeout.connect == 5.0, f"connect timeout: {timeout.connect}"
         assert timeout.read == 15.0, f"read timeout: {timeout.read}"
         assert timeout.write == 10.0, f"write timeout: {timeout.write}"

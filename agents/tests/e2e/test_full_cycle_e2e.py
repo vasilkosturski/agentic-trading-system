@@ -107,9 +107,10 @@ class TestFullCycleE2E:
         after_runs = latest_after.json().get("runs") or latest_after.json()
         assert after_runs, "Backend returned no runs after the cycle"
         run_id = after_runs[0]["runId"]
-        assert (
-            run_id > baseline_run_id
-        ), f"Cycle did not create a new run (baseline={baseline_run_id}, latest={run_id})"
+        new_run_msg = (
+            f"Cycle did not create a new run (baseline={baseline_run_id}, latest={run_id})"
+        )
+        assert run_id > baseline_run_id, new_run_msg
 
         # =================================================================
         # Phase-based API verification

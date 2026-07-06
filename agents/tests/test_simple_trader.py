@@ -30,7 +30,8 @@ def test_model_name_default_reads_current_config_value(monkeypatch):
         agent_id=999,
     )
 
-    assert trader.model_name == sentinel_model, (
+    model_name_msg = (
         f"model_name default should be re-evaluated from config.OPENAI_MODEL "
         f"at instantiation time, got {trader.model_name!r} instead of {sentinel_model!r}"
     )
+    assert trader.model_name == sentinel_model, model_name_msg

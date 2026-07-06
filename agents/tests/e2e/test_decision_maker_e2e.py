@@ -208,18 +208,18 @@ class TestDecisionMakerE2E:
 
             # Agent should have called get_symbol_trade_history at least once
             tool_names = [tc.name for tc in tool_calls]
-            assert "get_symbol_trade_history" in tool_names, (
-                "DecisionMaker should check trade history for candidates"
-            )
+            history_msg = "DecisionMaker should check trade history for candidates"
+            assert "get_symbol_trade_history" in tool_names, history_msg
 
             # Assertions -- structure only (LLM output is non-deterministic)
             assert decision is not None
             assert isinstance(decision, TradingDecision)
 
             # Decision should be BUY (given good candidates + available balance + position slots)
-            assert decision.action == TradeAction.BUY, (
+            buy_msg = (
                 f"Expected BUY given strong candidates and available capital, got {decision.action}"
             )
+            assert decision.action == TradeAction.BUY, buy_msg
 
             assert decision.symbol is not None
             assert decision.quantity is not None
@@ -231,12 +231,10 @@ class TestDecisionMakerE2E:
             assert 1 <= len(decision.symbol) <= 5, f"Symbol length should be 1-5: {decision.symbol}"
 
             # Structured reasoning fields must be populated
-            assert len(decision.portfolioContext) > 20, (
-                "portfolioContext should explain portfolio state"
-            )
-            assert len(decision.historicalContext) > 10, (
-                "historicalContext should reference trading history"
-            )
+            portfolio_ctx_msg = "portfolioContext should explain portfolio state"
+            assert len(decision.portfolioContext) > 20, portfolio_ctx_msg
+            historical_ctx_msg = "historicalContext should reference trading history"
+            assert len(decision.historicalContext) > 10, historical_ctx_msg
             assert len(decision.researchContext) > 20, "researchContext should reference research"
 
             # Rationale quality -- must be meaningful, not a stub

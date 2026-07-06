@@ -74,10 +74,11 @@ class TestErrorDetection:
         error = Exception("test error")
         output = default_tool_error_function(None, error)
 
-        assert output.lower().startswith(_SDK_ERROR_PREFIX), (
+        prefix_msg = (
             f"SDK error prefix mismatch! SDK produces: '{output[:80]}', "
             f"we match: '{_SDK_ERROR_PREFIX}'"
         )
+        assert output.lower().startswith(_SDK_ERROR_PREFIX), prefix_msg
 
     def test_detect_tool_error_model_api_error(self):
         """Detect ToolError model output with error_type='api_error'."""

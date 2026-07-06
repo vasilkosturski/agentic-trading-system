@@ -102,10 +102,11 @@ async def test_run_all_agents_one_failure_logs_with_agent_name(system, four_agen
         for r in caplog.records
         if r.levelno == logging.ERROR and getattr(r, "agent_name", None) == "George"
     ]
-    assert len(failure_records) == 1, (
+    failure_msg = (
         f"Expected exactly one ERROR record with agent_name='George'; "
         f"got: {[(r.levelname, getattr(r, 'agent_name', None), r.getMessage()) for r in caplog.records]}"
     )
+    assert len(failure_records) == 1, failure_msg
 
 
 # ---------------------------------------------------------------------------
@@ -192,10 +193,11 @@ async def test_run_all_agents_force_one_trade_forces_exactly_one_agent(system, f
     assert sorted(name for name, _ in captured_calls) == ["Cathie", "George", "Ray", "Warren"]
 
     forced_count = sum(1 for _, forced in captured_calls if forced)
-    assert forced_count == 1, (
+    forced_msg = (
         f"force_one_trade=True must force exactly one agent; got {forced_count} "
         f"(calls={captured_calls})"
     )
+    assert forced_count == 1, forced_msg
     # And the cycle still reports success counts for the run
     assert result == {"success": 4, "failure": 0}
 

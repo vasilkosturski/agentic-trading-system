@@ -61,10 +61,8 @@ class TestMarketDataCacheBounded:
 
         _put_cache("SYM0500", self._make_market_data("SYM0500"))
 
-        assert (
-            len(market_tools._market_data_cache) == 500
-        ), "Cache size must stay bounded at maxsize=500 after eviction"
-        assert (
-            "SYM0000" not in market_tools._market_data_cache
-        ), "Oldest entry should have been evicted when cache exceeded maxsize=500"
+        size_msg = "Cache size must stay bounded at maxsize=500 after eviction"
+        assert len(market_tools._market_data_cache) == 500, size_msg
+        evict_msg = "Oldest entry should have been evicted when cache exceeded maxsize=500"
+        assert "SYM0000" not in market_tools._market_data_cache, evict_msg
         assert "SYM0500" in market_tools._market_data_cache
