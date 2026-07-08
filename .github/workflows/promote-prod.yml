@@ -1,20 +1,26 @@
 name: Promote to production
 
-# Phase 4: manual, approval-gated promotion of a staging-verified build to prod.
+# Phase 4: manual promotion of a staging-verified build to prod.
 # Retags the exact :sha-<commit> images that ran on staging to :prod-<commit>
 # (bit-identical — no rebuild) and rolls the production deployments.
 #
-# The `environment: production` gate below makes this run WAIT for a required
-# reviewer's approval in the Actions UI before any step executes.
-# One-time setup: repo Settings → Environments → New environment "production"
-# → add yourself as a Required reviewer. Until that reviewer exists there is
-# no gate (GitHub auto-creates an unprotected environment on first use).
+# SHA resolution:
+#   - Leave the input blank (default) → the workflow reads the image tag the
+#     STAGING cluster is currently running and promotes exactly that commit.
+#     This promotes what was actually validated on staging, not "latest commit
+#     on main" (which may not have reached staging yet).
+#   - Pass commit_sha explicitly → promote that commit (manual override).
+#
+# `environment: production` records every promotion under the production
+# environment (deploy history / rollback trail). No required reviewer is
+# configured, so it is one-click; add a reviewer in repo Settings →
+# Environments → production to gate it behind an approval later.
 
 on:
   workflow_dispatch:
     inputs:
       commit_sha:
-        description: "Git SHA whose staging-validated images to promote. Blank = latest commit on the ref you run this from."
+        description: "Commit to promote. Blank = auto-resolve to the commit currently deployed on staging."
         required: false
 
 permissions:
@@ -26,11 +32,48 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Resolve SHA to promote
-        id: sha
+      - name: Set up SSH to the cluster
+        env:
+          SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
         run: |
-          SHA="${{ github.event.inputs.commit_sha }}"
-          [ -z "$SHA" ] && SHA="${{ github.sha }}"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+      - name: Resolve SHA to promote (from staging, or explicit override)
+        id: sha
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          INPUT_SHA: ${{ github.event.inputs.commit_sha }}
+        run: |
+          SSH="ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=20 root@$HOST"
+          NS=agentic-trading-staging
+          img_of() {
+            $SSH "kubectl -n $NS get deployment $1 -o jsonpath='{.spec.template.spec.containers[0].image}'"
+          }
+          if [ -n "$INPUT_SHA" ]; then
+            SHA="$INPUT_SHA"
+            echo "Using explicit override SHA: $SHA"
+          else
+            echo "No SHA given — resolving the commit currently running on staging."
+            IMG=$(img_of backend)
+            echo "staging backend image: $IMG"
+            case "$IMG" in
+              *:sha-*) SHA="${IMG##*:sha-}" ;;
+              *) echo "::error::staging backend image '$IMG' is not a :sha-<commit> tag; pass commit_sha explicitly."; exit 1 ;;
+            esac
+            # All three staging deployments must be on the same commit, else
+            # staging is mid-deploy or inconsistent — refuse to promote a
+            # partial state to production.
+            for c in frontend agents; do
+              OTHER=$(img_of "$c")
+              case "$OTHER" in
+                *:sha-$SHA) ;;
+                *) echo "::error::staging $c is on '$OTHER', not sha-$SHA — staging is inconsistent; aborting."; exit 1 ;;
+              esac
+            done
+            echo "All 3 staging deployments are on sha-$SHA"
+          fi
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "Promoting sha-$SHA"
 
@@ -54,13 +97,9 @@ jobs:
 
       - name: Deploy production
         env:
-          SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
           HOST: ${{ secrets.HETZNER_HOST }}
           SHA: ${{ steps.sha.outputs.sha }}
         run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
           SSH="ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=20 root@$HOST"
           for c in backend frontend agents; do
             echo "::group::deploy prod $c"
