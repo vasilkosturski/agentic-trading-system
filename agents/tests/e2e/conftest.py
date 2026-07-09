@@ -88,12 +88,14 @@ def require_brave_api_key():
 
 @pytest.fixture(scope="session")
 def docker_compose_command():
-    """Podman compose for E2E tests.
+    """Compose command for E2E tests.
 
-    Uses Podman's native builder which inherits the host CA trust store,
-    avoiding BuildKit certificate issues behind corporate proxies.
+    Defaults to Podman locally — its native builder inherits the host CA
+    trust store, avoiding BuildKit certificate issues behind corporate
+    proxies. CI (GitHub Actions runners ship Docker, not Podman) overrides
+    this via the E2E_COMPOSE_COMMAND env var, e.g. "docker compose".
     """
-    return "podman compose"
+    return os.environ.get("E2E_COMPOSE_COMMAND", "podman compose")
 
 
 # pytest-docker convention: auto-discovered by name, used by docker_services fixture.

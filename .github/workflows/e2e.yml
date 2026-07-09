@@ -1,0 +1,78 @@
+name: E2E (containerized)
+
+# Phase 2: real-integration e2e tests (agents/tests/e2e, marker `e2e`) against a
+# containerized stack (postgres + a freshly-built backend) with REAL OpenAI +
+# Brave + Finnhub calls. They are slow and cost real API $, so they run nightly
+# and on-demand — NOT on every push. Trades execute against the ephemeral test
+# backend only (no real brokerage).
+#
+# Once this is proven green, promote-prod.yml will `workflow_call` it as a
+# required pre-promote gate.
+#
+# Required repo secrets: OPENAI_API_KEY, BRAVE_API_KEY, FINNHUB_API_KEY, JWT_SECRET.
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # 04:00 UTC nightly
+  workflow_dispatch: {}
+  workflow_call: {} # invoked by promote-prod.yml before a prod promotion
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    name: Containerized e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image for the e2e stack
+        # The e2e compose (docker-compose.e2e.yml) expects this exact local tag.
+        run: docker build -t localhost/agentic-trading-backend:e2e -f backend/Dockerfile backend
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: agents/pyproject.toml
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install agents package + MCP servers
+        working-directory: agents
+        run: |
+          pip install -e ".[test]"
+          pip install mcp-server-fetch==2025.4.7
+          npm install -g @modelcontextprotocol/server-brave-search@0.6.2
+
+      - name: Write .env for the e2e stack
+        # conftest.py requires a repo-root .env; the backend compose service
+        # reads it via env_file. DB_* come from the compose `environment:` block.
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          cat > .env <<EOF
+          OPENAI_API_KEY=$OPENAI_API_KEY
+          BRAVE_API_KEY=$BRAVE_API_KEY
+          FINNHUB_API_KEY=$FINNHUB_API_KEY
+          JWT_SECRET=$JWT_SECRET
+          ADMIN_USERNAME=admin
+          ADMIN_PASSWORD=e2e-admin-pass
+          EOF
+
+      - name: Run e2e tests
+        working-directory: agents
+        env:
+          E2E_COMPOSE_COMMAND: "docker compose"
+          RUN_EVERY_N_MINUTES: "60"
+        run: pytest -m e2e -v
