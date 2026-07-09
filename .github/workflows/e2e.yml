@@ -61,13 +61,22 @@ jobs:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
+          # Ephemeral admin creds for the throwaway test backend, generated
+          # fresh each run so no credential is committed to this (public) repo.
+          # Both sides must use the same value: the backend creates its admin
+          # user from ADMIN_USERNAME/ADMIN_PASSWORD, the agents log in with
+          # BACKEND_ADMIN_USERNAME/BACKEND_ADMIN_PASSWORD (config.py). A mismatch
+          # (e.g. the agents' empty-string default) makes login fail with HTTP 400.
+          ADMIN_PW="$(openssl rand -hex 24)"
           cat > .env <<EOF
           OPENAI_API_KEY=$OPENAI_API_KEY
           BRAVE_API_KEY=$BRAVE_API_KEY
           FINNHUB_API_KEY=$FINNHUB_API_KEY
           JWT_SECRET=$JWT_SECRET
           ADMIN_USERNAME=admin
-          ADMIN_PASSWORD=e2e-admin-pass
+          ADMIN_PASSWORD=$ADMIN_PW
+          BACKEND_ADMIN_USERNAME=admin
+          BACKEND_ADMIN_PASSWORD=$ADMIN_PW
           EOF
 
       - name: Run e2e tests
