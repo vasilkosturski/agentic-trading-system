@@ -1,9 +1,9 @@
 name: E2E (containerized)
 
-# Phase 2: real-integration e2e tests (agents/tests/e2e, marker `e2e`) against a
+# Phase 2: the full-cycle real-integration e2e test (agents/tests/e2e) against a
 # containerized stack (postgres + a freshly-built backend) with REAL OpenAI +
-# Brave + Finnhub calls. They are slow and cost real API $, so they run nightly
-# and on-demand — NOT on every push. Trades execute against the ephemeral test
+# Brave + Finnhub calls. Slow and costs real API $, so it runs nightly and
+# on-demand — NOT on every push. The trade executes against the ephemeral test
 # backend only (no real brokerage).
 #
 # Once this is proven green, promote-prod.yml will `workflow_call` it as a
@@ -79,9 +79,15 @@ jobs:
           BACKEND_ADMIN_PASSWORD=$ADMIN_PW
           EOF
 
-      - name: Run e2e tests
+      - name: Run e2e test
         working-directory: agents
+        # Only the full-cycle test runs as the gate: it exercises the whole
+        # chain (research -> decision -> execution -> trade), so it covers what
+        # the per-agent e2e tests do individually, for the least API $. The
+        # per-agent tests (test_decision_maker_e2e, test_market_analyst_e2e)
+        # stay in the repo for local isolation debugging; the richer end-to-end
+        # verification comes from the Phase 3 agentic staging report.
         env:
           E2E_COMPOSE_COMMAND: "docker compose"
           RUN_EVERY_N_MINUTES: "60"
-        run: pytest -m e2e -v
+        run: pytest tests/e2e/test_full_cycle_e2e.py -m e2e -v
