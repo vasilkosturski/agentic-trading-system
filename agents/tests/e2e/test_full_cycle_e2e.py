@@ -89,7 +89,8 @@ class TestFullCycleE2E:
             f"{backend_url}/api/runs", params={"agentId": agent_id, "limit": 1}, timeout=10
         )
         latest_before.raise_for_status()
-        before_runs = latest_before.json().get("runs") or latest_before.json()
+        before_json = latest_before.json()
+        before_runs = before_json.get("runs", []) if isinstance(before_json, dict) else before_json
         baseline_run_id = before_runs[0]["runId"] if before_runs else 0
 
         # Execute full cycle with forced trade
@@ -104,7 +105,8 @@ class TestFullCycleE2E:
             f"{backend_url}/api/runs", params={"agentId": agent_id, "limit": 1}, timeout=10
         )
         latest_after.raise_for_status()
-        after_runs = latest_after.json().get("runs") or latest_after.json()
+        after_json = latest_after.json()
+        after_runs = after_json.get("runs", []) if isinstance(after_json, dict) else after_json
         assert after_runs, "Backend returned no runs after the cycle"
         run_id = after_runs[0]["runId"]
         new_run_msg = (
