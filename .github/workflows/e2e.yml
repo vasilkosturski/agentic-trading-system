@@ -68,6 +68,10 @@ jobs:
           # BACKEND_ADMIN_USERNAME/BACKEND_ADMIN_PASSWORD (config.py). A mismatch
           # (e.g. the agents' empty-string default) makes login fail with HTTP 400.
           ADMIN_PW="$(openssl rand -hex 24)"
+          # trading.public.display-delay-days defaults to 7: the public /api/runs
+          # hides runs newer than that ("legal protection" delay). The e2e asserts
+          # on the run it just created, so zero the delay for the test backend
+          # (SPRING_APPLICATION_JSON overrides the property unambiguously).
           cat > .env <<EOF
           OPENAI_API_KEY=$OPENAI_API_KEY
           BRAVE_API_KEY=$BRAVE_API_KEY
@@ -77,6 +81,7 @@ jobs:
           ADMIN_PASSWORD=$ADMIN_PW
           BACKEND_ADMIN_USERNAME=admin
           BACKEND_ADMIN_PASSWORD=$ADMIN_PW
+          SPRING_APPLICATION_JSON={"trading":{"public":{"display-delay-days":0}}}
           EOF
 
       - name: Run e2e test
@@ -90,4 +95,5 @@ jobs:
         env:
           E2E_COMPOSE_COMMAND: "docker compose"
           RUN_EVERY_N_MINUTES: "60"
+          NO_UPDATE_NOTIFIER: "1" # keep npm's update notice off the MCP servers' stdout
         run: pytest tests/e2e/test_full_cycle_e2e.py -m e2e -v
