@@ -148,9 +148,19 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.component }}
           cache-to: type=gha,scope=${{ matrix.component }},mode=max
 
+  e2e:
+    name: E2E gate
+    # Real-integration full-cycle test against a containerized stack (~7¢, ~3min).
+    # Runs on every push in parallel with build-push; deploy-staging waits on it,
+    # so a red e2e blocks the staging deploy. Defined once in e2e.yml (which also
+    # runs nightly / on-demand) and called here so it gates the pipeline too.
+    needs: [backend, agents, frontend, dockerfile-lint]
+    uses: ./.github/workflows/e2e.yml
+    secrets: inherit
+
   deploy-staging:
     name: Deploy to staging
-    needs: build-push
+    needs: [build-push, e2e]
     runs-on: ubuntu-latest
     steps:
       - name: Roll staging deployments to this commit's images

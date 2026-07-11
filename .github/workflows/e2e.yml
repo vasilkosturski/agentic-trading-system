@@ -2,12 +2,12 @@ name: E2E (containerized)
 
 # Phase 2: the full-cycle real-integration e2e test (agents/tests/e2e) against a
 # containerized stack (postgres + a freshly-built backend) with REAL OpenAI +
-# Brave + Finnhub calls. Slow and costs real API $, so it runs nightly and
-# on-demand — NOT on every push. The trade executes against the ephemeral test
-# backend only (no real brokerage).
+# Brave + Finnhub calls (~17k tokens, ~7¢, ~3min per run). The trade executes
+# against the ephemeral test backend only (no real brokerage).
 #
-# Once this is proven green, promote-prod.yml will `workflow_call` it as a
-# required pre-promote gate.
+# Runs three ways: (1) called by main.yml on every push as a gate before the
+# staging deploy (workflow_call); (2) nightly (schedule); (3) on-demand
+# (workflow_dispatch).
 #
 # Required repo secrets: OPENAI_API_KEY, BRAVE_API_KEY, FINNHUB_API_KEY, JWT_SECRET.
 
