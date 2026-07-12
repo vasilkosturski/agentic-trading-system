@@ -1,0 +1,125 @@
+name: Agentic staging check
+
+# Phase 3: headless Claude verifies the latest staging trading cycle, checks the
+# live dashboard via Playwright, diffs against the previous committed report to
+# detect drift, and emits a structured JSON verdict the pipeline gates on.
+# Reports live in reports/ci-cycles/ (kept to the newest 30); screenshots are
+# artifacts only. Prompt + content-safety rules: .github/agentic-staging-check.md
+#
+# Runs nightly and on-demand, and is called by promote-prod.yml as a pre-promote
+# gate. NOT per-push (a push doesn't produce a new staging cycle; the Phase 2
+# containerized e2e already covers per-push).
+#
+# Required repo secrets: ANTHROPIC_API_KEY, HETZNER_SSH_KEY, HETZNER_HOST.
+
+on:
+  schedule:
+    - cron: "30 5 * * *" # 05:30 UTC nightly (after the 04:00 e2e)
+  workflow_dispatch: {}
+  workflow_call: {} # pre-promote gate
+
+permissions:
+  contents: write # commit the new report back to reports/ci-cycles/
+
+concurrency:
+  group: agentic-staging-check
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Agentic staging verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH to the cluster (read-only DB access)
+        env:
+          SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Playwright MCP + browser
+        run: |
+          npm install -g @playwright/mcp@latest
+          npx --yes playwright install --with-deps chromium
+
+      - name: Write Playwright MCP config
+        run: |
+          cat > /tmp/mcp-config.json <<'EOF'
+          {"mcpServers":{"playwright":{"command":"npx","args":["-y","@playwright/mcp@latest","--headless","--isolated"]}}}
+          EOF
+
+      - name: Run agentic staging verification
+        id: verify
+        uses: anthropics/claude-code-action@v1
+        env:
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt_file: .github/agentic-staging-check.md
+          claude_args: >-
+            --max-turns 40
+            --model claude-sonnet-5
+            --mcp-config /tmp/mcp-config.json
+            --allowed-tools "Bash(ssh:*),Bash(curl:*),Read,Write,Glob,Grep,mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_console_messages,mcp__playwright__browser_network_requests,mcp__playwright__browser_evaluate,mcp__playwright__browser_close"
+
+      - name: Gate on the JSON verdict
+        id: gate
+        run: |
+          # The agent writes its output log; extract the LAST fenced json block.
+          LOG=$(ls -t "$HOME"/.claude* 2>/dev/null | head -1 || true)
+          # The action also exposes the final text via its output file; prefer that.
+          OUT="${{ steps.verify.outputs.execution_file }}"
+          VERDICT=""
+          if [ -n "$OUT" ] && [ -f "$OUT" ]; then
+            VERDICT=$(grep -oE '\{"status":"(pass|fail|error)".*\}' "$OUT" | tail -1 || true)
+          fi
+          echo "verdict: $VERDICT"
+          echo "verdict=$VERDICT" >> "$GITHUB_OUTPUT"
+          STATUS=$(printf '%s' "$VERDICT" | sed -nE 's/.*"status":"([a-z]+)".*/\1/p')
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+      - name: Upload report + screenshots (artifacts)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentic-staging-report
+          path: |
+            reports/ci-cycles/*.md
+            reports/ci-cycles/screenshots/**
+          if-no-files-found: warn
+
+      - name: Commit new report (prune to newest 30) — only on a real verdict
+        if: steps.gate.outputs.status == 'pass' || steps.gate.outputs.status == 'fail'
+        run: |
+          cd reports/ci-cycles
+          # keep newest 30 markdown reports; drop older
+          ls -1 *.md 2>/dev/null | sort | head -n -30 | xargs -r rm -f
+          # screenshots are artifacts only — never commit them
+          rm -rf screenshots
+          cd -
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/ci-cycles/*.md
+          if git diff --cached --quiet; then
+            echo "no report change to commit"
+          else
+            git commit -m "chore(ci): agentic staging cycle report [skip ci]"
+            git push
+          fi
+
+      - name: Enforce verdict
+        run: |
+          STATUS="${{ steps.gate.outputs.status }}"
+          case "$STATUS" in
+            pass)  echo "✅ staging verified — no regressions"; exit 0 ;;
+            fail)  echo "::error::Agentic staging check FAILED — real regression. Verdict: ${{ steps.gate.outputs.verdict }}"; exit 1 ;;
+            error) echo "::error::Agentic check could not complete (infra/agent error) — re-run to retry. Verdict: ${{ steps.gate.outputs.verdict }}"; exit 1 ;;
+            *)     echo "::error::No parseable verdict emitted by the agent"; exit 1 ;;
+          esac
