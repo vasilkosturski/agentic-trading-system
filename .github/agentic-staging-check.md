@@ -61,11 +61,16 @@ any infrastructure or security-posture narrative — no endpoint auth rules, no 
 names, no auth-flow / rate-limit / secret-name descriptions, no kubectl commands.
 This report is committed to a PUBLIC repo.
 
-## Step 5 — Write the verdict (the pipeline reads this)
+## Step 5 — Write the verdict (the pipeline reads this — do NOT skip)
 
-Write the verdict as a single JSON object to **`verdict.json`** at the repository
-root (use the Write tool). This file — not your chat output — is what the workflow
-gates on, so it must be valid JSON and must be written:
+The workflow gates on **`verdict.json`** at the repo root, NOT your chat output.
+It must be written and be valid JSON. To guarantee it survives a turn-budget cut:
+
+- **Early:** as soon as you have the DB + frontend results (before writing the
+  long report), write a first `verdict.json` with your current best assessment.
+- **Final:** after the report is written, overwrite `verdict.json` with the final
+  verdict. Keep the report itself concise — spend turns on the checks and the
+  verdict, not prose.
 
 ```json
 {"status":"pass|fail|error","checks_run":N,"regressions":[...],"console_errors":[...],"failed_runs":[...],"report":"reports/ci-cycles/CI_CYCLE_REPORT_...md","summary":"one sentence"}

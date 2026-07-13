@@ -75,7 +75,7 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: ${{ steps.prompt.outputs.text }}
           claude_args: >-
-            --max-turns 40
+            --max-turns 60
             --model claude-sonnet-5
             --mcp-config /tmp/mcp-config.json
             --permission-mode bypassPermissions
