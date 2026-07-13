@@ -40,6 +40,7 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
+          chmod +x .github/scripts/staging-psql.sh
 
       - uses: actions/setup-node@v4
         with:
@@ -77,22 +78,24 @@ jobs:
             --max-turns 40
             --model claude-sonnet-5
             --mcp-config /tmp/mcp-config.json
-            --allowed-tools "Bash(ssh:*),Bash(curl:*),Read,Write,Glob,Grep,mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_console_messages,mcp__playwright__browser_network_requests,mcp__playwright__browser_evaluate,mcp__playwright__browser_close"
+            --allowed-tools "Bash(.github/scripts/staging-psql.sh:*),Bash(curl:*),Read,Write,Glob,Grep,mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_console_messages,mcp__playwright__browser_network_requests,mcp__playwright__browser_evaluate,mcp__playwright__browser_close"
 
       - name: Gate on the JSON verdict
         id: gate
+        if: always()
         run: |
-          # The agent writes its output log; extract the LAST fenced json block.
-          LOG=$(ls -t "$HOME"/.claude* 2>/dev/null | head -1 || true)
-          # The action also exposes the final text via its output file; prefer that.
-          OUT="${{ steps.verify.outputs.execution_file }}"
+          # The agent writes its verdict to verdict.json at the repo root (prompt Step 5).
           VERDICT=""
-          if [ -n "$OUT" ] && [ -f "$OUT" ]; then
-            VERDICT=$(grep -oE '\{"status":"(pass|fail|error)".*\}' "$OUT" | tail -1 || true)
+          if [ -f verdict.json ]; then
+            VERDICT=$(tr -d '\n' < verdict.json)
           fi
           echo "verdict: $VERDICT"
-          echo "verdict=$VERDICT" >> "$GITHUB_OUTPUT"
-          STATUS=$(printf '%s' "$VERDICT" | sed -nE 's/.*"status":"([a-z]+)".*/\1/p')
+          {
+            echo "verdict<<VEOF"
+            echo "$VERDICT"
+            echo "VEOF"
+          } >> "$GITHUB_OUTPUT"
+          STATUS=$(printf '%s' "$VERDICT" | sed -nE 's/.*"status"[[:space:]]*:[[:space:]]*"([a-z]+)".*/\1/p')
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
 
       - name: Upload report + screenshots (artifacts)

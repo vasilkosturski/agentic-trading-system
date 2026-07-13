@@ -166,3 +166,6 @@ context_portal/
 # Operational notes — kept locally, not for the public repo
 reports/trading-cycles/
 tasks/
+
+# Agentic staging check — transient verdict, read by the gate step
+verdict.json
