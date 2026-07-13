@@ -132,11 +132,15 @@ jobs:
           fi
 
       - name: Enforce verdict
+        # Pass the verdict via env (NOT ${{ }} interpolated into the script) — the
+        # JSON contains quotes/brackets that break bash if pasted as code.
+        env:
+          STATUS: ${{ steps.gate.outputs.status }}
+          VERDICT: ${{ steps.gate.outputs.verdict }}
         run: |
-          STATUS="${{ steps.gate.outputs.status }}"
           case "$STATUS" in
             pass)  echo "✅ staging verified — no regressions"; exit 0 ;;
-            fail)  echo "::error::Agentic staging check FAILED — real regression. Verdict: ${{ steps.gate.outputs.verdict }}"; exit 1 ;;
-            error) echo "::error::Agentic check could not complete (infra/agent error) — re-run to retry. Verdict: ${{ steps.gate.outputs.verdict }}"; exit 1 ;;
+            fail)  echo "::error::Agentic staging check FAILED — real regression."; printf '%s\n' "$VERDICT"; exit 1 ;;
+            error) echo "::error::Agentic check could not complete (infra/agent error) — re-run to retry."; printf '%s\n' "$VERDICT"; exit 1 ;;
             *)     echo "::error::No parseable verdict emitted by the agent"; exit 1 ;;
           esac
