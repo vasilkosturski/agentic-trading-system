@@ -20,6 +20,7 @@ on:
 
 permissions:
   contents: write # commit the new report back to reports/ci-cycles/
+  id-token: write # claude-code-action requests an OIDC token during setup
 
 concurrency:
   group: agentic-staging-check
@@ -55,6 +56,15 @@ jobs:
           {"mcpServers":{"playwright":{"command":"npx","args":["-y","@playwright/mcp@latest","--headless","--isolated"]}}}
           EOF
 
+      - name: Load prompt
+        id: prompt
+        run: |
+          {
+            echo 'text<<PROMPT_EOF'
+            cat .github/agentic-staging-check.md
+            echo 'PROMPT_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Run agentic staging verification
         id: verify
         uses: anthropics/claude-code-action@v1
@@ -62,7 +72,7 @@ jobs:
           HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          prompt_file: .github/agentic-staging-check.md
+          prompt: ${{ steps.prompt.outputs.text }}
           claude_args: >-
             --max-turns 40
             --model claude-sonnet-5
