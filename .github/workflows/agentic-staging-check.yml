@@ -110,6 +110,8 @@ jobs:
 
       - name: Commit new report (prune to newest 30) — only on a real verdict
         if: steps.gate.outputs.status == 'pass' || steps.gate.outputs.status == 'fail'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd reports/ci-cycles
           # keep newest 30 markdown reports; drop older
@@ -124,7 +126,9 @@ jobs:
             echo "no report change to commit"
           else
             git commit -m "chore(ci): agentic staging cycle report [skip ci]"
-            git push
+            # Push over an explicitly-tokenized remote — the Claude action step
+            # can leave the default credential helper unusable for a raw push.
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF_NAME}
           fi
 
       - name: Enforce verdict
