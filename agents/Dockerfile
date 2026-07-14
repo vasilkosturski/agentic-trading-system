@@ -4,15 +4,17 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for MCP servers. Versions pinned to the
-# Debian trixie (13) packages shipped by the python:3.11-slim base image
-# at build time, so rebuilds produce reproducible images. Bump these in
-# lockstep with the Python base-image tag when rolling Debian releases.
+# Install system dependencies for MCP servers from the Debian trixie (13) repo
+# shipped by the python:3.11-slim base image. NOT pinned to exact patch versions:
+# Debian removes the prior patch from the repo whenever a security update lands,
+# so an exact pin (e.g. curl=8.14.1-2+deb13u3) breaks the build the moment that
+# happens. Reproducibility is anchored by the base-image tag; app dependencies
+# stay pinned in pyproject.toml.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    nodejs=20.19.2+dfsg-1+deb13u2 \
-    npm=9.2.0~ds1-3 \
-    curl=8.14.1-2+deb13u3 \
-    ca-certificates=20250419 \
+    nodejs \
+    npm \
+    curl \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv for Python package management (used by MCP servers).
