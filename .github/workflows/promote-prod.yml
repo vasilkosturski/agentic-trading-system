@@ -24,11 +24,20 @@ on:
         required: false
 
 permissions:
-  contents: read
+  contents: write # e2e/agentic gates need it (report commit); inherited by called workflows
 
 jobs:
+  # Pre-promote gate: headless Claude verifies staging's latest cycle + drift.
+  # (No e2e gate here — e2e runs per-push in main.yml before the staging deploy,
+  # so the staging SHA being promoted is already e2e-verified.)
+  agentic-check:
+    name: Pre-promote agentic staging gate
+    uses: ./.github/workflows/agentic-staging-check.yml
+    secrets: inherit
+
   promote:
     name: Promote to prod
+    needs: [agentic-check]
     runs-on: ubuntu-latest
     environment: production
     steps:

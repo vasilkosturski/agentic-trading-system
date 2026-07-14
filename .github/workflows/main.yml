@@ -150,13 +150,68 @@ jobs:
 
   e2e:
     name: E2E gate
-    # Real-integration full-cycle test against a containerized stack (~7¢, ~3min).
-    # Runs on every push in parallel with build-push; deploy-staging waits on it,
-    # so a red e2e blocks the staging deploy. Defined once in e2e.yml (which also
-    # runs nightly / on-demand) and called here so it gates the pipeline too.
+    # Real-integration full-cycle test (agents/tests/e2e) against a containerized
+    # stack (postgres + a freshly-built backend) with REAL OpenAI + Brave + Finnhub
+    # calls (~17k tokens, ~7¢, ~3min). Runs on every push in parallel with
+    # build-push; deploy-staging waits on it, so a red e2e blocks the staging
+    # deploy. The trade executes against the ephemeral test backend only.
+    # Requires repo secrets: OPENAI_API_KEY, BRAVE_API_KEY, FINNHUB_API_KEY, JWT_SECRET.
     needs: [backend, agents, frontend, dockerfile-lint]
-    uses: ./.github/workflows/e2e.yml
-    secrets: inherit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image for the e2e stack
+        # docker-compose.e2e.yml expects this exact local tag.
+        run: docker build -t localhost/agentic-trading-backend:e2e -f backend/Dockerfile backend
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: agents/pyproject.toml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install agents package + MCP servers
+        working-directory: agents
+        run: |
+          pip install -e ".[test]"
+          pip install mcp-server-fetch==2025.4.7
+          npm install -g @modelcontextprotocol/server-brave-search@0.6.2
+      - name: Write .env for the e2e stack
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          # Ephemeral admin creds for the throwaway test backend, generated fresh
+          # each run so nothing is committed. Backend creates its admin from
+          # ADMIN_USERNAME/ADMIN_PASSWORD; agents log in with BACKEND_ADMIN_* — both
+          # must match or login fails HTTP 400. display-delay-days=0 so the e2e can
+          # read back the run it just created (public API hides recent runs by default).
+          ADMIN_PW="$(openssl rand -hex 24)"
+          cat > .env <<EOF
+          OPENAI_API_KEY=$OPENAI_API_KEY
+          BRAVE_API_KEY=$BRAVE_API_KEY
+          FINNHUB_API_KEY=$FINNHUB_API_KEY
+          JWT_SECRET=$JWT_SECRET
+          ADMIN_USERNAME=admin
+          ADMIN_PASSWORD=$ADMIN_PW
+          BACKEND_ADMIN_USERNAME=admin
+          BACKEND_ADMIN_PASSWORD=$ADMIN_PW
+          SPRING_APPLICATION_JSON={"trading":{"public":{"display-delay-days":0}}}
+          EOF
+      - name: Run e2e test
+        working-directory: agents
+        # Only the full-cycle test runs as the gate: it exercises the whole chain
+        # (research -> decision -> execution -> trade). The per-agent e2e tests stay
+        # in the repo for local isolation debugging.
+        env:
+          E2E_COMPOSE_COMMAND: "docker compose"
+          RUN_EVERY_N_MINUTES: "60"
+          NO_UPDATE_NOTIFIER: "1" # keep npm's update notice off the MCP servers' stdout
+          OPENAI_AGENTS_DISABLE_TRACING: "1" # SDK trace exporter races pytest teardown
+        run: pytest tests/e2e/test_full_cycle_e2e.py -m e2e -v
 
   deploy-staging:
     name: Deploy to staging
