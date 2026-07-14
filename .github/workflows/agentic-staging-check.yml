@@ -46,10 +46,24 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          # Bump the vN suffix to force a refresh when the pinned MCP/browser changes.
+          key: ${{ runner.os }}-playwright-v1
+
       - name: Install Playwright MCP + browser
         run: |
           npm install -g @playwright/mcp@latest
-          npx --yes playwright install --with-deps chromium
+          # If the browser cache hit, skip the (large) chromium download and only
+          # ensure the OS deps are present; otherwise do the full install.
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            npx --yes playwright install-deps chromium
+          else
+            npx --yes playwright install --with-deps chromium
+          fi
 
       - name: Write Playwright MCP config
         run: |

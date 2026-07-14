@@ -171,6 +171,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Cache global npm (brave-search MCP)
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-global-brave-0.6.2
       - name: Install agents package + MCP servers
         working-directory: agents
         run: |
