@@ -24,7 +24,8 @@ on:
         required: false
 
 permissions:
-  contents: write # e2e/agentic gates need it (report commit); inherited by called workflows
+  contents: write # the agentic gate commits its report; inherited by called workflows
+  id-token: write # the agentic-staging-check reusable workflow requests an OIDC token
 
 jobs:
   # Pre-promote gate: headless Claude verifies staging's latest cycle + drift.
