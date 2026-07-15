@@ -10,6 +10,16 @@ verdict. Do NOT modify the cluster or database, do not run kubectl mutations, do
 not write outside the repo workspace, and never print secrets. (The DB helper
 enforces read-only at its own layer — it refuses anything but SELECT/WITH.)
 
+## Step 0 — Write a fallback verdict FIRST
+
+Before anything else, write `verdict.json` at the repo root with a fallback
+`error` status (Write tool):
+`{"status":"error","checks_run":0,"summary":"verification did not complete"}`.
+You will overwrite it with the real verdict at the end. This guarantees that even
+if you run out of turns mid-check, the pipeline reads a definite `error` (retryable)
+rather than an empty/missing verdict. Keep every step economical — you have a
+turn budget; spend it on the checks, not long prose.
+
 ## Step 1 — Read the latest cycle from the staging DB (read-only)
 
 Query staging Postgres with the provided helper (it resolves the host/key for
