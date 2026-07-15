@@ -6,17 +6,16 @@ name: Agentic staging check
 # Reports live in reports/ci-cycles/ (kept to the newest 30); screenshots are
 # artifacts only. Prompt + content-safety rules: .github/agentic-staging-check.md
 #
-# Runs nightly and on-demand, and is called by promote-prod.yml as a pre-promote
-# gate. NOT per-push (a push doesn't produce a new staging cycle; the Phase 2
-# containerized e2e already covers per-push).
+# Runs ONLY as a pre-promote gate (called by promote-prod.yml) or manually.
+# No nightly schedule — that spent real API $ every night for a report nobody
+# reads; this check earns its cost by gating an actual prod deploy. Per-push
+# code coverage is handled deterministically by the Phase 2 e2e in main.yml.
 #
 # Required repo secrets: ANTHROPIC_API_KEY, HETZNER_SSH_KEY, HETZNER_HOST.
 
 on:
-  schedule:
-    - cron: "30 5 * * *" # 05:30 UTC nightly (after the 04:00 e2e)
-  workflow_dispatch: {}
-  workflow_call: {} # pre-promote gate
+  workflow_dispatch: {} # manual, on-demand
+  workflow_call: {} # pre-promote gate (promote-prod.yml)
 
 permissions:
   contents: write # commit the new report back to reports/ci-cycles/
