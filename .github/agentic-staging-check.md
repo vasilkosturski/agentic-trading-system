@@ -35,6 +35,17 @@ phase, started_at, completed_at, error_message), `trading.research_phases`,
 latest `trading.account_portfolio_snapshots`. Identify the run IDs of the latest
 cycle (the newest batch of 4 runs, one per agent).
 
+### Known-behavior — do NOT flag these as regressions
+
+- **7-day public display delay.** The public `GET /api/runs` list (and the
+  dashboard's run-history table that consumes it) intentionally hides runs newer
+  than 7 days — a deliberate `trading.public.display-delay-days=7` policy. So the
+  list capping at a run that is ~7 days old, while the DB and `/api/runs/{id}` /
+  `/api/portfolio/snapshots` show newer runs, is CORRECT, not a bug. Verify the
+  latest cycle via the DB (Step 1) and per-run detail pages, NOT via the list
+  endpoint's high-water mark. Never report the delayed list as a regression.
+- **HOLD runs have no execution phase** — that is by design, not a missing phase.
+
 ## Step 2 — Frontend check (Playwright MCP)
 
 Base URL: `https://staging.agentic-trading.vkontech.com`. Load the dashboard, then
