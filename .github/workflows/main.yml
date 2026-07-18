@@ -223,7 +223,15 @@ jobs:
     needs: [build-push, e2e]
     runs-on: ubuntu-latest
     steps:
-      - name: Roll staging deployments to this commit's images
+      - name: Check out infra manifests (private sibling repo)
+        uses: actions/checkout@v4
+        with:
+          repository: vasilkosturski/agentic-trading-system-infra
+          # GHCR_TOKEN is a classic PAT with `repo` scope, so it also reads this
+          # private sibling repo — no separate infra-read token needed.
+          token: ${{ secrets.GHCR_TOKEN }}
+          path: infra
+      - name: Apply monitoring manifests + roll staging to this commit's images
         env:
           SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
           HOST: ${{ secrets.HETZNER_HOST }}
@@ -233,12 +241,39 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           SSH="ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=20 root@$HOST"
+
+          # Apply the shared monitoring manifests (Alloy/Grafana/Loki/etc.) from
+          # the infra repo on every push, so a monitoring change (dashboard, Alloy
+          # parse rule, alert) lands automatically instead of needing a manual
+          # kubectl apply. These are plain Deployments/ConfigMaps/Services in the
+          # `monitoring` namespace — safe to re-apply, and they have no image-pin
+          # deploy path of their own (that gap is exactly what this closes).
+          #
+          # The staging APP manifests are deliberately NOT applied here: their
+          # deployment specs carry a bare `:latest` (no registry prefix), so a
+          # blind apply would set an unpullable image; the app image is instead
+          # pinned by `kubectl set image` below. App-manifest shape changes remain
+          # a deliberate manual apply via the infra repo's deploy-to-k3s.sh.
+          MON=infra/k3s/k8s-manifests/monitoring
+          echo "::group::kubectl apply (shared monitoring)"
+          for f in $(ls "$MON"/*.yaml | sort); do
+            echo "--- applying $f ---"
+            cat "$f" | $SSH "kubectl apply -f -"
+          done
+          echo "::endgroup::"
+
+          # Alloy loads its config from a ConfigMap at startup, so a config change
+          # only takes effect after a restart. Idempotent + cheap to always do.
+          echo "::group::reload Alloy (picks up any config change)"
+          $SSH "kubectl -n monitoring rollout restart daemonset/alloy"
+          echo "::endgroup::"
+
+          echo "::group::set image + rollout (staging)"
           for c in backend frontend agents; do
-            echo "::group::deploy $c"
             $SSH "kubectl -n agentic-trading-staging set image deployment/$c $c=ghcr.io/vasilkosturski/agentic-trading-$c:sha-$SHA"
             $SSH "kubectl -n agentic-trading-staging rollout status deployment/$c --timeout=180s"
-            echo "::endgroup::"
           done
+          echo "::endgroup::"
       - name: Staging smoke (confirm it actually serves)
         run: |
           base=https://staging.agentic-trading.vkontech.com
