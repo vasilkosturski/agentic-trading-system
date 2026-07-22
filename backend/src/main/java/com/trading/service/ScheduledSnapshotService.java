@@ -36,14 +36,18 @@ public class ScheduledSnapshotService {
     }
 
     /**
-     * Create hourly portfolio snapshots for dashboard performance
-     * Runs every hour to keep portfolio values fresh without live API calls on each request
-     * Cron: "0 0 * * * ?" = At minute 0 of every hour
+     * Create intraday portfolio snapshots for dashboard performance.
+     * Runs every 4 hours (00:00, 04:00, ... UTC) to keep portfolio values fresh
+     * without live API calls on each request. The dashboard chart collapses to
+     * one point per agent per day, so hourly granularity was ~6x redundant — every
+     * 4 hours keeps intraday detail while cutting snapshot writes (and the growth
+     * of account_portfolio_snapshots) accordingly.
+     * Cron: at minute 0 of every 4th hour (00:00, 04:00, 08:00, ... ).
      */
-    @Scheduled(cron = "0 0 * * * ?")
-    public void createHourlySnapshots() {
-        logger.info("Starting hourly portfolio snapshot creation for dashboard");
-        createSnapshotsForAllAgents("hourly");
+    @Scheduled(cron = "0 0 */4 * * ?")
+    public void createIntradaySnapshots() {
+        logger.info("Starting intraday (every-4h) portfolio snapshot creation for dashboard");
+        createSnapshotsForAllAgents("intraday");
     }
 
     /**
