@@ -60,7 +60,7 @@ class TestPhaseBinding:
         assert "phase:decision" in binding.tags
         assert "agent:warren" in binding.tags
 
-    def test_tags_reach_the_only_body_field_litellm_reads(self):
+    def test_tags_reach_the_only_body_field_litellm_reads(self, gateway_configured):
         binding = resolve_phase_binding(Phase.RESEARCH, "Cathie")
 
         # LiteLLM reads request tags off the top-level ``tags`` body field
@@ -69,6 +69,15 @@ class TestPhaseBinding:
         extra_body = binding.model_settings.extra_body
         assert extra_body is not None
         assert extra_body["tags"] == list(binding.tags)
+
+    def test_no_gateway_sends_no_tags(self, gateway_absent):
+        binding = resolve_phase_binding(Phase.RESEARCH, "Cathie")
+
+        assert not (binding.model_settings.extra_body or {}), (
+            "tags are a LiteLLM extension; OpenAI rejects the whole request with "
+            "400 unknown_parameter, so the direct path must not carry them"
+        )
+        assert binding.tags, "the binding still records them for local telemetry"
 
 
 class TestGatewayWiring:

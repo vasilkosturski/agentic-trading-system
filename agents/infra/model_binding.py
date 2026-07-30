@@ -137,7 +137,9 @@ def _gateway_client(api_key: str) -> AsyncOpenAI:
     return client
 
 
-def _build_model_settings(reasoning_effort: str, tags: tuple[str, ...]) -> ModelSettings:
+def _build_model_settings(
+    reasoning_effort: str, tags: tuple[str, ...], via_gateway: bool
+) -> ModelSettings:
     """Explicit reasoning effort plus the spend tags the gateway attributes to.
 
     Tags go in ``extra_body`` under the top-level ``tags`` key because that is
@@ -145,10 +147,13 @@ def _build_model_settings(reasoning_effort: str, tags: tuple[str, ...]) -> Model
     ``add_request_tag_to_metadata`` checks the ``x-litellm-tags`` header and
     ``data["tags"]`` and nothing else, so tags sent anywhere else are dropped
     before the spend row is written and ``request_tags`` lands empty.
+
+    Off the gateway the key is omitted: ``tags`` is a LiteLLM extension, and
+    OpenAI rejects the whole request with ``400 unknown_parameter``.
     """
     return ModelSettings(
         reasoning=Reasoning(effort=reasoning_effort),  # type: ignore[arg-type]
-        extra_body={"tags": list(tags)},
+        extra_body={"tags": list(tags)} if via_gateway else None,
     )
 
 
@@ -190,5 +195,5 @@ def resolve_phase_binding(
         model_label=model_label,
         sdk_model=sdk_model,
         via_gateway=via_gateway,
-        model_settings=_build_model_settings(reasoning_effort, tags),
+        model_settings=_build_model_settings(reasoning_effort, tags, via_gateway),
     )
