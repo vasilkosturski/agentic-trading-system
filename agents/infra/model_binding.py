@@ -142,18 +142,23 @@ def _build_model_settings(
 ) -> ModelSettings:
     """Explicit reasoning effort plus the spend tags the gateway attributes to.
 
-    Tags go in ``extra_body`` under the top-level ``tags`` key because that is
-    the only shape the proxy reads them from — LiteLLM's
-    ``add_request_tag_to_metadata`` checks the ``x-litellm-tags`` header and
-    ``data["tags"]`` and nothing else, so tags sent anywhere else are dropped
-    before the spend row is written and ``request_tags`` lands empty.
+    Both fields are for the gateway alone, and off it the provider rejects the
+    request outright rather than ignoring them, so the direct path sends neither:
 
-    Off the gateway the key is omitted: ``tags`` is a LiteLLM extension, and
-    OpenAI rejects the whole request with ``400 unknown_parameter``.
+    * ``tags`` is a LiteLLM extension — 400 ``unknown_parameter``. It goes in
+      ``extra_body`` under the top-level key because that is the only shape the
+      proxy reads: ``add_request_tag_to_metadata`` checks the ``x-litellm-tags``
+      header and ``data["tags"]`` and nothing else, so tags sent anywhere else
+      are dropped before the spend row is written.
+    * ``reasoning.effort`` exists only on reasoning models — 400
+      ``unsupported_parameter``. Every gateway deployment is one; ``OPENAI_MODEL``,
+      which serves the direct path, need not be.
     """
+    if not via_gateway:
+        return ModelSettings()
     return ModelSettings(
         reasoning=Reasoning(effort=reasoning_effort),  # type: ignore[arg-type]
-        extra_body={"tags": list(tags)} if via_gateway else None,
+        extra_body={"tags": list(tags)},
     )
 
 

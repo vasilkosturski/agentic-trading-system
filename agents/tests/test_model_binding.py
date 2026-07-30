@@ -45,7 +45,7 @@ class TestPhaseBinding:
         assert research.intent == config.MODEL_INTENT_RESEARCH
         assert decision.intent == config.MODEL_INTENT_DECISION
 
-    def test_reasoning_effort_is_explicit_per_phase(self):
+    def test_reasoning_effort_is_explicit_per_phase(self, gateway_configured):
         research = resolve_phase_binding(Phase.RESEARCH, "Warren")
         decision = resolve_phase_binding(Phase.DECISION, "Warren")
 
@@ -70,14 +70,20 @@ class TestPhaseBinding:
         assert extra_body is not None
         assert extra_body["tags"] == list(binding.tags)
 
-    def test_no_gateway_sends_no_tags(self, gateway_absent):
+    def test_no_gateway_sends_neither_tags_nor_reasoning(self, gateway_absent):
+        """Off the gateway the request carries neither gateway-only field.
+
+        Both are rejected outright by the provider: ``tags`` is a LiteLLM
+        extension (400 ``unknown_parameter``) and ``reasoning.effort`` exists
+        only on reasoning models, which ``OPENAI_MODEL`` need not be
+        (400 ``unsupported_parameter``).
+        """
         binding = resolve_phase_binding(Phase.RESEARCH, "Cathie")
 
-        assert not (binding.model_settings.extra_body or {}), (
-            "tags are a LiteLLM extension; OpenAI rejects the whole request with "
-            "400 unknown_parameter, so the direct path must not carry them"
-        )
+        assert not (binding.model_settings.extra_body or {})
+        assert binding.model_settings.reasoning is None
         assert binding.tags, "the binding still records them for local telemetry"
+        assert binding.reasoning_effort, "and the effort the gateway would have used"
 
 
 class TestGatewayWiring:
