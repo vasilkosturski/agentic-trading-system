@@ -11,6 +11,8 @@ from agent_registry import AGENT_NAMES
 from ai_agents.simple_trader import SimpleTrader
 from api.server import TradingAPIServer
 from backend.client import close_backend_client
+from config import config
+from infra.tracing_setup import configure_tracing
 from logging_config import configure_json_logging
 from mcp_helpers.params import get_mcp_server_params
 from mcp_helpers.types import MCPPool
@@ -25,6 +27,11 @@ RUN_EVERY_N_MINUTES = int(_run_interval)
 
 configure_json_logging(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
+
+# Trace export needs its own credential decision now that the LLM path runs on a
+# gateway virtual key — see infra/tracing_setup.py.
+configure_tracing()
+logger.info("Model binding: %s", config)
 
 # Investment style + starting balance live at module scope so the
 # AGENT_CONFIGS list-comprehension can close over them — list comprehensions

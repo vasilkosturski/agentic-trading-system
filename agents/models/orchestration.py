@@ -73,7 +73,10 @@ class RunContext:
     agent_id: int
     agent_name: str
     agent_style: InvestmentStyle
-    model_name: str
+    # ``None`` means "no pinned model" — each phase declares its own intent and
+    # the gateway resolves it (see ``infra.model_binding``). A concrete string
+    # here pins both phases to that model instead.
+    model_name: str | None
 
     research_start_time: datetime
     balance: float = 0.0

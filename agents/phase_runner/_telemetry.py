@@ -2,9 +2,12 @@
 
 Two pure functions both phase helpers call:
 * ``extract_usage_metrics`` translates a ``Usage`` object into a ``UsageMetrics``
-  DTO with attached ``costUsd`` computed via ``MODEL_PRICING``. Unknown models
-  log once via the shared ``_UNKNOWN_MODELS_WARNED`` set and serialize
-  ``costUsd=None`` so analytics never silently aggregate wrong values.
+  DTO with an attached ``costUsd``. Cost has two possible sources and they do not
+  mix: on the gateway path the proxy's own reported cost wins, because the phase
+  named an intent alias that ``MODEL_PRICING`` cannot price and the gateway is
+  the one that chose the model. Off the gateway path (local dev) the vendored
+  ``MODEL_PRICING`` table applies. Either way an unpriceable call serializes
+  ``costUsd=None`` so analytics never silently aggregate a guess.
 * ``extract_run_telemetry`` is the DRY helper that pairs ``extract_tool_calls``
   (from ``utils.sdk_parser``) with ``extract_usage_metrics`` and emits the two
   observable INFO log lines.
@@ -18,6 +21,7 @@ import logging
 
 from agents import RunResult, Usage
 
+from infra.gateway_usage import GatewayUsage
 from infra.pricing import _UNKNOWN_MODELS_WARNED, MODEL_PRICING
 from models.run_tracking import ToolCallDto
 from models.usage_metrics import UsageMetrics
@@ -26,13 +30,43 @@ from utils.sdk_parser import extract_tool_calls
 logger = logging.getLogger(__name__)
 
 
-def extract_usage_metrics(usage: Usage, model_name: str) -> UsageMetrics:
+def _price_locally(model_name: str, input_tokens: int, output_tokens: int) -> float | None:
+    """Price a call from the vendored table. Used off the gateway path (local dev).
+
+    Unknown models warn once via the shared ``_UNKNOWN_MODELS_WARNED`` set and
+    yield ``None`` rather than a zero, so analytics never aggregate a guess.
+    """
+    pricing = MODEL_PRICING.get(model_name)
+    if pricing is None:
+        if model_name not in _UNKNOWN_MODELS_WARNED:
+            logger.warning(
+                f"No pricing entry for model {model_name!r}; costUsd will be None. "
+                f"Refresh agents/infra/model_prices.json (see MODEL_PRICES_README.md)."
+            )
+            _UNKNOWN_MODELS_WARNED.add(model_name)
+        return None
+    input_per_m, output_per_m = pricing
+    return round((input_tokens * input_per_m + output_tokens * output_per_m) / 1_000_000, 6)
+
+
+def extract_usage_metrics(
+    usage: Usage,
+    model_name: str,
+    gateway_usage: GatewayUsage | None = None,
+) -> UsageMetrics:
     """Translate SDK ``Usage`` to a ``UsageMetrics`` DTO with computed cost.
 
     Args:
         usage: From ``result.context_wrapper.usage``.
         model_name: Model name passed to the Agent constructor (fallback when
-            the SDK's ``request_usage_entries`` doesn't carry one).
+            the SDK's ``request_usage_entries`` doesn't carry one). On the
+            gateway path this is an intent alias, which ``MODEL_PRICING``
+            cannot price — hence ``gateway_usage``.
+        gateway_usage: What the gateway reported in its response headers, when
+            the phase ran through the gateway. Authoritative for both cost and
+            the concrete model: the gateway did the routing and it holds the
+            current price list, so an app-side estimate would only ever be a
+            stale second opinion in the same column.
     """
     cached = 0
     if usage.input_tokens_details:
@@ -46,24 +80,25 @@ def extract_usage_metrics(usage: Usage, model_name: str) -> UsageMetrics:
     if usage.request_usage_entries:
         sdk_model = getattr(usage.request_usage_entries[0], "model_name", None)
 
-    resolved_name: str = sdk_model if sdk_model is not None else model_name
+    gateway_model = gateway_usage.model_name if gateway_usage else None
+    resolved_name: str = gateway_model or sdk_model or model_name
 
     input_tokens = usage.input_tokens or 0
     output_tokens = usage.output_tokens or 0
 
-    pricing = MODEL_PRICING.get(resolved_name)
     cost_usd: float | None
-    if pricing is None:
-        if resolved_name not in _UNKNOWN_MODELS_WARNED:
+    if gateway_usage is not None and gateway_usage.responses:
+        # The gateway priced these calls against its own model_list. Do not
+        # fall back to MODEL_PRICING when it reported no cost: mixing a local
+        # estimate into the same column makes the column unaggregatable.
+        cost_usd = gateway_usage.cost_usd
+        if cost_usd is None:
             logger.warning(
-                f"No pricing entry for model {resolved_name!r}; costUsd will be None. "
-                f"Refresh agents/infra/model_prices.json (see MODEL_PRICES_README.md)."
+                f"Gateway reported no cost for {resolved_name!r} "
+                f"({gateway_usage.responses} calls); costUsd will be None."
             )
-            _UNKNOWN_MODELS_WARNED.add(resolved_name)
-        cost_usd = None
     else:
-        input_per_m, output_per_m = pricing
-        cost_usd = round((input_tokens * input_per_m + output_tokens * output_per_m) / 1_000_000, 6)
+        cost_usd = _price_locally(resolved_name, input_tokens, output_tokens)
 
     return UsageMetrics(
         tokensUsed=usage.total_tokens,
@@ -81,6 +116,7 @@ def extract_run_telemetry(
     result: RunResult,
     model_name: str,
     agent_label: str,
+    gateway_usage: GatewayUsage | None = None,
 ) -> tuple[list[ToolCallDto], UsageMetrics]:
     """Extract tool calls + usage metrics from a ``RunResult`` and log both."""
     parsed_calls = extract_tool_calls(result.new_items)
@@ -96,10 +132,10 @@ def extract_run_telemetry(
     logger.info(f"🔧 {agent_label} made {len(tool_calls)} tool calls")
 
     usage = result.context_wrapper.usage
-    usage_metrics = extract_usage_metrics(usage, model_name=model_name)
+    usage_metrics = extract_usage_metrics(usage, model_name=model_name, gateway_usage=gateway_usage)
     logger.info(
         f"📊 {agent_label} usage: {usage_metrics.tokensUsed} tokens, "
-        f"model={usage_metrics.modelName}"
+        f"model={usage_metrics.modelName}, cost={usage_metrics.costUsd}"
     )
     return tool_calls, usage_metrics
 

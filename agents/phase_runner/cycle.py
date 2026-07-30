@@ -21,8 +21,8 @@ from ai_agents.decision_maker import DecisionContext, DecisionMaker
 from ai_agents.guardrail_retry import run_with_guardrail_retry
 from ai_agents.market_analyst import MarketAnalyst, MarketAnalystContext
 from backend.client import get_backend_client
-from config import config
 from infra.constants import MAX_REASONING_FIELD_LEN
+from infra.gateway_usage import collect_gateway_usage
 from models import ResearchResponse, TradingDecision
 from models.api_responses import RecentActivityResponse
 from models.investment_style import InvestmentStyle
@@ -76,7 +76,10 @@ async def run_cycle(
         name: Agent name (e.g. "Warren").
         agent_style: Investment-style enum.
         mcp_pool: MCP pool for creating agents.
-        model_name: OpenAI model name; defaults to ``config.OPENAI_MODEL``.
+        model_name: Concrete model to pin for both phases. ``None`` (the norm)
+            leaves each phase to declare its own intent, which the gateway
+            resolves — see ``infra.model_binding``. Do NOT substitute a global
+            default here: that would override every phase's intent.
         force_trade: If True, the decision agent must produce BUY/SELL (no HOLD).
 
     Returns ``None``: the cycle is pure side-effect (DB writes + broadcasts).
@@ -84,8 +87,6 @@ async def run_cycle(
     today logs at the boundary and continues; embedding that contract here
     keeps it from leaking across each caller.
     """
-    resolved_model = model_name if model_name is not None else config.OPENAI_MODEL
-
     logger.info(
         f"🤖 {name} starting portfolio review at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     )
@@ -105,7 +106,7 @@ async def run_cycle(
             agent_id=agent_id,
             agent_name=name,
             agent_style=agent_style,
-            model_name=resolved_model,
+            model_name=model_name,
             research_start_time=research_start_time,
             balance=account_data.balance,
             holdings=account_data.holdings,
@@ -225,15 +226,18 @@ async def _run_research(ctx: RunContext, mcp_pool, lifecycle: Lifecycle) -> Rese
 
     logger.info(f"🔬 Running Market Analyst for {ctx.agent_name}...")
 
+    # The collector spans every retry, so a guardrail re-run's spend is attributed
+    # to the phase that caused it rather than lost.
     try:
-        guardrail_outcome = await run_with_guardrail_retry(
-            market_analyst.agent,
-            research_prompt,
-            max_attempts=RESEARCH_MAX_ATTEMPTS,
-            max_turns=AGENT_MAX_TURNS,
-            agent_name=ctx.agent_name,
-            run_id=ctx.run_id,
-        )
+        with collect_gateway_usage() as gateway_usage:
+            guardrail_outcome = await run_with_guardrail_retry(
+                market_analyst.agent,
+                research_prompt,
+                max_attempts=RESEARCH_MAX_ATTEMPTS,
+                max_turns=AGENT_MAX_TURNS,
+                agent_name=ctx.agent_name,
+                run_id=ctx.run_id,
+            )
     except OutputGuardrailTripwireTriggered as e:
         # Guardrail loop exhausted. The helper attaches a ``GuardrailOutcome`` to
         # the re-raised exception; persist it via the best-effort lifecycle method
@@ -263,7 +267,10 @@ async def _run_research(ctx: RunContext, mcp_pool, lifecycle: Lifecycle) -> Rese
     logger.info(f"📊 Market Analyst completed in {research_latency_ms}ms")
 
     tool_calls, usage_metrics = extract_run_telemetry(
-        result, model_name=market_analyst.model_name, agent_label="Market Analyst"
+        result,
+        model_name=market_analyst.model_name,
+        agent_label="Market Analyst",
+        gateway_usage=gateway_usage,
     )
 
     candidate_symbols = [c.symbol for c in research_response.candidates]
@@ -330,7 +337,10 @@ async def _run_decision(
     # the analyst path uses such a wrapper, but the catch is preserved so
     # decision-side guardrails get the same exhaustion-stub persistence.
     try:
-        result = await Runner.run(decision_maker.agent, decision_prompt, max_turns=AGENT_MAX_TURNS)
+        with collect_gateway_usage() as gateway_usage:
+            result = await Runner.run(
+                decision_maker.agent, decision_prompt, max_turns=AGENT_MAX_TURNS
+            )
     except OutputGuardrailTripwireTriggered as e:
         exhausted_outcome = getattr(e, "guardrail_outcome", None)
         if exhausted_outcome is not None:
@@ -347,7 +357,10 @@ async def _run_decision(
     logger.info(f"✅ Decision Maker: {decision.action} {decision.symbol or ''}")
 
     tool_calls, usage_metrics = extract_run_telemetry(
-        result, model_name=decision_maker.model_name, agent_label="Decision Maker"
+        result,
+        model_name=decision_maker.model_name,
+        agent_label="Decision Maker",
+        gateway_usage=gateway_usage,
     )
 
     decision_latency_ms = int((datetime.now() - decision_start_time).total_seconds() * 1000)

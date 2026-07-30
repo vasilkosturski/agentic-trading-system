@@ -1,10 +1,9 @@
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 
 from agents import trace
 
-from config import config
 from mcp_helpers.types import MCPPool
 from models.investment_style import InvestmentStyle
 from phase_runner import run_cycle
@@ -41,7 +40,9 @@ class SimpleTrader:
     agent_style: InvestmentStyle
     strategy: str
     agent_id: int
-    model_name: str = field(default_factory=lambda: config.OPENAI_MODEL)
+    # An override, not a default binding: ``None`` leaves each phase to declare
+    # its own intent for the gateway to resolve (see ``infra.model_binding``).
+    model_name: str | None = None
 
     async def run(self, mcp_pool: MCPPool, force_trade: bool = False):
         await run_trader_cycle(self, mcp_pool, force_trade)

@@ -17,7 +17,7 @@ from agents.mcp import MCPServer
 
 # Import backend client
 from backend.client import get_backend_client
-from config import config
+from infra.model_binding import Phase, resolve_phase_binding
 
 # Import prompt loader
 from infra.prompt_loader import load_and_format_prompt
@@ -148,19 +148,21 @@ class DecisionMaker:
             agent_name: Agent name (e.g., "Warren")
             agent_id: Agent ID for tools that need it
             mcp_pool: Optional MCP pool for additional research
-            model_name: OpenAI model name to use. Defaults to config.OPENAI_MODEL.
+            model_name: Concrete model to pin instead of the decision intent.
+                Defaults to letting the gateway resolve the intent.
             agent_style: Agent investment style (e.g., "Value Investor")
 
         Returns:
             DecisionMaker instance with agent ready to use
         """
-        if model_name is None:
-            model_name = config.OPENAI_MODEL
+        binding = resolve_phase_binding(Phase.DECISION, agent_name, model_override=model_name)
         instance = cls.__new__(cls)
         instance.agent_name = agent_name
         instance.agent_id = agent_id
         instance.mcp_pool = mcp_pool
-        instance.model_name = model_name
+        # What gets recorded with the run's usage metrics: the intent on the
+        # gateway path, the concrete model when there is no gateway.
+        instance.model_name = binding.model_label
         instance.agent_style = agent_style
         instance.agent = await create_decision_maker_agent(
             agent_name=agent_name,
@@ -205,7 +207,9 @@ async def create_decision_maker_agent(
         agent_name: Agent name (e.g., "Warren")
         agent_id: Agent ID for tools that need it
         mcp_pool: Optional MCP pool for additional research
-        model_name: OpenAI model name to use. Defaults to config.OPENAI_MODEL.
+        model_name: Concrete model to pin instead of the decision intent. Left
+            unset the gateway resolves ``decision`` intent → model; without a
+            gateway it falls back to ``config.OPENAI_MODEL``.
         agent_style: Agent investment style
 
     Returns:
@@ -215,8 +219,7 @@ async def create_decision_maker_agent(
         Agent personality is loaded from template files (prompts/decision_maker/{agent_name}.txt).
         Uses structured output (output_type=TradingDecision) instead of tool callback.
     """
-    if model_name is None:
-        model_name = config.OPENAI_MODEL
+    binding = resolve_phase_binding(Phase.DECISION, agent_name, model_override=model_name)
     # Load instructions from template file with position sizing parameter
     # (async + cached — see prompt_loader)
     position_sizing_pct = get_position_sizing_pct(agent_style)
@@ -266,14 +269,17 @@ async def create_decision_maker_agent(
     trader = Agent[TradingDecision](
         name=f"{agent_name}-DecisionMaker",
         instructions=instructions,
-        model=model_name,
+        model=binding.sdk_model,
+        model_settings=binding.model_settings,
         tools=tools,
         mcp_servers=mcp_servers,
         output_type=TradingDecision,  # Enforces schema compliance like Market Analyst
     )
 
     logger.info(
-        f"✅ Created Decision Maker agent for {agent_name} with {len(tools)} tools and {len(mcp_servers)} MCP servers"
+        f"✅ Created Decision Maker agent for {agent_name} with {len(tools)} tools "
+        f"and {len(mcp_servers)} MCP servers "
+        f"(model={binding.model_label}, gateway={binding.via_gateway})"
     )
 
     return trader

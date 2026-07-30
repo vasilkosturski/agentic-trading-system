@@ -54,7 +54,7 @@ from agents import (
 from agents.mcp import MCPServer
 from pydantic import ValidationError
 
-from config import config
+from infra.model_binding import Phase, resolve_phase_binding
 
 # Import prompt loader
 from infra.prompt_loader import load_and_format_prompt
@@ -202,17 +202,19 @@ class MarketAnalyst:
         Args:
             agent_name: Agent name (e.g., "Warren")
             mcp_pool: MCP pool with Brave Search + Fetch servers
-            model_name: OpenAI model name to use. Defaults to config.OPENAI_MODEL.
+            model_name: Concrete model to pin instead of the research intent.
+                Defaults to letting the gateway resolve the intent.
 
         Returns:
             MarketAnalyst instance with agent ready to use
         """
-        if model_name is None:
-            model_name = config.OPENAI_MODEL
+        binding = resolve_phase_binding(Phase.RESEARCH, agent_name, model_override=model_name)
         instance = cls.__new__(cls)
         instance.agent_name = agent_name
         instance.mcp_pool = mcp_pool
-        instance.model_name = model_name
+        # What gets recorded with the run's usage metrics: the intent on the
+        # gateway path, the concrete model when there is no gateway.
+        instance.model_name = binding.model_label
         instance.agent = await create_market_analyst_agent(
             agent_name=agent_name,
             mcp_pool=mcp_pool,
@@ -250,7 +252,9 @@ async def create_market_analyst_agent(
     Args:
         agent_name: Agent name (e.g., "Warren")
         mcp_pool: MCP pool with Brave Search + Fetch servers
-        model_name: OpenAI model name to use. Defaults to config.OPENAI_MODEL.
+        model_name: Concrete model to pin instead of the research intent. Left
+            unset the gateway resolves ``research`` intent → model; without a
+            gateway it falls back to ``config.OPENAI_MODEL``.
 
     Returns:
         Agent configured for research with ResearchResponse output type
@@ -258,8 +262,7 @@ async def create_market_analyst_agent(
     Note:
         Agent personality is loaded from template files (prompts/market_analyst/{agent_name}.txt).
     """
-    if model_name is None:
-        model_name = config.OPENAI_MODEL
+    binding = resolve_phase_binding(Phase.RESEARCH, agent_name, model_override=model_name)
     # Load instructions from template file (async + cached — see prompt_loader)
     instructions = await load_and_format_prompt(
         "market_analyst",
@@ -320,7 +323,8 @@ async def create_market_analyst_agent(
     analyst = Agent[ResearchResponse](
         name=f"{agent_name}-MarketAnalyst",
         instructions=instructions,
-        model=model_name,
+        model=binding.sdk_model,
+        model_settings=binding.model_settings,
         mcp_servers=mcp_servers,
         tools=db_tools,
         output_type=ResearchResponse,  # Enforces schema compliance
@@ -328,7 +332,9 @@ async def create_market_analyst_agent(
     )
 
     logger.info(
-        f"✅ Created Market Analyst agent for {agent_name} with {len(db_tools)} tools and {len(mcp_servers)} MCP servers"
+        f"✅ Created Market Analyst agent for {agent_name} with {len(db_tools)} tools "
+        f"and {len(mcp_servers)} MCP servers "
+        f"(model={binding.model_label}, gateway={binding.via_gateway})"
     )
 
     return analyst

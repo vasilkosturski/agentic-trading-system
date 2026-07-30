@@ -71,7 +71,20 @@ def _require_env(var_name: str):
 
 @pytest.fixture(scope="session")
 def require_openai_api_key():
-    """Skip if no real OpenAI API key."""
+    """Skip unless the agents have a working LLM credential.
+
+    Either path counts: a provider key (the local-dev default) or a gateway URL
+    plus virtual key (what the deployed pods hold). Demanding ``OPENAI_API_KEY``
+    unconditionally would skip the whole E2E suite on a gateway-configured
+    environment, which is the configuration production actually runs.
+
+    Note: these tests pin a concrete ``model_name``, which on the gateway path is
+    an override rather than an intent — so that model must exist in the gateway's
+    ``model_list`` or the proxy rejects the request.
+    """
+    if os.environ.get("LLM_GATEWAY_BASE_URL"):
+        _require_env("LLM_GATEWAY_API_KEY")
+        return
     _require_env("OPENAI_API_KEY")
 
 
@@ -312,12 +325,22 @@ def test_agent_style() -> "InvestmentStyle":
 
 
 @pytest.fixture
-def test_model_name() -> str:
-    """LLM model for E2E testing — derived from seed_data.
+def test_model_name() -> str | None:
+    """Model override for E2E testing, or ``None`` to use the phase intents.
 
-    Uses gpt-4o for better instruction-following.
-    Note: gpt-4o-mini struggles with complex multi-step agent workflows.
+    ``None`` on the gateway path is deliberate: it exercises the same
+    intent → model resolution production uses, so an E2E pass actually says
+    something about the deployed configuration. Pinning a concrete model here
+    would instead assert that the gateway's ``model_list`` happens to contain
+    that name.
+
+    Without a gateway it falls back to seed_data's ``gpt-4o`` for better
+    instruction-following; ``gpt-4o-mini`` struggles with these multi-step
+    agent workflows.
     """
+    if os.environ.get("LLM_GATEWAY_BASE_URL"):
+        return None
+
     from seed_data import TEST_AGENT
 
     return TEST_AGENT.model_name

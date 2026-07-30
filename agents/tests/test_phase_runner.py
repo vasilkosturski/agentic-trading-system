@@ -192,6 +192,46 @@ def stub_sdk_calls():
         }
 
 
+@pytest.fixture
+def gateway_priced_sdk_calls(stub_sdk_calls):
+    """Same SDK boundary as ``stub_sdk_calls``, plus the gateway's cost headers.
+
+    Fires ``record_gateway_response`` from inside each stubbed run, which is where
+    the real httpx hook fires — inside whatever collector the phase has open. The
+    research phase gets one priced call, the decision phase two, so a leak
+    between the two collectors shows up as a wrong total rather than a wrong
+    model name.
+    """
+    import httpx
+
+    from infra.gateway_usage import record_gateway_response
+
+    def _priced(cost: str, model: str) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"x-litellm-response-cost": cost, "x-litellm-model-name": model},
+            json={},
+        )
+
+    guardrail_outcome = _make_guardrail_outcome(stub_sdk_calls["research_response"])
+    decision_result = _make_sdk_result(stub_sdk_calls["decision"])
+
+    async def research_run(*_args, **_kwargs):
+        await record_gateway_response(_priced("0.005", "gpt-5-mini"))
+        return guardrail_outcome
+
+    async def decision_run(*_args, **_kwargs):
+        await record_gateway_response(_priced("0.003", "gpt-5"))
+        await record_gateway_response(_priced("0.004", "gpt-5"))
+        return decision_result
+
+    with (
+        patch("phase_runner.cycle.run_with_guardrail_retry", new=research_run),
+        patch("phase_runner.cycle.Runner.run", new=decision_run),
+    ):
+        yield
+
+
 class TestRunCycle:
     """Happy-path coverage through the public Interface."""
 
@@ -304,7 +344,7 @@ class TestRunCycle:
         assert complete_data.execution.tradeId is None
         assert complete_data.execution.errorDetails == "Broker rejected the order"
 
-    async def test_model_name_defaults_to_config_when_none(
+    async def test_no_model_name_leaves_phase_intent_to_the_binding(
         self,
         sample_agent_id,
         sample_agent_name,
@@ -313,14 +353,23 @@ class TestRunCycle:
         mock_agents,
         stub_sdk_calls,
     ):
-        from config import config
+        """With no explicit model the cycle must NOT substitute a global default.
+
+        Passing ``config.OPENAI_MODEL`` down here would override the per-phase
+        intent on every call and silently defeat gateway-side binding.
+        """
         from phase_runner import run_cycle
 
-        # MarketAnalyst.create gets called with the resolved model name.
-        with patch(
-            "phase_runner.cycle.MarketAnalyst.create",
-            new=AsyncMock(return_value=mock_agents["market_analyst"]),
-        ) as p_create:
+        with (
+            patch(
+                "phase_runner.cycle.MarketAnalyst.create",
+                new=AsyncMock(return_value=mock_agents["market_analyst"]),
+            ) as p_research,
+            patch(
+                "phase_runner.cycle.DecisionMaker.create",
+                new=AsyncMock(return_value=mock_agents["decision_maker"]),
+            ) as p_decision,
+        ):
             await run_cycle(
                 agent_id=sample_agent_id,
                 name=sample_agent_name,
@@ -329,7 +378,41 @@ class TestRunCycle:
                 model_name=None,
                 force_trade=False,
             )
-            assert p_create.await_args.kwargs["model_name"] == config.OPENAI_MODEL
+            assert p_research.await_args.kwargs["model_name"] is None
+            assert p_decision.await_args.kwargs["model_name"] is None
+
+    async def test_explicit_model_name_reaches_both_phases(
+        self,
+        sample_agent_id,
+        sample_agent_name,
+        sample_agent_style,
+        sample_model_name,
+        mock_backend,
+        mock_agents,
+        stub_sdk_calls,
+    ):
+        from phase_runner import run_cycle
+
+        with (
+            patch(
+                "phase_runner.cycle.MarketAnalyst.create",
+                new=AsyncMock(return_value=mock_agents["market_analyst"]),
+            ) as p_research,
+            patch(
+                "phase_runner.cycle.DecisionMaker.create",
+                new=AsyncMock(return_value=mock_agents["decision_maker"]),
+            ) as p_decision,
+        ):
+            await run_cycle(
+                agent_id=sample_agent_id,
+                name=sample_agent_name,
+                agent_style=sample_agent_style,
+                mcp_pool=MagicMock(),
+                model_name=sample_model_name,
+                force_trade=False,
+            )
+            assert p_research.await_args.kwargs["model_name"] == sample_model_name
+            assert p_decision.await_args.kwargs["model_name"] == sample_model_name
 
     async def test_force_trade_propagates_to_decision_context(
         self,
@@ -355,6 +438,69 @@ class TestRunCycle:
         # build_prompt on DecisionMaker received a DecisionContext with force_trade=True.
         build_call = mock_agents["decision_maker"].build_prompt.call_args
         assert build_call.args[0].force_trade is True
+
+
+class TestGatewayCostAttribution:
+    """Each phase scopes its own gateway-cost collector around its own LLM calls.
+
+    On the gateway path the phase names an intent alias, which the local pricing
+    table cannot price — the gateway's response headers are the only cost source.
+    The httpx hook credits whichever collector is active on the current task, so
+    this scoping is what makes per-phase attribution real rather than a shared
+    running total.
+    """
+
+    async def test_each_phase_reports_only_its_own_gateway_spend(
+        self,
+        sample_agent_id,
+        sample_agent_name,
+        sample_agent_style,
+        mock_backend,
+        mock_agents,
+        gateway_priced_sdk_calls,
+    ):
+        from phase_runner import run_cycle
+
+        await run_cycle(
+            agent_id=sample_agent_id,
+            name=sample_agent_name,
+            agent_style=sample_agent_style,
+            mcp_pool=MagicMock(),
+            force_trade=False,
+        )
+
+        complete_data = mock_backend.complete_run.await_args.args[1]
+        assert complete_data.research.metrics.costUsd == pytest.approx(0.005)
+        assert complete_data.decision.metrics.costUsd == pytest.approx(0.007), (
+            "a shared collector would make the decision phase report research "
+            "spend on top of its own"
+        )
+
+    async def test_the_concrete_model_is_persisted_not_the_intent_alias(
+        self,
+        sample_agent_id,
+        sample_agent_name,
+        sample_agent_style,
+        mock_backend,
+        mock_agents,
+        gateway_priced_sdk_calls,
+    ):
+        from phase_runner import run_cycle
+
+        await run_cycle(
+            agent_id=sample_agent_id,
+            name=sample_agent_name,
+            agent_style=sample_agent_style,
+            mcp_pool=MagicMock(),
+            force_trade=False,
+        )
+
+        complete_data = mock_backend.complete_run.await_args.args[1]
+        assert complete_data.research.metrics.modelName == "gpt-5-mini", (
+            "persisting 'research-tier' would make the model column useless for "
+            "answering which model actually served a run"
+        )
+        assert complete_data.decision.metrics.modelName == "gpt-5"
 
 
 class TestErrorPath:

@@ -19,6 +19,8 @@ class SeedAgent:
     name: str
     description: str
     style: InvestmentStyle
+    # Only used off the gateway path — see the ``test_model_name`` fixture, which
+    # returns None when a gateway is configured so the phase intents resolve.
     model_name: str
     is_active: bool = True
     trading_frequency: str = "DAILY"
