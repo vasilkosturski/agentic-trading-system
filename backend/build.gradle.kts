@@ -1,5 +1,5 @@
 plugins {
-    id("org.springframework.boot") version "3.5.14"
+    id("org.springframework.boot") version "3.5.16"
     id("io.spring.dependency-management") version "1.1.7"
     id("com.diffplug.spotless") version "6.25.0"
     checkstyle
@@ -39,7 +39,7 @@ dependencies {
 
     // Database
     implementation("org.xerial:sqlite-jdbc:3.44.1.0")
-    implementation("org.postgresql:postgresql:42.7.1")
+    implementation("org.postgresql:postgresql:42.7.14")
     implementation("org.hibernate.orm:hibernate-community-dialects:6.3.1.Final")
 
     // JSONB support for Hibernate (for trading runs phase tables).
