@@ -220,7 +220,7 @@ class TestPerAgentCredentials:
 
     def test_gateway_client_captures_cost_headers(self, gateway_configured):
         """The SDK discards response headers, so the gateway's per-call cost and
-        concrete model name are only reachable via an httpx event hook."""
+        concrete model name are only reachable via an httpx2 event hook."""
         binding = resolve_phase_binding(Phase.RESEARCH, "Warren")
 
         hooks = binding.sdk_model._client._client.event_hooks["response"]

@@ -22,10 +22,9 @@ import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-import httpx
 from agents import ModelSettings, OpenAIChatCompletionsModel
 from agents.model_settings import Reasoning
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, DefaultAsyncHttpx2Client
 
 from config import config
 from infra.gateway_usage import record_gateway_response
@@ -120,8 +119,9 @@ def _gateway_client(api_key: str) -> AsyncOpenAI:
     connection pool, and two agents never share a client, so a per-agent key
     cannot leak across agents via a cached client.
 
-    The httpx client is built here rather than left to the SDK so the response
-    hook that reads the gateway's cost headers can be attached; see
+    The HTTP client is built here rather than left to the SDK so the response
+    hook that reads the gateway's cost headers can be attached. It is the SDK's
+    own ``DefaultAsyncHttpx2Client``, which keeps its timeouts and limits; see
     ``infra.gateway_usage`` for why the headers are the only cost source once a
     phase names an intent instead of a model.
     """
@@ -131,7 +131,9 @@ def _gateway_client(api_key: str) -> AsyncOpenAI:
         client = AsyncOpenAI(
             base_url=identity[0],
             api_key=identity[1],
-            http_client=httpx.AsyncClient(event_hooks={"response": [record_gateway_response]}),
+            http_client=DefaultAsyncHttpx2Client(
+                event_hooks={"response": [record_gateway_response]}
+            ),
         )
         _gateway_clients[identity] = client
     return client

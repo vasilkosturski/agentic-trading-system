@@ -13,8 +13,9 @@ version = "0.1.0"
 description = "AI trading agents for the Agentic Trading System"
 requires-python = ">=3.11"
 dependencies = [
-    "openai-agents>=0.16.1",
-    "openai>=2.36.0",
+    "openai-agents>=0.24.0",
+    "openai>=3.49.0",
+    "httpx2>=2.16.0",
     "python-dotenv>=1.2.2",
     "pydantic>=2.13.4",
     "aiohttp>=3.13.5",

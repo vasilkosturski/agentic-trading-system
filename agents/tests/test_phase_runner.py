@@ -197,17 +197,17 @@ def gateway_priced_sdk_calls(stub_sdk_calls):
     """Same SDK boundary as ``stub_sdk_calls``, plus the gateway's cost headers.
 
     Fires ``record_gateway_response`` from inside each stubbed run, which is where
-    the real httpx hook fires — inside whatever collector the phase has open. The
+    the real httpx2 hook fires — inside whatever collector the phase has open. The
     research phase gets one priced call, the decision phase two, so a leak
     between the two collectors shows up as a wrong total rather than a wrong
     model name.
     """
-    import httpx
+    import httpx2
 
     from infra.gateway_usage import record_gateway_response
 
-    def _priced(cost: str, model: str) -> httpx.Response:
-        return httpx.Response(
+    def _priced(cost: str, model: str) -> httpx2.Response:
+        return httpx2.Response(
             200,
             headers={"x-litellm-response-cost": cost, "x-litellm-model-name": model},
             json={},
@@ -445,7 +445,7 @@ class TestGatewayCostAttribution:
 
     On the gateway path the phase names an intent alias, which the local pricing
     table cannot price — the gateway's response headers are the only cost source.
-    The httpx hook credits whichever collector is active on the current task, so
+    The httpx2 hook credits whichever collector is active on the current task, so
     this scoping is what makes per-phase attribution real rather than a shared
     running total.
     """

@@ -3,19 +3,19 @@
 The proxy returns ``x-litellm-response-cost`` and ``x-litellm-model-name``
 (the concrete deployment, not the intent alias) on every chat-completion. The
 Agents SDK calls ``chat.completions.create()`` and throws the headers away, so
-capture happens one layer down on the httpx client and is read back per phase.
+capture happens one layer down on the httpx2 client and is read back per phase.
 """
 
 import asyncio
 
-import httpx
+import httpx2
 import pytest
 
 from infra.gateway_usage import collect_gateway_usage, record_gateway_response
 
 
-def _response(headers: dict[str, str]) -> httpx.Response:
-    return httpx.Response(200, headers=headers, json={})
+def _response(headers: dict[str, str]) -> httpx2.Response:
+    return httpx2.Response(200, headers=headers, json={})
 
 
 class TestCollector:

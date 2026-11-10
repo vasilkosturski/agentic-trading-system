@@ -13,7 +13,7 @@ out of the app: a price change, or an intent rebound to a different model, shows
 up in the persisted cost with no app release.
 
 The Agents SDK calls ``chat.completions.create()`` and returns only the parsed
-body, so headers have to be intercepted a layer lower — an httpx event hook on
+body, so headers have to be intercepted a layer lower — an httpx2 event hook on
 the gateway client. That hook fires for every request the client makes, so the
 per-phase total is scoped with a ``ContextVar``: each phase opens a collector,
 and the hook credits whichever collector is active on the current task. Four
@@ -27,7 +27,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 
-import httpx
+import httpx2
 
 logger = logging.getLogger(__name__)
 
@@ -100,10 +100,10 @@ def collect_gateway_usage() -> Iterator[GatewayUsage]:
         _active_usage.reset(token)
 
 
-async def record_gateway_response(response: httpx.Response) -> None:
-    """httpx response event hook — credit this response to the active collector.
+async def record_gateway_response(response: httpx2.Response) -> None:
+    """httpx2 response event hook — credit this response to the active collector.
 
-    Registered on the gateway's httpx client, so it sees every gateway call and
+    Registered on the gateway's OpenAI client, so it sees every gateway call and
     nothing else. Responses without the cost header are ignored rather than
     counted as free: the same client may serve non-LLM routes.
     """
